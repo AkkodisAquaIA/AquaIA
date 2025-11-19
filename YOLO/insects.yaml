@@ -1,0 +1,14 @@
+path: C:\Users\agniraj.senathipathi\Documents\Aqua_IA\Detection
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['insects']
+
+roboflow:
+  workspace: senathipathi
+  project: pest-detection-orv0s-ru1ow
+  version: 1
+  license: CC BY 4.0
+  url: https://app.roboflow.com/senathipathi/pest-detection-orv0s-ru1ow/1
