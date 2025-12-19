@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 200
+
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore=["E101"]
+exclude= ["*.ipynb"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "tab"
