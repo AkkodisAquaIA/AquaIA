@@ -9,7 +9,7 @@ class NpyDetectionDataset(VisionDataset):
 	def __init__(
 			self, 
 			dataset_name, 
-			img_size=(640,640), 
+			img_size=(304,304), 
 			root_folder="datasets",  
 			transform=None, 
 			target_transform=None
