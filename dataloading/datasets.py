@@ -4,7 +4,7 @@ import numpy as np
 from torchvision.datasets import VisionDataset
 import torch
 
-class NpyDetectionDataset:
+class NpyDetectionDataset(VisionDataset):
 
 	def __init__(
 			self, 
@@ -40,6 +40,3 @@ class NpyDetectionDataset:
 		if self.target_transform:
 			label = self.target_transform(label)
 		return normalized_img, label
-
-d = NpyDetectionDataset('coco128')
-assert len(d.imgs) == len(d.labels), f"Number of images ({len(d.imgs)}) and labels ({len(d.labels)}) do not match"
