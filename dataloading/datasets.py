@@ -40,3 +40,17 @@ class NpyDetectionDataset(VisionDataset):
 		if self.target_transform:
 			label = self.target_transform(label)
 		return normalized_img, label
+	
+class PILDetectionDataset(VisionDataset):
+
+	# Read images from disk on the fly using PIL during forward pass
+	# Resize to img_size (304,304) and normalize using stats.npy
+	def __init__(self):
+		pass
+
+class RAMDetectionDataset(VisionDataset):
+	# Read images from disk using PIL during __init__ and index into array during forward pass
+	# Resize to img_size (304,304) and normalize using stats.npy
+
+	def __init__(self):
+		pass
