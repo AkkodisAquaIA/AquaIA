@@ -16,10 +16,9 @@ root_folder = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Data"
 process = psutil.Process(os.getpid())
 
 # -----------------------------------
-# Fonction pour benchmark étape par étape
+# Benchmark étape par étape
 # -----------------------------------
 def benchmark_steps(dataset, name, num_epochs=NUM_EPOCHS):
-    # Mesure RAM après création dataset
     ram_dataset = process.memory_info().rss / (1024**2)
 
     read_times, resize_times, norm_times = [], [], []
@@ -29,8 +28,6 @@ def benchmark_steps(dataset, name, num_epochs=NUM_EPOCHS):
         for idx in range(len(dataset)):
             img, label = dataset[idx]
 
-            # Chaque étape séparée pour PIL et RAM
-            # Pour NPY, lecture disque = 0
             if isinstance(dataset, PilDetectionDataset):
                 # Lecture disque
                 t0 = time.time()
@@ -49,15 +46,20 @@ def benchmark_steps(dataset, name, num_epochs=NUM_EPOCHS):
                 std  = torch.tensor(dataset.stats["std"], dtype=img_tensor.dtype).view(-1,1,1)
                 img_tensor = (img_tensor - mean)/std
                 norm_times.append(time.time() - t0)
+
             elif isinstance(dataset, RAMDetectionDataset):
                 # Resize fait dans __init__, normalisation dans __getitem__
                 t0 = time.time()
-                _ = img  # déjà en RAM
+                _ = img
+                read_times.append(0.0)
+                resize_times.append(0.0)
                 norm_times.append(time.time() - t0)
+
             elif isinstance(dataset, NpyDetectionDataset):
-                # Lecture / resize déjà en RAM, normalisation dans __getitem__
                 t0 = time.time()
                 _ = img
+                read_times.append(0.0)
+                resize_times.append(0.0)
                 norm_times.append(time.time() - t0)
 
     total_time = time.time() - start_total
@@ -74,24 +76,16 @@ def benchmark_steps(dataset, name, num_epochs=NUM_EPOCHS):
     }
 
 # -----------------------------------
-# Création des datasets
+# Création datasets
 # -----------------------------------
-datasets = []
-
-# NPY
-dataset_npy = NpyDetectionDataset(dataset_name, root_folder=root_folder, stats_file="stats_npy.npy")
-datasets.append(dataset_npy)
-
-# PIL
-dataset_pil = PilDetectionDataset(dataset_name, root_folder=root_folder, img_size=(304,304), stats_file="stats_pil.npy")
-datasets.append(dataset_pil)
-
-# RAM
-dataset_ram = RAMDetectionDataset(dataset_name, root_folder=root_folder, img_size=(304,304), stats_file="stats_ram.npy")
-datasets.append(dataset_ram)
+datasets = [
+    NpyDetectionDataset(dataset_name, root_folder=root_folder, stats_file="stats_npy.npy"),
+    PilDetectionDataset(dataset_name, root_folder=root_folder, img_size=(304,304), stats_file="stats_pil.npy"),
+    RAMDetectionDataset(dataset_name, root_folder=root_folder, img_size=(304,304), stats_file="stats_ram.npy")
+]
 
 # -----------------------------------
-# Benchmark tous les datasets
+# Benchmark
 # -----------------------------------
 results = []
 for ds in datasets:
@@ -112,7 +106,7 @@ for r in results:
     print(f"{r['name']:<12} | {r['total_time']:<10.2f} | {r['avg_time']:<12.2f} | {r['ram_dataset']:<10.1f}")
 
 # -----------------------------------
-# Graphique comparatif
+# Premier graphique : Total Time vs RAM
 # -----------------------------------
 labels = [r['name'] for r in results]
 total_times = [r['total_time'] for r in results]
@@ -123,18 +117,34 @@ width = 0.35
 
 fig, ax1 = plt.subplots(figsize=(8,5))
 
-# Temps
 ax1.bar(x - width/2, total_times, width, label='Total Time (s)', color='skyblue')
 ax1.set_ylabel('Time (s)')
 ax1.set_xticks(x)
 ax1.set_xticklabels(labels)
-ax1.set_title('Benchmark NPY / RAM / PIL')
+ax1.set_title('Benchmark NPY / RAM / PIL - Temps vs RAM')
 ax1.legend(loc='upper left')
 
-# RAM
 ax2 = ax1.twinx()
 ax2.bar(x + width/2, ram_values, width, label='RAM (MB)', color='salmon')
 ax2.set_ylabel('RAM (MB)')
 ax2.legend(loc='upper right')
 
+plt.show()
+
+# -----------------------------------
+# Deuxième graphique : temps empilé par étape
+# -----------------------------------
+read_times = [r['read_time'] for r in results]
+resize_times = [r['resize_time'] for r in results]
+norm_times = [r['norm_time'] for r in results]
+
+plt.figure(figsize=(8,5))
+plt.bar(x, read_times, width, label='Read', color='lightgreen')
+plt.bar(x, resize_times, width, bottom=np.array(read_times), label='Resize', color='orange')
+plt.bar(x, norm_times, width, bottom=np.array(read_times)+np.array(resize_times), label='Norm', color='skyblue')
+
+plt.xticks(x, labels)
+plt.ylabel('Time (s)')
+plt.title('Temps par étape par dataset (empilé)')
+plt.legend()
 plt.show()
