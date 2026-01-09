@@ -136,6 +136,70 @@ def measure_steps(dataset):
     norm_ms   = np.mean(norm_times)*1000
     return read_ms, resize_ms, norm_ms
 
+
+# ======================================
+# Bloc Graphiques
+# ======================================
+def plot_results(results, step_times):
+
+    # ======================================
+    # Graphique 1 : Total Time vs RAM
+    # ======================================
+    labels = [r['name'] for r in results]
+    total_times = [r['total_time'] for r in results]
+    ram_values = [r['ram_dataset'] for r in results]
+    x = np.arange(len(labels))
+    width = 0.35
+
+    fig, ax1 = plt.subplots(figsize=(8,5))
+    ax1.bar(x - width/2, total_times, width, label='Total Time (s)', color='skyblue')
+    ax1.set_ylabel('Time (s)')
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(labels)
+    ax1.set_title('Benchmark NPY / RAM / PIL→NPY - Temps vs RAM')
+    ax1.legend(loc='upper left')
+
+    ax2 = ax1.twinx()
+    ax2.bar(x + width/2, ram_values, width, label='RAM (MB)', color='salmon')
+    ax2.set_ylabel('RAM (MB)')
+    ax2.legend(loc='upper right')
+    fig.savefig("benchmark_total_vs_ram.png", bbox_inches='tight', dpi=150)
+    plt.show()
+
+    # ======================================
+    # Graphique 2 : Total Time + RAM annotée
+    # ======================================
+    plt.figure(figsize=(8,5))
+    plt.bar(x, total_times, width, label='Total Time', color='skyblue')
+    for i, ram in enumerate(ram_values):
+        plt.text(i, total_times[i]+0.05, f'{ram:.0f} MB', ha='center', va='bottom', color='red')
+    plt.xticks(x, labels)
+    plt.ylabel('Time (s)')
+    plt.title('Temps total par dataset + RAM')
+    plt.legend()
+    plt.savefig("benchmark_total.png", bbox_inches='tight', dpi=150)
+    plt.show()
+
+    # ======================================
+    # Graphique 3 : Temps moyen par image (Read/Resize/Norm)
+    # ======================================
+    read_vals = [x[1] for x in step_times]
+    resize_vals = [x[2] for x in step_times]
+    norm_vals = [x[3] for x in step_times]
+
+    plt.figure(figsize=(8,5))
+    plt.bar(x - width, read_vals, width, label='Read(ms)', color='skyblue')
+    plt.bar(x, resize_vals, width, label='Resize(ms)', color='lightgreen')
+    plt.bar(x + width, norm_vals, width, label='Norm(ms)', color='salmon')
+    plt.xticks(x, labels)
+    plt.ylabel('Time per image (ms)')
+    plt.title('Temps moyen par image par étape')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("benchmark_steps.png", dpi=150)
+    plt.show()
+
+
 # ======================================
 # Bloc principal
 # ======================================
@@ -189,60 +253,7 @@ if __name__ == "__main__":
     for name, r_ms, resize_ms, norm_ms in step_times:
         print(row_fmt.format(name, r_ms, resize_ms, norm_ms))
 
-# ======================================
-# Graphique 1 : Total Time vs RAM
-# ======================================
-labels = [r['name'] for r in results]
-total_times = [r['total_time'] for r in results]
-ram_values = [r['ram_dataset'] for r in results]
-x = np.arange(len(labels))
-width = 0.35
-
-fig, ax1 = plt.subplots(figsize=(8,5))
-ax1.bar(x - width/2, total_times, width, label='Total Time (s)', color='skyblue')
-ax1.set_ylabel('Time (s)')
-ax1.set_xticks(x)
-ax1.set_xticklabels(labels)
-ax1.set_title('Benchmark NPY / RAM / PIL→NPY - Temps vs RAM')
-ax1.legend(loc='upper left')
-
-ax2 = ax1.twinx()
-ax2.bar(x + width/2, ram_values, width, label='RAM (MB)', color='salmon')
-ax2.set_ylabel('RAM (MB)')
-ax2.legend(loc='upper right')
-fig.savefig("benchmark_total_vs_ram.png", bbox_inches='tight', dpi=150)
-plt.show()
-
-# ======================================
-# Graphique 2 : Total Time + RAM annotée
-# ======================================
-plt.figure(figsize=(8,5))
-plt.bar(x, total_times, width, label='Total Time', color='skyblue')
-for i, ram in enumerate(ram_values):
-    plt.text(i, total_times[i]+0.05, f'{ram:.0f} MB', ha='center', va='bottom', color='red')
-plt.xticks(x, labels)
-plt.ylabel('Time (s)')
-plt.title('Temps total par dataset + RAM')
-plt.legend()
-plt.savefig("benchmark_total.png", bbox_inches='tight', dpi=150)
-plt.show()
-
-# ======================================
-# Graphique 3 : Temps moyen par image (Read/Resize/Norm)
-# ======================================
-read_vals = [x[1] for x in step_times]
-resize_vals = [x[2] for x in step_times]
-norm_vals = [x[3] for x in step_times]
-
-plt.figure(figsize=(8,5))
-plt.bar(x - width, read_vals, width, label='Read(ms)', color='skyblue')
-plt.bar(x, resize_vals, width, label='Resize(ms)', color='lightgreen')
-plt.bar(x + width, norm_vals, width, label='Norm(ms)', color='salmon')
-plt.xticks(x, labels)
-plt.ylabel('Time per image (ms)')
-plt.title('Temps moyen par image par étape')
-plt.legend()
-plt.tight_layout()
-plt.savefig("benchmark_steps.png", dpi=150)
-plt.show()
-
+    # ======================================
+    # Graphiques
+    # ======================================    
+    plot_results(results, step_times)
