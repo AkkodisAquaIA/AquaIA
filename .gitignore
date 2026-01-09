@@ -4,3 +4,7 @@ __pycache__/
 *.npz
 *.pth
 *.pt
+dataloading/benchmark_steps.png
+dataloading/benchmark_total_vs_ram.png
+dataloading/benchmark_total.png
+dataloading/*.png

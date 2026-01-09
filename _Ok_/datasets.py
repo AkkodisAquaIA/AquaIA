@@ -8,6 +8,24 @@ from torchvision import transforms
 
 from torchvision.datasets import VisionDataset
 
+# def create_npy_images(dataset_name, root_folder, img_size=(304,304)):
+#     image_dir = os.path.join(root_folder, dataset_name, "images")
+#     image_files = sorted(glob.glob(os.path.join(image_dir, "*.*")))
+
+#     if not image_files:
+#         raise RuntimeError("Aucune image trouvée dans images/")
+
+#     all_images = []
+#     for f in image_files:
+#         img = Image.open(f).convert("RGB").resize(img_size)
+#         img = np.array(img, dtype=np.float32)
+#         all_images.append(img)
+
+#     imgs = np.stack(all_images, axis=0)  # N,H,W,3
+#     out_path = os.path.join(root_folder, dataset_name, "npy_images.npy")
+#     np.save(out_path, imgs)
+
+#     print(f" npy_images.npy créé : {imgs.shape}")
 
 # =====================
 # NPY Dataset
@@ -22,6 +40,10 @@ class NpyDetectionDataset(Dataset):
 
         # fichiers
         self.img_file = os.path.join(root_folder, dataset_name, "npy_images.npy")
+
+        # if not os.path.exists(self.img_file):
+        #     print(" npy_images.npy absent → création automatique")
+        #     create_npy_images(dataset_name, root_folder)
 
         self.imgs = np.load(self.img_file)
 
