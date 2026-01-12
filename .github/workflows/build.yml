@@ -1,0 +1,14 @@
+name: build
+on: 
+  workflow_dispatch:
+  
+jobs:
+  build-docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Archive
+        uses: ksm2/archive-action@v1
+        with: 
+          format: "tar"
+          name: aquaia_archive
+          path: /docker/build/aquaia_archive.tar
