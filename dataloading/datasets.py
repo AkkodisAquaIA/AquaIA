@@ -5,7 +5,6 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-
 from torchvision.datasets import VisionDataset
 
 
@@ -20,26 +19,28 @@ class NpyDetectionDataset(Dataset):
         self.transform = transform
         self.target_transform = target_transform
 
-        # fichiers
+        # Paths to files
         self.img_file = os.path.join(root_folder, dataset_name, "npy_images.npy")
 
+        # Load images from NPY file
         self.imgs = np.load(self.img_file)
 
+        # Load label files
         self.label_files = sorted(glob.glob(os.path.join(root_folder, dataset_name, "labels", "*.txt")))
 
-        # lecture images
+        # Verify image shape
         self.imgs = np.load(self.img_file)  # shape N,H,W,3
         if self.imgs.ndim != 4 or self.imgs.shape[-1] != 3:
-            raise ValueError(f"Le dernier axe doit être 3 (RGB), trouvé {self.imgs.shape[-1]}")
+            raise ValueError(f"The last axis must be 3 (RGB), found {self.imgs.shape[-1]}")
 
-        # lecture labels
+        # Load labels
         if self.label_files:
             self.labels = [torch.from_numpy(np.loadtxt(f, dtype=np.float32)) for f in self.label_files]
         else:
-            print(" Aucun label trouvé, création automatique de labels vides")
+            print(" No labels found, creating empty labels")
             self.labels = [torch.zeros((0,5), dtype=torch.float32) for _ in range(len(self.imgs))]
 
-        # stats
+        # Load or compute statistics (mean and std)
         stats_path = os.path.join(root_folder, dataset_name, stats_file)
         if os.path.exists(stats_path):
             self.stats = np.load(stats_path, allow_pickle=True).item()
@@ -48,29 +49,32 @@ class NpyDetectionDataset(Dataset):
             std  = self.imgs.std(axis=(0,1,2))
             self.stats = {"mean": mean, "std": std}
             np.save(stats_path, self.stats)
-            print(f"{stats_file} absent → calculé automatiquement")
+            print(f"{stats_file} not found → calculated automatically")
 
     def __len__(self):
         return len(self.imgs)
 
     def _normalize_image(self, img):
-        # img: H,W,C → convertir en tensor C,H,W
+        # img: H,W,C → convert to tensor C,H,W
         img = torch.from_numpy(img.copy()).permute(2,0,1)
         mean = torch.tensor(self.stats['mean'], dtype=img.dtype).view(-1,1,1)
         std  = torch.tensor(self.stats['std'], dtype=img.dtype).view(-1,1,1)
         return (img - mean)/std
 
     def __getitem__(self, idx):
+        # Retrieve image and label
         img = self.imgs[idx]
         img = self._normalize_image(img)
         label = self.labels[idx]
 
+        # Apply optional transforms
         if self.transform:
             img = self.transform(img)
         if self.target_transform:
             label = self.target_transform(label)
 
         return img, label
+
 
 # =====================
 # PIL Dataset
@@ -82,15 +86,17 @@ class PilDetectionDataset(Dataset):
         self.root_folder = root_folder
         self.img_size = img_size
 
+        # Image paths
         self.image_dir = os.path.join(root_folder, dataset_name, "images")
         self.image_files = sorted(glob.glob(os.path.join(self.image_dir, "*.*")))
+
+        # Label paths
         self.label_files = sorted(glob.glob(
             os.path.join(root_folder, dataset_name, "labels", "*.txt")
         ))
 
-        # labels
+        # Load labels
         self.labels = []
-
         label_dir = os.path.join(root_folder, dataset_name, "labels")
 
         for img_path in self.image_files:
@@ -106,7 +112,7 @@ class PilDetectionDataset(Dataset):
 
             self.labels.append(lbl)
 
-        # stats (calculées sur images PIL redimensionnées)
+        # Compute or load statistics from resized PIL images
         stats_path = os.path.join(root_folder, dataset_name, stats_file)
         if os.path.exists(stats_path):
             self.stats = np.load(stats_path, allow_pickle=True).item()
@@ -122,18 +128,18 @@ class PilDetectionDataset(Dataset):
 
             self.stats = {"mean": mean, "std": std}
             np.save(stats_path, self.stats)
-            print("stats_pil.npy créé")
+            print("stats_pil.npy created")
 
     def __len__(self):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-        # image
+        # Load image and convert to tensor
         img = Image.open(self.image_files[idx]).convert("RGB").resize(self.img_size)
         img = torch.from_numpy(np.array(img, dtype=np.float32) / 255.0)
         img = img.permute(2, 0, 1)  # C,H,W
 
-        # normalisation identique à NPY
+        # Normalize using precomputed statistics
         mean = torch.tensor(self.stats["mean"], dtype=img.dtype).view(-1,1,1)
         std  = torch.tensor(self.stats["std"], dtype=img.dtype).view(-1,1,1)
         img = (img - mean) / std
@@ -143,10 +149,11 @@ class PilDetectionDataset(Dataset):
 
 
 #------------------------------------------------------------------------------
-
+# RAM Dataset
+#------------------------------------------------------------------------------
 class RAMDetectionDataset(VisionDataset):
-	# Read images from disk using PIL during __init__ and index into array during forward pass
-	# Resize to img_size (304,304) and normalize using stats.npy
+    # Load images into RAM during initialization
+    # Resize to img_size and normalize using statistics
 
     def __init__(self, dataset_name, root_folder="datasets", img_size=(304,304),
                  stats_file="stats_ram.npy"):
@@ -156,12 +163,12 @@ class RAMDetectionDataset(VisionDataset):
         self.root_folder = root_folder
         self.img_size = img_size
 
-        # fichiers
+        # Image paths
         self.image_dir = os.path.join(root_folder, dataset_name, "images")
         self.image_files = sorted(glob.glob(os.path.join(self.image_dir, "*.*")))
         self.label_dir = os.path.join(root_folder, dataset_name, "labels")
 
-        # labels robustes
+        # Load labels robustly
         self.labels = []
         for img_path in self.image_files:
             base = os.path.splitext(os.path.basename(img_path))[0]
@@ -175,7 +182,7 @@ class RAMDetectionDataset(VisionDataset):
                 lbl = torch.zeros((0,5), dtype=torch.float32)
             self.labels.append(lbl)
 
-        # lecture et resize des images en RAM
+        # Load and resize all images into RAM
         self.imgs = []
         for f in self.image_files:
             img = Image.open(f).convert("RGB").resize(img_size)
@@ -183,7 +190,7 @@ class RAMDetectionDataset(VisionDataset):
             self.imgs.append(img)
         self.imgs = np.stack(self.imgs, axis=0)  # N,H,W,C
 
-        # stats
+        # Compute or load statistics
         stats_path = os.path.join(root_folder, dataset_name, stats_file)
         if os.path.exists(stats_path):
             self.stats = np.load(stats_path, allow_pickle=True).item()
@@ -192,13 +199,13 @@ class RAMDetectionDataset(VisionDataset):
             std  = self.imgs.std(axis=(0,1,2))
             self.stats = {"mean": mean, "std": std}
             np.save(stats_path, self.stats)
-            print(f"{stats_file} créé automatiquement")
+            print(f"{stats_file} created automatically")
 
     def __len__(self):
         return len(self.imgs)
 
     def __getitem__(self, idx):
-        # img: H,W,C → C,H,W
+        # Convert image from H,W,C to C,H,W and normalize
         img = torch.from_numpy(self.imgs[idx]).permute(2,0,1)
         mean = torch.tensor(self.stats["mean"], dtype=img.dtype).view(-1,1,1)
         std  = torch.tensor(self.stats["std"], dtype=img.dtype).view(-1,1,1)
@@ -206,3 +213,4 @@ class RAMDetectionDataset(VisionDataset):
 
         label = self.labels[idx]
         return img, label
+    

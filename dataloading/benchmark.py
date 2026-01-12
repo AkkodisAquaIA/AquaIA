@@ -26,7 +26,7 @@ class PilToNpyDataset(Dataset):
         else:
             self.labels = [torch.zeros((0,5), dtype=torch.float32) for _ in range(len(os.listdir(os.path.join(root_folder,dataset_name,"images"))))]
 
-        # Vérifie si le .npy existe
+        # Check whether the .npy file already exists
         if os.path.exists(self.npy_path):
             print(f"Chargement {self.npy_path} depuis disque...")
             self.imgs = np.load(self.npy_path)
@@ -42,7 +42,7 @@ class PilToNpyDataset(Dataset):
             np.save(self.npy_path, self.imgs)
             print(f"{self.npy_path} créé.")
 
-        # Stats
+        # Dataset statistics (mean and standard deviation)
         stats_path = os.path.join(root_folder, dataset_name, stats_file)
         if os.path.exists(stats_path):
             stats = np.load(stats_path, allow_pickle=True).item()
@@ -53,7 +53,7 @@ class PilToNpyDataset(Dataset):
             np.save(stats_path, {'mean': self.mean, 'std': self.std})
             print(f"{stats_file} créé.")
 
-        # Préparer images en torch tensor
+        # Prepare images as normalized PyTorch tensors
         self.images = []
         for img in self.imgs:
             img_tensor = torch.from_numpy(img).permute(2,0,1)
@@ -69,7 +69,7 @@ class PilToNpyDataset(Dataset):
         return self.images[idx], self.labels[idx]
 
 # ======================================
-# Fonction benchmark principale
+# Main benchmark function
 # ======================================
 def benchmark_dataset(dataset, name, batch_size=32, num_workers=0, num_epochs=5):
     process = psutil.Process(os.getpid())
@@ -92,27 +92,27 @@ def benchmark_dataset(dataset, name, batch_size=32, num_workers=0, num_epochs=5)
     }
 
 # ======================================
-# Fonction pour mesurer le temps par étape
+# Function to measure processing time per step
 # ======================================
 def measure_steps(dataset):
     read_times, resize_times, norm_times = [], [], []
 
     for idx in range(len(dataset)):
         start = time.time()
-        # Lecture
+        # Data reading
         if isinstance(dataset, PilToNpyDataset):
-            # déjà chargé → lecture minimale
+            # Already loaded in memory → minimal read overhead
             img = dataset.imgs[idx]
             t_read = time.time() - start
             read_times.append(t_read)
 
-            # Resize
+            # Tensor conversion / resize step
             start_resize = time.time()
             img_resized = torch.from_numpy(img).permute(2,0,1)
             t_resize = time.time() - start_resize
             resize_times.append(t_resize)
 
-            # Normalisation
+            # Normalization step
             start_norm = time.time()
             mean_tensor = torch.tensor(dataset.mean, dtype=img_resized.dtype).view(-1,1,1)
             std_tensor  = torch.tensor(dataset.std, dtype=img_resized.dtype).view(-1,1,1)
@@ -120,7 +120,7 @@ def measure_steps(dataset):
             t_norm = time.time() - start_norm
             norm_times.append(t_norm)
         else:
-            # Npy/RAM déjà torch → lecture + resize minimal
+            # NPY / RAM datasets already return torch tensors → minimal read and resize cost
             start_resize = time.time()
             img = dataset[idx][0]
             t_resize = time.time() - start_resize
@@ -138,13 +138,11 @@ def measure_steps(dataset):
 
 
 # ======================================
-# Bloc Graphiques
+# Plotting section
 # ======================================
 def plot_results(results, step_times):
 
-    # ======================================
-    # Graphique 1 : Total Time vs RAM
-    # ======================================
+    # Plot 1: Total execution time vs RAM usage
     labels = [r['name'] for r in results]
     total_times = [r['total_time'] for r in results]
     ram_values = [r['ram_dataset'] for r in results]
@@ -156,7 +154,7 @@ def plot_results(results, step_times):
     ax1.set_ylabel('Time (s)')
     ax1.set_xticks(x)
     ax1.set_xticklabels(labels)
-    ax1.set_title('Benchmark NPY / RAM / PIL→NPY - Temps vs RAM')
+    ax1.set_title('Benchmark NPY / RAM / PIL→NPY - Time vs RAM')
     ax1.legend(loc='upper left')
 
     ax2 = ax1.twinx()
@@ -166,23 +164,19 @@ def plot_results(results, step_times):
     fig.savefig("benchmark_total_vs_ram.png", bbox_inches='tight', dpi=150)
     plt.show()
 
-    # ======================================
-    # Graphique 2 : Total Time + RAM annotée
-    # ======================================
+    # Plot 2: Total execution time with RAM annotation
     plt.figure(figsize=(8,5))
     plt.bar(x, total_times, width, label='Total Time', color='skyblue')
     for i, ram in enumerate(ram_values):
         plt.text(i, total_times[i]+0.05, f'{ram:.0f} MB', ha='center', va='bottom', color='red')
     plt.xticks(x, labels)
     plt.ylabel('Time (s)')
-    plt.title('Temps total par dataset + RAM')
+    plt.title('Total execution time per dataset')
     plt.legend()
     plt.savefig("benchmark_total.png", bbox_inches='tight', dpi=150)
     plt.show()
 
-    # ======================================
-    # Graphique 3 : Temps moyen par image (Read/Resize/Norm)
-    # ======================================
+    # Plot 3: Average time per image (Read / Resize / Normalize)
     read_vals = [x[1] for x in step_times]
     resize_vals = [x[2] for x in step_times]
     norm_vals = [x[3] for x in step_times]
@@ -193,7 +187,7 @@ def plot_results(results, step_times):
     plt.bar(x + width, norm_vals, width, label='Norm(ms)', color='salmon')
     plt.xticks(x, labels)
     plt.ylabel('Time per image (ms)')
-    plt.title('Temps moyen par image par étape')
+    plt.title('Average processing time per image')
     plt.legend()
     plt.tight_layout()
     plt.savefig("benchmark_steps.png", dpi=150)
@@ -201,7 +195,7 @@ def plot_results(results, step_times):
 
 
 # ======================================
-# Bloc principal
+# Main execution block
 # ======================================
 if __name__ == "__main__":
     from multiprocessing import freeze_support
@@ -227,33 +221,33 @@ if __name__ == "__main__":
         results.append(r)
         print(f"{r['name']}: Total={r['total_time']:.2f}s | Avg/Epoch={r['avg_time']:.2f}s | RAM={r['ram_dataset']:.1f} MB")
 
-        # Mesure par étapes
+        # Per-step timing measurement
         read_ms, resize_ms, norm_ms = measure_steps(ds)
         step_times.append((ds.__class__.__name__, read_ms, resize_ms, norm_ms))
 
     # ======================================
-    # Tableau comparatif
+    # Summary comparison table
     # ======================================
-    print("\n==== Tableau comparatif ====")
+    print("\n==== Summary Table ====")
     header_fmt = "{:<22} | {:>10} | {:>12} | {:>10}"
     row_fmt    = "{:<22} | {:>10.2f} | {:>12.2f} | {:>10.1f}"
     print(header_fmt.format("Dataset", "Total(s)", "Avg/Epoch(s)", "RAM(MB)"))
-    print("-"*60)
+    print("-"*64)
     for r in results:
         print(row_fmt.format(r['name'], r['total_time'], r['avg_time'], r['ram_dataset']))
 
     # ======================================
-    # Tableau temps par image (ms)
+    # Average time per image (ms)
     # ======================================
-    print("\n==== Temps moyen par image (ms) ====")
+    print("\n==== Average time per image (ms) ====")
     header_fmt = "{:<22} | {:>10} | {:>10} | {:>10}"
     row_fmt    = "{:<22} | {:>10.2f} | {:>10.2f} | {:>10.2f}"
     print(header_fmt.format("Dataset", "Read(ms)", "Resize(ms)", "Norm(ms)"))
-    print("-"*60)
+    print("-"*64)
     for name, r_ms, resize_ms, norm_ms in step_times:
         print(row_fmt.format(name, r_ms, resize_ms, norm_ms))
 
     # ======================================
-    # Graphiques
+    # Plots
     # ======================================    
     plot_results(results, step_times)
