@@ -42,6 +42,7 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_so
     xywh = result.boxes.xywh.cpu().numpy()
     cls_idx = result.boxes.cls.cpu().numpy().astype(int)    # text prompt n → cls_idx n
     coco_ids = [coco128_keys_sorted[i] for i in cls_idx]   # map cls_idx back to COCO128 key
+    conf = result.boxes.conf.cpu().numpy()
     img_h, img_w = result.orig_img.shape[:2]    # original image size
 
     coco_bboxes_norm = []
@@ -50,8 +51,8 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_so
 
     label_path = labels_folder / f"{Path(img_path).stem}.txt"
     with label_path.open("w") as f:
-        for cid, bbox in zip(coco_ids, coco_bboxes_norm):
-            f.write(f"{cid} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f}\n")
+        for cid, bbox, score in zip(coco_ids, coco_bboxes_norm, conf):
+            f.write(f"{cid} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f} {score:.6f}\n")
 
 # Iterate over all images in IMAGES_FOLDER and run inference with the text prompts
 image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
