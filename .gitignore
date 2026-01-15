@@ -9,4 +9,5 @@ __pycache__/
 .ruff_cache/
 
 # SAM3
+runs/
 detection_sam3/result_det_*/

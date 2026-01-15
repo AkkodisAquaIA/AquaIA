@@ -20,7 +20,6 @@ from typing import Dict, List, Sequence, Tuple, Optional
 import cv2
 import numpy as np
 import torch
-from torchvision.ops import nms
 import yaml
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -31,7 +30,6 @@ SAM3_WEIGHTS = Path("C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/
 DATASET_YAML = Path("C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/AquaIA/detection_sam3/coco128.yaml")
 CLASS_BATCH = 8  # number of text prompts per forward pass (reuses image features)
 CONF_THRES = 0.25
-NMS_IOU = 0.6
 DEVICE = 0 if torch.cuda.is_available() else "cpu"
 FP16 = torch.cuda.is_available()
 NUM_IMAGE: Optional[int] = 5  # set to an int to limit number of images from COCO128
@@ -100,21 +98,6 @@ def iou_matrix(box: np.ndarray, boxes: np.ndarray) -> np.ndarray:
     area1 = (box[2] - box[0]) * (box[3] - box[1])
     area2 = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
     return inter / (area1 + area2 - inter + 1e-9)
-
-
-def classwise_nms(dets: List[Dict[str, float]], iou_thr: float) -> List[Dict[str, float]]:
-    final: List[Dict[str, float]] = []
-    if not dets:
-        return final
-    classes = sorted({int(d["category_id"]) for d in dets})
-    for cls in classes:
-        cls_dets = [d for d in dets if int(d["category_id"]) == cls]
-        boxes = torch.tensor([d["bbox_xyxy"] for d in cls_dets], dtype=torch.float32)
-        scores = torch.tensor([d["score"] for d in cls_dets], dtype=torch.float32)
-        keep = nms(boxes, scores, iou_thr)
-        for idx in keep.tolist():
-            final.append(cls_dets[idx])
-    return final
 
 
 def save_coco_files(
@@ -275,7 +258,6 @@ def main() -> None:
                     )
                 )
 
-        img_dets = classwise_nms(img_dets, NMS_IOU)
         detections.extend(img_dets)
         draw_and_save(entry.path, img_dets, names, out_dir)
 
