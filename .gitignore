@@ -7,3 +7,6 @@ __pycache__/
 
 #Linter
 .ruff_cache/
+
+# SAM3
+detection_sam3/result_det_*/
