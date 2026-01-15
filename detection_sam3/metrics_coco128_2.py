@@ -3,30 +3,69 @@ from datetime import datetime
 from ultralytics.models.sam import SAM3SemanticPredictor
 from coco128_dict import COCO128_DICT
 
-MODEL_PATH = "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/sam3.pt"
 IMAGES_FOLDER = "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/08_Data/coco128/images/train2017"
+SAM3_CONF = 0.25
+SAM3_TASK = "segment"
+SAM3_MODE = "predict"
+SAM3_PATH = "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/sam3.pt"
+SAM3_HALF = True  # Use FP16 for faster inference
+SAM3_SAVE = True  # Save results to project folder
 
-current_dir = Path(__file__).resolve().parent  # Directory of the current script
-timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+# Initialize SAM3 predictor with configuration
+current_folder = Path(__file__).resolve().parent
+timestamp = datetime.now().strftime("%Y%m%d%H%M")
 
-# Initialize predictor with configuration
 overrides = dict(
-    conf=0.25,
-    task="segment",
-    mode="predict",
-    model=MODEL_PATH,
-    half=True,  # Use FP16 for faster inference
-    save=True,
-    project=str(current_dir),
+    conf=SAM3_CONF,
+    task=SAM3_TASK,
+    mode=SAM3_MODE,
+    model=SAM3_PATH,
+    half=SAM3_HALF,
+    save=SAM3_SAVE,
+    project=str(current_folder),
     name=f"result_det_{timestamp}",)
 predictor = SAM3SemanticPredictor(overrides=overrides)
 
-# Text prompts sourced from the COCO label dictionary (keys sorted for stable order)
+# Text prompts sourced from the COCO128 label dictionary (keys sorted for stable order)
 text_prompts = [COCO128_DICT[idx] for idx in sorted(COCO128_DICT.keys())]
 
-# Iterate over all images in IMAGES_FOLDER and run inference with the text prompts
-image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})[0:2]
+# Map detection index back to COCO128 key
+coco128_keys_sorted = [idx for idx in sorted(COCO128_DICT.keys())]
 
-for img in image_files:
-    predictor.set_image(str(img))
+# Create output labels folder
+labels_folder = Path(current_folder) / f"result_det_{timestamp}" / "labels"
+labels_folder.mkdir(parents=True, exist_ok=True)
+
+def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_sorted: list[int]) -> None:
+    """Save normalized xywh labels for one image.
+    Args:
+        result: The prediction result object containing boxes and original image.
+        img_path (Path): Path to the input image.
+        labels_folder (Path): Directory to save the label file.
+        coco128_keys_sorted (list[int]): List of COCO128 keys sorted in order.    
+    """
+    if result.boxes is None:
+        return
+    xywh = result.boxes.xywh.cpu().numpy()
+    cls_idx = result.boxes.cls.cpu().numpy().astype(int)    # text prompt n → cls_idx n
+    coco_ids = [coco128_keys_sorted[i] for i in cls_idx]   # map cls_idx back to COCO128 key
+    img_h, img_w = result.orig_img.shape[:2]    # original image size
+
+    coco_bboxes_norm = []
+    for cx, cy, w, h in xywh:
+        coco_bboxes_norm.append([cx / img_w, cy / img_h, w / img_w, h / img_h])
+
+    label_path = labels_folder / f"{Path(img_path).stem}.txt"
+    with label_path.open("w") as f:
+        for cid, bbox in zip(coco_ids, coco_bboxes_norm):
+            f.write(f"{cid} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f}\n")
+
+# Iterate over all images in IMAGES_FOLDER and run inference with the text prompts
+image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
+
+for img_path in image_files:
+    predictor.set_image(str(img_path))
     results = predictor(text=text_prompts)
+    if not results:
+        continue
+    save_xywh_label(results[0], img_path, labels_folder, coco128_keys_sorted)
