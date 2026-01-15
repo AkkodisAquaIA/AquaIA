@@ -1,4 +1,5 @@
 IMAGES_FOLDER = "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/08_Data/coco128/images/train2017"
+LABELS_FOLDER = "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/08_Data/coco128/labels/train2017"
 SAM3_CONF = 0.25
 SAM3_TASK = "segment"
 SAM3_MODE = "predict"
