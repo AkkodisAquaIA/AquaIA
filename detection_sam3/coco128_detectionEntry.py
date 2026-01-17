@@ -29,6 +29,22 @@ coco128_keys_sorted = [idx for idx in sorted(COCO128_DICT.keys())]
 labels_folder = Path(current_folder) / f"result_det_{timestamp}" / "labels"
 labels_folder.mkdir(parents=True, exist_ok=True)
 
+# Save the loaded configuration as a flat text file for reference
+cfg_path = labels_folder.parent / "cfg.txt"
+cfg_content = {
+    "IMAGES_FOLDER": IMAGES_FOLDER,
+    "SAM3_CONF": SAM3_CONF,
+    "SAM3_TASK": SAM3_TASK,
+    "SAM3_MODE": SAM3_MODE,
+    "SAM3_PATH": SAM3_PATH,
+    "SAM3_HALF": SAM3_HALF,
+    "SAM3_SAVE": SAM3_SAVE,
+}
+with cfg_path.open("w", encoding="utf-8") as cfg_file:
+    for key, value in cfg_content.items():
+        formatted = f"\"{value}\"" if isinstance(value, str) else value
+        cfg_file.write(f"{key} = {formatted}\n")
+
 def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_sorted: list[int]) -> None:
     """Save normalized xywh labels for one image.
     Args:

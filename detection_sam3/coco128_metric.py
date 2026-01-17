@@ -209,13 +209,13 @@ def evaluate_two_folders_intersection(
             "recall(B)": float(r["metrics/recall(B)"]),}
 
 if __name__ == "__main__":
-    from coco128_cfg import LABELS_FOLDER
+    from coco128_cfg import IMAGES_FOLDER
     from coco128_dict import COCO128_DICT
 
     current_folder = Path(__file__).resolve().parent
     latest_dir = get_latest_result_dir(current_folder)
     det_labels_folder = latest_dir / "labels"
-    gt_labels_folder = Path(LABELS_FOLDER)
+    gt_labels_folder = Path(str(IMAGES_FOLDER).replace("images", "labels"))
 
     out = evaluate_two_folders_intersection(
         gt_labels_folder=str(gt_labels_folder),
@@ -227,8 +227,8 @@ if __name__ == "__main__":
     for key in keys:
         print(f"{key}: {out.get(key)}")
 
-    # Save metrics to det_labels_folder/metrics.txt
+    # Save metrics to txt file
     metrics_txt = "\n".join(f"{key}: {out.get(key)}" for key in keys)
-    metrics_path = det_labels_folder / "metrics.txt"
+    metrics_path = latest_dir / "metrics.txt"
     metrics_path.write_text(metrics_txt + "\n", encoding="utf-8")
     print(f"Saved metrics to {metrics_path}")
