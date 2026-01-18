@@ -46,25 +46,30 @@ with cfg_path.open("w", encoding="utf-8") as cfg_file:
         cfg_file.write(f"{key} = {formatted}\n")
 
 def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_sorted: list[int]) -> None:
-    """Save normalized xywh labels for one image.
+    """Save normalized xywh labels for one image. cx, cy, w, h are normalized by image width and height.
     Args:
         result: The prediction result object containing boxes and original image.
         img_path (Path): Path to the input image.
         labels_folder (Path): Directory to save the label file.
         coco128_keys_sorted (list[int]): List of COCO128 keys sorted in order.    
     """
+    # Return if no boxes detected
     if result.boxes is None:
         return
+
     xywh = result.boxes.xywh.cpu().numpy()
     cls_idx = result.boxes.cls.cpu().numpy().astype(int)    # text prompt n → cls_idx n
-    coco_ids = [coco128_keys_sorted[i] for i in cls_idx]   # map cls_idx back to COCO128 key
+    # Map cls_idx back to COCO128 key
+    coco_ids = [coco128_keys_sorted[i] for i in cls_idx]
     conf = result.boxes.conf.cpu().numpy()
-    img_h, img_w = result.orig_img.shape[:2]    # original image size
+    # Get original image size
+    img_h, img_w = result.orig_img.shape[:2]
 
     coco_bboxes_norm = []
     for cx, cy, w, h in xywh:
         coco_bboxes_norm.append([cx / img_w, cy / img_h, w / img_w, h / img_h])
 
+    # Write to label file
     label_path = labels_folder / f"{Path(img_path).stem}.txt"
     with label_path.open("w") as f:
         for cid, bbox, score in zip(coco_ids, coco_bboxes_norm, conf):
@@ -76,6 +81,9 @@ image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.low
 for img_path in image_files:
     predictor.set_image(str(img_path))
     results = predictor(text=text_prompts)
+
+    # If no results, skip saving
     if not results:
         continue
+
     save_xywh_label(results[0], img_path, labels_folder, coco128_keys_sorted)

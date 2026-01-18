@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 from ultralytics.utils.metrics import DetMetrics, box_iou
 from ultralytics.utils.ops import xywh2xyxy
+import torch
 
 def get_latest_result_dir(base_dir: Path) -> Path | None:
     """Return the newest result_det_YYYYMMDDHHmm* folder directory under base_dir."""
@@ -44,23 +45,23 @@ def load_label_txt(path: Path, with_conf: bool):
 
     return np.array(rows, dtype=np.float32)
 
-def cxcywh_norm_to_xyxy_norm(cxcywhn: np.ndarray) -> np.ndarray:
+def xywh_norm_to_xyxy_norm(xywhn: np.ndarray) -> np.ndarray:
     """
     Convert normalized [cx,cy,w,h] to normalized [x1,y1,x2,y2], clipped to [0,1].
     Args:
-        cxcywhn: (N,4) normalized [cx,cy,w,h] in [0,1]
+        xywhn: (N,4) normalized [cx,cy,w,h] in [0,1]
     Returns:
         (N,4) normalized xyxy (up left and down right corners) in [0,1]
     Note:
         IoU is invariant to uniform scaling, so calculating IoU with normalized coordinates
     is equivalent to pixel coordinates (no need to read image width/height).
     """
-    # If cxcywhn empty, return empty array
-    if cxcywhn.size == 0:
+    # If xywhn empty, return empty array
+    if xywhn.size == 0:
         return np.zeros((0, 4), dtype=np.float32)
 
     # Convert to xyxy and clip to [0,1]
-    xyxy = xywh2xyxy(cxcywhn.copy())
+    xyxy = xywh2xyxy(xywhn.copy())
     xyxy = np.clip(xyxy, 0.0, 1.0)
     return xyxy.astype(np.float32)
 
@@ -76,7 +77,7 @@ def match_predictions(pred_xyxy, pred_cls, gt_xyxy, gt_cls, iouv):
     Returns:
         tp: boolean matrix (Nb pred,K), tp[A,B]=True means Ath pred box is TP at Bth threshold value.
     """
-    import torch
+
     # Create tp output array, of shape (nb pred, nb iou thresholds)
     nb_pred = pred_xyxy.shape[0]
     tp = np.zeros((nb_pred, len(iouv)), dtype=bool)
@@ -88,7 +89,7 @@ def match_predictions(pred_xyxy, pred_cls, gt_xyxy, gt_cls, iouv):
     # Use torch to compute IoU matrix, of shape (nb pred, nb GT)
     pred_t = torch.from_numpy(pred_xyxy).float()
     gt_t = torch.from_numpy(gt_xyxy).float()
-    # Each element ious[a,b] = IoU[[pred box a, gt box b]
+    # Each element ious[a,b] = IoU[pred box a, gt box b]
     ious = box_iou(pred_t, gt_t).cpu().numpy()
 
     # Same class restriction: different classes IoU = 0
@@ -98,8 +99,7 @@ def match_predictions(pred_xyxy, pred_cls, gt_xyxy, gt_cls, iouv):
 
     for thr_idx, thr in enumerate(iouv):
         # Find all candidate elements in ious[pred_i, gt_j] with IoU >= thr
-        # pred_i and gt_j are 1D arrays of indices
-        pred_i, gt_j = np.where(ious >= thr)
+        pred_i, gt_j = np.where(ious >= thr)    # pred_i and gt_j are 1D arrays of indices
         if pred_i.size == 0:
             continue
 
@@ -129,15 +129,15 @@ def evaluate_two_folders_intersection(
     Evaluate box metrics (precision/recall/mAP50/mAP50-95) in an Ultralytics-like manner
     by comparing predicted labels against GT labels.
 
-    Evaluation set definition (IMPORTANT):
+    Evaluation set definition:
     - We use the intersection of filenames existing in BOTH gt_labels_folder and det_labels_folder.
     - Reason: the official GT label set is missing annotations for 2 images, so using the full GT set
       would make the evaluation set inconsistent.
     - Predictions are sorted by confidence descending before AP computation to match PR/AP definition.
 
     Input label formats:
-    - GT txt:  cls cx cy w h          (normalized)
-    - Pred txt: cls cx cy w h conf    (normalized)
+    - GT txt:  cls cx cy w h (normalized)
+    - Pred txt: cls cx cy w h conf (normalized)
     """
     # Get paths of GT and detection label folders
     gt_dir = Path(gt_labels_folder)
@@ -154,7 +154,7 @@ def evaluate_two_folders_intersection(
     if not common_names:
         raise RuntimeError(f"No matched txt files between:\n  gt: {gt_dir}\n  det: {det_dir}")
 
-    # IoU thresholds: 0.50:0.95 step 0.05 (COCO mAP)
+    # IoU thresholds: 0.50:0.95 step 0.05
     iouv = np.linspace(0.5, 0.95, 10)
 
     # Initialize metrics object to collect tp, conf, pred_cls, target_cls, target_img for each image
@@ -174,9 +174,9 @@ def evaluate_two_folders_intersection(
         gt_cls = gt[:, 0].astype(int) if gt.shape[0] else np.array([], dtype=int)
         pr_cls = pr[:, 0].astype(int) if pr.shape[0] else np.array([], dtype=int)
 
-        # Convert boxes from cxcywh normalized to xyxy normalized. If no boxes, create empty arrays
-        gt_xyxy = cxcywh_norm_to_xyxy_norm(gt[:, 1:5]) if gt.shape[0] else np.zeros((0, 4), dtype=np.float32)
-        pr_xyxy = cxcywh_norm_to_xyxy_norm(pr[:, 1:5]) if pr.shape[0] else np.zeros((0, 4), dtype=np.float32)
+        # Convert boxes from xywh normalized to xyxy normalized. If no boxes, create empty arrays
+        gt_xyxy = xywh_norm_to_xyxy_norm(gt[:, 1:5]) if gt.shape[0] else np.zeros((0, 4), dtype=np.float32)
+        pr_xyxy = xywh_norm_to_xyxy_norm(pr[:, 1:5]) if pr.shape[0] else np.zeros((0, 4), dtype=np.float32)
 
         # Get pred confidences. If no boxes, create empty array
         pr_conf = pr[:, 5].astype(np.float32) if pr.shape[0] else np.array([], dtype=np.float32)
