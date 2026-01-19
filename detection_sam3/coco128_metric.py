@@ -135,7 +135,8 @@ def match_predictions(pred_xyxy, pred_cls, gt_xyxy, gt_cls, iouv):
 def evaluate_two_folders_intersection(
     gt_labels_folder: str,
     det_labels_folder: str,
-    names: dict,):
+    names: dict,
+    det_conf_threshold: float | None = None,):
     """
     Evaluate box metrics (precision/recall/mAP50/mAP50-95) in an Ultralytics-like manner
     by comparing predicted labels against GT labels.
@@ -179,7 +180,7 @@ def evaluate_two_folders_intersection(
     
         # Load txt files
         gt = load_label_txt(gt_txt, with_conf=False)
-        pr = load_label_txt(det_txt, with_conf=True)
+        pr = load_label_txt(det_txt, with_conf=True, conf_threshold=det_conf_threshold)
     
         # Get classes. If no boxes, create empty arrays
         gt_cls = gt[:, 0].astype(int) if gt.shape[0] else np.array([], dtype=int)
@@ -222,30 +223,48 @@ def evaluate_two_folders_intersection(
 if __name__ == "__main__":
     from coco128_cfg import IMAGES_FOLDER
     from coco128_dict import COCO128_DICT
+    import tkinter as tk
+    from tkinter import filedialog
 
     current_folder = Path(__file__).resolve().parent
-    try:
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        chosen_dir = filedialog.askdirectory(
-            initialdir=current_folder,
-            title="Select result_det folder (Cancel to use latest)") or None
-        root.update()
-        root.destroy()
-    except Exception as exc:
-        print(f"Folder selection unavailable ({exc}). Falling back to latest result directory.")
-        chosen_dir = None
 
+    # Ask user to select result_det folder, or use latest if cancelled
+    root = tk.Tk()
+    root.withdraw()
+    chosen_dir = filedialog.askdirectory(
+        initialdir=current_folder,
+        title="Select result_det folder (Cancel to use latest)") or None
+    root.update()
+    root.destroy()
     det_dir = Path(chosen_dir) if chosen_dir else get_latest_result_dir(current_folder)
+
+    # Read SAM3_CONF from cfg.txt under the selected/latest result directory
+    cfg_conf = None
+    cfg_path = det_dir / "cfg.txt"
+    if cfg_path.exists():
+        for line in cfg_path.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("SAM3_CONF"):
+                parts = line.split("=")
+                if len(parts) == 2:
+                    # Extract confidence value
+                    cfg_conf = float(parts[1].strip().strip('"').strip("'"))
+                break
+
+    # Ask user for a new confidence threshold
+    user_input = input(f"Inference SAM3_CONF = {cfg_conf}, define a new threshold? (blank to skip): ").strip()
+    det_conf_threshold = float(user_input) if user_input else None
+    suffix = ""
+    if det_conf_threshold is not None:
+        suffix = f"_conf{int(round(det_conf_threshold * 100)):03d}"
+
     det_labels_folder = det_dir / "labels"
     gt_labels_folder = Path(str(IMAGES_FOLDER).replace("images", "labels"))
 
     out = evaluate_two_folders_intersection(
         gt_labels_folder=str(gt_labels_folder),
         det_labels_folder=str(det_labels_folder),
-        names=COCO128_DICT,)
+        names=COCO128_DICT,
+        det_conf_threshold=det_conf_threshold,)
 
     # Print each metric on its own line for readability
     keys = ("Nb_images", "mAP50-95(B)", "mAP50(B)", "precision(B)", "recall(B)")
@@ -254,6 +273,6 @@ if __name__ == "__main__":
 
     # Save metrics to txt file
     metrics_txt = "\n".join(f"{key}: {out.get(key)}" for key in keys)
-    metrics_path = det_dir / "metrics.txt"
+    metrics_path = det_dir / f"metrics{suffix}.txt"
     metrics_path.write_text(metrics_txt + "\n", encoding="utf-8")
     print(f"Saved metrics to {metrics_path}")
