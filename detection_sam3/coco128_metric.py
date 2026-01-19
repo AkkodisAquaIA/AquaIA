@@ -16,8 +16,10 @@ def get_latest_result_dir(base_dir: Path) -> Path | None:
     latest = max(candidates, key=lambda p: p.name.replace("result_det_", ""))
     return latest
 
-def load_label_txt(path: Path, with_conf: bool):
-    """Reads txt label file (GT or detections). Returns clean box coordinates with or without confidence."""
+def load_label_txt(path: Path, with_conf: bool, conf_threshold: float | None = None):
+    """Reads txt label file (GT or detections). Returns clean box coordinates with or without confidence.
+    If with_conf is True and conf_threshold is provided, rows with conf < conf_threshold are dropped.
+    """
     dim = 6 if with_conf else 5
 
     # If file does not exist, return empty array
@@ -43,7 +45,16 @@ def load_label_txt(path: Path, with_conf: bool):
     if not rows:
         return np.zeros((0, dim), dtype=np.float32)
 
-    return np.array(rows, dtype=np.float32)
+    # Keep only detections above the specified (if provided) confidence threshold 
+    row_thr = np.array(rows, dtype=np.float32)
+    if with_conf and conf_threshold is not None:
+        row_thr = row_thr[row_thr[:, 5] >= conf_threshold]
+
+    # If after thresholding no rows remain, return empty array
+    if row_thr.size == 0:
+        return np.zeros((0, dim), dtype=np.float32)
+
+    return row_thr
 
 def xywh_norm_to_xyxy_norm(xywhn: np.ndarray) -> np.ndarray:
     """
