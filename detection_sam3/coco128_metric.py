@@ -213,8 +213,22 @@ if __name__ == "__main__":
     from coco128_dict import COCO128_DICT
 
     current_folder = Path(__file__).resolve().parent
-    latest_dir = get_latest_result_dir(current_folder)
-    det_labels_folder = latest_dir / "labels"
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        chosen_dir = filedialog.askdirectory(
+            initialdir=current_folder,
+            title="Select result_det folder (Cancel to use latest)") or None
+        root.update()
+        root.destroy()
+    except Exception as exc:
+        print(f"Folder selection unavailable ({exc}). Falling back to latest result directory.")
+        chosen_dir = None
+
+    det_dir = Path(chosen_dir) if chosen_dir else get_latest_result_dir(current_folder)
+    det_labels_folder = det_dir / "labels"
     gt_labels_folder = Path(str(IMAGES_FOLDER).replace("images", "labels"))
 
     out = evaluate_two_folders_intersection(
@@ -229,6 +243,6 @@ if __name__ == "__main__":
 
     # Save metrics to txt file
     metrics_txt = "\n".join(f"{key}: {out.get(key)}" for key in keys)
-    metrics_path = latest_dir / "metrics.txt"
+    metrics_path = det_dir / "metrics.txt"
     metrics_path.write_text(metrics_txt + "\n", encoding="utf-8")
     print(f"Saved metrics to {metrics_path}")
