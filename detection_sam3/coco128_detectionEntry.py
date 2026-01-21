@@ -78,8 +78,16 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_so
 # Iterate over all images in IMAGES_FOLDER and run inference with the text prompts
 image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
 
+# Print device information once
+INFO_DEVICE = True
+
 for img_path in image_files:
     predictor.set_image(str(img_path))
+
+    if INFO_DEVICE:
+        print(f"Device used: {predictor.device}")
+        INFO_DEVICE = False
+    
     results = predictor(text=text_prompts)
 
     # If no results, skip saving
