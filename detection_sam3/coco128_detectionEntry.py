@@ -1,8 +1,10 @@
 from pathlib import Path
 from datetime import datetime
+import torch
 from ultralytics.models.sam import SAM3SemanticPredictor
+from ultralytics.utils.nms import TorchNMS
 from coco128_dict import COCO128_DICT
-from coco128_cfg import IMAGES_FOLDER, SAM3_CONF, SAM3_TASK, SAM3_MODE, SAM3_PATH, SAM3_HALF, SAM3_SAVE, SAM3_IMGSZ
+from coco128_cfg import IMAGES_FOLDER, SAM3_CONF, SAM3_TASK, SAM3_MODE, SAM3_PATH, SAM3_HALF, SAM3_SAVE, SAM3_IMGSZ, SAM3_NMS
 
 # Initialize SAM3 predictor with configuration
 current_folder = Path(__file__).resolve().parent
@@ -41,11 +43,51 @@ cfg_content = {
     "SAM3_HALF": SAM3_HALF,
     "SAM3_SAVE": SAM3_SAVE,
     "SAM3_IMGSZ": SAM3_IMGSZ,
+    "SAM3_NMS": SAM3_NMS,
 }
 with cfg_path.open("w", encoding="utf-8") as cfg_file:
     for key, value in cfg_content.items():
         formatted = f"\"{value}\"" if isinstance(value, str) else value
         cfg_file.write(f"{key} = {formatted}\n")
+
+def sam3_nms(result, iou_threshold, INFO_NMS):
+    """Per-class NMS for SAM3 results; keeps cls/conf, optional masks.
+    The terminal logs and auto-saved visualizations during inference
+    are still the results before NMS."""
+    # Print notice about NMS once
+    if INFO_NMS:
+        print("\n" + "=" * 100)
+        print("The terminal logs and auto-saved visualizations during inference"
+          " are still the results before NMS.")
+        print("=" * 100 + "\n")
+        INFO_NMS = False
+
+    # If no boxes, return as is
+    if result.boxes is None or result.boxes.shape[0] == 0:
+        return result, INFO_NMS
+
+    # Extract box coordinates, scores, and classes
+    bboxes = result.boxes.xyxy
+    scores = result.boxes.conf
+    classes = result.boxes.cls
+
+    keep_all = []
+    # For each unique class id
+    for cls_id in classes.unique():
+        # idx stores indices mapping this class's boxes to the original results
+        idx = (classes == cls_id).nonzero(as_tuple=False).squeeze(1)
+        # keep_c contains the indices to be retained within this class subset
+        keep_c = TorchNMS.fast_nms(bboxes[idx], scores[idx], iou_threshold=iou_threshold)
+        # Map back to the original result indices and store
+        keep_all.append(idx[keep_c])
+
+    # Concatenate all kept indices and filter results
+    keep = torch.cat(keep_all) if keep_all else torch.empty(0, dtype=torch.long, device=bboxes.device)
+    result.boxes = result.boxes[keep]
+    if result.masks is not None:
+        result.masks = result.masks[keep]
+
+    return result, INFO_NMS
 
 def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_sorted: list[int]) -> None:
     """Save normalized xywh labels for one image. cx, cy, w, h are normalized by image width and height.
@@ -80,8 +122,9 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_so
 # Iterate over all images in IMAGES_FOLDER and run inference with the text prompts
 image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
 
-# Print device information once
+# Print information once
 INFO_DEVICE = True
+INFO_NMS = True
 
 for img_path in image_files:
     predictor.set_image(str(img_path))
@@ -95,5 +138,9 @@ for img_path in image_files:
     # If no results, skip saving
     if not results:
         continue
+
+    # Apply NMS only when enabled and keep updated result in-place
+    if SAM3_NMS != False:
+        results[0], INFO_NMS = sam3_nms(results[0], SAM3_NMS, INFO_NMS)
 
     save_xywh_label(results[0], img_path, labels_folder, coco128_keys_sorted)

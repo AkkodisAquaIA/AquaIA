@@ -6,3 +6,4 @@ SAM3_PATH = "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/s
 SAM3_HALF = True  # Use FP16 for faster inference
 SAM3_SAVE = True  # Save results to project folder
 SAM3_IMGSZ = 640
+SAM3_NMS = 0.5
