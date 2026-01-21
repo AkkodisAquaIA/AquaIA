@@ -1,0 +1,76 @@
+# AquaIA - Generic Ultralytics YOLO training config (Docker/OVH ready)
+
+model:
+  # Model loading:
+  # - family: YOLO major line, e.g. "yolo8", "yolo11", "yolo26"
+  # - size: model scale, one of: n, s, m, l, x
+  # - init:
+  #     - "pretrained" -> loads "{family}{size}.pt" (weights pretrained by Ultralytics)
+  #     - "random"     -> loads "{family}{size}.yaml" (from scratch architecture definition)
+  family: "yolo11"
+  size: "n"
+  init: "pretrained"
+
+data:
+  # IMPORTANT (Docker/OVH): avoid Windows absolute paths.
+  # Use a relative path (resolved relative to this YAML file), or an env var like ${DATASET_YAML}.
+  dataset_yaml: "app/datasets/coco128/coco128_custom.yaml"
+
+output:
+  # Output directory. Relative path is resolved from YAML directory.
+  project: "models"
+  name: "generic_yolo_experiment"
+  exist_ok: true
+  save: true
+  save_period: 0
+  plots: true
+
+training:
+  # Device selection:
+  # - Use "cpu" for local test
+  # - Use 0 (or "0") for the first CUDA GPU in Docker
+  device: "0"
+
+  # ---------- DATA INPUT SIZE ----------
+  imgsz: 800
+  batch: 4
+  rect: false
+
+  # ---------- TRAINING SCHEDULE ----------
+  epochs: 3
+  patience: 5
+
+  # ---------- OPTIMIZER & LR ----------
+  optimizer: "AdamW"
+  lr0: 0.0020
+  lrf: 0.05
+  cos_lr: true
+  momentum: 0.9
+  weight_decay: 0.01
+  warmup_epochs: 2
+  warmup_momentum: 0.8
+  warmup_bias_lr: 0.1
+
+  # ---------- REGULARIZATION ----------
+  label_smoothing: 0.03  # NOTE: Ultralytics warns this is deprecated.
+
+  # ---------- DATA AUGMENTATION ----------
+  augment: true
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  degrees: 10.0
+  translate: 0.10
+  scale: 0.50
+  shear: 2.0
+  perspective: 0.0005
+  flipud: 0.0
+  fliplr: 0.5
+  mosaic: 0.80
+  mixup: 0.05
+  close_mosaic: 40
+
+  # ---------- PERFORMANCE ----------
+  amp: false
+  cache: false
+  workers: 2
