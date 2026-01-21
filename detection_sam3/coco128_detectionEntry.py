@@ -2,7 +2,7 @@ from pathlib import Path
 from datetime import datetime
 from ultralytics.models.sam import SAM3SemanticPredictor
 from coco128_dict import COCO128_DICT
-from coco128_cfg import IMAGES_FOLDER, SAM3_CONF, SAM3_TASK, SAM3_MODE, SAM3_PATH, SAM3_HALF, SAM3_SAVE
+from coco128_cfg import IMAGES_FOLDER, SAM3_CONF, SAM3_TASK, SAM3_MODE, SAM3_PATH, SAM3_HALF, SAM3_SAVE, SAM3_IMGSZ
 
 # Initialize SAM3 predictor with configuration
 current_folder = Path(__file__).resolve().parent
@@ -15,6 +15,7 @@ overrides = dict(
     model=SAM3_PATH,
     half=SAM3_HALF,
     save=SAM3_SAVE,
+    imgsz=SAM3_IMGSZ,
     project=str(current_folder),
     name=f"result_det_{timestamp}",)
 predictor = SAM3SemanticPredictor(overrides=overrides)
@@ -39,6 +40,7 @@ cfg_content = {
     "SAM3_PATH": SAM3_PATH,
     "SAM3_HALF": SAM3_HALF,
     "SAM3_SAVE": SAM3_SAVE,
+    "SAM3_IMGSZ": SAM3_IMGSZ,
 }
 with cfg_path.open("w", encoding="utf-8") as cfg_file:
     for key, value in cfg_content.items():
