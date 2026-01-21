@@ -1,5 +1,5 @@
 """
-Generic Ultralytics YOLO training entrypoint for AquaIA (Docker/OVH ready).
+Generic Ultralytics YOLO training entrypoint for AquaIA.
 
 Highlights:
 - Model selection is configurable via family/size/init.

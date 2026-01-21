@@ -1,4 +1,4 @@
-# AquaIA - Generic Ultralytics YOLO training config (Docker/OVH ready)
+# AquaIA - Generic Ultralytics YOLO training config
 
 model:
   # Model loading:
@@ -12,7 +12,6 @@ model:
   init: "pretrained"
 
 data:
-  # IMPORTANT (Docker/OVH): avoid Windows absolute paths.
   # Use a relative path (resolved relative to this YAML file), or an env var like ${DATASET_YAML}.
   dataset_yaml: "app/datasets/coco128/coco128_custom.yaml"
 
@@ -52,7 +51,7 @@ training:
   warmup_bias_lr: 0.1
 
   # ---------- REGULARIZATION ----------
-  label_smoothing: 0.03  # NOTE: Ultralytics warns this is deprecated.
+  label_smoothing: 0.03  
 
   # ---------- DATA AUGMENTATION ----------
   augment: true
