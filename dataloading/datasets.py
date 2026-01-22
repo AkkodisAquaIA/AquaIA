@@ -22,9 +22,6 @@ class NpyDetectionDataset(Dataset):
         # Paths to files
         self.img_file = os.path.join(root_folder, dataset_name, "npy_images.npy")
 
-        # Load images from NPY file
-        self.imgs = np.load(self.img_file)
-
         # Load label files
         self.label_files = sorted(glob.glob(os.path.join(root_folder, dataset_name, "labels", "*.txt")))
 
@@ -47,6 +44,8 @@ class NpyDetectionDataset(Dataset):
         else:
             mean = self.imgs.mean(axis=(0,1,2))
             std  = self.imgs.std(axis=(0,1,2))
+            std = np.clip(std, 1e-6, None)
+
             self.stats = {"mean": mean, "std": std}
             np.save(stats_path, self.stats)
             print(f"{stats_file} not found → calculated automatically")
@@ -56,9 +55,11 @@ class NpyDetectionDataset(Dataset):
 
     def _normalize_image(self, img):
         # img: H,W,C → convert to tensor C,H,W
-        img = torch.from_numpy(img.copy()).permute(2,0,1)
+        img = torch.from_numpy(img.copy()).float().permute(2,0,1)
         mean = torch.tensor(self.stats['mean'], dtype=img.dtype).view(-1,1,1)
         std  = torch.tensor(self.stats['std'], dtype=img.dtype).view(-1,1,1)
+        std = np.clip(std, 1e-6, None)
+
         return (img - mean)/std
 
     def __getitem__(self, idx):
@@ -125,6 +126,7 @@ class PilDetectionDataset(Dataset):
             imgs = np.stack(imgs, axis=0)  # N,H,W,C
             mean = imgs.mean(axis=(0,1,2))
             std  = imgs.std(axis=(0,1,2))
+            std = np.clip(std, 1e-6, None)
 
             self.stats = {"mean": mean, "std": std}
             np.save(stats_path, self.stats)
@@ -136,12 +138,14 @@ class PilDetectionDataset(Dataset):
     def __getitem__(self, idx):
         # Load image and convert to tensor
         img = Image.open(self.image_files[idx]).convert("RGB").resize(self.img_size)
-        img = torch.from_numpy(np.array(img, dtype=np.float32) / 255.0)
+        img = torch.from_numpy(img.copy()).float().permute(2,0,1)
         img = img.permute(2, 0, 1)  # C,H,W
 
         # Normalize using precomputed statistics
         mean = torch.tensor(self.stats["mean"], dtype=img.dtype).view(-1,1,1)
         std  = torch.tensor(self.stats["std"], dtype=img.dtype).view(-1,1,1)
+        std = np.clip(std, 1e-6, None)
+
         img = (img - mean) / std
 
         label = self.labels[idx]
@@ -197,6 +201,8 @@ class RAMDetectionDataset(VisionDataset):
         else:
             mean = self.imgs.mean(axis=(0,1,2))
             std  = self.imgs.std(axis=(0,1,2))
+            std = np.clip(std, 1e-6, None)
+
             self.stats = {"mean": mean, "std": std}
             np.save(stats_path, self.stats)
             print(f"{stats_file} created automatically")
@@ -209,6 +215,8 @@ class RAMDetectionDataset(VisionDataset):
         img = torch.from_numpy(self.imgs[idx]).permute(2,0,1)
         mean = torch.tensor(self.stats["mean"], dtype=img.dtype).view(-1,1,1)
         std  = torch.tensor(self.stats["std"], dtype=img.dtype).view(-1,1,1)
+        std = np.clip(std, 1e-6, None)
+
         img = (img - mean)/std
 
         label = self.labels[idx]

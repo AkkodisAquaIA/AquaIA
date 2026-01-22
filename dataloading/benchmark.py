@@ -73,9 +73,9 @@ class PilToNpyDataset(Dataset):
 # ======================================
 def benchmark_dataset(dataset, name, batch_size=32, num_workers=0, num_epochs=5):
     process = psutil.Process(os.getpid())
-    ram_dataset = process.memory_info().rss / (1024**2)  # MB
+    ram_dataset = process.memory_info().rss / (1024**2)
 
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
     start_time = time.time()
     for epoch in range(num_epochs):
@@ -90,51 +90,6 @@ def benchmark_dataset(dataset, name, batch_size=32, num_workers=0, num_epochs=5)
         "avg_time": avg_time,
         "ram_dataset": ram_dataset
     }
-
-# ======================================
-# Function to measure processing time per step
-# ======================================
-def measure_steps(dataset):
-    read_times, resize_times, norm_times = [], [], []
-
-    for idx in range(len(dataset)):
-        start = time.time()
-        # Data reading
-        if isinstance(dataset, PilToNpyDataset):
-            # Already loaded in memory → minimal read overhead
-            img = dataset.imgs[idx]
-            t_read = time.time() - start
-            read_times.append(t_read)
-
-            # Tensor conversion / resize step
-            start_resize = time.time()
-            img_resized = torch.from_numpy(img).permute(2,0,1)
-            t_resize = time.time() - start_resize
-            resize_times.append(t_resize)
-
-            # Normalization step
-            start_norm = time.time()
-            mean_tensor = torch.tensor(dataset.mean, dtype=img_resized.dtype).view(-1,1,1)
-            std_tensor  = torch.tensor(dataset.std, dtype=img_resized.dtype).view(-1,1,1)
-            img_norm = (img_resized - mean_tensor)/std_tensor
-            t_norm = time.time() - start_norm
-            norm_times.append(t_norm)
-        else:
-            # NPY / RAM datasets already return torch tensors → minimal read and resize cost
-            start_resize = time.time()
-            img = dataset[idx][0]
-            t_resize = time.time() - start_resize
-            resize_times.append(t_resize)
-            read_times.append(0.0)
-            start_norm = time.time()
-            _ = img
-            t_norm = time.time() - start_norm
-            norm_times.append(t_norm)
-
-    read_ms   = np.mean(read_times)*1000
-    resize_ms = np.mean(resize_times)*1000
-    norm_ms   = np.mean(norm_times)*1000
-    return read_ms, resize_ms, norm_ms
 
 
 # ======================================
@@ -162,7 +117,7 @@ def plot_results(results, step_times):
     ax2.set_ylabel('RAM (MB)')
     ax2.legend(loc='upper right')
     fig.savefig("benchmark_total_vs_ram.png", bbox_inches='tight', dpi=150)
-    plt.show()
+    # plt.show()
 
     # Plot 2: Total execution time with RAM annotation
     plt.figure(figsize=(8,5))
@@ -174,38 +129,25 @@ def plot_results(results, step_times):
     plt.title('Total execution time per dataset')
     plt.legend()
     plt.savefig("benchmark_total.png", bbox_inches='tight', dpi=150)
-    plt.show()
-
-    # Plot 3: Average time per image (Read / Resize / Normalize)
-    read_vals = [x[1] for x in step_times]
-    resize_vals = [x[2] for x in step_times]
-    norm_vals = [x[3] for x in step_times]
-
-    plt.figure(figsize=(8,5))
-    plt.bar(x - width, read_vals, width, label='Read(ms)', color='skyblue')
-    plt.bar(x, resize_vals, width, label='Resize(ms)', color='lightgreen')
-    plt.bar(x + width, norm_vals, width, label='Norm(ms)', color='salmon')
-    plt.xticks(x, labels)
-    plt.ylabel('Time per image (ms)')
-    plt.title('Average processing time per image')
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig("benchmark_steps.png", dpi=150)
-    plt.show()
+    # plt.show()
 
 
 # ======================================
 # Main execution block
 # ======================================
 if __name__ == "__main__":
-    from multiprocessing import freeze_support
-    freeze_support()
 
     NUM_EPOCHS = 5
     BATCH_SIZE = 32
-    NUM_WORKERS = 0
+
+    # Dataset configuration
     dataset_name = "coco128"
-    root_folder = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Data"
+
+    # Current working directory
+    cwd = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA"
+
+    # Path relative to the cwd
+    root_folder = os.path.join(cwd, "Data")
 
     datasets = [
         NpyDetectionDataset(dataset_name, root_folder=root_folder, stats_file="stats_npy.npy"),
@@ -217,14 +159,11 @@ if __name__ == "__main__":
     step_times = []
     for ds in datasets:
         print(f"\n==== Benchmark {ds.__class__.__name__} ====")
-        r = benchmark_dataset(ds, ds.__class__.__name__, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS, num_epochs=NUM_EPOCHS)
+        r = benchmark_dataset(ds, ds.__class__.__name__, batch_size=BATCH_SIZE, num_workers=0, num_epochs=NUM_EPOCHS)
         results.append(r)
         print(f"{r['name']}: Total={r['total_time']:.2f}s | Avg/Epoch={r['avg_time']:.2f}s | RAM={r['ram_dataset']:.1f} MB")
 
-        # Per-step timing measurement
-        read_ms, resize_ms, norm_ms = measure_steps(ds)
-        step_times.append((ds.__class__.__name__, read_ms, resize_ms, norm_ms))
-
+        
     # ======================================
     # Summary comparison table
     # ======================================
@@ -236,16 +175,6 @@ if __name__ == "__main__":
     for r in results:
         print(row_fmt.format(r['name'], r['total_time'], r['avg_time'], r['ram_dataset']))
 
-    # ======================================
-    # Average time per image (ms)
-    # ======================================
-    print("\n==== Average time per image (ms) ====")
-    header_fmt = "{:<22} | {:>10} | {:>10} | {:>10}"
-    row_fmt    = "{:<22} | {:>10.2f} | {:>10.2f} | {:>10.2f}"
-    print(header_fmt.format("Dataset", "Read(ms)", "Resize(ms)", "Norm(ms)"))
-    print("-"*64)
-    for name, r_ms, resize_ms, norm_ms in step_times:
-        print(row_fmt.format(name, r_ms, resize_ms, norm_ms))
 
     # ======================================
     # Plots
