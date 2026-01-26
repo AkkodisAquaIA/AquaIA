@@ -21,7 +21,7 @@ from typing import Any, Dict, Tuple
 import torch
 import yaml
 from ultralytics import YOLO
-
+import argparse
 
 # -----------------------------
 # Helpers: env expansion & path resolution
@@ -90,53 +90,6 @@ def load_config(config_path: str | Path) -> Tuple[Dict[str, Any], Path]:
 
     return cfg, cfg_path.parent
 
-
-# -----------------------------
-# Dataset sanity checks
-# -----------------------------
-def assert_labels_exist(dataset_yaml: str | Path) -> None:
-    """
-    Ensure train/val label folders exist and contain label .txt files.
-
-    Expected convention:
-    - .../images/... for images
-    - .../labels/... for labels
-    """
-    p = Path(dataset_yaml).expanduser().resolve()
-    if not p.is_file():
-        raise FileNotFoundError(f"[DATA ERROR] Dataset YAML not found: {p}")
-
-    data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
-    if not isinstance(data, dict):
-        raise ValueError(f"[DATA ERROR] Dataset YAML root must be a dict: {p}")
-
-    # Ultralytics dataset YAML convention: "path" is the dataset root.
-    # If missing, fallback to the dataset YAML directory.
-    root = Path(data.get("path") or p.parent).expanduser().resolve()
-
-    def check_split(split: str) -> None:
-        rel = data.get(split)
-        if not rel:
-            return  # split is optional
-
-        img_dir = (root / rel).expanduser().resolve()
-        if not img_dir.exists():
-            raise FileNotFoundError(f"[DATA ERROR] {split} images dir not found: {img_dir}")
-
-        parts = list(img_dir.parts)
-        if "images" not in parts:
-            raise ValueError(f"[DATA ERROR] Cannot infer labels dir (no 'images' in path): {img_dir}")
-
-        parts[parts.index("images")] = "labels"
-        lab_dir = Path(*parts)
-
-        if not lab_dir.exists() or not any(lab_dir.glob("*.txt")):
-            raise FileNotFoundError(f"[DATA ERROR] Missing/empty labels dir for {split}: {lab_dir}")
-
-    check_split("train")
-    check_split("val")
-
-
 # -----------------------------
 # Model resolution (family/size/init)
 # -----------------------------
@@ -198,9 +151,6 @@ def main(config_path: str) -> Any:
     # Resolve dataset YAML relative to the config file location
     dataset_yaml = _resolve_path(cfg_dir, str(dataset_yaml))
 
-    # Fail fast if dataset structure is broken
-    assert_labels_exist(dataset_yaml)
-
     # Instantiate YOLO model (keep variable name: model)
     model_id = resolve_model_identifier(model_cfg)
     model = YOLO(model_id)
@@ -233,18 +183,26 @@ def main(config_path: str) -> Any:
     results = model.train(**train_args)
     return results
 
+def parse_args() -> str:
+    parser = argparse.ArgumentParser(
+        description="Train a YOLO model from a YAML config."
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        default="yolo_train_config.yaml",
+        help="Path to the training config YAML file.",
+    )
+    args = parser.parse_args()
+    return args.config
+
 
 if __name__ == "__main__":
-
-    cfg_path = sys.argv[1] if len(sys.argv) > 1 else "yolo_train_config.yaml"
-
-    # main() returns the Ultralytics results object (DetMetrics for detection tasks)
+    cfg_path = parse_args()
     out = main(cfg_path)
-
-    # Prefer reading save_dir from the returned results object (robust across Ultralytics versions)
-    save_dir = getattr(out, "save_dir", None)
-    if save_dir is not None:
-        print(f"Training finished. Results saved to: {Path(save_dir)}")
+    savedir = getattr(out, "save_dir", None)
+    if savedir is not None:
+        print(f"Training finished. Results saved to {Path(savedir)}")
     else:
         print("Training finished.")
 
