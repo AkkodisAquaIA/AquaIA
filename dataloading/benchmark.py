@@ -1,12 +1,11 @@
 import os
 import time
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, Any, List
 
-import numpy as np
-import torch
+
 import psutil
-import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
 from datasets import (
@@ -20,6 +19,14 @@ class BenchmarkConfig:
     num_epochs: int = 5
     batch_size: int = 32
     num_workers: int = 0
+
+def get_path(prompt: str, color_key: str = 'input') -> Path:
+    while True:
+        path_input = input(prompt).strip()
+        if os.path.exists(path_input):
+            return Path(path_input)
+
+        print( f"Invalid path: {path_input}. Please try again.")
 
 
 def benchmark_dataset(
@@ -60,7 +67,8 @@ if __name__ == "__main__":
 
     cfg = BenchmarkConfig()
 
-    cwd = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA"
+    cwd = get_path("Enter the project root folder path: ") 
+ 
     root_folder = os.path.join(cwd, "Data")
     dataset_name = "coco128"
 
