@@ -6,14 +6,14 @@ from ultralytics.utils.ops import xywh2xyxy
 import torch
 
 def get_latest_result_dir(base_dir: Path) -> Path | None:
-    """Return the newest sam3_result_det_YYYYMMDDHHmm* folder directory under base_dir."""
+    """Return the newest [model]_result_det_YYYYMMDDHHmm folder directory under base_dir."""
     candidates = [
-        p for p in base_dir.glob("sam3_result_det_*")
-        if p.is_dir() and p.name.replace("sam3_result_det_", "").isdigit()]
+        p for p in base_dir.glob("*_result_det_*")
+        if p.is_dir() and p.name.split("_result_det_")[-1].isdigit()]
     if not candidates:
-        print("No sam3_result_det_YYYYMMDDHHmm* directories found. Exiting.")
+        print("No [model]_result_det_YYYYMMDDHHmm directories found. Exiting.")
         sys.exit(1)
-    latest = max(candidates, key=lambda p: p.name.replace("sam3_result_det_", ""))
+    latest = max(candidates, key=lambda p: p.name.split("_result_det_")[-1])
     return latest
 
 def load_label_txt(path: Path, with_conf: bool, conf_threshold: float | None = None):

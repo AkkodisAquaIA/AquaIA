@@ -10,4 +10,4 @@ __pycache__/
 
 # SAM3
 runs/
-detection_sam3/result_det_*/
+detection_sam3/*_result_det_*/
