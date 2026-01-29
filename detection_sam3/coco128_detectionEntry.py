@@ -19,7 +19,7 @@ overrides = dict(
     save=SAM3_SAVE,
     imgsz=SAM3_IMGSZ,
     project=str(current_folder),
-    name=f"result_det_{timestamp}",)
+    name=f"sam3_result_det_{timestamp}",)
 predictor = SAM3SemanticPredictor(overrides=overrides)
 
 # Text prompts sourced from the COCO128 label dictionary (keys sorted for stable order)
@@ -29,7 +29,7 @@ text_prompts = [COCO128_DICT[idx] for idx in sorted(COCO128_DICT.keys())]
 coco128_keys_sorted = [idx for idx in sorted(COCO128_DICT.keys())]
 
 # Create output labels folder
-labels_folder = Path(current_folder) / f"result_det_{timestamp}" / "labels"
+labels_folder = Path(current_folder) / f"sam3_result_det_{timestamp}" / "labels"
 labels_folder.mkdir(parents=True, exist_ok=True)
 
 # Save the loaded configuration as a flat text file for reference
