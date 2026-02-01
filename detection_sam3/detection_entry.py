@@ -4,7 +4,7 @@ import torch
 from ultralytics.models.sam import SAM3SemanticPredictor
 from ultralytics.utils.nms import TorchNMS
 from coco128_dict import COCO128_DICT
-from coco128_cfg import IMAGES_FOLDER, SAM3_CONF, SAM3_TASK, SAM3_MODE, SAM3_PATH, SAM3_HALF, SAM3_SAVE, SAM3_IMGSZ, SAM3_NMS
+from model_cfg import IMAGES_FOLDER, SAM3_CONF, SAM3_TASK, SAM3_MODE, SAM3_PATH, SAM3_HALF, SAM3_SAVE, SAM3_IMGSZ, SAM3_NMS
 
 # Initialize SAM3 predictor with configuration
 current_folder = Path(__file__).resolve().parent
