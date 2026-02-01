@@ -16,10 +16,10 @@ model.set_classes(names, model.get_text_pe(names))
 # Run detection on the given image
 results = model.predict(
     source="C:/Users/zhijian.zhou/OneDrive - Akkodis/Bureau/unnamed.jpg",
-    conf=0.25,   # confidence
-    half=True,   # FP16
-    save=True,   # 保存结果
-    imgsz=320,   # 输入尺寸
+    conf=0.25,
+    half=True,
+    save=True,
+    imgsz=640,
     project=str(current_folder),
     name=f"yolo_result_det_{timestamp}",)
 
