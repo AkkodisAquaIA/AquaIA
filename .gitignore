@@ -4,6 +4,8 @@ __pycache__/
 *.npz
 *.pth
 *.pt
+dataloading/*.png
+coco128
 
 #Linter
 .ruff_cache/
