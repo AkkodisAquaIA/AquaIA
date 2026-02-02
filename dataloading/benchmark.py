@@ -27,9 +27,11 @@ def read_param() -> Tuple[Path, Path]:
     Parse command-line arguments and validate the data directory.
 
     Returns:
-        Tuple[Path, Path]: A tuple containing:
-            - the base working directory
-            - the data directory (working_dir / folder)
+        Tuple[Path, Path]: Base path and data directory.
+
+    Raises:
+        FileNotFoundError: If base path or data directory does not exist.
+        NotADirectoryError: If data path is not a directory.
     """
     parser = argparse.ArgumentParser(
         description="Program using a base path and a data folder"
@@ -51,25 +53,17 @@ def read_param() -> Tuple[Path, Path]:
 
     args = parser.parse_args()
 
-    base_path: Path = Path(args.work_dir)
-    folder_name: str = args.folder
+    base_path = Path(args.work_dir)
+    data_path = base_path / args.folder
 
-    # Build the full data path
-    data_path: Path = base_path / folder_name
-
-    # Check that the base path exists
     if not base_path.exists():
-        print(f"Error: base path does not exist -> {base_path}")
-        sys.exit(1)
+        raise FileNotFoundError(f"Base path does not exist: {base_path}")
 
-    # Check that the data directory exists and is a directory
     if not data_path.exists():
-        print(f"Error: data directory does not exist -> {data_path}")
-        sys.exit(1)
+        raise FileNotFoundError(f"Data directory does not exist: {data_path}")
 
     if not data_path.is_dir():
-        print(f"Error: data path is not a directory -> {data_path}")
-        sys.exit(1)
+        raise NotADirectoryError(f"Data path is not a directory: {data_path}")
 
     return base_path, data_path
 
@@ -111,8 +105,12 @@ if __name__ == "__main__":
 
     cfg = BenchmarkConfig()
 
-    # Lecture des chemins depuis les arguments de la ligne de commande
-    working_path, folder = read_param()
+    # Read parameters from command line
+    try:
+        working_path, folder = read_param()
+    except (FileNotFoundError, NotADirectoryError) as e:
+        print(f"Configuration error: {e}")
+        sys.exit(1)
     
     # root_folder = os.path.join(working_path, folder)
     # dataset_name = folder
