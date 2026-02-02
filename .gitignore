@@ -6,3 +6,6 @@ __pycache__/
 *.pt
 dataloading/*.png
 coco128
+
+#Linter
+.ruff_cache/
