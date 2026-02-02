@@ -64,8 +64,9 @@ def read_param() -> Tuple[Path, Path]:
 
     if not data_path.is_dir():
         raise NotADirectoryError(f"Data path is not a directory: {data_path}")
+    
 
-    return base_path, data_path
+    return base_path, args.folder
 
 def benchmark_dataset(
     dataset,
@@ -89,7 +90,7 @@ def benchmark_dataset(
     start_time = time.time()
 
     for _ in range(cfg.num_epochs):
-        for images, labels in loader:
+        for images in loader:
             _ = images * 2  # simulate workload
 
     total_time = time.time() - start_time
@@ -113,9 +114,9 @@ if __name__ == "__main__":
         sys.exit(1)
     
     datasets = [
-        NpyDetectionDataset(folder, working_path, "stats_npy.npy"),
-        PilDetectionDataset(folder, working_path, (304, 304), "stats_pil.npy"),
-        RAMDetectionDataset(folder, working_path, (304, 304), "stats_ram.npy")
+        NpyDetectionDataset(folder, working_path),
+        PilDetectionDataset(folder, working_path, (304, 304)),
+        RAMDetectionDataset(folder, working_path, (304, 304))
     ]
 
     results: List[Dict[str, Any]] = []
