@@ -112,11 +112,6 @@ if __name__ == "__main__":
         print(f"Configuration error: {e}")
         sys.exit(1)
     
-    # root_folder = os.path.join(working_path, folder)
-    # dataset_name = folder
-
-    print("Loading datasets...")
-
     datasets = [
         NpyDetectionDataset(folder, working_path, "stats_npy.npy"),
         PilDetectionDataset(folder, working_path, (304, 304), "stats_pil.npy"),
