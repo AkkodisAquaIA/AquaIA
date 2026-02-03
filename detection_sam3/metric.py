@@ -222,7 +222,7 @@ def evaluate_two_folders_intersection(
 
 if __name__ == "__main__":
     from model_cfg import IMAGES_FOLDER
-    from coco128_dict import COCO128_DICT
+    from dataset_dict import DATASET_DICT
     import tkinter as tk
     from tkinter import filedialog
 
@@ -263,7 +263,7 @@ if __name__ == "__main__":
     out = evaluate_two_folders_intersection(
         gt_labels_folder=str(gt_labels_folder),
         det_labels_folder=str(det_labels_folder),
-        names=COCO128_DICT,
+        names=DATASET_DICT,
         det_conf_threshold=det_conf_threshold,)
 
     # Print each metric on its own line for readability

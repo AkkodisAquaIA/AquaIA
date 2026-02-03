@@ -4,7 +4,7 @@ import torch
 from ultralytics.models.sam import SAM3SemanticPredictor
 from ultralytics import YOLOE
 from ultralytics.utils.nms import TorchNMS
-from coco128_dict import COCO128_DICT
+from dataset_dict import DATASET_DICT
 from model_cfg import IMAGES_FOLDER, MODEL_NAME, MODEL_CFG
 
 # Initialization parameters
@@ -14,10 +14,10 @@ cfg = MODEL_CFG[MODEL_NAME]
 run_name = f"{MODEL_NAME}_result_det_{timestamp}"
 
 # Text prompts sourced from the dataset label dictionary (keys sorted for stable order)
-text_prompts = [COCO128_DICT[idx] for idx in sorted(COCO128_DICT.keys())]
+text_prompts = [DATASET_DICT[idx] for idx in sorted(DATASET_DICT.keys())]
 
-# Map detection index back to COCO128 key
-coco128_keys_sorted = [idx for idx in sorted(COCO128_DICT.keys())]
+# Map detection index back to dataset key
+dataset_keys_sorted = [idx for idx in sorted(DATASET_DICT.keys())]
 
 # Create output labels folder
 labels_folder = Path(current_folder) / run_name / "labels"
@@ -30,6 +30,7 @@ for key, value in cfg.items():
     cfg_content[key] = value
 with cfg_path.open("w", encoding="utf-8") as cfg_file:
     for key, value in cfg_content.items():
+        # Format strings with quotes
         formatted = f"\"{value}\"" if isinstance(value, str) else value
         cfg_file.write(f"{key} = {formatted}\n")
 
@@ -72,13 +73,13 @@ def post_nms(result, iou_threshold, INFO_NMS):
 
     return result, INFO_NMS
 
-def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_sorted: list[int]) -> None:
+def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_sorted: list[int]) -> None:
     """Save normalized xywh labels for one image. cx, cy, w, h are normalized by image width and height.
     Args:
         result: The prediction result object containing boxes and original image.
         img_path (Path): Path to the input image.
         labels_folder (Path): Directory to save the label file.
-        coco128_keys_sorted (list[int]): List of COCO128 keys sorted in order.    
+        dataset_keys_sorted (list[int]): List of dataset keys sorted in order.    
     """
     # Return if no boxes detected
     if result.boxes is None:
@@ -86,8 +87,8 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_so
 
     xywh = result.boxes.xywh.cpu().numpy()
     cls_idx = result.boxes.cls.cpu().numpy().astype(int)    # text prompt n → cls_idx n
-    # Map cls_idx back to COCO128 key
-    coco_ids = [coco128_keys_sorted[i] for i in cls_idx]
+    # Map cls_idx back to dataset key
+    coco_ids = [dataset_keys_sorted[i] for i in cls_idx]
     conf = result.boxes.conf.cpu().numpy()
     # Get original image size
     img_h, img_w = result.orig_img.shape[:2]
@@ -102,6 +103,13 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, coco128_keys_so
         for cid, bbox, score in zip(coco_ids, coco_bboxes_norm, conf):
             f.write(f"{cid} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f} {score:.6f}\n")
 
+def print_device_info(model_instance):
+    """Print the device information of the model instance."""
+    global INFO_DEVICE
+    if INFO_DEVICE:
+        print(f"Device used: {model_instance.device}")
+        INFO_DEVICE = False
+
 # Iterate over all images in IMAGES_FOLDER and run inference with the text prompts
 image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
 
@@ -110,6 +118,7 @@ INFO_DEVICE = True
 INFO_NMS = True
 
 if MODEL_NAME == "sam3":
+    # Initialize SAM3
     overrides = dict(
         conf=cfg["CONF"],
         task=cfg["TASK"],
@@ -126,10 +135,10 @@ if MODEL_NAME == "sam3":
     for img_path in image_files:
         predictor.set_image(str(img_path))
 
-        if INFO_DEVICE:
-            print(f"Device used: {predictor.device}")
-            INFO_DEVICE = False
-        
+        # Print device info
+        print_device_info(predictor)
+
+        # Run prediction
         results = predictor(text=text_prompts)
 
         # If no results, skip saving
@@ -141,16 +150,17 @@ if MODEL_NAME == "sam3":
             results[0], INFO_NMS = post_nms(results[0], cfg["NMS"], INFO_NMS)
 
         # Save labels in xywh format
-        save_xywh_label(results[0], img_path, labels_folder, coco128_keys_sorted)
+        save_xywh_label(results[0], img_path, labels_folder, dataset_keys_sorted)
 
 if MODEL_NAME == "yoloe26":
+    # Initialize YOLOE26
     model = YOLOE(cfg["PATH"])
     model.set_classes(text_prompts, model.get_text_pe(text_prompts))
 
-    if INFO_DEVICE:
-        print(f"Device used: {model.device}")
-        INFO_DEVICE = False
+    # Print device info
+    print_device_info(model)
 
+    # Run prediction
     results = model.predict(
         source=str(IMAGES_FOLDER),
         conf=cfg["CONF"],
@@ -170,4 +180,4 @@ if MODEL_NAME == "yoloe26":
 
             # Save labels in xywh format
             img_path = Path(result.path)
-            save_xywh_label(result, img_path, labels_folder, coco128_keys_sorted)
+            save_xywh_label(result, img_path, labels_folder, dataset_keys_sorted)

@@ -1,4 +1,4 @@
-COCO128_DICT = {
+DATASET_DICT = {    # COCO128
     0: "person",
     1: "bicycle",
     2: "car",

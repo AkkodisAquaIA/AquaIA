@@ -2,7 +2,7 @@
 IMAGES_FOLDER = "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/08_Data/coco128/images/train2017"
 
 # Active model key: "sam3" or "yoloe26"
-MODEL_NAME = "sam3"
+MODEL_NAME = "yoloe26"
 
 MODEL_CFG = {
     "sam3": {
