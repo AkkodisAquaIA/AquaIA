@@ -5,12 +5,13 @@ jobs:
   build-docker-image:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: Create archive
         uses: ksm2/archive-action@v1
         with: 
           format: "tar"
           name: aquaia_archive
-          path: /docker/build/aquaia_archive.tar
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       - name: Login to Docker Hub
@@ -18,19 +19,21 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: df -h
+        run: df -h ./
       - name: Build Docker Image
         uses: docker/build-push-action@v4
         with:
           context: .
           file: ./docker/build/Dockerfile
-          tags: aquaia/aquaia:latest
-          push: true
+          tags: aquaia/aquaia:latest # TODO setup repo and change push status to true
+          push: false
           load: true
       - name: Save Docker image as artifact
-        run: docker save aquia/aquaia:latest -o aquaia_latest.tar
+        run: docker save aquaia/aquaia:latest -o aquaia_latest.tar
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: aquaia_docker_image
-          path: aquaia_image.tar
+          path: aquaia_latest.tar
           retention-days: 3
