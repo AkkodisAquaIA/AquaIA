@@ -156,28 +156,30 @@ def write_run_readme(save_dir: Path, cfg: Dict[str, Any], metrics: Dict[str, flo
         f"- Batch size: {train.get('batch')}",
         f"- Image size: {train.get('imgsz')}",
         "",
-        "All training hyperparameters, paths and runtime details are stored in the "
-        "`resolved_config.after.yaml` file in this folder. It contains the exact "
-        "model used, the dataset YAML path, the device, and the final save directory.",
-        "",
-        "## Plots and how to read them",
-        "- **results.png**: summaries of the whole training; the left columns show how the "
-        "training losses (box / cls / dfl) decrease over epochs, the right columns show "
-        "how validation metrics (precision, recall, mAP) improve.",
-        "- **confusion_matrix.png**: matrix of predicted vs. true classes; the diagonal "
-        "corresponds to correct detections, strong off-diagonal values reveal which "
-        "classes the model confuses.",
-        "- **F1_curve.png**: F1 score as a function of the confidence threshold; the peak "
-        "indicates the best compromise between missing objects (low recall) and producing "
-        "false positives (low precision).",
-        "- **PR_curve.png**: precision–recall curves for each class; curves closer to the "
-        "top-right corner indicate that the model keeps high precision while covering "
-        "most objects.",
-        "- **P_curve.png**: precision as a function of confidence threshold; it shows how "
-        "many predicted boxes are correct when you increase the confidence cut-off.",
-        "- **R_curve.png**: recall as a function of confidence threshold; it shows how many "
-        "true objects are still detected when you raise the confidence cut-off.",
-        "",
+        "All training hyperparameters, paths and runtime details are stored in "
+        "the `resolved_config.after.yaml` file in this folder. It contains the "
+        "exact model used, the dataset YAML path, the device, and the final "
+        "save directory.",
+        "- **results.png**: summaries of the whole training; the left columns "
+        "show how the training losses (box / cls / dfl) decrease over epochs, "
+        "the right columns show how validation metrics (precision, recall, "
+        "mAP) improve.",
+        "- **confusion_matrix.png**: matrix of predicted vs true classes; the "
+        "diagonal corresponds to correct detections, strong off-diagonal "
+        "values reveal which classes the model confuses.",
+        "- **F1_curve.png**: F1 score as a function of the confidence "
+        "threshold; the peak indicates the best compromise between missing "
+        "objects (low recall) and producing false positives (low precision).",
+        "- **PR_curve.png**: precision–recall curves for each class; curves "
+        "closer to the top-right corner indicate that the model keeps high "
+        "precision while covering most objects.",
+        "- **P_curve.png**: precision as a function of confidence threshold; "
+        "it shows how many predicted boxes are correct when you increase the "
+        "confidence cut-off.",
+        "- **R_curve.png**: recall as a function of confidence threshold; it "
+        "shows how many true objects are still detected when you raise the "
+        "confidence cut-off.",
+        
         "## Final validation metrics",
         f"- mAP50-95: {metrics.get('map50_95', 0.0):.4f}",
         f"- mAP50:    {metrics.get('map50', 0.0):.4f}",
