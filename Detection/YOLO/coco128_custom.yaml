@@ -10,7 +10,7 @@
 # If labels are missing, training degenerates to "background-only".
 # ------------------------------------------------------------------
 
-path: C:/Users/hbeng/project_ml/AQUA_IA_YOLO11n/datasets/coco128
+path: app/datasets/coco128
 train: images/train2017
 val: images/train2017
 

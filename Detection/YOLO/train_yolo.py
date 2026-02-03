@@ -9,9 +9,7 @@ Highlights:
 - Environment variables in YAML are supported (e.g., ${DATASET_YAML}).
 - Prints a compact JSON of key validation metrics at the end.
 """
-
 from __future__ import annotations
-
 import json
 import os
 from pathlib import Path
@@ -21,6 +19,7 @@ import torch
 import yaml
 from ultralytics import YOLO
 import argparse
+from datetime import datetime, timezone
 
 # -----------------------------
 # Helpers: env expansion & path resolution
@@ -30,7 +29,6 @@ def _expand_env(value: Any) -> Any:
     if isinstance(value, str):
         return os.path.expandvars(value)
     return value
-
 
 def _expand_env_in_dict(d: Dict[str, Any]) -> Dict[str, Any]:
     """Recursively expand environment variables in a nested dict."""
@@ -43,7 +41,6 @@ def _expand_env_in_dict(d: Dict[str, Any]) -> Dict[str, Any]:
         else:
             out[k] = _expand_env(v)
     return out
-
 
 def _resolve_path(base_dir: Path, maybe_path: str) -> str:
     """
@@ -58,6 +55,15 @@ def _resolve_path(base_dir: Path, maybe_path: str) -> str:
         return str(p.resolve())
     return str((base_dir / p).expanduser().resolve())
 
+def write_resolved_config_yaml(save_dir: Path, resolved_cfg: Dict[str, Any], filename: str) -> Path:
+    """Write the enriched configuration used for the run as a YAML file."""
+    save_dir.mkdir(parents=True, exist_ok=True)
+    out_path = save_dir / filename
+    out_path.write_text(
+        yaml.safe_dump(resolved_cfg, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    return out_path
 
 # -----------------------------
 # Config loading
@@ -115,9 +121,8 @@ def resolve_model_identifier(model_cfg: Dict[str, Any]) -> str:
 
     raise ValueError(f"[CONFIG ERROR] Unsupported model.init '{init}'. Use 'pretrained' or 'random'.")
 
-
 # -----------------------------
-# Device selection (portable)
+# Device selection
 # -----------------------------
 def resolve_device(training_cfg: Dict[str, Any]) -> str | int:
     """
@@ -130,12 +135,65 @@ def resolve_device(training_cfg: Dict[str, Any]) -> str | int:
         return training_cfg["device"]
     return 0 if torch.cuda.is_available() else "cpu"
 
+# -----------------------------
+# Run documentation (README)
+# -----------------------------
+def write_run_readme(save_dir: Path, cfg: Dict[str, Any], metrics: Dict[str, float]) -> None:
+    """Generate a README_run.md file describing the run and the main plots."""
+    model_cfg = cfg.get("model", {})
+    data_cfg = cfg.get("data", {})
+    train = cfg.get("training", {})
+
+    lines = [
+        "# AquaIA Training Run",
+        "",
+        "## Run overview",
+        f"- Date (UTC): {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
+        f"- Model: {model_cfg.get('family', 'yolo')}{model_cfg.get('size', '')} ({model_cfg.get('init', '')})",
+        f"- Dataset YAML: {data_cfg.get('dataset_yaml')}",
+        f"- Task / mode: {train.get('task', 'detect')} / {train.get('mode', 'train')}",
+        f"- Epochs: {train.get('epochs')}",
+        f"- Batch size: {train.get('batch')}",
+        f"- Image size: {train.get('imgsz')}",
+        "",
+        "All training hyperparameters, paths and runtime details are stored in the "
+        "`resolved_config.after.yaml` file in this folder. It contains the exact "
+        "model used, the dataset YAML path, the device, and the final save directory.",
+        "",
+        "## Plots and how to read them",
+        "- **results.png**: summaries of the whole training; the left columns show how the "
+        "training losses (box / cls / dfl) decrease over epochs, the right columns show "
+        "how validation metrics (precision, recall, mAP) improve.",
+        "- **confusion_matrix.png**: matrix of predicted vs. true classes; the diagonal "
+        "corresponds to correct detections, strong off-diagonal values reveal which "
+        "classes the model confuses.",
+        "- **F1_curve.png**: F1 score as a function of the confidence threshold; the peak "
+        "indicates the best compromise between missing objects (low recall) and producing "
+        "false positives (low precision).",
+        "- **PR_curve.png**: precision–recall curves for each class; curves closer to the "
+        "top-right corner indicate that the model keeps high precision while covering "
+        "most objects.",
+        "- **P_curve.png**: precision as a function of confidence threshold; it shows how "
+        "many predicted boxes are correct when you increase the confidence cut-off.",
+        "- **R_curve.png**: recall as a function of confidence threshold; it shows how many "
+        "true objects are still detected when you raise the confidence cut-off.",
+        "",
+        "## Final validation metrics",
+        f"- mAP50-95: {metrics.get('map50_95', 0.0):.4f}",
+        f"- mAP50:    {metrics.get('map50', 0.0):.4f}",
+        f"- Precision: {metrics.get('precision', 0.0):.4f}",
+        f"- Recall:    {metrics.get('recall', 0.0):.4f}",
+    ]
+
+    (save_dir / "README_run.md").write_text("\n".join(lines), encoding="utf-8")
 
 # -----------------------------
 # Main entrypoint
 # -----------------------------
+
 def main(config_path: str) -> Any:
-    """Load config, validate dataset, instantiate model, and launch training."""
+    """Main: load config, prepare run, train YOLO, and save metadata."""
+    # ---------- 1. Load and unpack config ----------
     cfg, cfg_dir = load_config(config_path)
 
     model_cfg = cfg["model"]
@@ -143,13 +201,15 @@ def main(config_path: str) -> Any:
     training_cfg = cfg["training"]
     output_cfg = cfg.get("output", {})
 
+    # ---------- 2. Resolve dataset path ----------
     dataset_yaml = data_cfg.get("dataset_yaml")
     if not dataset_yaml:
-        raise KeyError("[CONFIG ERROR] 'data.datase t_yaml' must be set.")
+        raise KeyError("[CONFIG ERROR] 'data.dataset_yaml' must be set.")
 
     # Resolve dataset YAML relative to the config file location
     dataset_yaml = _resolve_path(cfg_dir, str(dataset_yaml))
 
+    # ---------- 3. Build model and device ----------
     # Instantiate YOLO model (keep variable name: model)
     model_id = resolve_model_identifier(model_cfg)
     model = YOLO(model_id)
@@ -157,32 +217,121 @@ def main(config_path: str) -> Any:
     # Device selection (portable)
     device = resolve_device(training_cfg)
 
-    # Build training args (pass-through from YAML)
+    # ---------- 4. Build train arguments ----------
+    # Start from training section and inject data/device
     train_args: Dict[str, Any] = dict(training_cfg)
     train_args["data"] = dataset_yaml
     train_args["device"] = device
 
-    # Output controls (Docker-friendly)
+    # ---------- 5. Resolve output project/name ----------
     project = output_cfg.get("project")
-    name = output_cfg.get("name")
 
     if project:
         project_resolved = _resolve_path(cfg_dir, str(project))
         Path(project_resolved).mkdir(parents=True, exist_ok=True)
         train_args["project"] = project_resolved
+    else:
+        project_resolved = str((cfg_dir / "runs").resolve())
+        Path(project_resolved).mkdir(parents=True, exist_ok=True)
+        train_args["project"] = project_resolved
 
-    if name:
-        train_args["name"] = str(name)
+    # Auto-generate informative run name if not provided in YAML
+    family = str(model_cfg.get("family", "yolo")).lower()
+    size = str(model_cfg.get("size", "n")).lower()
+    init = str(model_cfg.get("init", "pretrained")).lower()
+
+    dataset_yaml_name = Path(data_cfg.get("dataset_yaml", "data.yaml")).stem
+    epochs = training_cfg.get("epochs")
+    batch = training_cfg.get("batch")
+    imgsz = training_cfg.get("imgsz")
+
+    run_timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    default_name = (
+        f"{run_timestamp}_{family}{size}_{dataset_yaml_name}"
+        f"_e{epochs}_bs{batch}_img{imgsz}_{init}"
+    )
+
+    # If output.name is set in YAML, it overrides the default
+    name = output_cfg.get("name") or default_name
+    train_args["name"] = str(name)
 
     # Merge a few output flags into train args
     for k in ("exist_ok", "save", "save_period", "plots"):
         if k in output_cfg:
             train_args[k] = output_cfg[k]
 
+    # ---------- 6. Prepare resolved config snapshot ----------
+    resolved_cfg = {
+        "model": model_cfg,
+        "data": {
+            "dataset_yaml": dataset_yaml,
+        },
+        "training": training_cfg,
+        "output": output_cfg,
+        "resolved": {
+            # Time & reproducibility
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+
+            # Effective runtime values
+            "model_id": model_id,
+            "device": str(device),
+
+            # Where Ultralytics is instructed to write
+            "project": train_args.get("project"),
+            "name": train_args.get("name"),
+
+            # Filled after training
+            "save_dir": None,
+            "weights": {
+                "best": None,
+                "last": None,
+            },
+            "metrics": None,
+        },
+    }
+    
+    write_cfg = output_cfg.get("write_config", True)
+    cfg_after_name = str(output_cfg.get("config_filename_after", "resolved_config.after.yaml"))
+    run_dir_guess = Path(str(train_args.get("project"))) / str(train_args.get("name"))
+
+    # ---------- 7. Launch training ----------
     results = model.train(**train_args)
+
+    # ---------- 8. Collect outputs and metrics ----------
+    final_dir = getattr(results, "save_dir", None)
+    if final_dir is not None:
+        final_dir = Path(final_dir)
+        resolved_cfg["resolved"]["save_dir"] = str(final_dir)
+
+        best = final_dir / "weights" / "best.pt"
+        last = final_dir / "weights" / "last.pt"
+        resolved_cfg["resolved"]["weights"]["best"] = str(best) if best.exists() else None
+        resolved_cfg["resolved"]["weights"]["last"] = str(last) if last.exists() else None
+
+        metrics = getattr(results, "results_dict", {}) or {}
+        resolved_cfg["resolved"]["metrics"] = {
+            "map50_95": float(metrics.get("metrics/mAP50-95(B)", 0.0)),
+            "map50": float(metrics.get("metrics/mAP50(B)", 0.0)),
+            "precision": float(metrics.get("metrics/precision(B)", 0.0)),
+            "recall": float(metrics.get("metrics/recall(B)", 0.0)),
+        }
+
+        # Write human-readable summary README in the run folder
+        write_run_readme(final_dir, cfg, resolved_cfg["resolved"]["metrics"])
+
+        # Snapshot of final resolved config after training
+        if write_cfg:
+            target_dir = Path(final_dir) if final_dir is not None else run_dir_guess
+            write_resolved_config_yaml(target_dir, resolved_cfg, cfg_after_name)
+
     return results
 
+# -----------------------------
+# CLI entrypoint
+# -----------------------------
+
 def parse_args() -> str:
+    """Parse command-line arguments and return the config path."""
     parser = argparse.ArgumentParser(
         description="Train a YOLO model from a YAML config."
     )
@@ -195,17 +344,19 @@ def parse_args() -> str:
     args = parser.parse_args()
     return args.config
 
-
 if __name__ == "__main__":
+    # Parse CLI args and run training
     cfg_path = parse_args()
     out = main(cfg_path)
+
+    # Print where results were saved
     savedir = getattr(out, "save_dir", None)
     if savedir is not None:
         print(f"Training finished. Results saved to {Path(savedir)}")
     else:
         print("Training finished.")
 
-    # Print compact KPIs as JSON
+    # Print compact KPIs as JSON for easy logging/automation
     metrics = getattr(out, "results_dict", {}) or {}
     pretty = {
         "map50_95": float(metrics.get("metrics/mAP50-95(B)", 0.0)),
