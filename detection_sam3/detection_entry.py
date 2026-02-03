@@ -54,8 +54,10 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_so
         labels_folder (Path): Directory to save the label file.
         dataset_keys_sorted (list[int]): List of dataset keys sorted in order.    
     """
-    # Return if no boxes detected
-    if result.boxes is None:
+    # Always create the label file; keep it empty if no boxes detected
+    label_path = labels_folder / f"{Path(img_path).stem}.txt"
+    if result.boxes is None or result.boxes.shape[0] == 0:
+        label_path.open("w").close()
         return
 
     xywh = result.boxes.xywh.cpu().numpy()
@@ -71,7 +73,6 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_so
         coco_bboxes_norm.append([cx / img_w, cy / img_h, w / img_w, h / img_h])
 
     # Write to label file
-    label_path = labels_folder / f"{Path(img_path).stem}.txt"
     with label_path.open("w") as f:
         for cid, bbox, score in zip(coco_ids, coco_bboxes_norm, conf):
             f.write(f"{cid} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f} {score:.6f}\n")
@@ -142,8 +143,9 @@ if __name__ == "__main__":
             # Run prediction
             results = predictor(text=text_prompts)
 
-            # If no results, skip saving
+            # If no results, still create empty txt file
             if not results:
+                (labels_folder / f"{img_path.stem}.txt").open("w").close()
                 continue
 
             # Apply NMS only when enabled and keep updated result in-place

@@ -2,11 +2,11 @@
 IMAGES_FOLDER = "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/08_Data/coco128/images/train2017"
 
 # Active model key: "sam3" or "yoloe26"
-MODEL_NAME = "yoloe26"
+MODEL_NAME = "sam3"
 
 MODEL_CFG = {
     "sam3": {
-        "CONF": 0.3,
+        "CONF": 0.5,
         "TASK": "segment",
         "MODE": "predict",
         "PATH": "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/sam3.pt",
