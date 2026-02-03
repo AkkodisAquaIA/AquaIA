@@ -7,33 +7,6 @@ from ultralytics.utils.nms import TorchNMS
 from dataset_dict import DATASET_DICT
 from model_cfg import IMAGES_FOLDER, MODEL_NAME, MODEL_CFG
 
-# Initialization parameters
-current_folder = Path(__file__).resolve().parent
-timestamp = datetime.now().strftime("%Y%m%d%H%M")
-cfg = MODEL_CFG[MODEL_NAME]
-run_name = f"{MODEL_NAME}_result_det_{timestamp}"
-
-# Text prompts sourced from the dataset label dictionary (keys sorted for stable order)
-text_prompts = [DATASET_DICT[idx] for idx in sorted(DATASET_DICT.keys())]
-
-# Map detection index back to dataset key
-dataset_keys_sorted = [idx for idx in sorted(DATASET_DICT.keys())]
-
-# Create output labels folder
-labels_folder = Path(current_folder) / run_name / "labels"
-labels_folder.mkdir(parents=True, exist_ok=True)
-
-# Save the loaded configuration as a flat text file for reference
-cfg_path = labels_folder.parent / "cfg.txt"
-cfg_content = {"IMAGES_FOLDER": IMAGES_FOLDER, "MODEL_NAME": MODEL_NAME}
-for key, value in cfg.items():
-    cfg_content[key] = value
-with cfg_path.open("w", encoding="utf-8") as cfg_file:
-    for key, value in cfg_content.items():
-        # Format strings with quotes
-        formatted = f"\"{value}\"" if isinstance(value, str) else value
-        cfg_file.write(f"{key} = {formatted}\n")
-
 def post_nms(result, iou_threshold, INFO_NMS):
     """Per-class NMS for detection results; keeps cls/conf, optional masks.
     The terminal logs and auto-saved visualizations during inference
@@ -110,74 +83,102 @@ def print_device_info(model_instance):
         print(f"Device used: {model_instance.device}")
         INFO_DEVICE = False
 
-# Iterate over all images in IMAGES_FOLDER and run inference with the text prompts
-image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
+if __name__ == "__main__":
+    # Initialization parameters
+    current_folder = Path(__file__).resolve().parent
+    timestamp = datetime.now().strftime("%Y%m%d%H%M")
+    cfg = MODEL_CFG[MODEL_NAME]
+    run_name = f"{MODEL_NAME}_result_det_{timestamp}"
 
-# Print information once
-INFO_DEVICE = True
-INFO_NMS = True
+    # Text prompts sourced from the dataset label dictionary (keys sorted for stable order)
+    text_prompts = [DATASET_DICT[idx] for idx in sorted(DATASET_DICT.keys())]
 
-if MODEL_NAME == "sam3":
-    # Initialize SAM3
-    overrides = dict(
-        conf=cfg["CONF"],
-        task=cfg["TASK"],
-        mode=cfg["MODE"],
-        model=cfg["PATH"],
-        half=cfg["HALF"],
-        save=cfg["SAVE"],
-        imgsz=cfg["IMGSZ"],
-        project=str(current_folder),
-        name=run_name,
-        exist_ok=True,)
-    predictor = SAM3SemanticPredictor(overrides=overrides)
+    # Map detection index back to dataset key
+    dataset_keys_sorted = [idx for idx in sorted(DATASET_DICT.keys())]
 
-    for img_path in image_files:
-        predictor.set_image(str(img_path))
+    # Create output labels folder
+    labels_folder = Path(current_folder) / run_name / "labels"
+    labels_folder.mkdir(parents=True, exist_ok=True)
 
-        # Print device info
-        print_device_info(predictor)
+    # Save the loaded configuration as a flat text file for reference
+    cfg_path = labels_folder.parent / "cfg.txt"
+    cfg_content = {"IMAGES_FOLDER": IMAGES_FOLDER, "MODEL_NAME": MODEL_NAME}
+    for key, value in cfg.items():
+        cfg_content[key] = value
+    with cfg_path.open("w", encoding="utf-8") as cfg_file:
+        for key, value in cfg_content.items():
+            # Format strings with quotes
+            formatted = f"\"{value}\"" if isinstance(value, str) else value
+            cfg_file.write(f"{key} = {formatted}\n")
 
-        # Run prediction
-        results = predictor(text=text_prompts)
+    # Iterate over all images in IMAGES_FOLDER and run inference with the text prompts
+    image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
 
-        # If no results, skip saving
-        if not results:
-            continue
+    # Print information once
+    INFO_DEVICE = True
+    INFO_NMS = True
 
-        # Apply NMS only when enabled and keep updated result in-place
-        if cfg["NMS"] != False:
-            results[0], INFO_NMS = post_nms(results[0], cfg["NMS"], INFO_NMS)
+    if MODEL_NAME == "sam3":
+        # Initialize SAM3
+        overrides = dict(
+            conf=cfg["CONF"],
+            task=cfg["TASK"],
+            mode=cfg["MODE"],
+            model=cfg["PATH"],
+            half=cfg["HALF"],
+            save=cfg["SAVE"],
+            imgsz=cfg["IMGSZ"],
+            project=str(current_folder),
+            name=run_name,
+            exist_ok=True,)
+        predictor = SAM3SemanticPredictor(overrides=overrides)
 
-        # Save labels in xywh format
-        save_xywh_label(results[0], img_path, labels_folder, dataset_keys_sorted)
+        for img_path in image_files:
+            predictor.set_image(str(img_path))
 
-if MODEL_NAME == "yoloe26":
-    # Initialize YOLOE26
-    model = YOLOE(cfg["PATH"])
-    model.set_classes(text_prompts, model.get_text_pe(text_prompts))
+            # Print device info
+            print_device_info(predictor)
 
-    # Print device info
-    print_device_info(model)
+            # Run prediction
+            results = predictor(text=text_prompts)
 
-    # Run prediction
-    results = model.predict(
-        source=str(IMAGES_FOLDER),
-        conf=cfg["CONF"],
-        half=cfg["HALF"],
-        save=cfg["SAVE"],
-        imgsz=cfg["IMGSZ"],
-        project=str(current_folder),
-        name=run_name,
-        exist_ok=True)
+            # If no results, skip saving
+            if not results:
+                continue
 
-    # If no results, skip saving
-    if results:
-        for result in results:
             # Apply NMS only when enabled and keep updated result in-place
             if cfg["NMS"] != False:
-                result, INFO_NMS = post_nms(result, cfg["NMS"], INFO_NMS)
+                results[0], INFO_NMS = post_nms(results[0], cfg["NMS"], INFO_NMS)
 
             # Save labels in xywh format
-            img_path = Path(result.path)
-            save_xywh_label(result, img_path, labels_folder, dataset_keys_sorted)
+            save_xywh_label(results[0], img_path, labels_folder, dataset_keys_sorted)
+
+    if MODEL_NAME == "yoloe26":
+        # Initialize YOLOE26
+        model = YOLOE(cfg["PATH"])
+        model.set_classes(text_prompts, model.get_text_pe(text_prompts))
+
+        # Print device info
+        print_device_info(model)
+
+        # Run prediction
+        results = model.predict(
+            source=str(IMAGES_FOLDER),
+            conf=cfg["CONF"],
+            half=cfg["HALF"],
+            save=cfg["SAVE"],
+            imgsz=cfg["IMGSZ"],
+            project=str(current_folder),
+            name=run_name,
+            exist_ok=True)
+
+        # If no results, skip saving
+        if results:
+            for result in results:
+                # Apply NMS only when enabled and keep updated result in-place
+                if cfg["NMS"] != False:
+                    result, INFO_NMS = post_nms(result, cfg["NMS"], INFO_NMS)
+
+                # Save labels in xywh format
+                img_path = Path(result.path)
+                save_xywh_label(result, img_path, labels_folder, dataset_keys_sorted)
