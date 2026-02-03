@@ -2,56 +2,39 @@ from pathlib import Path
 from datetime import datetime
 import torch
 from ultralytics.models.sam import SAM3SemanticPredictor
+from ultralytics import YOLOE
 from ultralytics.utils.nms import TorchNMS
 from coco128_dict import COCO128_DICT
-from model_cfg import IMAGES_FOLDER, SAM3_CONF, SAM3_TASK, SAM3_MODE, SAM3_PATH, SAM3_HALF, SAM3_SAVE, SAM3_IMGSZ, SAM3_NMS
+from model_cfg import IMAGES_FOLDER, MODEL_NAME, MODEL_CFG
 
-# Initialize SAM3 predictor with configuration
+# Initialization parameters
 current_folder = Path(__file__).resolve().parent
 timestamp = datetime.now().strftime("%Y%m%d%H%M")
+cfg = MODEL_CFG[MODEL_NAME]
+run_name = f"{MODEL_NAME}_result_det_{timestamp}"
 
-overrides = dict(
-    conf=SAM3_CONF,
-    task=SAM3_TASK,
-    mode=SAM3_MODE,
-    model=SAM3_PATH,
-    half=SAM3_HALF,
-    save=SAM3_SAVE,
-    imgsz=SAM3_IMGSZ,
-    project=str(current_folder),
-    name=f"sam3_result_det_{timestamp}",)
-predictor = SAM3SemanticPredictor(overrides=overrides)
-
-# Text prompts sourced from the COCO128 label dictionary (keys sorted for stable order)
+# Text prompts sourced from the dataset label dictionary (keys sorted for stable order)
 text_prompts = [COCO128_DICT[idx] for idx in sorted(COCO128_DICT.keys())]
 
 # Map detection index back to COCO128 key
 coco128_keys_sorted = [idx for idx in sorted(COCO128_DICT.keys())]
 
 # Create output labels folder
-labels_folder = Path(current_folder) / f"sam3_result_det_{timestamp}" / "labels"
+labels_folder = Path(current_folder) / run_name / "labels"
 labels_folder.mkdir(parents=True, exist_ok=True)
 
 # Save the loaded configuration as a flat text file for reference
 cfg_path = labels_folder.parent / "cfg.txt"
-cfg_content = {
-    "IMAGES_FOLDER": IMAGES_FOLDER,
-    "SAM3_CONF": SAM3_CONF,
-    "SAM3_TASK": SAM3_TASK,
-    "SAM3_MODE": SAM3_MODE,
-    "SAM3_PATH": SAM3_PATH,
-    "SAM3_HALF": SAM3_HALF,
-    "SAM3_SAVE": SAM3_SAVE,
-    "SAM3_IMGSZ": SAM3_IMGSZ,
-    "SAM3_NMS": SAM3_NMS,
-}
+cfg_content = {"IMAGES_FOLDER": IMAGES_FOLDER, "MODEL_NAME": MODEL_NAME}
+for key, value in cfg.items():
+    cfg_content[key] = value
 with cfg_path.open("w", encoding="utf-8") as cfg_file:
     for key, value in cfg_content.items():
         formatted = f"\"{value}\"" if isinstance(value, str) else value
         cfg_file.write(f"{key} = {formatted}\n")
 
-def sam3_nms(result, iou_threshold, INFO_NMS):
-    """Per-class NMS for SAM3 results; keeps cls/conf, optional masks.
+def post_nms(result, iou_threshold, INFO_NMS):
+    """Per-class NMS for detection results; keeps cls/conf, optional masks.
     The terminal logs and auto-saved visualizations during inference
     are still the results before NMS."""
     # Print notice about NMS once
@@ -126,21 +109,65 @@ image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.low
 INFO_DEVICE = True
 INFO_NMS = True
 
-for img_path in image_files:
-    predictor.set_image(str(img_path))
+if MODEL_NAME == "sam3":
+    overrides = dict(
+        conf=cfg["CONF"],
+        task=cfg["TASK"],
+        mode=cfg["MODE"],
+        model=cfg["PATH"],
+        half=cfg["HALF"],
+        save=cfg["SAVE"],
+        imgsz=cfg["IMGSZ"],
+        project=str(current_folder),
+        name=run_name,
+        exist_ok=True,)
+    predictor = SAM3SemanticPredictor(overrides=overrides)
+
+    for img_path in image_files:
+        predictor.set_image(str(img_path))
+
+        if INFO_DEVICE:
+            print(f"Device used: {predictor.device}")
+            INFO_DEVICE = False
+        
+        results = predictor(text=text_prompts)
+
+        # If no results, skip saving
+        if not results:
+            continue
+
+        # Apply NMS only when enabled and keep updated result in-place
+        if cfg["NMS"] != False:
+            results[0], INFO_NMS = post_nms(results[0], cfg["NMS"], INFO_NMS)
+
+        # Save labels in xywh format
+        save_xywh_label(results[0], img_path, labels_folder, coco128_keys_sorted)
+
+if MODEL_NAME == "yoloe26":
+    model = YOLOE(cfg["PATH"])
+    model.set_classes(text_prompts, model.get_text_pe(text_prompts))
 
     if INFO_DEVICE:
-        print(f"Device used: {predictor.device}")
+        print(f"Device used: {model.device}")
         INFO_DEVICE = False
-    
-    results = predictor(text=text_prompts)
+
+    results = model.predict(
+        source=str(IMAGES_FOLDER),
+        conf=cfg["CONF"],
+        half=cfg["HALF"],
+        save=cfg["SAVE"],
+        imgsz=cfg["IMGSZ"],
+        project=str(current_folder),
+        name=run_name,
+        exist_ok=True)
 
     # If no results, skip saving
-    if not results:
-        continue
+    if results:
+        for result in results:
+            # Apply NMS only when enabled and keep updated result in-place
+            if cfg["NMS"] != False:
+                result, INFO_NMS = post_nms(result, cfg["NMS"], INFO_NMS)
 
-    # Apply NMS only when enabled and keep updated result in-place
-    if SAM3_NMS != False:
-        results[0], INFO_NMS = sam3_nms(results[0], SAM3_NMS, INFO_NMS)
-
-    save_xywh_label(results[0], img_path, labels_folder, coco128_keys_sorted)
+            # Save labels in xywh format
+            img_path = Path(result.path)
+            save_xywh_label(result, img_path, labels_folder, coco128_keys_sorted)

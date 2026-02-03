@@ -238,12 +238,12 @@ if __name__ == "__main__":
     root.destroy()
     det_dir = Path(chosen_dir) if chosen_dir else get_latest_result_dir(current_folder)
 
-    # Read SAM3_CONF from cfg.txt under the selected/latest result directory
+    # Read CONF from cfg.txt under the selected/latest result directory
     cfg_conf = None
     cfg_path = det_dir / "cfg.txt"
     if cfg_path.exists():
         for line in cfg_path.read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith("SAM3_CONF"):
+            if line.strip().startswith("CONF"):
                 parts = line.split("=")
                 if len(parts) == 2:
                     # Extract confidence value
@@ -251,7 +251,7 @@ if __name__ == "__main__":
                 break
 
     # Ask user for a new confidence threshold
-    user_input = input(f"Inference SAM3_CONF = {cfg_conf}, define a new threshold? (blank to skip): ").strip()
+    user_input = input(f"Inference CONF = {cfg_conf}, define a new threshold? (blank to skip): ").strip()
     det_conf_threshold = float(user_input) if user_input else None
     suffix = ""
     if det_conf_threshold is not None:
