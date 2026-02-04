@@ -1,6 +1,7 @@
 import torch
+import torch.nn as nn
 
-class DINODetector:
+class DINODetector(nn.Module):
     def __init__(
         self, 
         backbone_id="dino", 
@@ -10,6 +11,7 @@ class DINODetector:
         num_classes=91,
         num_queries=50,
         ):
+        super(DINODetector, self).__init__()
         self.backbone_id = backbone_id
         self.detector_head_id = detector_head_id
         self.device = device
@@ -22,6 +24,6 @@ class DINODetector:
         batch_size = images.shape[0]
         dummy_outputs = {
             "pred_logits": torch.randn(batch_size, self.num_queries, self.num_classes + 1),
-            "pred_boxes": torch.randn(batch_size, self.num_queries, 4),
+            "pred_boxes": torch.sigmoid(torch.randn(batch_size, self.num_queries, 4)),
         }
         return dummy_outputs

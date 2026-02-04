@@ -18,7 +18,7 @@ import torch
 from scipy.optimize import linear_sum_assignment
 from torch import nn
 
-from util.box_ops import box_cxcywh_to_xyxy, generalized_box_iou, bbox2delta
+from .box_ops import box_cxcywh_to_xyxy, generalized_box_iou, bbox2delta
 
 
 class HungarianMatcher(nn.Module):
@@ -129,12 +129,3 @@ class HungarianMatcher(nn.Module):
                 )
                 for i, j in indices
             ]
-
-
-def build_matcher(args):
-    return HungarianMatcher(
-        cost_class=args.set_cost_class,
-        cost_bbox=args.set_cost_bbox,
-        cost_giou=args.set_cost_giou,
-        cost_bbox_type='l1' if (not args.reparam) else 'reparam',
-    )

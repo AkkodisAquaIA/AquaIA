@@ -2,8 +2,38 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .matcher import HungarianMatcher
-from .util import accuracy, box_ops
+from .utils.matcher import HungarianMatcher
+from .utils import box_ops 
+from .utils.misc import accuracy, get_world_size
+
+def sigmoid_focal_loss(
+    inputs, targets, num_boxes, alpha: float = 0.25, gamma: float = 2
+):
+    """
+    Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
+    Args:
+        inputs: A float tensor of arbitrary shape.
+                The predictions for each example.
+        targets: A float tensor with the same shape as inputs. Stores the binary
+                 classification label for each element in inputs
+                (0 for the negative class and 1 for the positive class).
+        alpha: (optional) Weighting factor in range (0,1) to balance
+                positive vs negative examples. Default = -1 (no weighting).
+        gamma: Exponent of the modulating factor (1 - p_t) to
+               balance easy vs hard examples.
+    Returns:
+        Loss tensor
+    """
+    prob = inputs.sigmoid()
+    ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+    p_t = prob * targets + (1 - prob) * (1 - targets)
+    loss = ce_loss * ((1 - p_t) ** gamma)
+
+    if alpha >= 0:
+        alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
+        loss = alpha_t * loss
+
+    return loss.mean(1).sum() / num_boxes
 
 class SetCriterion(nn.Module):
     """ This class computes the loss for DETR.
@@ -12,13 +42,12 @@ class SetCriterion(nn.Module):
         2) we supervise each pair of matched ground-truth / prediction (supervise class and box)
     """
 
-    def __init__(self, num_classes, matcher, weight_dict, losses, focal_alpha=0.25, reparam=False):
+    def __init__(self, num_classes, matcher, weight_dict, focal_alpha=0.25, reparam=False):
         """ Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
             matcher: module able to compute a matching between targets and proposals
             weight_dict: dict containing as key the names of the losses and as values their relative weight.
-            losses: list of all the losses to be applied. See get_loss for list of available losses.
             focal_alpha: alpha in Focal Loss
             loss_bbox_type: how to perform loss_bbox
         """
@@ -26,11 +55,11 @@ class SetCriterion(nn.Module):
         self.num_classes = num_classes
         self.matcher = matcher
         self.weight_dict = weight_dict
-        self.losses = losses
         self.focal_alpha = focal_alpha
         self.loss_bbox_type = 'l1' if (not reparam) else 'reparam'
+        self.losses = ["labels", "boxes", "cardinality"]
 
-    def loss_labels(self, outputs, targets, indices, num_boxes, log=True):
+    def loss_labels(self, outputs, targets, indices, num_boxes):
         """Classification loss (NLL)
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
         """
@@ -70,9 +99,8 @@ class SetCriterion(nn.Module):
         )
         losses = {"loss_ce": loss_ce}
 
-        if log:
-            # TODO this should probably be a separate loss, not hacked in this one here
-            losses["class_error"] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
+        # TODO this should probably be a separate loss, not hacked in this one here
+        losses["class_error"] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
         return losses
 
     @torch.no_grad()
@@ -172,8 +200,6 @@ class SetCriterion(nn.Module):
         num_boxes = torch.as_tensor(
             [num_boxes], dtype=torch.float, device=next(iter(outputs.values())).device
         )
-        if is_dist_avail_and_initialized():
-            torch.distributed.all_reduce(num_boxes)
         num_boxes = torch.clamp(num_boxes / get_world_size(), min=1).item()
 
         # Compute all the requested losses
