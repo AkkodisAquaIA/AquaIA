@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .matcher import HungarianMatcher
-from .util import accuracy, box_ops, nested_tensor_from_tensor_list
+from .util import accuracy, box_ops
 
 class SetCriterion(nn.Module):
     """ This class computes the loss for DETR.
@@ -125,41 +125,7 @@ class SetCriterion(nn.Module):
         losses["loss_giou"] = loss_giou.sum() / num_boxes
         return losses
 
-    def loss_masks(self, outputs, targets, indices, num_boxes):
-        """Compute the losses related to the masks: the focal loss and the dice loss.
-           targets dicts must contain the key "masks" containing a tensor of dim [nb_target_boxes, h, w]
-        """
-        assert "pred_masks" in outputs
-
-        src_idx = self._get_src_permutation_idx(indices)
-        tgt_idx = self._get_tgt_permutation_idx(indices)
-
-        src_masks = outputs["pred_masks"]
-
-        # TODO use valid to mask invalid areas due to padding in loss
-        target_masks, valid = nested_tensor_from_tensor_list(
-            [t["masks"] for t in targets]
-        ).decompose()
-        target_masks = target_masks.to(src_masks)
-
-        src_masks = src_masks[src_idx]
-        # upsample predictions to the target size
-        src_masks = interpolate(
-            src_masks[:, None],
-            size=target_masks.shape[-2:],
-            mode="bilinear",
-            align_corners=False,
-        )
-        src_masks = src_masks[:, 0].flatten(1)
-
-        target_masks = target_masks[tgt_idx].flatten(1)
-
-        losses = {
-            "loss_mask": sigmoid_focal_loss(src_masks, target_masks, num_boxes),
-            "loss_dice": dice_loss(src_masks, target_masks, num_boxes),
-        }
-        return losses
-
+   
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
         batch_idx = torch.cat(
@@ -181,7 +147,6 @@ class SetCriterion(nn.Module):
             "labels": self.loss_labels,
             "cardinality": self.loss_cardinality,
             "boxes": self.loss_boxes,
-            "masks": self.loss_masks,
         }
         assert loss in loss_map, f"do you really want to compute {loss} loss?"
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
@@ -224,9 +189,6 @@ class SetCriterion(nn.Module):
             for i, aux_outputs in enumerate(outputs["aux_outputs"]):
                 indices = self.matcher(aux_outputs, targets)
                 for loss in self.losses:
-                    if loss == "masks":
-                        # Intermediate masks losses are too costly to compute, we ignore them.
-                        continue
                     kwargs = {}
                     if loss == "labels":
                         # Logging is enabled only for the last layer
@@ -244,9 +206,6 @@ class SetCriterion(nn.Module):
                 bt["labels"] = torch.zeros_like(bt["labels"])
             indices = self.matcher(enc_outputs, bin_targets)
             for loss in self.losses:
-                if loss == "masks":
-                    # Intermediate masks losses are too costly to compute, we ignore them.
-                    continue
                 kwargs = {}
                 if loss == "labels":
                     # Logging is enabled only for the last layer
