@@ -4,6 +4,7 @@ __pycache__/
 *.npz
 *.pth
 *.pt
+/data
 
 #Linter
 .ruff_cache/
