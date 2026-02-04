@@ -34,7 +34,12 @@ class BaseDetectionDataset(Dataset):
             "images"
         )
         self.image_files = sorted(glob.glob(os.path.join(image_dir, "*.*")))
-        self.labels: List[torch.Tensor] = []
+        self.labels  =  []
+
+    def load_labels(self) -> None:
+        # Load labels from label folder
+        # Should return a list of dict("labels", "boxes")
+        pass
 
     def load_stats(self) -> None:
         stats_path = os.path.join(
