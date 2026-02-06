@@ -7,7 +7,7 @@ MODEL_NAME = "sam3"
 MODEL_CFG = {
     "sam3": {
         "CONF": 0.5,
-        "TASK": "segment",
+        "TASK": "segment",   # "detect" seems have no effect
         "MODE": "predict",
         "PATH": "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/sam3.pt",
         "HALF": True,   # Use FP16 for faster inference
@@ -15,12 +15,12 @@ MODEL_CFG = {
         "IMGSZ": 640,
         "NMS": False,   # Not original NMS
     },
-    "yoloe26": {
-        "CONF": 0.3,
+    "yoloe26": {    # TASK and DEVICE seems have no effect
+        "CONF": 0.2,
         "PATH": "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/yoloe-26x-seg.pt",
         "HALF": False,
         "SAVE": True,
         "IMGSZ": 640,
-        "NMS": False,   # Not original NMS
+        "NMS": 0.7,   # Not original NMS
     },
 }
