@@ -13,7 +13,7 @@ MODEL_CFG = {
         "HALF": True,   # Use FP16 for faster inference
         "SAVE": True,   # Save results to project folder
         "IMGSZ": 640,
-        "NMS": False,   # Not original NMS
+        "NMS": False,   # Not native NMS
     },
     "yoloe26": {    # TASK and DEVICE seems have no effect
         "CONF": 0.2,
@@ -21,6 +21,6 @@ MODEL_CFG = {
         "HALF": False,
         "SAVE": True,
         "IMGSZ": 640,
-        "NMS": 0.7,   # Not original NMS
+        "NMS": 0.7,   # Not native NMS
     },
 }
