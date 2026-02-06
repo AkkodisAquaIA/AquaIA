@@ -17,7 +17,11 @@ Rules about this repository :
 
 # Installation
 
-First, you need to install python module dependencies: `pip install -r ./requirements.txt`
+First, you need to install python module dependencies: 
+pip install -r requirements.txt
+pip install -r requirements-dev.txt     # si dev
+pip install -r requirements-gpu.txt     # si GPU avancé
+
 You also need to setup the configuration hooks: `pre-commit install`
 
 # Usage
