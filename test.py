@@ -1,4 +1,4 @@
-from Detection.DINOv3.models.dino_detector import DINODetector
+from Detection.DINO.dino_detector import DINODetector
 from Detection.loss import SetCriterion
 from Detection.utils.matcher import HungarianMatcher
 import torch
