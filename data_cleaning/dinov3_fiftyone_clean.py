@@ -12,7 +12,7 @@ import fiftyone.brain as fob
 # =========================
 DATA_DIR = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/test"  # racine: class_a/, class_b/, ...
 
-model_name = "dinov2" # "dinov3"
+model_name = "dinov3" # "dinov3"
 
 if model_name == "dinov2":
     MODEL_ID = "facebook/dinov2-base"
@@ -69,8 +69,20 @@ def main():
     print("Classes:", dataset.distinct("ground_truth.label"))
    
     # 2) Charger modèle
-    processor = AutoImageProcessor.from_pretrained(MODEL_ID)
-    model = AutoModel.from_pretrained(MODEL_ID).to(device).eval()
+    # processor = AutoImageProcessor.from_pretrained(MODEL_ID)
+    # model = AutoModel.from_pretrained(MODEL_ID).to(device).eval()
+    processor = AutoImageProcessor.from_pretrained(
+        MODEL_ID,
+        token=True,   #force l’usage du token local HF
+    )
+
+    model = AutoModel.from_pretrained(
+        MODEL_ID,
+        token=True,
+    )
+
+    model = model.to(device)
+    model.eval()
 
     # 3) Calcul embeddings (robuste) + stockage
     filepaths = dataset.values("filepath")
