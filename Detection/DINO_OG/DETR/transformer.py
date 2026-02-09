@@ -53,9 +53,12 @@ class Transformer(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, src, query_embed, pos_embed):
-        bs = src.shape[0]
-        query_embed = query_embed.unsqueeze(0).expand(bs, -1, -1)  # no copy
-        tgt = torch.zeros_like(query_embed) 
+        # flatten NxCxHxW to HWxNxC
+        bs, c, h, w = src.shape
+        src = src.flatten(2).permute(0, 2, 1)
+        pos_embed = pos_embed.flatten(2).permute(0, 2, 1)
+        query_embed = query_embed.unsqueeze(0).repeat(bs, 1, 1) # TODO : could be cached ?
+        tgt = torch.zeros_like(query_embed)
         memory = self.encoder(src, pos=pos_embed)
         hs = self.decoder(tgt, memory, pos=pos_embed, query_pos=query_embed)
         return hs#.transpose(1, 2)#, memory.permute(1, 2, 0).view(bs, c, h, w)

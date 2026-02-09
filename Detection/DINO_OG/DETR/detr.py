@@ -25,7 +25,7 @@ class DETR(nn.Module):
         self.class_embed = nn.Linear(d_model, num_classes + 1)
         self.bbox_embed = MLP(d_model, d_model, 4, 3)
         self.query_embed = nn.Embedding(num_queries, d_model)
-        self.input_proj = nn.Linear(num_input_channels, d_model)
+        self.input_proj = nn.Conv2d(num_input_channels, d_model, kernel_size=1)
         self.aux_loss = aux_loss
 
     def forward(self, features, pos):

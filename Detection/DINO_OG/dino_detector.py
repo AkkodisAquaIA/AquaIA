@@ -9,7 +9,6 @@ class DINODetector(nn.Module):
     # with one line of code)
     def __init__(
         self, 
-        img_size,
         backbone_id="dino", 
         detector_head_id="detr",
         positional_encoding_id="sine",
@@ -22,7 +21,6 @@ class DINODetector(nn.Module):
         num_queries=50,
         ):
         super(DINODetector, self).__init__()
-        self.img_size = img_size
         self.backbone_id = backbone_id
         self.detector_head_id = detector_head_id
         self.device = device
@@ -34,7 +32,6 @@ class DINODetector(nn.Module):
 
         # Build model (backbone + positional encoding +  detection head)
         self.backbone = torch.hub.load('facebookresearch/dinov2', 'dinov2_vits14_reg')
-        # TODO : turn into a stateless function
         self.positional_encoding = build_position_encoding(positional_encoding_id, h_dim=d_model)
         self.detector = DETR(
             num_input_channels=self.backbone.embed_dim, 
@@ -42,17 +39,19 @@ class DINODetector(nn.Module):
             num_queries=num_queries,
             d_model=d_model
         )
-        self.patch_size = self.img_size // self.backbone.patch_size
-        self.pe = self.positional_encoding(patch_x=self.patch_size, device=self.device) # precompute positional encoding for a single image (will be broadcasted in forward)
+        self.patch_size = self.backbone.patch_size
         if not self.lora_ft:
             self.backbone.eval()
 
     def _forward_backbone(self, images):
         # TODO : check for useless permute and contiguous copy
         # Assuming square images for simplicity, otherwise we would need to compute patch_x and patch_y separately
+        patch_x = images.shape[2] // self.patch_size
         with torch.set_grad_enabled(self.lora_ft):
-            features = self.backbone(images, is_training=True)["x_norm_patchtokens"] # (B, H*W, C)
-        return features, self.pe.unsqueeze(0).expand(features.shape[0], -1, -1) # (B, H*W, 2*num_pos_feats) add batch dimension with broadcasting
+            features = self.backbone(images, is_training=True)["x_norm_patchtokens"]
+            features = features.permute(0, 2, 1).contiguous()  # (B, C, H*W)
+            features = features.view(features.shape[0], features.shape[1], patch_x, patch_x)  # (B, C, H, W)
+        return features, self.positional_encoding(features) # (B, C, H, W)
 
     @torch.inference_mode()
     def forward(self, images):

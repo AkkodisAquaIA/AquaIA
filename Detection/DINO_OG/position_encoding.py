@@ -40,13 +40,15 @@ class PositionEmbeddingSine(nn.Module):
             scale = 2 * math.pi
         self.scale = scale
 
-    def forward(self, patch_x, device):
+    def forward(self, x):
         """
         x: (B, C, H, H)
         returns: (B, 2*num_pos_feats, H, H)
         """
-        H, W = patch_x, patch_x
+        B, _, H, W = x.shape
         assert H == W, "Input must be square"
+
+        device = x.device
 
         # Coordinate grids
         y_embed = torch.arange(H, device=device).float() + 0.5
@@ -81,7 +83,9 @@ class PositionEmbeddingSine(nn.Module):
 
         # Concatenate and reshape
         pos = torch.cat((pos_y, pos_x), dim=-1)      # (H, W, 2*num_pos_feats)
-        pos = pos.flatten(end_dim=1)                  # (H*W, 2*num_pos_feats)
+        pos = pos.permute(2, 0, 1)                    # (2*num_pos_feats, H, W)
+        pos = pos.unsqueeze(0).expand(B, -1, -1, -1)
+
         return pos
 
 

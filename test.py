@@ -1,9 +1,14 @@
+from Detection.DINO_OG.dino_detector import DINODetector as DINODetectorOG
 from Detection.DINO.dino_detector import DINODetector
 from Detection.loss import SetCriterion
 from Detection.utils.matcher import HungarianMatcher
 import torch
 import glob
 import os
+import time
+import tqdm
+import cProfile, pstats, io
+from pstats import SortKey
 
 def _parse_label_line(line):
     parts = line.split()
@@ -48,8 +53,31 @@ dataset_name = "coco128"
 dataset_dir = "data"
 data_path = os.path.join(dataset_dir, dataset_name)
 targets = load_targets(data_path)
-model = DINODetector()
-y = model(dummy_images)
+model_og = DINODetectorOG()
+model = DINODetector(img_size=224)
+
+
+# Profiling the forward pass
+if False:
+    pr = cProfile.Profile()
+    pr.enable()
+    for _ in tqdm.tqdm(range(5)):
+        y = model_og(dummy_images)
+    pr.disable()
+    s = io.StringIO()
+    sortby = SortKey.TIME
+    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    ps.print_stats(30)
+    print(s.getvalue())
+
+
+# Run forward and compute inference time
+start_time = time.time()
+for _ in tqdm.tqdm(range(10)):
+    y = model_og(dummy_images)
+end_time = time.time()
+avg_inference_time = (end_time - start_time) / 10
+print(f"Average inference time: {avg_inference_time:.4f} seconds")
 
 loss_dict = criterion(y, targets)
 print(loss_dict)
