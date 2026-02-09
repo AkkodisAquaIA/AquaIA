@@ -18,7 +18,7 @@ Samuel Beaussant : Taken from DETR official repo. Modified and simplified for th
 import copy
 import torch
 import torch.nn.functional as F
-from torch import nn, Tensor
+from torch import nn
 
 
 class Transformer(nn.Module):
