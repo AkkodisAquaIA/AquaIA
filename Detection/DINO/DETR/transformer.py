@@ -11,6 +11,9 @@ Samuel Beaussant : Taken from DETR official repo. Modified and simplified for th
 	* Removed Type Hints for less verbosity (mostly tensors anyway)
     * Only supports post normalization
     * Removed support for masks and padding masks for simplicity (operate on square images)
+    * Added batch first, need_weight=False and fp16 for flash attention support
+    * Removed useless copies and permute for better efficiency
+    * Default dropout is 0 (plain detr removed it completely)
 """
 import copy
 import torch
@@ -53,13 +56,13 @@ class Transformer(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, src, query_embed, pos_embed):
-        # print("query_embed", query_embed.dtype, "src", src.dtype, "pos", pos_embed.dtype)
+        
         bs = src.shape[0]
         query_embed = query_embed.unsqueeze(0).expand(bs, -1, -1)  # no copy
         tgt = torch.zeros_like(query_embed) 
         memory = self.encoder(src, pos=pos_embed)
         hs = self.decoder(tgt, memory, pos=pos_embed, query_pos=query_embed)
-        return hs#.transpose(1, 2)#, memory.permute(1, 2, 0).view(bs, c, h, w)
+        return hs
 
 
 class TransformerEncoder(nn.Module):
