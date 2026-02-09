@@ -6,6 +6,8 @@ __pycache__/
 *.pt
 data/
 datasets/
+dataloading/*.png
+coco128
 
 #Linter
 .ruff_cache/
