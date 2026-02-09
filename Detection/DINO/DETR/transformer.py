@@ -53,6 +53,7 @@ class Transformer(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, src, query_embed, pos_embed):
+        # print("query_embed", query_embed.dtype, "src", src.dtype, "pos", pos_embed.dtype)
         bs = src.shape[0]
         query_embed = query_embed.unsqueeze(0).expand(bs, -1, -1)  # no copy
         tgt = torch.zeros_like(query_embed) 
@@ -127,7 +128,7 @@ class TransformerEncoderLayer(nn.Module):
 
     def forward_post(self, src,pos = None):
         q = k = self.with_pos_embed(src, pos)
-        src2 = self.self_attn(q, k, value=src)[0]
+        src2 = self.self_attn(q, k, value=src, need_weights=False)[0]
         src = src + self.dropout1(src2)
         src = self.norm1(src)
         src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
@@ -166,13 +167,14 @@ class TransformerDecoderLayer(nn.Module):
 
     def forward_post(self, tgt, memory, pos = None, query_pos = None):
         q = k = self.with_pos_embed(tgt, query_pos)
-        tgt2 = self.self_attn(q, k, value=tgt)[0]
+        tgt2 = self.self_attn(q, k, value=tgt, need_weights=False)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
         tgt2 = self.multihead_attn(
             query=self.with_pos_embed(tgt, query_pos),
             key=self.with_pos_embed(memory, pos),
-            value=memory
+            value=memory,
+            need_weights=False
         )[0]
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)

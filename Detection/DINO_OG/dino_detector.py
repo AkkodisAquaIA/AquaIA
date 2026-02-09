@@ -38,10 +38,10 @@ class DINODetector(nn.Module):
             num_classes=num_classes, 
             num_queries=num_queries,
             d_model=d_model
-        )
+        ).to(device)
         self.patch_size = self.backbone.patch_size
         if not self.lora_ft:
-            self.backbone.eval()
+            self.backbone.eval().to(device)
 
     def _forward_backbone(self, images):
         # TODO : check for useless permute and contiguous copy
