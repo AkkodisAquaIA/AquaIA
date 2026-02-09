@@ -6,6 +6,13 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from .transformer import Transformer
+"""
+Samuel Beaussant : Taken from DETR official repo. Modified and simplified for the current project:
+    * Removed support for masks and padding masks for simplicity (operate on square images)
+    * Default dropout is 0 (plain detr removed it completely)
+    * Replaced conv2d with linear for better efficiency (backbone already produces patch embeddings)
+    * Added fp16 for flash attention support
+"""
 
 class DETR(nn.Module):
     """ This is the DETR module that performs object detection """
