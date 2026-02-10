@@ -2,7 +2,7 @@
 This folder provides a simple promptable detection workflow:
 1. Define the classes you want to detect in `dataset_dict.py` (COCO128 is provided as an example).
 2. Configure the model and inference settings in `model_cfg.yaml`.
-3. Run detection with `detection_entry.py`. A custom (non-native) per-class NMS is optionally applied.
+3. Run detection with `detection_entry.py`. A custom non-native per-class NMS is optionally applied.
 4. Evaluate results with `metric.py`.
 
 ## 1. Configure classes (dataset_dict.py)
