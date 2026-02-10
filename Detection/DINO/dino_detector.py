@@ -9,6 +9,7 @@ class DINODetector(nn.Module):
     # TODO : Ajouter TTA (test time augmentation) pour améliorer les performances (Soft-nms – improving object detection
     # with one line of code)
     # TODO : tester transfomers with dynamic tanh (no layer norms)
+    # TODO : tester MALA (Magnitude Aware Linear Attention)
     def __init__(
         self, 
         img_size,
