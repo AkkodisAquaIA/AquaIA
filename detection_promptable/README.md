@@ -3,7 +3,7 @@
 This folder provides a simple promptable detection workflow:
 
 1. Define the classes you want to detect in `dataset_dict.py` (COCO128 is provided as an example).
-2. Configure the model and inference settings in `model_cfg.py`.
+2. Configure the model and inference settings in `model_cfg.yaml`.
 3. Run detection with `detection_entry.py`. A custom (non-native) per-class NMS is optionally applied.
 4. Evaluate results with `metric.py`.
 
@@ -19,13 +19,17 @@ Update this file to match your dataset:
 - Add or remove classes.
 - Use the correct class IDs.
 
-## 2. Configure model and inputs (model_cfg.py)
+## 2. Configure model and inputs (model_cfg.yaml)
 
 Key settings:
 
 - `IMAGES_FOLDER`: folder with images to run inference on.
 - `MODEL_NAME`: `"sam3"` or `"yoloe26"`.
 - `MODEL_CFG`: per-model settings, including `CONF`, `PATH`, `IMGSZ`, `HALF`, and `NMS`.
+
+Notes:
+
+- The config is loaded from YAML by both `detection_entry.py` and `metric.py`.
 
 `NMS` in this project is **not** the native model NMS. It is a custom per-class NMS applied after inference:
 

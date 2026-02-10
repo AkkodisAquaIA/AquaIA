@@ -13,21 +13,21 @@ IMAGES_FOLDER = CFG_DATA["IMAGES_FOLDER"]
 MODEL_NAME = CFG_DATA["MODEL_NAME"]
 MODEL_CFG = CFG_DATA["MODEL_CFG"]
 
-def post_nms(result, iou_threshold, INFO_NMS):
+def post_nms(result, iou_threshold, info_nms):
     """Per-class NMS for detection results; keeps cls/conf, optional masks.
     The terminal logs and auto-saved visualizations during inference
     are still the results before NMS."""
     # Print notice about NMS once
-    if INFO_NMS:
+    if info_nms:
         print("\n" + "=" * 100)
         print("The terminal logs and auto-saved visualizations during inference"
           " are still the results before NMS.")
         print("=" * 100 + "\n")
-        INFO_NMS = False
+        info_nms = False
 
     # If no boxes, return as is
     if result.boxes is None or result.boxes.shape[0] == 0:
-        return result, INFO_NMS
+        return result, info_nms
 
     # Extract box coordinates, scores, and classes
     bboxes = result.boxes.xyxy
@@ -50,7 +50,7 @@ def post_nms(result, iou_threshold, INFO_NMS):
     if result.masks is not None:
         result.masks = result.masks[keep]
 
-    return result, INFO_NMS
+    return result, info_nms
 
 def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_sorted: list[int]) -> None:
     """Save normalized xywh labels for one image. cx, cy, w, h are normalized by image width and height.
@@ -122,8 +122,8 @@ if __name__ == "__main__":
     image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
 
     # Print information once
-    INFO_DEVICE = True
-    INFO_NMS = True
+    info_device = True
+    info_nms = True
 
     if MODEL_NAME == "sam3":
         # Initialize SAM3
@@ -144,7 +144,7 @@ if __name__ == "__main__":
             predictor.set_image(str(img_path))
 
             # Print device info
-            INFO_DEVICE = print_device_info(predictor, INFO_DEVICE)
+            info_device = print_device_info(predictor, info_device)
 
             # Run prediction
             results = predictor(text=text_prompts)
@@ -156,7 +156,7 @@ if __name__ == "__main__":
 
             # Apply NMS only when enabled and keep updated result in-place
             if cfg["NMS"] != False:
-                results[0], INFO_NMS = post_nms(results[0], cfg["NMS"], INFO_NMS)
+                results[0], info_nms = post_nms(results[0], cfg["NMS"], info_nms)
 
             # Save labels in xywh format
             save_xywh_label(results[0], img_path, labels_folder, dataset_keys_sorted)
@@ -167,7 +167,7 @@ if __name__ == "__main__":
         model.set_classes(text_prompts, model.get_text_pe(text_prompts))
 
         # Print device info
-        INFO_DEVICE = print_device_info(model, INFO_DEVICE)
+        info_device = print_device_info(model, info_device)
 
         # Run prediction
         results = model.predict(
@@ -185,7 +185,7 @@ if __name__ == "__main__":
             for result in results:
                 # Apply NMS only when enabled and keep updated result in-place
                 if cfg["NMS"] != False:
-                    result, INFO_NMS = post_nms(result, cfg["NMS"], INFO_NMS)
+                    result, info_nms = post_nms(result, cfg["NMS"], info_nms)
 
                 # Save labels in xywh format
                 img_path = Path(result.path)
