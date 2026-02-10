@@ -10,7 +10,8 @@ __pycache__/
 
 # SAM3
 runs/
-detection_*/*_result_det_*/
+detection_promptable/*_result_det_*/
+detection_promptable/useless/
 
 # YOLOE26
 *.ts
