@@ -1,11 +1,17 @@
 from pathlib import Path
 from datetime import datetime
+import yaml
 import torch
 from ultralytics.models.sam import SAM3SemanticPredictor
 from ultralytics import YOLOE
 from ultralytics.utils.nms import TorchNMS
 from dataset_dict import DATASET_DICT
-from model_cfg import IMAGES_FOLDER, MODEL_NAME, MODEL_CFG
+
+CFG_PATH = Path(__file__).resolve().parent / "model_cfg.yaml"
+CFG_DATA = yaml.safe_load(CFG_PATH.read_text(encoding="utf-8"))
+IMAGES_FOLDER = CFG_DATA["IMAGES_FOLDER"]
+MODEL_NAME = CFG_DATA["MODEL_NAME"]
+MODEL_CFG = CFG_DATA["MODEL_CFG"]
 
 def post_nms(result, iou_threshold, INFO_NMS):
     """Per-class NMS for detection results; keeps cls/conf, optional masks.

@@ -8,10 +8,8 @@ __pycache__/
 #Linter
 .ruff_cache/
 
-# SAM3
+# detection_promptable
 runs/
 detection_promptable/*_result_det_*/
 detection_promptable/useless/
-
-# YOLOE26
 *.ts

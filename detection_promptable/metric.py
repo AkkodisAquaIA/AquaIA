@@ -1,9 +1,14 @@
 import sys
 from pathlib import Path
 import numpy as np
+import yaml
 from ultralytics.utils.metrics import DetMetrics, box_iou
 from ultralytics.utils.ops import xywh2xyxy
 import torch
+
+CFG_PATH = Path(__file__).resolve().parent / "model_cfg.yaml"
+CFG_DATA = yaml.safe_load(CFG_PATH.read_text(encoding="utf-8"))
+IMAGES_FOLDER = CFG_DATA["IMAGES_FOLDER"]
 
 def get_latest_result_dir(base_dir: Path) -> Path | None:
     """Return the newest [model]_result_det_YYYYMMDDHHmm folder directory under base_dir."""
@@ -221,7 +226,6 @@ def evaluate_two_folders_intersection(
             "recall(B)": float(r["metrics/recall(B)"]),}
 
 if __name__ == "__main__":
-    from model_cfg import IMAGES_FOLDER
     from dataset_dict import DATASET_DICT
     import tkinter as tk
     from tkinter import filedialog
