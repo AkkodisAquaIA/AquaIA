@@ -77,12 +77,12 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_so
         for cid, bbox, score in zip(coco_ids, coco_bboxes_norm, conf):
             f.write(f"{cid} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f} {score:.6f}\n")
 
-def print_device_info(model_instance):
+def print_device_info(model_instance, info_device: bool) -> bool:
     """Print the device information of the model instance."""
-    global INFO_DEVICE
-    if INFO_DEVICE:
+    if info_device:
         print(f"Device used: {model_instance.device}")
-        INFO_DEVICE = False
+        return False
+    return info_device
 
 if __name__ == "__main__":
     # Initialization parameters
@@ -138,7 +138,7 @@ if __name__ == "__main__":
             predictor.set_image(str(img_path))
 
             # Print device info
-            print_device_info(predictor)
+            INFO_DEVICE = print_device_info(predictor, INFO_DEVICE)
 
             # Run prediction
             results = predictor(text=text_prompts)
@@ -161,7 +161,7 @@ if __name__ == "__main__":
         model.set_classes(text_prompts, model.get_text_pe(text_prompts))
 
         # Print device info
-        print_device_info(model)
+        INFO_DEVICE = print_device_info(model, INFO_DEVICE)
 
         # Run prediction
         results = model.predict(
