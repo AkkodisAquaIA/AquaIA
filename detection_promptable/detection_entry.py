@@ -5,13 +5,16 @@ import torch
 from ultralytics.models.sam import SAM3SemanticPredictor
 from ultralytics import YOLOE
 from ultralytics.utils.nms import TorchNMS
-from dataset_dict import DATASET_DICT
 
-CFG_PATH = Path(__file__).resolve().parent / "model_cfg.yaml"
+PARENT_FOLDER = Path(__file__).resolve().parent
+CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
 CFG_DATA = yaml.safe_load(CFG_PATH.read_text(encoding="utf-8"))
 IMAGES_FOLDER = CFG_DATA["IMAGES_FOLDER"]
 MODEL_NAME = CFG_DATA["MODEL_NAME"]
 MODEL_CFG = CFG_DATA["MODEL_CFG"]
+DATASET_DICT_PATH = PARENT_FOLDER / "dataset_dict.yaml"
+DATASET_DICT_RAW = yaml.safe_load(DATASET_DICT_PATH.read_text(encoding="utf-8"))
+DATASET_DICT = {int(key): value for key, value in DATASET_DICT_RAW.items()}
 
 def post_nms(result, iou_threshold, info_nms):
     """Per-class NMS for detection results; keeps cls/conf, optional masks.

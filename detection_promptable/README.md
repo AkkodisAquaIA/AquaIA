@@ -5,8 +5,8 @@ This folder provides a simple promptable detection workflow:
 3. Run detection with `detection_entry.py`. A custom non-native per-class NMS is optionally applied.
 4. Evaluate results with `metric.py`.
 
-## 1. Configure classes (dataset_dict.py)
-`DATASET_DICT` maps class IDs to class names. The keys are the class IDs used in labels.
+## 1. Configure classes (dataset_dict.yaml)
+Maps class IDs to class names. The keys are the class IDs used in labels.
 - Example: COCO128 uses IDs 0–79.
 - The order of sorted keys is used to build the text prompts passed into the model.
 

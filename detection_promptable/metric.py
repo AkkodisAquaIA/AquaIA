@@ -6,9 +6,13 @@ from ultralytics.utils.metrics import DetMetrics, box_iou
 from ultralytics.utils.ops import xywh2xyxy
 import torch
 
-CFG_PATH = Path(__file__).resolve().parent / "model_cfg.yaml"
+PARENT_FOLDER = Path(__file__).resolve().parent
+CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
 CFG_DATA = yaml.safe_load(CFG_PATH.read_text(encoding="utf-8"))
 IMAGES_FOLDER = CFG_DATA["IMAGES_FOLDER"]
+DATASET_DICT_PATH = PARENT_FOLDER / "dataset_dict.yaml"
+DATASET_DICT_RAW = yaml.safe_load(DATASET_DICT_PATH.read_text(encoding="utf-8"))
+DATASET_DICT = {int(key): value for key, value in DATASET_DICT_RAW.items()}
 
 def get_latest_result_dir(base_dir: Path) -> Path | None:
     """Return the newest [model]_result_det_YYYYMMDDHHmm folder directory under base_dir."""
@@ -226,7 +230,6 @@ def evaluate_two_folders_intersection(
             "recall(B)": float(r["metrics/recall(B)"]),}
 
 if __name__ == "__main__":
-    from dataset_dict import DATASET_DICT
     import tkinter as tk
     from tkinter import filedialog
 
