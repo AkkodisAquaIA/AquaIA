@@ -2,7 +2,7 @@
 # train_dinov3.py
 
 from __future__ import annotations
-import json, time, platform, random, re
+import json, time, re
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, Optional, Tuple
@@ -15,8 +15,8 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from torchvision.datasets import ImageFolder
-from torchvision.transforms import Compose, Lambda, Resize, CenterCrop
-from transformers import AutoImageProcessor, AutoModel
+from torchvision.transforms import Compose, Lambda
+from transformers import AutoImageProcessor
 
 from common_dinov3 import (
     ensure_dir, write_json, set_seed, get_env_info,

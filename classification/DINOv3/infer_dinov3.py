@@ -4,7 +4,7 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -13,13 +13,13 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from PIL import Image
-from transformers import AutoImageProcessor, AutoModel
+from transformers import AutoImageProcessor
 
 from sklearn.metrics import confusion_matrix, classification_report, f1_score, balanced_accuracy_score
 import matplotlib.pyplot as plt
 
 from common_dinov3 import (
-    DinoV3Classifier, load_checkpoint
+    DinoV3Classifier
 )
 
 # =========================
