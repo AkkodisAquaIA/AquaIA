@@ -26,11 +26,11 @@ jobs:
         with:
           context: .
           file: ./docker/build/Dockerfile
-          tags: aquaia/aquaia:latest # TODO setup repo and change push status to true
-          push: false
-          load: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/aquaia_test:latest # TODO setup repo and change push status to true
+          push: true
+          load: false
       - name: Save Docker image as artifact
-        run: docker save aquaia/aquaia:latest -o aquaia_latest.tar
+        run: docker save ${{ secrets.DOCKERHUB_USERNAME }}/aquaia_test:latest -o aquaia_latest.tar ch
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
