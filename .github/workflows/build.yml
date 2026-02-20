@@ -29,11 +29,3 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/aquaia_test:latest # TODO setup repo and change push status to true
           push: true
           load: false
-      - name: Save Docker image as artifact
-        run: docker save ${{ secrets.DOCKERHUB_USERNAME }}/aquaia_test:latest -o aquaia_latest.tar ch
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: aquaia_docker_image
-          path: aquaia_latest.tar
-          retention-days: 3
