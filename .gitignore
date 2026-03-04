@@ -9,3 +9,9 @@ coco128
 
 #Linter
 .ruff_cache/
+
+# detection_promptable
+Detection/runs/
+Detection/detection_promptable/*_result_det_*/
+Detection/detection_promptable/useless/
+*.ts
