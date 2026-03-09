@@ -6,7 +6,7 @@ from ultralytics.utils.metrics import DetMetrics, box_iou
 from ultralytics.utils.ops import xywh2xyxy
 import torch
 
-PARENT_FOLDER = Path(__file__).resolve().parent
+PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
 CFG_DATA = yaml.safe_load(CFG_PATH.read_text(encoding="utf-8"))
 IMAGES_FOLDER = CFG_DATA["IMAGES_FOLDER"]
@@ -26,8 +26,12 @@ def get_latest_result_dir(base_dir: Path) -> Path | None:
     return latest
 
 def load_label_txt(path: Path, with_conf: bool, conf_threshold: float | None = None):
-    """Reads txt label file (GT or detections). Returns clean box coordinates with or without confidence.
+    """Reads txt label file (GT or detections). Returns clean box coordinates with or without confidence. 
     If with_conf is True and conf_threshold is provided, rows with conf < conf_threshold are dropped.
+    Args:
+        path: path to txt file
+        with_conf: whether to expect confidence column in the txt file
+        conf_threshold: if provided keep only rows with confidence >= conf_threshold (if with_conf is True)
     """
     dim = 6 if with_conf else 5
 
@@ -54,7 +58,7 @@ def load_label_txt(path: Path, with_conf: bool, conf_threshold: float | None = N
     if not rows:
         return np.zeros((0, dim), dtype=np.float32)
 
-    # Keep only detections above the specified (if provided) confidence threshold 
+    # Keep only detections with confidence >= provided conf_threshold (if with_conf is True)
     row_thr = np.array(rows, dtype=np.float32)
     if with_conf and conf_threshold is not None:
         row_thr = row_thr[row_thr[:, 5] >= conf_threshold]
@@ -93,7 +97,7 @@ def match_predictions(pred_xyxy, pred_cls, gt_xyxy, gt_cls, iouv):
         pred_cls: pred classes (Nb pred,)
         gt_xyxy: GT box coordinates (Nb GT,4)
         gt_cls: GT classes (Nb GT,)
-        iouv: IoU thresholds list (K,)
+        iouv: IoU thresholds list (K,), example: [0.5, 0.55, ..., 0.95]
     Returns:
         tp: boolean matrix (Nb pred,K), tp[A,B]=True means Ath pred box is TP at Bth threshold value.
     """
@@ -114,9 +118,10 @@ def match_predictions(pred_xyxy, pred_cls, gt_xyxy, gt_cls, iouv):
 
     # Same class restriction: different classes IoU = 0
     if gt_cls.size and pred_cls.size:
-        same_cls = (pred_cls[:, None] == gt_cls[None, :])
-        ious = np.where(same_cls, ious, 0.0)
+        same_cls = (pred_cls[:, None] == gt_cls[None, :])   # True false matrix of shape (nb pred, nb GT)
+        ious = np.where(same_cls, ious, 0.0)    # Set IoU to 0 if different classes
 
+    # For each IoU threshold value in iouv
     for thr_idx, thr in enumerate(iouv):
         # Find all candidate elements in ious[pred_i, gt_j] with IoU >= thr
         pred_i, gt_j = np.where(ious >= thr)    # pred_i and gt_j are 1D arrays of indices
@@ -124,9 +129,9 @@ def match_predictions(pred_xyxy, pred_cls, gt_xyxy, gt_cls, iouv):
             continue
 
         # Order candidate elements in ious[pred_i, gt_j] by IoU descending
-        order = np.argsort(-ious[pred_i, gt_j])
-        pred_i = pred_i[order]
-        gt_j = gt_j[order]
+        order = np.argsort(-ious[pred_i, gt_j], kind="stable")
+        pred_i = pred_i[order]  # Reorder prediction indices by descending IoU scores
+        gt_j = gt_j[order]  # Reorder GT indices with the same order to keep pair alignment
 
         # Create sets to keep track of matched preds and gts, avoid multiple matches
         matched_pred = set()
@@ -149,16 +154,19 @@ def evaluate_two_folders_intersection(
     """
     Evaluate box metrics (precision/recall/mAP50/mAP50-95) in an Ultralytics-like manner
     by comparing predicted labels against GT labels.
+    Args:
+    - gt_labels_folder: path to folder containing GT txt label files (one per image)
+    - det_labels_folder: path to folder containing detection txt label files (one per image)
+    - names: dict mapping class indices to class names
+    - det_conf_threshold: if provided, only keep predicted boxes with confidence >= this threshold
+    Note:
+        Evaluation set definition:
+        - We use the intersection of filenames existing in BOTH gt_labels_folder and det_labels_folder.
+        - Predictions are sorted by confidence descending before AP computation to match PR/AP definition.
 
-    Evaluation set definition:
-    - We use the intersection of filenames existing in BOTH gt_labels_folder and det_labels_folder.
-    - Reason: the official GT label set is missing annotations for 2 images, so using the full GT set
-      would make the evaluation set inconsistent.
-    - Predictions are sorted by confidence descending before AP computation to match PR/AP definition.
-
-    Input label formats:
-    - GT txt:  cls cx cy w h (normalized)
-    - Pred txt: cls cx cy w h conf (normalized)
+        Input label formats:
+        - GT txt:  cls cx cy w h (normalized)
+        - Pred txt: cls cx cy w h conf (normalized)
     """
     # Get paths of GT and detection label folders
     gt_dir = Path(gt_labels_folder)
@@ -186,11 +194,11 @@ def evaluate_two_folders_intersection(
         # Get GT and detection txt file paths
         gt_txt = gt_files[img_name]
         det_txt = det_files[img_name]
-    
+
         # Load txt files
         gt = load_label_txt(gt_txt, with_conf=False)
         pr = load_label_txt(det_txt, with_conf=True, conf_threshold=det_conf_threshold)
-    
+
         # Get classes. If no boxes, create empty arrays
         gt_cls = gt[:, 0].astype(int) if gt.shape[0] else np.array([], dtype=int)
         pr_cls = pr[:, 0].astype(int) if pr.shape[0] else np.array([], dtype=int)
@@ -233,19 +241,17 @@ if __name__ == "__main__":
     import tkinter as tk
     from tkinter import filedialog
 
-    current_folder = Path(__file__).resolve().parent
-
     # Ask user to select result_det folder, or use latest if cancelled
     root = tk.Tk()
     root.withdraw()
     chosen_dir = filedialog.askdirectory(
-        initialdir=current_folder,
+        initialdir=PARENT_FOLDER,
         title="Select result_det folder (Cancel to use latest)") or None
     root.update()
     root.destroy()
-    det_dir = Path(chosen_dir) if chosen_dir else get_latest_result_dir(current_folder)
+    det_dir = Path(chosen_dir) if chosen_dir else get_latest_result_dir(PARENT_FOLDER)
 
-    # Read CONF from cfg.txt under the selected/latest result directory
+    # Read model CONF from cfg.txt under the selected/latest result directory
     cfg_conf = None
     cfg_path = det_dir / "cfg.txt"
     if cfg_path.exists():
@@ -258,7 +264,7 @@ if __name__ == "__main__":
                 break
 
     # Ask user for a new confidence threshold
-    user_input = input(f"Inference CONF = {cfg_conf}, define a new threshold? (blank to skip): ").strip()
+    user_input = input(f"Inference model CONF = {cfg_conf}, define a new threshold? (blank to skip): ").strip()
     det_conf_threshold = float(user_input) if user_input else None
     suffix = ""
     if det_conf_threshold is not None:
