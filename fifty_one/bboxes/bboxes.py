@@ -7,6 +7,8 @@ from tools import constants as ct
 from tools.constants import DISPLAY_COLORS as colors
 
 
+display = util.DisplayColor()
+
 # --- Détection détaillée des bbox problématiques ---
 def detect_bbox_problemes_detail_tolere(dataset, bbox_tol=1e-6):
     """
@@ -104,7 +106,7 @@ def afficher_bbox_erreurs_compact(bbox_erreurs, noms_par_ligne=5):
     # Calculer largeur max pour aligner les catégories
     categorie_max_len = max(len(cat) for cat in bbox_erreurs.keys())
     
-    print("Erreurs de bbox détectées :\n")
+    display.print("Erreurs de bbox détectées :", colors["warning"])
     
     for categorie, chemins in bbox_erreurs.items():
         if not chemins:

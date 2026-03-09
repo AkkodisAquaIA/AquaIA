@@ -249,7 +249,6 @@ if any(len(paths) > 0 for paths in bbox_erreurs.values()):
     afficher_bbox_erreurs_compact(bbox_erreurs, noms_par_ligne=ct.n_per_line)
 
 
-
 # ================= ENCODING =================
 encoding(dataset)
 
