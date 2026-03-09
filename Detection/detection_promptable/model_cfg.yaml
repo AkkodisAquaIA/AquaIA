@@ -20,4 +20,5 @@ MODEL_CFG:
     HALF: false
     SAVE: true
     IMGSZ: 640
+    BATCH: 16
     NMS: 0.7  # Not native NMS

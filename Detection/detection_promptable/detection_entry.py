@@ -189,6 +189,7 @@ if __name__ == "__main__":
             half=cfg["HALF"],
             save=cfg["SAVE"],
             imgsz=cfg["IMGSZ"],
+            batch=cfg["BATCH"],
             project=str(PARENT_FOLDER),
             name=run_name,
             exist_ok=True)
