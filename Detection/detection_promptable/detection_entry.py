@@ -6,7 +6,7 @@ from ultralytics.models.sam import SAM3SemanticPredictor
 from ultralytics import YOLOE
 from ultralytics.utils.nms import TorchNMS
 
-PARENT_FOLDER = Path(__file__).resolve().parent
+PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
 CFG_DATA = yaml.safe_load(CFG_PATH.read_text(encoding="utf-8"))
 IMAGES_FOLDER = CFG_DATA["IMAGES_FOLDER"]
@@ -18,8 +18,12 @@ DATASET_DICT = {int(key): value for key, value in DATASET_DICT_RAW.items()}
 
 def post_nms(result, iou_threshold, info_nms):
     """Per-class NMS for detection results; keeps cls/conf, optional masks.
-    The terminal logs and auto-saved visualizations during inference
-    are still the results before NMS."""
+    The terminal logs and auto-saved visualizations during inference are still the results before NMS.
+    Args:
+        result: The prediction result object (1 image) containing boxes, scores, classes, and optional masks.
+        iou_threshold: IoU threshold for NMS.
+        info_nms: Boolean flag to print NMS notice only once.
+    """
     # Print notice about NMS once
     if info_nms:
         print("\n" + "=" * 100)
@@ -40,9 +44,9 @@ def post_nms(result, iou_threshold, info_nms):
     keep_all = []
     # For each unique class id
     for cls_id in classes.unique():
-        # idx stores indices mapping this class's boxes to the original results
+        # Find indices (orginal) of all predicted boxes where class == cls_id.
         idx = (classes == cls_id).nonzero(as_tuple=False).squeeze(1)
-        # keep_c contains the indices to be retained within this class subset
+        # keep_c contains the indices (interior of idx) to be retained within this class subset
         keep_c = TorchNMS.fast_nms(bboxes[idx], scores[idx], iou_threshold=iou_threshold)
         # Map back to the original result indices and store
         keep_all.append(idx[keep_c])
@@ -56,12 +60,16 @@ def post_nms(result, iou_threshold, info_nms):
     return result, info_nms
 
 def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_sorted: list[int]) -> None:
-    """Save normalized xywh labels for one image. cx, cy, w, h are normalized by image width and height.
+    """Save normalized xywh labels for 1 image. cx, cy, w, h are normalized by image width and height.
     Args:
-        result: The prediction result object containing boxes and original image.
+        result: The prediction result object (1 image) containing boxes and original image.
         img_path (Path): Path to the input image.
         labels_folder (Path): Directory to save the label file.
-        dataset_keys_sorted (list[int]): List of dataset keys sorted in order.    
+        dataset_keys_sorted (list[int]): List of dataset keys sorted in order.
+    Note:
+        Class values in result.boxes.cls are prompt-order indices,
+        which may be different from the actual keys from dataset_dict.yaml,
+        dataset_keys_sorted provides this index-to-key mapping.
     """
     # Always create the label file; keep it empty if no boxes detected
     label_path = labels_folder / f"{Path(img_path).stem}.txt"
@@ -70,24 +78,26 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_so
         return
 
     xywh = result.boxes.xywh.cpu().numpy()
-    cls_idx = result.boxes.cls.cpu().numpy().astype(int)    # text prompt n → cls_idx n
-    # Map cls_idx back to dataset key
-    coco_ids = [dataset_keys_sorted[i] for i in cls_idx]
+    cls_idx = result.boxes.cls.cpu().numpy().astype(int)
     conf = result.boxes.conf.cpu().numpy()
+
+    # Map cls_idx back to dataset key
+    dataset_ids = [dataset_keys_sorted[i] for i in cls_idx]
+
     # Get original image size
     img_h, img_w = result.orig_img.shape[:2]
 
-    coco_bboxes_norm = []
+    dataset_bboxes_norm = []
     for cx, cy, w, h in xywh:
-        coco_bboxes_norm.append([cx / img_w, cy / img_h, w / img_w, h / img_h])
+        dataset_bboxes_norm.append([cx / img_w, cy / img_h, w / img_w, h / img_h])
 
     # Write to label file
     with label_path.open("w") as f:
-        for cid, bbox, score in zip(coco_ids, coco_bboxes_norm, conf):
+        for cid, bbox, score in zip(dataset_ids, dataset_bboxes_norm, conf):
             f.write(f"{cid} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f} {score:.6f}\n")
 
 def print_device_info(model_instance, info_device: bool) -> bool:
-    """Print the device information of the model instance."""
+    """Print the device information of the model instance. Only prints once."""
     if info_device:
         print(f"Device used: {model_instance.device}")
         return False
@@ -95,19 +105,18 @@ def print_device_info(model_instance, info_device: bool) -> bool:
 
 if __name__ == "__main__":
     # Initialization parameters
-    current_folder = Path(__file__).resolve().parent
     timestamp = datetime.now().strftime("%Y%m%d%H%M")
     cfg = MODEL_CFG[MODEL_NAME]
     run_name = f"{MODEL_NAME}_result_det_{timestamp}"
 
-    # Text prompts sourced from the dataset label dictionary (keys sorted for stable order)
+    # Text prompts (string) sourced from the dataset dictionary (sorted for stable order)
     text_prompts = [DATASET_DICT[idx] for idx in sorted(DATASET_DICT.keys())]
 
-    # Map detection index back to dataset key
+    # Sorted dataset keys used for mapping detection index back to dataset key
     dataset_keys_sorted = [idx for idx in sorted(DATASET_DICT.keys())]
 
     # Create output labels folder
-    labels_folder = Path(current_folder) / run_name / "labels"
+    labels_folder = Path(PARENT_FOLDER) / run_name / "labels"
     labels_folder.mkdir(parents=True, exist_ok=True)
 
     # Save the loaded configuration as a flat text file for reference
@@ -121,7 +130,7 @@ if __name__ == "__main__":
             formatted = f"\"{value}\"" if isinstance(value, str) else value
             cfg_file.write(f"{key} = {formatted}\n")
 
-    # Iterate over all images in IMAGES_FOLDER and run inference with the text prompts
+    # All images in IMAGES_FOLDER
     image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
 
     # Print information once
@@ -138,15 +147,16 @@ if __name__ == "__main__":
             half=cfg["HALF"],
             save=cfg["SAVE"],
             imgsz=cfg["IMGSZ"],
-            project=str(current_folder),
+            project=str(PARENT_FOLDER),
             name=run_name,
             exist_ok=True,)
         predictor = SAM3SemanticPredictor(overrides=overrides)
 
+        # For each image
         for img_path in image_files:
             predictor.set_image(str(img_path))
 
-            # Print device info
+            # Print device info (only once)
             info_device = print_device_info(predictor, info_device)
 
             # Run prediction
@@ -169,21 +179,21 @@ if __name__ == "__main__":
         model = YOLOE(cfg["PATH"])
         model.set_classes(text_prompts, model.get_text_pe(text_prompts))
 
-        # Print device info
+        # Print device info (only once)
         info_device = print_device_info(model, info_device)
 
-        # Run prediction
+        # Run multi-image prediction
         results = model.predict(
             source=str(IMAGES_FOLDER),
             conf=cfg["CONF"],
             half=cfg["HALF"],
             save=cfg["SAVE"],
             imgsz=cfg["IMGSZ"],
-            project=str(current_folder),
+            project=str(PARENT_FOLDER),
             name=run_name,
             exist_ok=True)
 
-        # If no results, skip saving
+        # If no multi-image prediction results, skip saving
         if results:
             for result in results:
                 # Apply NMS only when enabled and keep updated result in-place
