@@ -1,0 +1,24 @@
+# Images to be predicted with detection models
+IMAGES_FOLDER: "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/08_Data/coco128/images/train2017"
+
+# Active model key: "sam3" or "yoloe26"
+MODEL_NAME: "sam3"
+
+MODEL_CFG:
+  sam3:
+    CONF: 0.5
+    TASK: "segment" # "detect" seems have no effect
+    MODE: "predict"
+    PATH: "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/sam3.pt"
+    HALF: true  # Use FP16 for faster inference
+    SAVE: true  # Save results to project folder
+    IMGSZ: 640
+    NMS: false  # Not native NMS
+  yoloe26:  # TASK and DEVICE seems have no effect
+    CONF: 0.2
+    PATH: "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/yoloe-26x-seg.pt"
+    HALF: false
+    SAVE: true
+    IMGSZ: 640
+    BATCH: 16
+    NMS: 0.7  # Not native NMS
