@@ -1,5 +1,5 @@
 # Images to be predicted with detection models
-IMAGES_FOLDER: "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/08_Data/coco128/images/train2017"
+IMAGES_FOLDER: "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/08_Data/FIN-Benthic_cleaned"
 
 # Active model key: "sam3" or "yoloe26"
 MODEL_NAME: "sam3"

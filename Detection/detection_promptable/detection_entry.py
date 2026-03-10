@@ -99,7 +99,7 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_so
 def print_device_info(model_instance, info_device: bool) -> bool:
     """Print the device information of the model instance. Only prints once."""
     if info_device:
-        print(f"Device used: {model_instance.device}")
+        print(f"\nDevice used: {model_instance.device}")
         return False
     return info_device
 
@@ -108,6 +108,8 @@ if __name__ == "__main__":
     timestamp = datetime.now().strftime("%Y%m%d%H%M")
     cfg = MODEL_CFG[MODEL_NAME]
     run_name = f"{MODEL_NAME}_result_det_{timestamp}"
+    run_dir = Path(PARENT_FOLDER) / run_name
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     # Text prompts (string) sourced from the dataset dictionary (sorted for stable order)
     text_prompts = [DATASET_DICT[idx] for idx in sorted(DATASET_DICT.keys())]
@@ -115,16 +117,12 @@ if __name__ == "__main__":
     # Sorted dataset keys used for mapping detection index back to dataset key
     dataset_keys_sorted = [idx for idx in sorted(DATASET_DICT.keys())]
 
-    # Create output labels folder
-    labels_folder = Path(PARENT_FOLDER) / run_name / "labels"
-    labels_folder.mkdir(parents=True, exist_ok=True)
-
     # Save the loaded configuration as a flat text file for reference
-    cfg_path = labels_folder.parent / "cfg.txt"
+    cfg_dir = run_dir / "cfg.txt"
     cfg_content = {"IMAGES_FOLDER": IMAGES_FOLDER, "MODEL_NAME": MODEL_NAME}
     for key, value in cfg.items():
         cfg_content[key] = value
-    with cfg_path.open("w", encoding="utf-8") as cfg_file:
+    with cfg_dir.open("w", encoding="utf-8") as cfg_file:
         for key, value in cfg_content.items():
             # Format strings with quotes
             formatted = f"\"{value}\"" if isinstance(value, str) else value
@@ -132,6 +130,7 @@ if __name__ == "__main__":
 
     # All images in IMAGES_FOLDER
     image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
+    print(f"\nFound {len(image_files)} images in {IMAGES_FOLDER} for detection.")
 
     # Print information once
     info_device = True
@@ -145,7 +144,7 @@ if __name__ == "__main__":
             mode=cfg["MODE"],
             model=cfg["PATH"],
             half=cfg["HALF"],
-            save=cfg["SAVE"],
+            save=False,
             imgsz=cfg["IMGSZ"],
             project=str(PARENT_FOLDER),
             name=run_name,
@@ -154,6 +153,10 @@ if __name__ == "__main__":
 
         # For each image
         for img_path in image_files:
+            rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))   # Image folder name
+            vis_dir = run_dir / rel_dir
+            label_dir = vis_dir / "labels"
+            label_dir.mkdir(parents=True, exist_ok=True)
             predictor.set_image(str(img_path))
 
             # Print device info (only once)
@@ -162,45 +165,58 @@ if __name__ == "__main__":
             # Run prediction
             results = predictor(text=text_prompts)
 
-            # If no results, still create empty txt file
-            if not results:
-                (labels_folder / f"{img_path.stem}.txt").open("w").close()
-                continue
-
             # Apply NMS only when enabled and keep updated result in-place
             if cfg["NMS"] != False:
                 results[0], info_nms = post_nms(results[0], cfg["NMS"], info_nms)
 
             # Save labels in xywh format
-            save_xywh_label(results[0], img_path, labels_folder, dataset_keys_sorted)
+            save_xywh_label(results[0], img_path, label_dir, dataset_keys_sorted)
+
+            # Save visualization 
+            if cfg["SAVE"]:
+                results[0].save(filename=str(vis_dir / img_path.name))
 
     if MODEL_NAME == "yoloe26":
         # Initialize YOLOE26
         model = YOLOE(cfg["PATH"])
         model.set_classes(text_prompts, model.get_text_pe(text_prompts))
 
-        # Print device info (only once)
-        info_device = print_device_info(model, info_device)
+        # Write all image paths to a txt file for efficient processing
+        imgpath_dir = run_dir / "imgpath.txt"
+        with imgpath_dir.open("w", encoding="utf-8") as f:
+            for img_path in image_files:
+                f.write(f"{img_path}\n")
 
-        # Run multi-image prediction
         results = model.predict(
-            source=str(IMAGES_FOLDER),
+            source=str(imgpath_dir),
+            stream=True,    # Stream results for memory efficiency with large datasets; process one by one
             conf=cfg["CONF"],
             half=cfg["HALF"],
-            save=cfg["SAVE"],
+            save=False,
             imgsz=cfg["IMGSZ"],
             batch=cfg["BATCH"],
             project=str(PARENT_FOLDER),
             name=run_name,
             exist_ok=True)
 
-        # If no multi-image prediction results, skip saving
-        if results:
-            for result in results:
-                # Apply NMS only when enabled and keep updated result in-place
-                if cfg["NMS"] != False:
-                    result, info_nms = post_nms(result, cfg["NMS"], info_nms)
+        # Run prediction
+        for result in results:
+            img_path = Path(result.path)
+            rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))
+            vis_dir = run_dir / rel_dir
+            label_dir = vis_dir / "labels"
+            label_dir.mkdir(parents=True, exist_ok=True)
 
-                # Save labels in xywh format
-                img_path = Path(result.path)
-                save_xywh_label(result, img_path, labels_folder, dataset_keys_sorted)
+            # Print device info (only once)
+            info_device = print_device_info(model, info_device)
+
+            # Apply NMS only when enabled and keep updated result in-place
+            if cfg["NMS"] != False:
+                result, info_nms = post_nms(result, cfg["NMS"], info_nms)
+
+            # Save labels in xywh format
+            save_xywh_label(result, img_path, label_dir, dataset_keys_sorted)
+
+            # Save visualization
+            if cfg["SAVE"]:
+                result.save(filename=str(vis_dir / img_path.name))
