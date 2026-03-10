@@ -18,7 +18,7 @@ DATASET_DICT = {int(key): value for key, value in DATASET_DICT_RAW.items()}
 
 def post_nms(result, iou_threshold, info_nms):
     """Per-class NMS for detection results; keeps cls/conf, optional masks.
-    The terminal logs and auto-saved visualizations during inference are still the results before NMS.
+    The terminal logs during inference are still the results before NMS.
     Args:
         result: The prediction result object (1 image) containing boxes, scores, classes, and optional masks.
         iou_threshold: IoU threshold for NMS.
@@ -27,8 +27,7 @@ def post_nms(result, iou_threshold, info_nms):
     # Print notice about NMS once
     if info_nms:
         print("\n" + "=" * 100)
-        print("The terminal logs and auto-saved visualizations during inference"
-          " are still the results before NMS.")
+        print("The terminal logs during inference are still the results before NMS.")
         print("=" * 100 + "\n")
         info_nms = False
 

@@ -37,12 +37,15 @@ Notes:
 - If images are in subfolders, output mirrors subfolder structure (each subfolder has its own `labels` folder).
 - Writes a `cfg.txt` with the exact run configuration.
 
-Label format (per image, normalized):
+Notes:
+- Label format (per image, normalized):
 
 ```
 cls cx cy w h conf
 ```
-If no detections are found, an empty `.txt` file is created for that image.
+- If no detections are found, an empty `.txt` file is created for that image.
+- Inference terminal logs are generated before custom post-NMS filtering.
+- Saved labels and visualizations are generated after custom NMS.
 
 ## 4. Evaluate metrics (metric.py)
 `metric.py` compares predictions to ground-truth labels and outputs:
