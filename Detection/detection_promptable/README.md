@@ -1,4 +1,4 @@
-## detection_promptable
+﻿## detection_promptable
 This folder provides a simple promptable detection workflow:
 1. Define the classes you want to detect in `dataset_dict.yaml` (COCO128 is provided as an example).
 2. Configure the model and inference settings in `model_cfg.yaml`.
@@ -7,7 +7,7 @@ This folder provides a simple promptable detection workflow:
 
 ## 1. Configure classes (dataset_dict.yaml)
 Maps class IDs to class names. The keys are the class IDs used in labels.
-- Example: COCO128 uses IDs 0–79.
+- Example: COCO128 uses IDs 0-79.
 - The order of sorted keys is used to build the text prompts passed into the model.
 
 Update this file to match your dataset:
@@ -18,7 +18,9 @@ Update this file to match your dataset:
 Key settings:
 - `IMAGES_FOLDER`: folder with images to run inference on.
 - `MODEL_NAME`: `"sam3"` or `"yoloe26"`.
-- `MODEL_CFG`: per-model settings, including `CONF`, `PATH`, `IMGSZ`, `HALF`, and `NMS`.
+- `MODEL_CFG`: per-model settings.
+- `sam3`: `CONF`, `TASK`, `MODE`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `NMS`.
+- `yoloe26`: `CONF`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `BATCH`, `NMS`.
 
 Notes:
 - The config is loaded from YAML by both `detection_entry.py` and `metric.py`.
@@ -30,7 +32,9 @@ Notes:
 - Builds text prompts from `DATASET_DICT`.
 - Runs the selected model on all images under `IMAGES_FOLDER`.
 - Optionally applies the custom NMS.
-- Saves labels to `detection_promptable/[MODEL]_result_det_YYYYMMDDHHmm/labels`.
+- Saves labels under `detection_promptable/[MODEL]_result_det_YYYYMMDDHHmm/.../labels`.
+- If images are directly under `IMAGES_FOLDER`, labels are in `.../labels`.
+- If images are in subfolders, output mirrors subfolder structure (each subfolder has its own `labels` folder).
 - Writes a `cfg.txt` with the exact run configuration.
 
 Label format (per image, normalized):
@@ -46,9 +50,11 @@ If no detections are found, an empty `.txt` file is created for that image.
 
 Notes:
 - It evaluates only the **intersection** of filenames in GT and prediction folders.
+- GT folder is auto-derived as `IMAGES_FOLDER` with `"images"` replaced by `"labels"`.
 - It uses normalized coordinates, so no image size is required.
-- You can choose a result folder via GUI, or it will use the latest one automatically.
-- It can apply an additional confidence threshold on detections.
+- You can choose a result folder via GUI, or it will use the latest one automatically (`*_result_det_YYYYMMDDHHmm`).
+- It can apply an additional confidence threshold on detections (blank input = no extra threshold).
+- Current evaluation reads `det_dir/labels/*.txt` and is **not recursive**.
 
 Output:
 - Metrics are printed to console.
