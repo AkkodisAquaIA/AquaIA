@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 from ultralytics.utils.ops import xywh2xyxy
 
-def get_latest_result_dir(base_dir: Path) -> Path | None:
+def get_latest_result_dir(base_dir: Path) -> Path:
     """Return the newest [model]_result_det_YYYYMMDDHHmm folder directory under base_dir."""
     candidates = [
         p for p in base_dir.glob("*_result_det_*")
@@ -13,6 +13,21 @@ def get_latest_result_dir(base_dir: Path) -> Path | None:
         sys.exit(1)
     latest = max(candidates, key=lambda p: p.name.split("_result_det_")[-1])
     return latest
+
+def select_or_latest(base_dir: Path, title: str) -> Path:
+    """Ask user to select a directory under base_dir, or use latest if cancelled."""
+    import tkinter as tk
+    from tkinter import filedialog
+
+    root = tk.Tk()
+    root.withdraw()
+    chosen_dir = filedialog.askdirectory(
+        initialdir=base_dir,
+        title=title) or None
+    root.update()
+    root.destroy()
+    det_dir = Path(chosen_dir) if chosen_dir else get_latest_result_dir(base_dir)
+    return det_dir
 
 def load_label_txt(path: Path, with_conf: bool, conf_threshold: float | None = None):
     """Reads txt label file (GT or detections). Returns clean box coordinates with or without confidence. 

@@ -3,7 +3,7 @@ import numpy as np
 import yaml
 from ultralytics.utils.metrics import DetMetrics, box_iou
 import torch
-from utils import get_latest_result_dir, load_label_txt, xywh_norm_to_xyxy_norm
+from utils import select_or_latest, load_label_txt, xywh_norm_to_xyxy_norm
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
@@ -162,18 +162,8 @@ def evaluate_two_folders_intersection(
             "recall(B)": float(r["metrics/recall(B)"]),}
 
 if __name__ == "__main__":
-    import tkinter as tk
-    from tkinter import filedialog
-
-    # Ask user to select result_det folder, or use latest if cancelled
-    root = tk.Tk()
-    root.withdraw()
-    chosen_dir = filedialog.askdirectory(
-        initialdir=PARENT_FOLDER,
-        title="Select result_det folder (Cancel to use latest)") or None
-    root.update()
-    root.destroy()
-    det_dir = Path(chosen_dir) if chosen_dir else get_latest_result_dir(PARENT_FOLDER)
+    # Select result_det folder or automatically use the latest one
+    det_dir = select_or_latest(base_dir=PARENT_FOLDER, title="Select result_det folder (Cancel to use latest)")
 
     # Read model CONF from cfg.txt under the selected/latest result directory
     cfg_conf = None
