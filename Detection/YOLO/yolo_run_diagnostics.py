@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Tuple
+import logging
 
 import numpy as np
 import torch
@@ -287,8 +288,8 @@ def infer_final_epoch(
                         last_epoch = int(float(value))
                 if last_epoch is not None:
                     return last_epoch
-        except Exception:
-            pass
+        except Exception as exc:
+            logging.debug("Failed to infer final epoch from %s: %s", results_csv, exc)
 
     epoch_from_path = _infer_epoch_from_path_or_step(weights_path, 0)
     if epoch_from_path is not None:
