@@ -60,7 +60,7 @@ if __name__ == "__main__":
         classes = labels[:, 0].astype(int)
 
         # Define and create the specific crop directory maintaining recursive structure
-        crop_dir = det_dir / "0crop" / rel_dir
+        crop_dir = det_dir / "00crop" / rel_dir
         crop_dir.mkdir(parents=True, exist_ok=True)
 
         # For each detected box
@@ -91,4 +91,4 @@ if __name__ == "__main__":
             crop_count += 1
 
     print(f"\nCropping completed successfully!")
-    print(f"Total {crop_count} bounding boxes cropped and saved in: {det_dir / '0crop'}")
+    print(f"Total {crop_count} bounding boxes cropped and saved in: {det_dir / '00crop'}")
