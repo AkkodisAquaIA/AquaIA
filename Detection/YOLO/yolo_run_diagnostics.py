@@ -363,6 +363,8 @@ def load_train_run(
         try:
             weights_path = weights_path.resolve()
         except Exception:
+            # Resolution can legitimately fail on some platforms or for malformed paths;
+            # this is non-fatal because we will fall back to the run directory below.
             pass
 
     # If not found (typical on Windows), fallback to local run folder
@@ -381,8 +383,12 @@ def load_train_run(
         if dataset_yaml_path is not None:
             try:
                 dataset_yaml_path = dataset_yaml_path.resolve()
-            except Exception:
-                pass
+            except Exception as exc:
+                logging.debug(
+                    "Failed to resolve dataset YAML path %s: %s",
+                    dataset_yaml_path,
+                    exc,
+                )
 
     if dataset_yaml_path is None or not dataset_yaml_path.is_file():
         raise FileNotFoundError(
