@@ -42,7 +42,7 @@ class SetCriterion(nn.Module):
         2) we supervise each pair of matched ground-truth / prediction (supervise class and box)
     """
 
-    def __init__(self, num_classes, matcher, weight_dict, focal_alpha=0.25, reparam=False):
+    def __init__(self, num_classes, matcher, focal_alpha=0.25, reparam=False):
         """ Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -54,7 +54,6 @@ class SetCriterion(nn.Module):
         super().__init__()
         self.num_classes = num_classes
         self.matcher = matcher
-        self.weight_dict = weight_dict
         self.focal_alpha = focal_alpha
         self.loss_bbox_type = 'l1' if (not reparam) else 'reparam'
         self.losses = ["labels", "boxes", "cardinality"]
@@ -66,16 +65,20 @@ class SetCriterion(nn.Module):
         assert "pred_logits" in outputs
         src_logits = outputs["pred_logits"]
 
-        idx = self._get_src_permutation_idx(indices)
+        idx = self._get_src_permutation_idx(indices) # gets (batch_idx, i)
+
         target_classes_o = torch.cat(
-            [t["labels"][J] for t, (_, J) in zip(targets, indices)]
-        )
+            [t["labels"][J] for t, (_, J) in zip(targets, indices)] 
+        ) # flatten
+
+
         target_classes = torch.full(
             src_logits.shape[:2],
             self.num_classes,
             dtype=torch.int64,
             device=src_logits.device,
-        )
+        ) # (B, N)
+        
         target_classes[idx] = target_classes_o
 
         target_classes_onehot = torch.zeros(
@@ -87,13 +90,17 @@ class SetCriterion(nn.Module):
         target_classes_onehot.scatter_(2, target_classes.unsqueeze(-1), 1)
 
         target_classes_onehot = target_classes_onehot[:, :, :-1]
+
+        # print(target_classes_onehot[0][:10])
+        # print(src_logits[0][:10])
+
         loss_ce = (
             sigmoid_focal_loss(
                 src_logits,
                 target_classes_onehot,
                 num_boxes,
                 alpha=self.focal_alpha,
-                gamma=2,
+                gamma=3.0,
             )
             * src_logits.shape[1]
         )
@@ -132,6 +139,8 @@ class SetCriterion(nn.Module):
         )
 
         if self.loss_bbox_type == "l1":
+            # print(src_boxes.shape)
+            # print(target_boxes.shape)
             loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction="none")
         elif self.loss_bbox_type == "reparam":
             src_deltas = outputs["pred_deltas"][idx]
@@ -156,6 +165,7 @@ class SetCriterion(nn.Module):
    
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
+        # print(indices)
         batch_idx = torch.cat(
             [torch.full_like(src, i) for i, (src, _) in enumerate(indices)]
         )

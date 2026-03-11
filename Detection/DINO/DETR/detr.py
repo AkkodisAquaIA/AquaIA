@@ -16,7 +16,7 @@ Samuel Beaussant : Taken from DETR official repo. Modified and simplified for th
 
 class DETR(nn.Module):
     """ This is the DETR module that performs object detection """
-    def __init__(self,  num_input_channels, num_classes, num_queries, d_model=256, aux_loss=False, fp16=False):
+    def __init__(self,  num_input_channels, num_classes, num_queries, d_model=256, aux_loss=False):
         """ Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
@@ -28,15 +28,11 @@ class DETR(nn.Module):
         """
         super().__init__()
         self.num_queries = num_queries
-        if fp16:
-            dtype = torch.float16
-        else:
-            dtype = torch.float32
-        self.transformer = Transformer(d_model=d_model).to(dtype=dtype)
-        self.class_embed = nn.Linear(d_model, num_classes + 1).to(dtype=dtype)
-        self.bbox_embed = MLP(d_model, d_model, 4, 3).to(dtype=dtype)
-        self.query_embed = nn.Embedding(num_queries, d_model).to(dtype=dtype)
-        self.input_proj = nn.Linear(num_input_channels, d_model).to(dtype=dtype)
+        self.transformer = Transformer(d_model=d_model)#.to(dtype=dtype)
+        self.class_embed = nn.Linear(d_model, num_classes + 1)#.to(dtype=dtype)
+        self.bbox_embed = MLP(d_model, d_model, 4, 3)#.to(dtype=dtype)
+        self.query_embed = nn.Embedding(num_queries, d_model)#.to(dtype=dtype)
+        self.input_proj = nn.Linear(num_input_channels, d_model)#.to(dtype=dtype)
         self.aux_loss = aux_loss
 
     def forward(self, features, pos):

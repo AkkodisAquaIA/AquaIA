@@ -70,10 +70,10 @@ class HungarianMatcher(nn.Module):
                 len(index_i) = len(index_j) = min(num_queries, num_target_boxes)
         """
         with torch.no_grad():
-            bs, num_queries = outputs["pred_logits"].shape[:2]
+            bs, num_queries = outputs["pred_logits"].shape[:2] # (B, N, Nc)
 
             # We flatten to compute the cost matrices in a batch
-            out_prob = outputs["pred_logits"].flatten(0, 1).sigmoid()
+            out_prob = outputs["pred_logits"].flatten(0, 1).sigmoid()  # B*N, Nc
             out_bbox = outputs["pred_boxes"].flatten(
                 0, 1
             )  # [batch_size * num_queries, 4]
@@ -117,8 +117,12 @@ class HungarianMatcher(nn.Module):
                 + self.cost_giou * cost_giou
             )
             C = C.view(bs, num_queries, -1).cpu()
+            # print(C.shape)
 
             sizes = [len(v["boxes"]) for v in targets]
+            # print(sizes)
+            # print(C.split(sizes, dim=-1)[0].shape)
+            # print(len(C.split(sizes, -1)))
             indices = [
                 linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))
             ]

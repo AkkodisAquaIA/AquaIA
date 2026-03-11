@@ -5,9 +5,11 @@ __pycache__/
 *.pth
 *.pt
 data/
-datasets/
 dataloading/*.png
 coco128
 
 #Linter
 .ruff_cache/
+
+/results
+/datasets

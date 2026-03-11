@@ -3,6 +3,7 @@ import torch.nn as nn
 from .position_encoding import build_position_encoding
 from .DETR import DETR
 from .backbone_id_map import resolve_backbone_id
+import torch.nn.attention as attn
 
 class DINODetector(nn.Module):
     # TODO : Ajouter windowing strategy pour les images de grande taille
@@ -19,7 +20,6 @@ class DINODetector(nn.Module):
         d_model=256, # Transformer hidden dimension
         device="cpu",
         inference_mode=False,
-        fp16=False,
         lora_ft=False,
         quantize=False,
         num_classes=91,
@@ -33,7 +33,6 @@ class DINODetector(nn.Module):
         self.device = device
         self.num_classes = num_classes
         self.num_queries = num_queries
-        self.fp16 = fp16
         self.lora_ft = lora_ft
         self.quantize = quantize
 
@@ -45,16 +44,13 @@ class DINODetector(nn.Module):
             num_input_channels=self.backbone.embed_dim, 
             num_classes=num_classes, 
             num_queries=num_queries,
-            d_model=d_model,
-            fp16=fp16
+            d_model=d_model
         ).to(device)
         # Assuming square images for simplicity, otherwise we would need to compute patch_x and patch_y separately
         self.patch_size = self.img_size // self.backbone.patch_size
 
         # precompute positional encoding once for a single image (will be broadcasted in forward) 
         self.pe = self.positional_encoding(patch_x=self.patch_size, device=self.device) 
-        if self.fp16:
-            self.pe = self.pe.half()
 
         if not self.lora_ft:
             self.backbone.eval().to(device)
@@ -65,16 +61,10 @@ class DINODetector(nn.Module):
         # Feed input to backbone and extract features
         with torch.set_grad_enabled(self.lora_ft):
             features = self.backbone(images, is_training=True)["x_norm_patchtokens"] # (B, H*W, C)
-            if self.fp16 and features.dtype != torch.float16:
-                # The backbone may output float32 even under autocast, explicit cast for downstream flash attention kernel compatibility
-                features = features.half()
         return features, self.pe.unsqueeze(0).expand(features.shape[0], -1, -1) # (B, H*W, 2*num_pos_feats) add batch dimension with broadcasting
 
     def forward(self, images):
-        with torch.inference_mode(self.device=="cpu" or self.inference_mode):
-            with torch.autocast(enabled=self.fp16, device_type="cuda", dtype=torch.float16):
-                with torch.nn.attention.sdpa_kernel(backends=[torch.nn.attention.SDPBackend.FLASH_ATTENTION]):
-                    # print(images.dtype)
-                    embeddings, pe = self._forward_backbone(images)
-                    out = self.detector(embeddings, pe)
+        with torch.nn.attention.sdpa_kernel(backends=[attn.SDPBackend.FLASH_ATTENTION]):
+            embeddings, pe = self._forward_backbone(images)
+            out = self.detector(embeddings, pe)
         return out
