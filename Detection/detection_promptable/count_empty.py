@@ -1,4 +1,4 @@
-import yaml
+﻿import yaml
 from pathlib import Path
 from collections import defaultdict
 from utils import select_or_latest, collect_image_files, load_label_txt
@@ -15,8 +15,8 @@ if __name__ == "__main__":
     # All images in IMAGES_FOLDER (recursive)
     image_files, _ = collect_image_files(IMAGES_FOLDER, stage="checking empty detection images")
 
-    # Use dictionaries to count failures and totals per subfolder
-    subfolder_failure_counts = defaultdict(int)
+    # Use dictionaries to count empties and totals per subfolder
+    subfolder_empty_counts = defaultdict(int)
     subfolder_total_counts = defaultdict(int)
 
     # For each image
@@ -40,23 +40,27 @@ if __name__ == "__main__":
         # File is empty or contains only whitespace
         labels = load_label_txt(label_path, with_conf=False)
         if labels.shape[0] == 0:
-            subfolder_failure_counts[subfolder_name] += 1
+            subfolder_empty_counts[subfolder_name] += 1
 
     # Write the results to a file
     output_dir = det_dir / "empty_detection.txt"
     with output_dir.open("w", encoding="utf-8") as f:
         f.write("Empty detections:\n"
-        "(Subfolder, Failures, Total)\n")
+        "(Subfolder, Empty, Total)\n")
+
+        total_all_empties = 0
+        total_all_images = 0
 
         # Sort subfolders by name
         for subfolder in sorted(subfolder_total_counts.keys()):
             total = subfolder_total_counts[subfolder]
-            failures = subfolder_failure_counts[subfolder]
-            line = f"{subfolder}, {failures}, {total}\n"
+            empties = subfolder_empty_counts[subfolder]
+            line = f"{subfolder}, {empties}, {total}\n"
             f.write(line)
             total_all_images += total
-            total_all_failures += failures
+            total_all_empties += empties
 
-    f.write("-" * 30 + "\n")
-    f.write(f"TOTAL, {total_all_failures}, {total_all_images}\n")
+        f.write("-" * 30 + "\n")
+        f.write(f"TOTAL, {total_all_empties}, {total_all_images}\n")
+
     print(f"\nDone! Saved summary to: {output_dir}")
