@@ -1,9 +1,10 @@
 ﻿## detection_promptable
-This folder provides a simple promptable detection workflow:
+This folder provides a promptable detection workflow:
 1. Define the classes you want to detect in `dataset_dict.yaml` (COCO128 is provided as an example).
 2. Configure the model and inference settings in `model_cfg.yaml`.
 3. Run detection with `detection_entry.py`. A custom non-native per-class NMS is optionally applied.
-4. Evaluate results with `metric.py`.
+4. Crop detected boxes with `crop.py`.
+5. Evaluate results with `metric.py`.
 
 ## 1. Configure classes (dataset_dict.yaml)
 Maps class IDs to class names. The keys are the class IDs used in labels.
@@ -38,16 +39,20 @@ Notes:
 - Writes a `cfg.txt` with the exact run configuration.
 
 Notes:
-- Label format (per image, normalized):
-
-```
-cls cx cy w h conf
-```
+- Label format (per image, normalized): cls cx cy w h conf
 - If no detections are found, an empty `.txt` file is created for that image.
 - Inference terminal logs are generated before custom post-NMS filtering.
 - Saved labels and visualizations are generated after custom NMS.
 
-## 4. Evaluate metrics (metric.py)
+## 4. Crop detections (crop.py)
+`crop.py` reads detection labels and writes cropped image patches.
+- You can choose a result folder via GUI, or it automatically uses the latest `*_result_det_YYYYMMDDHHmm` folder.
+- It reads labels from `<result_dir>/<relative_image_folder>/labels/<image_name>.txt`.
+- It saves crops under `<result_dir>/00crop/<relative_image_folder>/`.
+- Crop filename format is `<image_stem>_<class_name>_<index>.ext`.
+- Confidence is ignored during cropping (boxes are read from the first 5 label columns: `cls cx cy w h`).
+
+## 5. Evaluate metrics (metric.py)
 `metric.py` compares predictions to ground-truth labels and outputs:
 - `mAP50-95(B)`, `mAP50(B)`, `precision(B)`, `recall(B)`, and number of images.
 
@@ -57,7 +62,8 @@ Notes:
 - It uses normalized coordinates, so no image size is required.
 - You can choose a result folder via GUI, or it will use the latest one automatically (`*_result_det_YYYYMMDDHHmm`).
 - It can apply an additional confidence threshold on detections (blank input = no extra threshold).
-- Current evaluation reads `det_dir/labels/*.txt` and is **not recursive**.
+- Current evaluation reads only `det_dir/labels/*.txt` and is **not recursive**.
+- If your predictions are in nested folders (mirrored structure from `detection_entry.py`), aggregate them first or adapt `metric.py`.
 
 Output:
 - Metrics are printed to console.

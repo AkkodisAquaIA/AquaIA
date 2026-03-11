@@ -5,6 +5,7 @@ import torch
 from ultralytics.models.sam import SAM3SemanticPredictor
 from ultralytics import YOLOE
 from ultralytics.utils.nms import TorchNMS
+from utils import collect_image_files
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
@@ -127,9 +128,8 @@ if __name__ == "__main__":
             formatted = f"\"{value}\"" if isinstance(value, str) else value
             cfg_file.write(f"{key} = {formatted}\n")
 
-    # All images in IMAGES_FOLDER
-    image_files = sorted(f for f in Path(IMAGES_FOLDER).glob("**/*") if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
-    print(f"\nFound {len(image_files)} images in {IMAGES_FOLDER} for detection.")
+    # All images in IMAGES_FOLDER (recursive)
+    image_files, total_images = collect_image_files(IMAGES_FOLDER, stage="detection")
 
     # Print information once
     info_device = True
@@ -151,7 +151,7 @@ if __name__ == "__main__":
         predictor = SAM3SemanticPredictor(overrides=overrides)
 
         # For each image
-        for img_path in image_files:
+        for index, img_path in enumerate(image_files, start=1):
             rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))   # Image folder name
             vis_dir = run_dir / rel_dir
             label_dir = vis_dir / "labels"
@@ -174,6 +174,10 @@ if __name__ == "__main__":
             # Save visualization 
             if cfg["SAVE"]:
                 results[0].save(filename=str(vis_dir / img_path.name))
+
+            # Print progress every 100 images (and at the end)
+            if index % 20 == 0 or index == total_images:
+                print(f"\nSAM3 progress: {index}/{total_images} images processed.\n")
 
     if MODEL_NAME == "yoloe26":
         # Initialize YOLOE26

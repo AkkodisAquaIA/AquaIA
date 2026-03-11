@@ -29,6 +29,13 @@ def select_or_latest(base_dir: Path, title: str) -> Path:
     det_dir = Path(chosen_dir) if chosen_dir else get_latest_result_dir(base_dir)
     return det_dir
 
+def collect_image_files(base_dir: str | Path, stage: str = "processing") -> tuple[list[Path], int]:
+    """Collect image files recursively and print summary."""
+    image_files = sorted(f for f in Path(base_dir).glob("**/*")if f.suffix.lower() in {".jpg", ".jpeg", ".png"})
+    total_images = len(image_files)
+    print(f"\nFound {total_images} images in {base_dir} for {stage}.")
+    return image_files, total_images
+
 def load_label_txt(path: Path, with_conf: bool, conf_threshold: float | None = None):
     """Reads txt label file (GT or detections). Returns clean box coordinates with or without confidence. 
     If with_conf is True and conf_threshold is provided, rows with conf < conf_threshold are dropped.
