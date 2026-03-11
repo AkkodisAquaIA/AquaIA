@@ -4,12 +4,15 @@ __pycache__/
 *.npz
 *.pth
 *.pt
+data/
 dataloading/*.png
 coco128
 
 #Linter
 .ruff_cache/
 
+/results
+/datasets
 # detection_promptable
 Detection/runs/
 Detection/detection_promptable/*_result_det_*/
