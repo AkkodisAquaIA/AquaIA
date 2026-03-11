@@ -46,7 +46,7 @@ if __name__ == "__main__":
     output_dir = det_dir / "empty_detection.txt"
     with output_dir.open("w", encoding="utf-8") as f:
         f.write("Empty detections:"
-        "\n(Subfolder, Empty, Total)")
+        "\n(Subfolder, Empty, Total)\n")
 
         total_all_empties = 0
         total_all_images = 0
