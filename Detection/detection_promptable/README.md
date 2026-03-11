@@ -4,7 +4,8 @@ This folder provides a promptable detection workflow:
 2. Configure the model and inference settings in `model_cfg.yaml`.
 3. Run detection with `detection_entry.py`. A custom non-native per-class NMS is optionally applied.
 4. Crop detected boxes with `crop.py`.
-5. Evaluate results with `metric.py`.
+5. Count empty detections with `count_failure.py`.
+6. Evaluate results with `metric.py`.
 
 ## 1. Configure classes (dataset_dict.yaml)
 Maps class IDs to class names. The keys are the class IDs used in labels.
@@ -52,7 +53,21 @@ Notes:
 - Crop filename format is `<image_stem>_<class_name>_<index>.ext`.
 - Confidence is ignored during cropping (boxes are read from the first 5 label columns: `cls cx cy w h`).
 
-## 5. Evaluate metrics (metric.py)
+## 5. Count empty detections (count_failure.py)
+`count_failure.py` checks how many images have empty detection labels (no boxes).
+
+Notes:
+- It scans images recursively from `IMAGES_FOLDER`.
+- You can choose a result folder via GUI, or it automatically uses the latest `*_result_det_YYYYMMDDHHmm` folder.
+- For each image, it reads prediction labels from `<result_dir>/<relative_image_folder>/labels/<image_name>.txt`.
+- Empty label files are counted as failures.
+- Missing label files are reported as warnings and skipped.
+
+Output:
+- A summary file `empty_detection.txt` is saved inside the selected result folder.
+- Format includes per-subfolder counts: `Subfolder, Failures, Total`, plus a `TOTAL` line.
+
+## 6. Evaluate metrics (metric.py)
 `metric.py` compares predictions to ground-truth labels and outputs:
 - `mAP50-95(B)`, `mAP50(B)`, `precision(B)`, `recall(B)`, and number of images.
 
