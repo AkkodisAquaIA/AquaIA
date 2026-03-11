@@ -45,8 +45,8 @@ if __name__ == "__main__":
     # Write the results to a file
     output_dir = det_dir / "empty_detection.txt"
     with output_dir.open("w", encoding="utf-8") as f:
-        f.write("Empty detections:\n"
-        "(Subfolder, Empty, Total)\n")
+        f.write("Empty detections:"
+        "\n(Subfolder, Empty, Total)")
 
         total_all_empties = 0
         total_all_images = 0
@@ -60,8 +60,8 @@ if __name__ == "__main__":
             total_all_images += total
             total_all_empties += empties
 
-        f.write("-" * 30 + "\n")
-        f.write(f"TOTAL, {total_all_empties}, {total_all_images}\n")
+        f.write("-" * 30)
+        f.write(f"\nTOTAL, {total_all_empties}, {total_all_images}\n")
 
-    print(f"\nTOTAL, {total_all_empties}, {total_all_images}")
+    print(f"\nEmpty images: {total_all_empties}, Total images: {total_all_images}")
     print(f"\nDone! Saved summary to: {output_dir}")

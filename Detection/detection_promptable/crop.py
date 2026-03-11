@@ -91,4 +91,4 @@ if __name__ == "__main__":
             crop_count += 1
 
     print(f"\nCropping completed successfully!")
-    print(f"Total {crop_count} bounding boxes cropped and saved in: {det_dir / '00crop'}")
+    print(f"\nTotal {crop_count} bounding boxes cropped and saved in: {det_dir / '00crop'}")
