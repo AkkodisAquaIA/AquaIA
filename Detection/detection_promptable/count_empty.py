@@ -63,4 +63,5 @@ if __name__ == "__main__":
         f.write("-" * 30 + "\n")
         f.write(f"TOTAL, {total_all_empties}, {total_all_images}\n")
 
+    print(f"\nTOTAL, {total_all_empties}, {total_all_images}")
     print(f"\nDone! Saved summary to: {output_dir}")
