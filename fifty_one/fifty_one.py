@@ -15,10 +15,15 @@ from tqdm import tqdm
 from yaspin import yaspin
 import random
 
-from bboxes.bboxes import detect_bbox_problemes_detail_tolere, afficher_bbox_erreurs_compact
+
+from bboxes import bboxes as bb
+from statistics_yolo import dataset_statistics_yolo as ds
+
+
 
 from tools import utility as util
 from tools import constants as ct
+import tools.display_color as dc
 from tools.constants import DISPLAY_COLORS as colors
 
 #==========================================================================================
@@ -35,46 +40,6 @@ def load_rgb(path):
 # --- Normalisation L2 ---
 def l2_normalize(x):
     return x / np.clip(np.linalg.norm(x, axis=1, keepdims=True), 1e-12, None)
-
-# --- Labels orphelins YOLO ---
-def orphelins_YOLO():
-    images = set(Path(DATASET_DIR, "images").rglob("*.*"))
-    labels = set(Path(DATASET_DIR, "labels").rglob("*.txt"))
-    image_stems = {p.stem for p in images}
-    label_stems = {p.stem for p in labels}
-
-    orphan_labels = sorted(label_stems - image_stems)
-    util.display_and_save_errors(
-        orphan_labels,
-        "labels_orphelins.txt",
-        "Labels orphelins (txt sans image)"
-    )
-    print()
-
-# --- CONTROLE IMAGES SANS LABEL AVANT CREATION DATASET ---
-def controle_images_sans_label():
-    images_dir = Path(DATASET_DIR) / "images"
-    labels_dir = Path(DATASET_DIR) / "labels"
-
-    images = [p for p in images_dir.rglob("*") if p.suffix.lower() in ct.IMAGE_EXT]
-    labels = list(labels_dir.rglob("*.txt"))
-
-    image_stems = {p.stem for p in images}
-    label_stems = {p.stem for p in labels}
-
-    images_without_label = sorted(image_stems - label_stems)
-
-    if images_without_label:
-        util.display_and_save_errors(
-            images_without_label,
-            "images_sans_labels.txt",
-            "Images sans labels"
-        )
-        prompt = f"Arrêt du programme. Corrige les erreurs avant de continuer.{ct.BELL}"
-        display.print(prompt, colors['error'])
-        exit(1)
-
-    display.print("Toutes les images ont un fichier label.\n", colors['ok'])
 
 # --- Encodage des images avec skip intelligent et batch save ---
 def encoding(dataset, batch_size=ct.BATCH_SIZE):
@@ -170,7 +135,7 @@ MODEL_PATH = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model
 DUP_THRESHOLD = 0.98
 NEIGHBORS = 20
 
-display = util.DisplayColor()
+display = dc.DisplayColor()
 
 # ================= REPRO =================
 torch.manual_seed(ct.SEED)
@@ -180,8 +145,11 @@ random.seed(ct.SEED)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-print(ct.logo)
 
+# # Display du logo et infos système
+# print(ct.logo)
+
+display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
 
 display.print(f"Report mode {'ON' if ct.REPORT_MODE else 'OFF'}.", colors['warning'])
 
@@ -202,8 +170,28 @@ if dataset_name in fo.list_datasets():
     display.print(f"Suppression du dataset existant '{dataset_name}'", colors['info'])
     fo.delete_dataset(dataset_name)
 
-controle_images_sans_label()
 
+# validation des labels avant création du dataset FiftyOne
+erreur, rapport_detail, Ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR)
+
+print("\n===== RESUME VALIDATION =====")
+
+total_errors = sum(len(v) for v in erreur.values())
+
+print(f"Total types warning/erreurs : {len(erreur)}")
+print(f"Total warning/erreurs : {total_errors}")
+
+for k,v in erreur.items():
+    print(f"{k:25} : {len(v)}")
+print()
+
+
+if not Ctrl_ok:
+    display.print("Erreurs détectées dans les labels. Arrêt du programme.", colors['error'])
+    util.afficher_bbox_erreurs_compact(erreur)
+    exit(1) 
+else:    
+    display.print("Aucune erreur de label détectée. Création du dataset FiftyOne...", colors['ok'])
 
 display.print(f"Création du dataset FiftyOne à partir du dossier '{DATASET_DIR}'...", colors['info'])
 with yaspin(text="Chargement en cours...", color="cyan") as spinner:
@@ -218,8 +206,9 @@ with yaspin(text="Chargement en cours...", color="cyan") as spinner:
         spinner.ok("Ok ") 
     except Exception as e:
         spinner.fail("Out ")
-        raise e
-
+        util.format_and_display_error(f"création  ", rep="default_reports")
+        exit(1)
+ 
 total_images = len(dataset)
 display.print(f"Dataset chargé avec succès : {total_images} images", colors['info'])
 
@@ -238,101 +227,17 @@ preprocess = transforms.Compose([
                          (0.229, 0.224, 0.225)),
 ])
 
-# --- Labels orphelins YOLO ---
-orphelins_YOLO()
-
-# --- Détections bbox invalides ---
-display.print("Détection des problèmes de bbox...", colors['info'])
-bbox_erreurs = detect_bbox_problemes_detail_tolere(dataset, bbox_tol=1e-6)
-
-if any(len(paths) > 0 for paths in bbox_erreurs.values()):
-    afficher_bbox_erreurs_compact(bbox_erreurs, noms_par_ligne=ct.n_per_line)
-
 
 # ================= ENCODING =================
 encoding(dataset)
 
-# ================= FAISS OPTIMISE =================
-display.print("Détection doublons FAISS...", colors['info'])
-embeddings = np.array(dataset.values(VEC_FIELD), dtype="float32")
-num_embeddings, dim = embeddings.shape
 
-# Paramètres FAISS IVF
-nlist = int(np.sqrt(num_embeddings))
-nprobe = max(5, nlist // 20)
+# ================= STATISTICS =================
+dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
+class_names = ds.load_class_names(dataset_yaml)
 
-quantizer = faiss.IndexFlatIP(dim)
-index = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_INNER_PRODUCT)
-
-# GPU optionnel
-try:
-    if faiss.get_num_gpus() > 0:
-        display.print("Utilisation FAISS GPU", colors['info'])
-        res = faiss.StandardGpuResources()
-        index = faiss.index_cpu_to_gpu(res, 0, index)
-except Exception as e:
-    display.print(f"FAISS GPU indisponible → CPU : {e}", colors['warning'])
-
-# Train et ajout embeddings
-display.print("Training index FAISS...", colors['info'])
-index.train(embeddings)
-index.add(embeddings)
-index.nprobe = nprobe
-
-display.print(f"Recherche FAISS (nprobe={nprobe})...", colors['info'])
-D, I = index.search(embeddings, NEIGHBORS)
-
-# ================= CLUSTERING =================
-parent = np.arange(num_embeddings)
-
-def find(x):
-    while parent[x] != x:
-        parent[x] = parent[parent[x]]
-        x = parent[x]
-    return x
-
-def union(x, y):
-    parent[find(x)] = find(y)
-
-for i in range(num_embeddings):
-    for j in range(1, NEIGHBORS):
-        if I[i, j] <= i:
-            continue
-        if D[i, j] >= DUP_THRESHOLD:
-            union(i, I[i, j])
-
-clusters = {}
-sample_ids = dataset.values("id")
-for i in range(num_embeddings):
-    root = find(i)
-    clusters.setdefault(root, []).append(sample_ids[i])
-
-dup_ids = []
-for group in clusters.values():
-    if len(group) > 1:
-        dup_ids.extend(group)
-
-dataset.select(list(dup_ids)).tag_samples("dups")
-
-# --- Affichage et sauvegarde ---
-dup_paths = [p for p in dataset.select(list(dup_ids)).values("filepath")]
-util.display_and_save_errors(
-    dup_paths,
-    "images_doublons.txt",
-    f"Images doublons (seuil {DUP_THRESHOLD})"
-)
-
-# --- Vue combinée : doublons + bbox hors limites ---
-combined_view = dataset.match(
-    (F("tags").contains("dups")) # |
-   # (F("filepath").is_in(invalid_bbox_paths))
-)
-
-if len(combined_view) > 0:
-    display.print(f"Lancement de l'interface FiftyOne pour les doublons et bbox hors limites ({len(combined_view)} images)...", colors['info'])
-    util.launch_fiftyone_interface(combined_view)
-else:
-    display.print("Aucun doublon ni bbox hors limites à afficher.", colors['info'])
+results = ds.dataset_statistics_yolo(DATASET_DIR)
+ds.afficher_dataset_statistics(results, class_names, classes_par_ligne=3, afficher_hist=False)
 
 print()
 prompt = f"Script terminé.{ct.BELL}"

@@ -36,9 +36,17 @@ logo = r"""
 ████████████████████████████████████████████████████████████             
 """
 
+#-----------------------------------------------------------------------------------
+# Mode debug
+"""
+True  : The full error message is displayed.
+False : The error message is displayed in a concise format.
+"""
+DEBUG_MODE = False
+
 
 # required imports 
-REPORT_MODE  = True
+REPORT_MODE  = False
 
 # Constants and configuration for the FiftyOne project
 BATCH_SIZE = 64
@@ -52,14 +60,31 @@ SEED = 42
 # supported image extensions
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 
+
+# Bounding box size limits (relative to image dimensions) 
+MIN_BBOX = 0.001  
+MAX_BBOX = 1.0
+
+# Bounding box area limits (relative to image area)
+MIN_BBOX_AREA = 0.0001
+MAX_BBOX_AREA = 0.99
+
+# Tolérance maximale avant d’émettre un warning (en %)
+BBOX_OVERFLOW_WARNING = 2       # 2 % → warning
+# Tolérance maximale absolue avant de bloquer l'image (en %)
+BBOX_OVERFLOW_ERROR   = 4       # 4 % → erreur
+
+# Maximum number of classes (for class ID validation)
+nb_classes = 100
+
 # progress bar width
 TQDM_NCOLS = 150
 
 # Number of items to display per line in error reports
 n_per_line = 5
 
-# Tolérance pour les bbox hors limites en pourcentage
-threshold_bounding_box = 0.0   
+# # Tolérance pour les bbox hors limites en pourcentage
+# threshold_bounding_box = 0.5   
 
 # Sound system for Error.
 BELL = "\a"

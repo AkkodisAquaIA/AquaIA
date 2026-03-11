@@ -1,50 +1,19 @@
+import os
+import sys
 import socket
+import traceback
+from collections import Counter
 from pathlib import Path
 import argparse
 import fiftyone as fo
 
 from typing import Tuple, List
 
+import tools.display_color as dc
 from tools.constants import DISPLAY_COLORS as colors
 from tools import constants as ct
 
 #==========================================================================================
-
-# A color spec is (red, green, blue, prefix_str)
-ColorSpec = Tuple[int, int, int, str]
-
-class DisplayColor:
-    RESET = "\033[0m"
-    BOLD  = "\033[1m"
-
-    def __init__(self) -> None:
-        """Initialize the DisplayColor helper."""
-        # Nothing to do here for now
-
-    def print(self, text: str, color_spec: ColorSpec, bold: bool = False) -> None:
-        """
-        Print `text` in the RGB color and with the prefix defined by `color_spec`.
-
-        Args:
-            text: The message to display.
-            color_spec: 4-tuple (r, g, b, prefix), where:
-                - r, g, b are ints 0-255
-                - prefix is a short string (e.g. "[X] ")
-            bold: If True, render message in bold.
-
-        Usage:
-            self.display.print("Something went wrong", colors["error"])
-        """
-        # Destructure for clarity
-        r, g, b, prefix = color_spec
-
-        # Build ANSI escape codes
-        rgb_code  = f"\033[38;2;{r};{g};{b}m"
-        bold_code = self.BOLD if bold else ""
-
-        # Final output
-        print(f"{rgb_code}{bold_code}{prefix}{text}{self.RESET}")
-
 
 # ------------------------------
 # Function to find a free port
@@ -69,7 +38,7 @@ def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
         dataset (fo.Dataset): The FiftyOne dataset to visualize.
     """
 
-    color = DisplayColor()
+    color = dc.DisplayColor()
 
     color.print("Launching FiftyOne web interface...", colors['info'])
     
@@ -165,16 +134,16 @@ def display_and_save_errors(
         n_per_line (int): Number of items per line when printing
     """
 
-    color = DisplayColor()
+    display = dc.DisplayColor()
 
     if not items:
-        color.print(f"{title}: No issues detected.\n", colors['ok'])
+        display.print(f"{title}: No issues detected.\n", colors['ok'])
         return
 
     if sort:
         items = sorted(items, key=lambda p: str(p))
 
-    color.print(f"{title}: {len(items)} item(s) detected", colors['warning'], bold=True)
+    display.print(f"{title}: {len(items)} item(s) detected", colors['warning'], bold=True)
     for i in range(0, len(items), ct.n_per_line):
         line_items = items[i:i + ct.n_per_line]
         line = " | ".join(str(x) if full_path else Path(x).name for x in line_items)
@@ -190,3 +159,142 @@ def display_and_save_errors(
         print(f"List saved to '{file_name}'\n")
     else:
         print()
+
+
+
+def format_and_display_error(texte : str, rep= "") -> None  :
+    """
+    Handles errors based on the specified level of detail.
+    """
+
+    display = dc.DisplayColor()
+
+    # Retrieve the type, value, and traceback of the most recent exception
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+ 
+    # --- Full mode (DEBUG) ---
+    if ct.DEBUG_MODE:
+        tb = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+        prompt = f"{texte} :\n{tb}"
+
+        report = Path(rep, "fault.txt"  )
+        print(f' ---- Error report saved to: {report}     ')
+        with open(report, "a", encoding="utf-8") as f:
+            f.write(f"{texte} :\n {''.join(tb)}\n")
+
+    # --- Simplified mode (without traceback) ---                                             
+    else:
+        # Only display the exception type and value
+        prompt = f"{texte} :\n{exc_type.__name__}: {exc_value}"
+
+    display.print(prompt, colors['error'])
+
+    
+def afficher_bbox_erreurs_compact(bbox_erreurs, noms_par_ligne=5):
+    """
+    Affiche les erreurs de bbox par catégorie, plusieurs noms d'images par ligne.
+    
+    bbox_erreurs : dict retourné par detect_bbox_problemes_detail()
+    noms_par_ligne : nombre de noms d'images affichés par ligne
+    """
+
+    display = dc.DisplayColor()
+
+    # Calculer largeur max pour aligner les catégories
+    categorie_max_len = max(len(cat) for cat in bbox_erreurs.keys())
+    
+    display.print("Erreurs de bbox détectées :", colors["warning"])
+    
+    for categorie, chemins in bbox_erreurs.items():
+        if not chemins:
+            continue  # ignorer les catégories sans erreur
+        
+        # Titre catégorie + nombre d'images
+        print(f"{categorie.capitalize().ljust(categorie_max_len)} ({len(chemins)} images) :")
+        
+        # Extraire uniquement les noms de fichiers
+        noms_images = [os.path.basename(chemin) for chemin in chemins]
+        
+        # Affichage en blocs de plusieurs noms par ligne
+        for i in range(0, len(noms_images), noms_par_ligne):
+            ligne = "  ".join(noms_images[i:i+noms_par_ligne])
+            print(f"{' ' * (categorie_max_len + 3)}{ligne}")
+        
+        print()  # ligne vide entre catégories
+
+
+
+def afficher_distribution_classes(class_distribution, classes_par_ligne=4):
+
+    print("\n--- Distribution des classes ---")
+
+    total = sum(class_distribution.values())
+
+    items = sorted(class_distribution.items())
+
+    largeur_colonne = 28  # largeur d'une colonne pour aligner
+
+    for i in range(0, len(items), classes_par_ligne):
+
+        ligne = items[i:i+classes_par_ligne]
+
+        morceaux = []
+
+        for cls, count in ligne:
+            pct = (count / total) * 100
+            txt = f"classe {cls:<3}: {count:<6} ({pct:5.2f}%)"
+            morceaux.append(txt.ljust(largeur_colonne))
+
+        print("".join(morceaux))
+
+
+
+def afficher_dataset_statistics(resultats):
+
+    display = dc.DisplayColor()
+
+    stats = resultats["stats"]
+    class_distribution = resultats["class_distribution"]
+    anomalies = resultats["anomalies"]
+
+    display.print("Statistiques du dataset YOLO", colors["info"])
+
+    print("\n--- Dataset ---")
+
+    print(f"{'Images':20}: {stats['images']}")
+    print(f"{'Fichiers labels':20}: {stats['labels']}")
+    print(f"{'Bounding boxes':20}: {stats['bounding_boxes']}")
+
+    print("\n--- Bounding boxes ---")
+
+    print(f"{'Largeur moyenne':20}: {stats['bbox_width_mean']:.4f}")
+    print(f"{'Hauteur moyenne':20}: {stats['bbox_height_mean']:.4f}")
+    print(f"{'Aire moyenne':20}: {stats['bbox_area_mean']:.4f}")
+
+    print(f"{'Largeur min':20}: {stats['bbox_width_min']:.4f}")
+    print(f"{'Largeur max':20}: {stats['bbox_width_max']:.4f}")
+
+    print(f"{'Hauteur min':20}: {stats['bbox_height_min']:.4f}")
+    print(f"{'Hauteur max':20}: {stats['bbox_height_max']:.4f}")
+
+    afficher_distribution_classes(class_distribution, classes_par_ligne=4)
+
+
+    print("\n--- Annotations suspectes ---")
+
+    total = sum(class_distribution.values())
+    if not anomalies:
+        display.print("Aucune anomalie détectée", colors["ok"])
+    else:
+
+        anomalies_count = Counter(a[0] for a in anomalies)
+
+        for type_anom, count in anomalies_count.items():
+            pct = (count / total) * 100
+            display.print(
+                f"{type_anom:<20}: {count} ({pct:.3f}%)",
+                colors["warning"]
+            )
+
+
+
