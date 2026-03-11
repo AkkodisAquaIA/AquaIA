@@ -13,3 +13,8 @@ coco128
 
 /results
 /datasets
+# detection_promptable
+Detection/runs/
+Detection/detection_promptable/*_result_det_*/
+Detection/detection_promptable/useless/
+*.ts
