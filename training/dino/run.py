@@ -7,13 +7,13 @@ import tqdm
 from torch.utils.data import DataLoader
 from transformers import get_scheduler
 
+from dataloading.datasets import NpyDetectionDataset, dataset_config_from_path, detection_collate_fn
 from Detection.DINO.dino_detector import DINODetector
 from Detection.loss import SetCriterion
 from Detection.metric import evaluate_map, log_epoch, update_log_dict
 from Detection.utils.matcher import HungarianMatcher
 from training.checkpoint import get_model_state_dict, save_model_checkpoint, save_training_state_checkpoint, update_best_checkpoint
 from training.config_utils import save_resolved_config
-from training.dataset_dino import Coco128NpyDataset, collate_fn
 
 
 def train_dino(config):
@@ -27,20 +27,26 @@ def train_dino(config):
         device = configured_device
 
     use_amp = device == "cuda"
-    dataset = Coco128NpyDataset(root=config["data"]["dataset_yaml"], device=device)
+    dataset_config = dataset_config_from_path(config["data"]["dataset_yaml"])
+    dataset = NpyDetectionDataset(
+        dataset_name=dataset_config.dataset_name,
+        root_folder=dataset_config.root_folder,
+        stats_file=dataset_config.stats_file,
+        load_targets=True,
+    )
     dataloader = DataLoader(
         dataset,
         batch_size=training_config["batch"],
         shuffle=True,
         num_workers=training_config["workers"],
-        collate_fn=collate_fn,
+        collate_fn=detection_collate_fn,
     )
     eval_dataloader = DataLoader(
         dataset,
         batch_size=training_config["batch"],
         shuffle=False,
         num_workers=training_config["workers"],
-        collate_fn=collate_fn,
+        collate_fn=detection_collate_fn,
     )
 
     run_dir = os.path.join(output_config["project"], datetime.now().strftime("%Y%m%d_%H%M%S"))
@@ -51,7 +57,7 @@ def train_dino(config):
     resolved_config_path = os.path.join(run_dir, output_config.get("config_filename", "train_config.yaml"))
 
     model = DINODetector(
-        img_size=dataset.images.shape[-1],
+        img_size=dataset.imgs.shape[-1],
         device=device,
         num_classes=dataset.num_classes,
     ).to(device)
@@ -172,7 +178,7 @@ def train_dino(config):
             device=device,
             use_amp=use_amp,
             run_dir=run_dir,
-            img_size=dataset.images.shape[-1],
+            img_size=dataset.imgs.shape[-1],
             num_classes=dataset.num_classes,
         )
 
