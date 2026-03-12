@@ -67,7 +67,7 @@ MAX_BBOX = 1.0
 
 # Bounding box area limits (relative to image area)
 MIN_BBOX_AREA = 0.0001
-MAX_BBOX_AREA = 0.99
+MAX_BBOX_AREA = 1
 
 # Tolérance maximale avant d’émettre un warning (en %)
 BBOX_OVERFLOW_WARNING = 2       # 2 % → warning

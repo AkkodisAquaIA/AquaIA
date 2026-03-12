@@ -1,6 +1,6 @@
 import fiftyone as fo
 from fiftyone import ViewField as F
-# from fiftyone import utils
+
 
 import os
 from pathlib import Path
@@ -159,6 +159,9 @@ prompt = (
     )
 display.print(prompt, colors['warning'])
 
+# Chargement des noms de classes pour les stats
+dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
+class_names = ds.load_class_names(dataset_yaml)
 
 # ================= DATASET =================
 yaml_path = Path(DATASET_DIR) / "dataset.yaml"
@@ -172,12 +175,10 @@ if dataset_name in fo.list_datasets():
 
 
 # validation des labels avant création du dataset FiftyOne
-erreur, rapport_detail, Ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR)
+erreur, all_bboxes, rapport, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR)
 
-print("\n===== RESUME VALIDATION =====")
-
+print("===== RESUME VALIDATION =====")
 total_errors = sum(len(v) for v in erreur.values())
-
 print(f"Total types warning/erreurs : {len(erreur)}")
 print(f"Total warning/erreurs : {total_errors}")
 
@@ -185,13 +186,13 @@ for k,v in erreur.items():
     print(f"{k:25} : {len(v)}")
 print()
 
-
-if not Ctrl_ok:
+if not ctrl_ok:
     display.print("Erreurs détectées dans les labels. Arrêt du programme.", colors['error'])
     util.afficher_bbox_erreurs_compact(erreur)
     exit(1) 
 else:    
     display.print("Aucune erreur de label détectée. Création du dataset FiftyOne...", colors['ok'])
+
 
 display.print(f"Création du dataset FiftyOne à partir du dossier '{DATASET_DIR}'...", colors['info'])
 with yaspin(text="Chargement en cours...", color="cyan") as spinner:
@@ -212,32 +213,116 @@ with yaspin(text="Chargement en cours...", color="cyan") as spinner:
 total_images = len(dataset)
 display.print(f"Dataset chargé avec succès : {total_images} images", colors['info'])
 
-# ================= MODEL =================
-display.print("Chargement du modèle DINOv3...\n", colors['info'])
-model = timm.create_model("vit_small_patch16_224", pretrained=False, num_classes=0)
-state_dict = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
-model.load_state_dict(state_dict, strict=False)
-model = model.to(DEVICE).eval()
-
-preprocess = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize((0.485, 0.456, 0.406),
-                         (0.229, 0.224, 0.225)),
-])
-
-
-# ================= ENCODING =================
-encoding(dataset)
-
-
 # ================= STATISTICS =================
 dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
 class_names = ds.load_class_names(dataset_yaml)
 
 results = ds.dataset_statistics_yolo(DATASET_DIR)
 ds.afficher_dataset_statistics(results, class_names, classes_par_ligne=3, afficher_hist=False)
+
+
+
+# # ================= MODEL =================
+# display.print("Chargement du modèle DINOv3...\n", colors['info'])
+# model = timm.create_model("vit_small_patch16_224", pretrained=False, num_classes=0)
+# state_dict = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
+# model.load_state_dict(state_dict, strict=False)
+# model = model.to(DEVICE).eval()
+
+# preprocess = transforms.Compose([
+#     transforms.Resize(256),
+#     transforms.CenterCrop(224),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.485, 0.456, 0.406),
+#                          (0.229, 0.224, 0.225)),
+# ])
+
+
+# # ================= ENCODING =================
+# encoding(dataset)
+
+
+# # ================= FAISS OPTIMISE =================
+# display.print("Détection doublons FAISS...", colors['info'])
+# embeddings = np.array(dataset.values(VEC_FIELD), dtype="float32")
+# num_embeddings, dim = embeddings.shape
+
+# # Paramètres FAISS IVF
+# nlist = int(np.sqrt(num_embeddings))
+# nprobe = max(5, nlist // 20)
+
+# quantizer = faiss.IndexFlatIP(dim)
+# index = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_INNER_PRODUCT)
+
+# # GPU optionnel
+# try:
+#     if faiss.get_num_gpus() > 0:
+#         display.print("Utilisation FAISS GPU", colors['info'])
+#         res = faiss.StandardGpuResources()
+#         index = faiss.index_cpu_to_gpu(res, 0, index)
+# except Exception as e:
+#     display.print(f"FAISS GPU indisponible → CPU : {e}", colors['warning'])
+
+# # Train et ajout embeddings
+# display.print("Training index FAISS...", colors['info'])
+# index.train(embeddings)
+# index.add(embeddings)
+# index.nprobe = nprobe
+
+# display.print(f"Recherche FAISS (nprobe={nprobe})...", colors['info'])
+# D, I = index.search(embeddings, NEIGHBORS)
+
+# # ================= CLUSTERING =================
+# parent = np.arange(num_embeddings)
+
+# def find(x):
+#     while parent[x] != x:
+#         parent[x] = parent[parent[x]]
+#         x = parent[x]
+#     return x
+
+# def union(x, y):
+#     parent[find(x)] = find(y)
+
+# for i in range(num_embeddings):
+#     for j in range(1, NEIGHBORS):
+#         if I[i, j] <= i:
+#             continue
+#         if D[i, j] >= DUP_THRESHOLD:
+#             union(i, I[i, j])
+
+# clusters = {}
+# sample_ids = dataset.values("id")
+# for i in range(num_embeddings):
+#     root = find(i)
+#     clusters.setdefault(root, []).append(sample_ids[i])
+
+# dup_ids = []
+# for group in clusters.values():
+#     if len(group) > 1:
+#         dup_ids.extend(group)
+
+# dataset.select(list(dup_ids)).tag_samples("dups")
+
+# # --- Affichage et sauvegarde ---
+# dup_paths = [p for p in dataset.select(list(dup_ids)).values("filepath")]
+# util.display_and_save_errors(
+#     dup_paths,
+#     "images_doublons.txt",
+#     f"Images doublons (seuil {DUP_THRESHOLD})"
+# )
+
+# # --- Vue combinée : doublons + bbox hors limites ---
+# combined_view = dataset.match(
+#     (F("tags").contains("dups")) # |
+#    # (F("filepath").is_in(invalid_bbox_paths))
+# )
+
+# if len(combined_view) > 0:
+#     display.print(f"Lancement de l'interface FiftyOne pour les doublons et bbox hors limites ({len(combined_view)} images)...", colors['info'])
+#     util.launch_fiftyone_interface(combined_view)
+# else:
+#     display.print("Aucun doublon ni bbox hors limites à afficher.", colors['info'])
 
 print()
 prompt = f"Script terminé.{ct.BELL}"
