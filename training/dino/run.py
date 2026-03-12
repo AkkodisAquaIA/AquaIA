@@ -27,7 +27,6 @@ def train_dino(config):
         device = configured_device
 
     use_amp = device == "cuda"
-    print(config["data"]["dataset_yaml"])
     dataset = Coco128NpyDataset(root=config["data"]["dataset_yaml"], device=device)
     dataloader = DataLoader(
         dataset,
