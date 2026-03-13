@@ -3,6 +3,7 @@ import sys
 import socket
 import traceback
 from collections import Counter
+from colorama import init, Style
 from pathlib import Path
 import argparse
 import fiftyone as fo
@@ -110,6 +111,50 @@ def read_param() -> Tuple[Path, Path]:
         raise NotADirectoryError(f"Data path is not a directory: {data_path}")
 
     return base_path, data_path
+
+
+def rgb_to_ansi(rgb: Tuple[int, int, int]) -> str:
+    """Convert RGB color to ANSI escape code."""
+    return f"\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
+
+def chck_color(color_key: str) -> Tuple[int, int, int]:
+    """
+    Check if the color key exists in the DISPLAY_COLORS dictionary.
+    If it does, return the corresponding RGB value.
+    If not, return a default color (Light Green).
+    """
+    try:
+        color = colors[color_key]
+    except KeyError:
+        color = (153, 204, 51)  # Default to Light Green
+
+    # Check if the color is a valid RGB tuple.
+    if not (isinstance(color, tuple) and len(color) == 3 and
+             all(isinstance(c, int) and 0 <= c <= 255 for c in color)):
+        color = (153, 204, 51)
+
+    return color
+
+def get_path_color(prompt: str, color_key: str = 'input') -> Path:
+    """
+    Requests a valid path from the user.
+    Displays the prompt in the specified color.
+    If the specified color key is invalid, the prompt will be displayed in Light Green.
+    """
+    display = dc.DisplayColor()
+    color = chck_color(color_key)
+    while True:
+        # Convert the input color from DISPLAY_COLORS to ANSI
+        input_color = rgb_to_ansi(color)
+        # Displays the prompt in color
+        colored_prompt = f"{input_color}[?] {prompt}: {Style.RESET_ALL}"
+        path_input = input(colored_prompt).strip()
+        if os.path.exists(path_input):
+            return Path(path_input)
+
+        text = f"Invalid path: {path_input}. Please try again."
+        display.print(text, colors['error'])
+
 
 
 # ------------------------------

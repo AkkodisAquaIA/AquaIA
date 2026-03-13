@@ -277,19 +277,19 @@ def validate_yolo_dataset_detailed(DATASET_DIR):
                         erreurs_ligne.append("valeurs_non_numeriques")
                         Ctrl_ok = False
 
-                # --- Coordonnées négatives ou taille nulle ---
-                if x < 0 or y < 0:
-                    erreurs_syntaxe["coord_negatives"].append(f"{entry.name} (ligne {i})")
-                    erreurs_ligne.append("coord_negatives")
-                    Ctrl_ok = False
-                if w <= 0 or h <= 0:
-                    erreurs_syntaxe["taille_non_positive"].append(f"{entry.name} (ligne {i})")
-                    erreurs_ligne.append("taille_non_positive")
-                    Ctrl_ok = False
-                if cls < 0:
-                    erreurs_syntaxe["classe_negative"].append(f"{entry.name} (ligne {i})")
-                    erreurs_ligne.append("classe_negative")
-                    Ctrl_ok = False
+                    # --- Coordonnées négatives ou taille nulle ---
+                    if x < 0 or y < 0:
+                        erreurs_syntaxe["coord_negatives"].append(f"{entry.name} (ligne {i})")
+                        erreurs_ligne.append("coord_negatives")
+                        Ctrl_ok = False
+                    if w <= 0 or h <= 0:
+                        erreurs_syntaxe["taille_non_positive"].append(f"{entry.name} (ligne {i})")
+                        erreurs_ligne.append("taille_non_positive")
+                        Ctrl_ok = False
+                    if cls < 0:
+                        erreurs_syntaxe["classe_negative"].append(f"{entry.name} (ligne {i})")
+                        erreurs_ligne.append("classe_negative")
+                        Ctrl_ok = False
 
                 # --- BBox dupliquées ---
                 bbox_tuple = (cls, x, y, w, h)

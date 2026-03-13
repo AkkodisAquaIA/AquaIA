@@ -1,19 +1,24 @@
+import os
+from pathlib import Path
+import time
+import torch
+from PIL import Image
+import numpy as np
+# from torchvision import transforms
+import timm
+from concurrent.futures import ThreadPoolExecutor
+# import faiss
+from tqdm import tqdm
+from yaspin import yaspin
+import random
+import tkinter as tk
+from PIL import Image, ImageTk, ImageDraw, ImageFont
+import time
+
 import fiftyone as fo
 from fiftyone import ViewField as F
 
 
-import os
-from pathlib import Path
-import torch
-from PIL import Image
-import numpy as np
-from torchvision import transforms
-import timm
-from concurrent.futures import ThreadPoolExecutor
-import faiss
-from tqdm import tqdm
-from yaspin import yaspin
-import random
 
 
 from bboxes import bboxes as bb
@@ -28,6 +33,98 @@ from tools.constants import DISPLAY_COLORS as colors
 
 #==========================================================================================
 # ================= FONCTIONS =================
+
+    
+ # image_path = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Image1.png"
+def splash_screen_circle(image_path, duration=2000, fade_steps=20):
+    """
+    Splash screen circulaire en couleur avec texte Aqua-IA.
+    """
+    splash = tk.Tk()
+    splash.overrideredirect(True)
+    splash.attributes("-topmost", True)
+    transparent_color = "magenta"
+    splash.configure(bg=transparent_color)
+
+    # --- Charger l'image et créer un cercle ---
+    image_path = "Image1.png"    
+    img = Image.open(image_path).convert("RGBA")
+    size = min(img.width, img.height)
+    img = img.resize((size, size))
+
+    # Masque circulaire
+    mask = Image.new("L", (size, size), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0, size, size), fill=255)
+
+
+    img_circle = Image.new("RGBA", (size, size), (0,0,0,0))
+    img_circle.paste(img, (0,0), mask=mask)
+
+    # Ajouter le texte "Aqua-IA" centré
+    draw_text = ImageDraw.Draw(img_circle)
+    font_size = size // 8
+    try:
+        font = ImageFont.truetype("arial.ttf", font_size)
+    except:
+        font = ImageFont.load_default()
+    text = "Aqua-IA"
+    bbox = draw_text.textbbox((0,0), text, font=font)
+    w = bbox[2] - bbox[0]
+    h = bbox[3] - bbox[1]
+    draw_text.text(((size-w)/2, (size-h)/2), text, font=font, fill=(0,204,153,255))
+
+    photo = ImageTk.PhotoImage(img_circle)
+
+    label = tk.Label(splash, image=photo, bg=transparent_color, bd=0)
+    label.pack()
+    splash.wm_attributes("-transparentcolor", transparent_color)
+
+    # Centrer la fenêtre
+    screen_width = splash.winfo_screenwidth()
+    screen_height = splash.winfo_screenheight()
+    x = (screen_width - size) // 2
+    y = (screen_height - size) // 2
+    splash.geometry(f"{size}x{size}+{x}+{y}")
+
+
+
+    splash.update()
+    fade_in(splash)
+    splash.after(duration, lambda: fade_out(splash, fade_steps))
+    splash.mainloop()
+
+def fade_in(window, steps=40, delay=50):
+    alpha = 0.0
+    window.attributes("-alpha", alpha)
+
+    increment = 1.0 / steps
+
+    def _fade():
+        nonlocal alpha
+        alpha += increment
+        if alpha >= 1.0:
+            window.attributes("-alpha", 1.0)
+        else:
+            window.attributes("-alpha", alpha)
+            window.after(delay, _fade)
+
+    _fade()
+
+def fade_out(window, steps):
+    alpha = window.attributes("-alpha") or 1.0
+    decrement = alpha / steps
+    def fade():
+        nonlocal alpha
+        alpha -= decrement
+        if alpha <= 0:
+            window.destroy()
+        else:
+            window.attributes("-alpha", alpha)
+            window.after(50, fade)
+    fade()
+
+
 
 # --- Chargement image RGB avec gestion erreurs ---
 def load_rgb(path):
@@ -123,119 +220,129 @@ def encoding(dataset, batch_size=ct.BATCH_SIZE):
     executor.shutdown()
     display.print("Embeddings enregistrés.\n", colors['info'])
 
+def maain():
+    # ================= CONFIG =================
+
+    VEC_FIELD = "emb_dinov3"
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    DUP_THRESHOLD = 0.98
+    NEIGHBORS = 20
+
+    display = dc.DisplayColor()
+
+    # ================= REPRO =================
+    torch.manual_seed(ct.SEED)
+    torch.cuda.manual_seed_all(ct.SEED)
+    np.random.seed(ct.SEED)
+    random.seed(ct.SEED)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+
+    # # Display du logo et infos système
+    print()
+    splash_screen_circle("Image.png", duration=2500)
+
+    display.print("Analyse des micro-invertébrés aquatiques", colors['aqua'])
+    display.print("Version : 0.5.00 Beta", colors['aqua_dark'])
+    print()
+
+    display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
+
+    display.print(f"Report mode {'ON' if ct.REPORT_MODE else 'OFF'}.", colors['warning'])
+
+    prompt = (
+            f"CUDA{'' if torch.cuda.is_available() else ' not'} available"
+            f" - Running on {'GPU' if torch.cuda.is_available() else 'CPU'}.\n"
+        )
+    display.print(prompt, colors['warning'])
+
+
+
+    DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
+    MODEL_PATH = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3\dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+
+
+    # DATASET_DIR = util.get_path_color("Entrée le chemin du dataset")
+    # MODEL_PATH = util.get_path_color("Entrée le chemin du modèle DINOv3")
+
+    print()
+    display.print("Démarrage du traitement ...", colors['info'])
+
+    dataset_name = "coco128_local"
+
+
+    # Chargement des noms de classes pour les stats
+    dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
+    class_names = ds.load_class_names(dataset_yaml)
+
+    # ================= DATASET =================
+    yaml_path = Path(DATASET_DIR) / "dataset.yaml"
+    if not yaml_path.exists():
+        display.print(f"dataset.yaml introuvable dans {DATASET_DIR}", colors['error'])
+        exit(1)
+        
+    if dataset_name in fo.list_datasets():
+        display.print(f"Suppression du dataset existant '{dataset_name}'", colors['info'])
+        fo.delete_dataset(dataset_name)
+
+
+    # validation des labels avant création du dataset FiftyOne
+    erreur, all_bboxes, rapport, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR)
+
+    print("===== RESUME VALIDATION =====")
+    total_errors = sum(len(v) for v in erreur.values())
+    print(f"Total types warning/erreurs : {len(erreur)}")
+    print(f"Total warning/erreurs : {total_errors}")
+
+    for k,v in erreur.items():
+        print(f"{k:25} : {len(v)}")
+    print()
+
+    if not ctrl_ok:
+        display.print("Erreurs détectées dans les labels. Arrêt du programme.", colors['error'])
+        util.afficher_bbox_erreurs_compact(erreur)
+        exit(1) 
+    else:    
+        display.print("Aucune erreur de label détectée. Création du dataset FiftyOne...\n", colors['ok'])
+
+
+    display.print(f"Création du dataset FiftyOne à partir du dossier '{DATASET_DIR}'...", colors['info'])
+    with yaspin(text="Chargement en cours...", color="cyan") as spinner:
+        try:
+            dataset = fo.Dataset.from_dir(
+                dataset_type=fo.types.YOLOv5Dataset,
+                dataset_dir=str(DATASET_DIR),
+                name=dataset_name,
+                progress=False  
+            )
+            spinner.text = " "
+            spinner.ok("Ok ") 
+        except Exception as e:
+            spinner.fail("Out ")
+            util.format_and_display_error(f"création  ", rep="default_reports")
+            exit(1)
+    
+    total_images = len(dataset)
+    display.print(f"Dataset chargé avec succès : {total_images} images", colors['info'])
+
+    # ================= STATISTICS =================
+    dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
+    class_names = ds.load_class_names(dataset_yaml)
+
+    results = ds.dataset_statistics_yolo(DATASET_DIR)
+    ds.afficher_dataset_statistics(results, class_names, classes_par_ligne=3, afficher_hist=False)
+
+
+    print()
+    prompt = f"Script terminé.{ct.BELL}"
+    display.print(prompt, colors['goodbye'])
 
 
 #==========================================================================================
-# ================= CONFIG =================
-DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
-dataset_name = "coco128_local"
-VEC_FIELD = "emb_dinov3"
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-MODEL_PATH = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3\dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
-DUP_THRESHOLD = 0.98
-NEIGHBORS = 20
-
-display = dc.DisplayColor()
-
-# ================= REPRO =================
-torch.manual_seed(ct.SEED)
-torch.cuda.manual_seed_all(ct.SEED)
-np.random.seed(ct.SEED)
-random.seed(ct.SEED)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-
-
-# # Display du logo et infos système
-# print(ct.logo)
-
-display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
-
-display.print(f"Report mode {'ON' if ct.REPORT_MODE else 'OFF'}.", colors['warning'])
-
-prompt = (
-        f"CUDA{'' if torch.cuda.is_available() else ' not'} available"
-        f" - Running on {'GPU' if torch.cuda.is_available() else 'CPU'}.\n"
-    )
-display.print(prompt, colors['warning'])
-
-# Chargement des noms de classes pour les stats
-dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
-class_names = ds.load_class_names(dataset_yaml)
-
-# ================= DATASET =================
-yaml_path = Path(DATASET_DIR) / "dataset.yaml"
-if not yaml_path.exists():
-    display.print(f"dataset.yaml introuvable dans {DATASET_DIR}", colors['error'])
-    exit(1)
-    
-if dataset_name in fo.list_datasets():
-    display.print(f"Suppression du dataset existant '{dataset_name}'", colors['info'])
-    fo.delete_dataset(dataset_name)
-
-
-# validation des labels avant création du dataset FiftyOne
-erreur, all_bboxes, rapport, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR)
-
-print("===== RESUME VALIDATION =====")
-total_errors = sum(len(v) for v in erreur.values())
-print(f"Total types warning/erreurs : {len(erreur)}")
-print(f"Total warning/erreurs : {total_errors}")
-
-for k,v in erreur.items():
-    print(f"{k:25} : {len(v)}")
-print()
-
-if not ctrl_ok:
-    display.print("Erreurs détectées dans les labels. Arrêt du programme.", colors['error'])
-    util.afficher_bbox_erreurs_compact(erreur)
-    exit(1) 
-else:    
-    display.print("Aucune erreur de label détectée. Création du dataset FiftyOne...", colors['ok'])
-
-
-display.print(f"Création du dataset FiftyOne à partir du dossier '{DATASET_DIR}'...", colors['info'])
-with yaspin(text="Chargement en cours...", color="cyan") as spinner:
-    try:
-        dataset = fo.Dataset.from_dir(
-            dataset_type=fo.types.YOLOv5Dataset,
-            dataset_dir=str(DATASET_DIR),
-            name=dataset_name,
-            progress=False  
-        )
-        spinner.text = " "
-        spinner.ok("Ok ") 
-    except Exception as e:
-        spinner.fail("Out ")
-        util.format_and_display_error(f"création  ", rep="default_reports")
-        exit(1)
- 
-total_images = len(dataset)
-display.print(f"Dataset chargé avec succès : {total_images} images", colors['info'])
-
-# ================= STATISTICS =================
-dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
-class_names = ds.load_class_names(dataset_yaml)
-
-results = ds.dataset_statistics_yolo(DATASET_DIR)
-ds.afficher_dataset_statistics(results, class_names, classes_par_ligne=3, afficher_hist=False)
-
-
-
-# # ================= MODEL =================
-# display.print("Chargement du modèle DINOv3...\n", colors['info'])
-# model = timm.create_model("vit_small_patch16_224", pretrained=False, num_classes=0)
-# state_dict = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
-# model.load_state_dict(state_dict, strict=False)
-# model = model.to(DEVICE).eval()
-
-# preprocess = transforms.Compose([
-#     transforms.Resize(256),
-#     transforms.CenterCrop(224),
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.485, 0.456, 0.406),
-#                          (0.229, 0.224, 0.225)),
-# ])
+if __name__ == "__main__":
+    maain()
 
 
 # # ================= ENCODING =================
@@ -324,6 +431,4 @@ ds.afficher_dataset_statistics(results, class_names, classes_par_ligne=3, affich
 # else:
 #     display.print("Aucun doublon ni bbox hors limites à afficher.", colors['info'])
 
-print()
-prompt = f"Script terminé.{ct.BELL}"
-display.print(prompt, colors['goodbye'])
+
