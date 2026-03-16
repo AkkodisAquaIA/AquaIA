@@ -15,9 +15,10 @@ if __name__ == "__main__":
     # All images in IMAGES_FOLDER (recursive)
     image_files, _ = collect_image_files(IMAGES_FOLDER, stage="checking empty detection images")
 
-    # Use dictionaries to count empties and totals per subfolder
+    # Use dictionaries to count empties, totals, and predicted boxes per subfolder
     subfolder_empty_counts = defaultdict(int)
     subfolder_total_counts = defaultdict(int)
+    subfolder_box_counts = defaultdict(int)
 
     # For each image
     for img_path in image_files:
@@ -37,8 +38,11 @@ if __name__ == "__main__":
             print(f"Warning: Label file not found for image {img_path}")
             continue
 
-        # File is empty or contains only whitespace
+        # Load labels and count the number of boxes (lines) in the label file
         labels = load_label_txt(label_path, with_conf=False)
+        subfolder_box_counts[subfolder_name] += labels.shape[0]
+
+        # File is empty or contains only whitespace = no detections
         if labels.shape[0] == 0:
             subfolder_empty_counts[subfolder_name] += 1
 
@@ -46,22 +50,25 @@ if __name__ == "__main__":
     output_dir = det_dir / "empty_detection.txt"
     with output_dir.open("w", encoding="utf-8") as f:
         f.write("Empty detections:"
-        "\n(Subfolder, Empty, Total)\n")
+        "\n(Subfolder, Empty, Total, Crop boxes)\n")
 
         total_all_empties = 0
         total_all_images = 0
+        total_all_boxes = 0
 
         # Sort subfolders by name
         for subfolder in sorted(subfolder_total_counts.keys()):
             total = subfolder_total_counts[subfolder]
             empties = subfolder_empty_counts[subfolder]
-            line = f"{subfolder}, {empties}, {total}\n"
+            box_count = subfolder_box_counts[subfolder]
+            line = f"{subfolder}, {empties}, {total}, {box_count}\n"
             f.write(line)
             total_all_images += total
             total_all_empties += empties
+            total_all_boxes += box_count
 
         f.write("-" * 30)
-        f.write(f"\nTOTAL, {total_all_empties}, {total_all_images}\n")
+        f.write(f"\nTOTAL, {total_all_empties}, {total_all_images}, {total_all_boxes}\n")
 
-    print(f"\nEmpty images: {total_all_empties}, Total images: {total_all_images}")
+    print(f"\nEmpty images: {total_all_empties}, Total images: {total_all_images}, Total crop boxes: {total_all_boxes}")
     print(f"\nDone! Saved summary to: {output_dir}")
