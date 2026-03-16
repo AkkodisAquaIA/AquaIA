@@ -69,7 +69,7 @@ Notes:
 
 Output:
 - A summary file `empty_detection.txt` is saved inside the selected result folder.
-- Format includes per-subfolder counts: `Subfolder, Empaty, Total`, plus a `TOTAL` line.
+- Format includes per-subfolder counts: `Subfolder, Empty, Total, Crop boxes`, plus a `TOTAL` line.
 
 ## 6. Evaluate metrics (metric.py)
 `metric.py` compares predictions to ground-truth labels and outputs:
