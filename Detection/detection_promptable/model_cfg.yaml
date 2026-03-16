@@ -14,6 +14,7 @@ MODEL_CFG:
     SAVE: true  # Save results to project folder
     IMGSZ: 640
     NMS: false  # Not native NMS
+    UNIC: false # If true, keep only the highest-confidence bbox per image
   yoloe26:  # TASK and DEVICE seems have no effect
     CONF: 0.2
     PATH: "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/yoloe-26x-seg.pt"
@@ -22,3 +23,4 @@ MODEL_CFG:
     IMGSZ: 640
     BATCH: 16
     NMS: 0.7  # Not native NMS
+    UNIC: false # If true, keep only the highest-confidence bbox per image

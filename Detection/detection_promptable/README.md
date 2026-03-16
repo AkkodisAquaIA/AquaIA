@@ -21,19 +21,23 @@ Key settings:
 - `IMAGES_FOLDER`: folder with images to run inference on.
 - `MODEL_NAME`: `"sam3"` or `"yoloe26"`.
 - `MODEL_CFG`: per-model settings.
-- `sam3`: `CONF`, `TASK`, `MODE`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `NMS`.
-- `yoloe26`: `CONF`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `BATCH`, `NMS`.
+- `sam3`: `CONF`, `TASK`, `MODE`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `NMS`, `UNIC`.
+- `yoloe26`: `CONF`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `BATCH`, `NMS`, `UNIC`.
 
 Notes:
 - The config is loaded from YAML by both `detection_entry.py` and `metric.py`.
 - `NMS` in this project is **not** the native model NMS. It is a custom per-class NMS applied after inference:
 - Set `NMS` to a float IoU threshold (e.g., `0.7`) to enable.
 - Set `NMS` to `False` to disable.
+- `UNIC` keeps only one bbox per image after all other post-processing:
+- Set `UNIC` to `True` to keep only the bbox with the highest `conf`.
+- Set `UNIC` to `False` to keep the original behavior.
 
 ## 3. Run detection (detection_entry.py)
 - Builds text prompts from `DATASET_DICT`.
 - Runs the selected model on all images under `IMAGES_FOLDER`.
 - Optionally applies the custom NMS.
+- Optionally applies `UNIC` after NMS and keeps only the highest-confidence bbox for each image.
 - Saves labels under `detection_promptable/[MODEL]_result_det_YYYYMMDDHHmm/.../labels`.
 - If images are directly under `IMAGES_FOLDER`, labels are in `.../labels`.
 - If images are in subfolders, output mirrors subfolder structure (each subfolder has its own `labels` folder).
@@ -43,7 +47,7 @@ Notes:
 - Label format (per image, normalized): cls cx cy w h conf
 - If no detections are found, an empty `.txt` file is created for that image.
 - Inference terminal logs are generated before custom post-NMS filtering.
-- Saved labels and visualizations are generated after custom NMS.
+- Saved labels and visualizations are generated after custom post-processing (`NMS`, then `UNIC` if enabled).
 
 ## 4. Crop detections (crop.py)
 `crop.py` reads detection labels and writes cropped image patches.

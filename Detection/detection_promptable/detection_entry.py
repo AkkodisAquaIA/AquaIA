@@ -59,6 +59,24 @@ def post_nms(result, iou_threshold, info_nms):
 
     return result, info_nms
 
+def post_unic(result):
+    """Keep only the highest-confidence bbox for one image."""
+    # If no boxes, return as is
+    if result.boxes is None or result.boxes.shape[0] == 0:
+        return result
+
+    # Find the index of the box with the highest confidence score
+    keep = result.boxes.conf.argmax().reshape(1)
+
+    # Filter results to keep only the highest-confidence box
+    result.boxes = result.boxes[keep]
+
+    # If masks exist, keep the corresponding mask
+    if result.masks is not None:
+        result.masks = result.masks[keep]
+
+    return result
+
 def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_sorted: list[int]) -> None:
     """Save normalized xywh labels for 1 image. cx, cy, w, h are normalized by image width and height.
     Args:
@@ -168,6 +186,10 @@ if __name__ == "__main__":
             if cfg["NMS"] != False:
                 results[0], info_nms = post_nms(results[0], cfg["NMS"], info_nms)
 
+            # Keep only the highest-confidence bbox when UNIC is enabled
+            if cfg["UNIC"] == True:
+                results[0] = post_unic(results[0])
+
             # Save labels in xywh format
             save_xywh_label(results[0], img_path, label_dir, dataset_keys_sorted)
 
@@ -216,6 +238,10 @@ if __name__ == "__main__":
             # Apply NMS only when enabled and keep updated result in-place
             if cfg["NMS"] != False:
                 result, info_nms = post_nms(result, cfg["NMS"], info_nms)
+
+            # Keep only the highest-confidence bbox when UNIC is enabled
+            if cfg["UNIC"] == True:
+                result = post_unic(result)
 
             # Save labels in xywh format
             save_xywh_label(result, img_path, label_dir, dataset_keys_sorted)
