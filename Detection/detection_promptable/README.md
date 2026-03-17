@@ -5,7 +5,8 @@ This folder provides a promptable detection workflow:
 3. Run detection with `detection_entry.py`. A custom non-native per-class NMS is optionally applied.
 4. Crop detected boxes with `crop.py`.
 5. Count empty detections with `count_empty.py`.
-6. Evaluate results with `metric.py`.
+6. Compare crop outputs with `check_image.py`.
+7. Evaluate results with `metric.py`.
 
 ## 1. Configure classes (dataset_dict.yaml)
 Maps class IDs to class names. The keys are the class IDs used in labels.
@@ -72,7 +73,27 @@ Output:
 - A summary file `empty_detection.txt` is saved inside the selected result folder.
 - Format includes per-subfolder counts: `Subfolder, Empty, Total, Crop boxes`, plus a `TOTAL` line.
 
-## 6. Evaluate metrics (metric.py)
+## 6. Compare crop outputs (check_image.py)
+`check_image.py` compares the cropped detection images in two result folders and reports what is extra or missing relative to a reference run.
+
+Notes:
+- You first select a `REFERENCE` `*_result_det_*` folder, then a `CURRENT` one. If no manual selection is made, the helper can fall back to the latest result folder.
+- The script compares files inside `00crop/`.
+- Comparison is content-based and groups images by:
+    - crop subfolder path under `00crop`
+    - original image stem extracted from `<image_stem>_<class_name>_<index>`
+    - file extension
+    - SHA256 hash of the crop content
+- This means crops with the same source image stem but different content are treated as different images.
+
+Output:
+- A folder `<current_result_dir>/00check_image/` is created.
+- `ref+` contains crops present in `CURRENT` but not matched in `REFERENCE`.
+- `ref-` contains crops present in `REFERENCE` but not matched in `CURRENT`.
+- Original directory structure under `00crop` is preserved in both output folders.
+- A summary file `chek_image.txt` is saved in `00check_image/`.
+
+## 7. Evaluate metrics (metric.py)
 `metric.py` compares predictions to ground-truth labels and outputs:
 - `mAP50-95(B)`, `mAP50(B)`, `precision(B)`, `recall(B)`, and number of images.
 
