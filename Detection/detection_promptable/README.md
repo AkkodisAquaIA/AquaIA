@@ -46,7 +46,7 @@ Notes:
 Notes:
 - Label format (per image, normalized): cls cx cy w h conf
 - If no detections are found, an empty `.txt` file is created for that image.
-- Inference terminal logs are generated before custom post-NMS filtering.
+- Inference terminal logs are generated before custom post-processing (NMS or UNIC).
 - Saved labels and visualizations are generated after custom post-processing (`NMS`, then `UNIC` if enabled).
 
 ## 4. Crop detections (crop.py)

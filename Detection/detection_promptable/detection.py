@@ -18,24 +18,15 @@ DATASET_DICT_PATH = PARENT_FOLDER / "dataset_dict.yaml"
 DATASET_DICT_RAW = yaml.safe_load(DATASET_DICT_PATH.read_text(encoding="utf-8"))
 DATASET_DICT = {int(key): value for key, value in DATASET_DICT_RAW.items()}
 
-def post_nms(result, iou_threshold, info_nms):
+def post_nms(result, iou_threshold):
     """Per-class NMS for detection results; keeps cls/conf, optional masks.
-    The terminal logs during inference are still the results before NMS.
     Args:
         result: The prediction result object (1 image) containing boxes, scores, classes, and optional masks.
         iou_threshold: IoU threshold for NMS.
-        info_nms: Boolean flag to print NMS notice only once.
     """
-    # Print notice about NMS once
-    if info_nms:
-        print("\n" + "=" * 100)
-        print("The terminal logs during inference are still the results before NMS.")
-        print("=" * 100 + "\n")
-        info_nms = False
-
     # If no boxes, return as is
     if result.boxes is None or result.boxes.shape[0] == 0:
-        return result, info_nms
+        return result
 
     # Extract box coordinates, scores, and classes
     bboxes = result.boxes.xyxy
@@ -58,7 +49,7 @@ def post_nms(result, iou_threshold, info_nms):
     if result.masks is not None:
         result.masks = result.masks[keep]
 
-    return result, info_nms
+    return result
 
 def post_unic(result):
     """Keep only the highest-confidence bbox for one image."""
@@ -145,7 +136,10 @@ if __name__ == "__main__":
 
     # Print information once
     info_device = True
-    info_nms = True
+    if cfg["NMS"] != False or cfg["UNIC"] == True:
+        print("\n" + "=" * 100)
+        print("The terminal logs during inference are still the results before custom post-processing (NMS or UNIC).")
+        print("=" * 100 + "\n")
 
     if MODEL_NAME == "sam3":
         # Initialize SAM3
@@ -178,7 +172,7 @@ if __name__ == "__main__":
 
             # Apply NMS only when enabled and keep updated result in-place
             if cfg["NMS"] != False:
-                results[0], info_nms = post_nms(results[0], cfg["NMS"], info_nms)
+                results[0] = post_nms(results[0], cfg["NMS"])
 
             # Keep only the highest-confidence bbox when UNIC is enabled
             if cfg["UNIC"] == True:
@@ -231,7 +225,7 @@ if __name__ == "__main__":
 
             # Apply NMS only when enabled and keep updated result in-place
             if cfg["NMS"] != False:
-                result, info_nms = post_nms(result, cfg["NMS"], info_nms)
+                result = post_nms(result, cfg["NMS"])
 
             # Keep only the highest-confidence bbox when UNIC is enabled
             if cfg["UNIC"] == True:
