@@ -4,26 +4,28 @@ import yaml
 from utils import select_or_latest, collect_image_files, load_label_txt, xywh_norm_to_xyxy_norm
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
-CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
-CFG_DATA = yaml.safe_load(CFG_PATH.read_text(encoding="utf-8"))
-IMAGES_FOLDER = CFG_DATA["IMAGES_FOLDER"]
-DATASET_DICT_PATH = PARENT_FOLDER / "dataset_dict.yaml"
-DATASET_DICT_RAW = yaml.safe_load(DATASET_DICT_PATH.read_text(encoding="utf-8"))
-DATASET_DICT = {int(key): value for key, value in DATASET_DICT_RAW.items()}
 
 if __name__ == "__main__":
     # Select result_det folder or automatically use the latest one
     det_dir = select_or_latest(base_dir=PARENT_FOLDER, title="Select result_det folder (Cancel to use latest)")
 
+    # Read config files
+    cfg_path = det_dir / "model_cfg.yaml"
+    cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    images_folder = cfg_data["IMAGES_FOLDER"]
+    dataset_dict_path = det_dir / "dataset_dict.yaml"
+    dataset_dict_raw = yaml.safe_load(dataset_dict_path.read_text(encoding="utf-8"))
+    dataset_dict = {int(key): value for key, value in dataset_dict_raw.items()}
+
     # All images in IMAGES_FOLDER (recursive)
-    image_files, _ = collect_image_files(IMAGES_FOLDER, stage="cropping")
+    image_files, _ = collect_image_files(images_folder, stage="cropping")
 
     crop_count = 0
 
     # For each image
     for img_path in image_files:
         # Get relative directory to maintain the original folder structure
-        rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))   # Image folder name
+        rel_dir = img_path.parent.relative_to(Path(images_folder))   # Image folder name
 
         # In detection_entry.py, labels are saved in: run_dir (here det_dir) / rel_dir / "labels"
         label_dir = det_dir / rel_dir / "labels"
@@ -77,7 +79,7 @@ if __name__ == "__main__":
                 continue
 
             # Map class ID to string name
-            cls_name = DATASET_DICT[classes[i]]
+            cls_name = dataset_dict[classes[i]]
 
             # Crop the image using numpy slicing
             crop_img = img[y1_i:y2_i, x1_i:x2_i]

@@ -41,7 +41,7 @@ Notes:
 - Saves labels under `detection_promptable/[MODEL]_result_det_YYYYMMDDHHmm/.../labels`.
 - If images are directly under `IMAGES_FOLDER`, labels are in `.../labels`.
 - If images are in subfolders, output mirrors subfolder structure (each subfolder has its own `labels` folder).
-- Writes a `cfg.txt` with the exact run configuration.
+- Copies `model_cfg.yaml` and `dataset_dict.yaml` into the result folder for traceability.
 
 Notes:
 - Label format (per image, normalized): cls cx cy w h conf
@@ -52,6 +52,7 @@ Notes:
 ## 4. Crop detections (crop.py)
 `crop.py` reads detection labels and writes cropped image patches.
 - You can choose a result folder via GUI, or it automatically uses the latest `*_result_det_YYYYMMDDHHmm` folder.
+- It reads `model_cfg.yaml` and `dataset_dict.yaml` from the selected result folder when available, so cropping stays aligned with that run.
 - It reads labels from `<result_dir>/<relative_image_folder>/labels/<image_name>.txt`.
 - It saves crops under `<result_dir>/00crop/<relative_image_folder>/`.
 - Crop filename format is `<image_stem>_<class_name>_<index>.ext`.
@@ -61,7 +62,7 @@ Notes:
 `count_empty.py` checks how many images have empty detection labels (no boxes).
 
 Notes:
-- It scans images recursively from `IMAGES_FOLDER`.
+- It scans images recursively from the `IMAGES_FOLDER` stored in the selected result folder's `model_cfg.yaml` when available.
 - You can choose a result folder via GUI, or it automatically uses the latest `*_result_det_YYYYMMDDHHmm` folder.
 - For each image, it reads prediction labels from `<result_dir>/<relative_image_folder>/labels/<image_name>.txt`.
 - Empty label files are counted as empties.

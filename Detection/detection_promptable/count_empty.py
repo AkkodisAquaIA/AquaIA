@@ -4,16 +4,18 @@ from collections import defaultdict
 from utils import select_or_latest, collect_image_files, load_label_txt
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
-CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
-CFG_DATA = yaml.safe_load(CFG_PATH.read_text(encoding="utf-8"))
-IMAGES_FOLDER = CFG_DATA["IMAGES_FOLDER"]
 
 if __name__ == "__main__":
     # Select result_det folder or automatically use the latest one
     det_dir = select_or_latest(base_dir=PARENT_FOLDER, title="Select result_det folder (Cancel to use latest)")
 
+    # Read config file
+    cfg_path = det_dir / "model_cfg.yaml"
+    cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    images_folder = cfg_data["IMAGES_FOLDER"]
+
     # All images in IMAGES_FOLDER (recursive)
-    image_files, _ = collect_image_files(IMAGES_FOLDER, stage="checking empty detection images")
+    image_files, _ = collect_image_files(images_folder, stage="checking empty detection images")
 
     # Use dictionaries to count empties, totals, and predicted boxes per subfolder
     subfolder_empty_counts = defaultdict(int)
@@ -23,7 +25,7 @@ if __name__ == "__main__":
     # For each image
     for img_path in image_files:
         # Get relative directory and subfolder name
-        rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))   # Image folder name
+        rel_dir = img_path.parent.relative_to(Path(images_folder))   # Image folder name
         subfolder_name = str(rel_dir)
 
         # Count total images for subfolder

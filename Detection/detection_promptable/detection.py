@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime
+import shutil
 import yaml
 import torch
 from ultralytics.models.sam import SAM3SemanticPredictor
@@ -129,22 +130,15 @@ if __name__ == "__main__":
     run_dir = Path(PARENT_FOLDER) / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    # Copy config files to run_dir for record-keeping
+    shutil.copy2(CFG_PATH, run_dir / CFG_PATH.name)
+    shutil.copy2(DATASET_DICT_PATH, run_dir / DATASET_DICT_PATH.name)
+
     # Text prompts (string) sourced from the dataset dictionary (sorted for stable order)
     text_prompts = [DATASET_DICT[idx] for idx in sorted(DATASET_DICT.keys())]
 
     # Sorted dataset keys used for mapping detection index back to dataset key
     dataset_keys_sorted = [idx for idx in sorted(DATASET_DICT.keys())]
-
-    # Save the loaded configuration as a flat text file for reference
-    cfg_dir = run_dir / "cfg.txt"
-    cfg_content = {"IMAGES_FOLDER": IMAGES_FOLDER, "MODEL_NAME": MODEL_NAME}
-    for key, value in cfg.items():
-        cfg_content[key] = value
-    with cfg_dir.open("w", encoding="utf-8") as cfg_file:
-        for key, value in cfg_content.items():
-            # Format strings with quotes
-            formatted = f"\"{value}\"" if isinstance(value, str) else value
-            cfg_file.write(f"{key} = {formatted}\n")
 
     # All images in IMAGES_FOLDER (recursive)
     image_files, total_images = collect_image_files(IMAGES_FOLDER, stage="detection")

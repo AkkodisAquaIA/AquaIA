@@ -165,17 +165,15 @@ if __name__ == "__main__":
     # Select result_det folder or automatically use the latest one
     det_dir = select_or_latest(base_dir=PARENT_FOLDER, title="Select result_det folder (Cancel to use latest)")
 
-    # Read model CONF from cfg.txt under the selected/latest result directory
+    # Read config file to get CONF
     cfg_conf = None
-    cfg_path = det_dir / "cfg.txt"
+    cfg_path = det_dir / "model_cfg.yaml"
     if cfg_path.exists():
-        for line in cfg_path.read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith("CONF"):
-                parts = line.split("=")
-                if len(parts) == 2:
-                    # Extract confidence value
-                    cfg_conf = float(parts[1].strip().strip('"').strip("'"))
-                break
+        cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        model_name = cfg_data.get("MODEL_NAME")
+        model_cfg = cfg_data.get("MODEL_CFG", {}).get(model_name, {})
+        if "CONF" in model_cfg:
+            cfg_conf = float(model_cfg["CONF"])
 
     # Ask user for a new confidence threshold
     user_input = input(f"Inference model CONF = {cfg_conf}, define a new threshold? (blank to skip): ").strip()
