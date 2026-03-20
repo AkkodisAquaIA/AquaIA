@@ -3,7 +3,8 @@ from pathlib import Path
 from test.config_utils import find_latest_run_dir, load_infer_config, load_run_config
 
 from test.plot_utils import plot_metrics
-from test.test_dino import test_dino
+from test.dino.run import test_dino
+from test.yolo.run import test_yolo
 
 
 def test(config):
@@ -18,8 +19,7 @@ def test(config):
     if model_family.startswith("dino"):
         return test_dino(config)
     if model_family.startswith("yolo"):
-        print("Pas encore refactored")
-        raise NotImplementedError
+        return test_yolo(config)
     raise ValueError(f"Unsupported test backend for model config: {model_config}")
 
 

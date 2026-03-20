@@ -1,7 +1,7 @@
 # AquaIA - DETR+DINO inference config
 
 run:
-  runs_root: "results/detection/detr"
+  runs_root: "results/detect/yolo11_n_random"
   run_dir: null
 
 data:
@@ -9,6 +9,7 @@ data:
 
 inference:
   batch: 8
+  imgsz : 304
   conf: 0.3
   num_samples: 20
   seed: 0

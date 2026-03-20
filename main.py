@@ -9,11 +9,11 @@ def build_parser():
     parser = argparse.ArgumentParser(description="AquaIA entry point")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    train_parser = subparsers.add_parser("train", help="Train a DETR model")
+    train_parser = subparsers.add_parser("train", help="Train a model")
     train_parser.add_argument("--config", type=str, default=os.path.join("training","train_config.yaml"))
     train_parser.set_defaults(command_handler=handle_train)
 
-    test_parser = subparsers.add_parser("infer", help="Run DETR inference on train and test samples")
+    test_parser = subparsers.add_parser("infer", help="Run inference on train and test samples")
     test_parser.add_argument("--config", type=str, default=os.path.join("test", "infer_config.yaml"))
     test_parser.set_defaults(command_handler=handle_test)
 
