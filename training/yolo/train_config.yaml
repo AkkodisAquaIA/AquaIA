@@ -1,35 +1,10 @@
-# AquaIA - Generic Ultralytics YOLO training config
-#
-# Ultralytics references (full arguments and hyperparameter definitions):
-# - Train (all train arguments):
-#   https://docs.ultralytics.com/modes/train/
-# - Configuration (default values, full config file):
-#   https://docs.ultralytics.com/usage/cfg/
-#   https://github.com/ultralytics/ultralytics/blob/main/ultralytics/cfg/default.yaml
-# - Hyperparameter Tuning (explains lr0, lrf, momentum, etc.):
-#   https://docs.ultralytics.com/guides/hyperparameter-tuning/
-# - Data Augmentation (hsv_*, mosaic, mixup, flips, etc.):
-#   https://docs.ultralytics.com/guides/yolo-data-augmentation/
-#
-# NOTE:
-# This config overrides the most relevant train hyperparameters for AquaIA.
-# It is NOT guaranteed to contain every possible argument.
-# For the full and always up-to-date list, see Ultralytics `default.yaml`
-# and the Train docs linked above.
-
 # ----------------------------------------------------------------------
-# Model section: YOLO backbone choice
+# Model section:
 # ----------------------------------------------------------------------
 model:
-  # Model loading:
-  # - family: YOLO major line, e.g. "yolo8", "yolo11", "yolo26"
-  # - size: model scale, one of: n, s, m, l, x
-  # - init:
-  #   - "pretrained" -> loads "{family}{size}.pt" (weights pretrained by Ultralytics)
-  #   - "random"     -> loads "{family}{size}.yaml" (from scratch architecture definition)
   family: "yolo11"
   size: "n"
-  init: "pretrained"
+  init: "random"
 
 # ----------------------------------------------------------------------
 # Data section: train/val dataset
@@ -38,22 +13,16 @@ data:
   # dataset_yaml: path to the dataset YAML.
   #   - can be relative (resolved from this config file location)
   #   - or an environment variable, e.g. ${DATASET_YAML}
-  dataset_yaml: "app/datasets/coco128/coco128_custom.yaml"
+  dataset_yaml: "datasets/coco128"
 
 # ----------------------------------------------------------------------
 # Output section: Ultralytics output handling
 # ----------------------------------------------------------------------
 output:
-  # Output directory. Relative path is resolved from YAML directory.
-  project: "models"
+  # Output directory is inferred as: results/<task>/<family>_<size>_<init>
   exist_ok: true
-  save: true
   save_period: 0
   plots: true
-
-  # Optional: export the fully-resolved config used at runtime.
-  write_config: true
-  config_filename: "resolved_config.yaml"
 
 # ----------------------------------------------------------------------
 # Training section: arguments forwarded to model.train()
@@ -63,15 +32,14 @@ output:
 training:
   # ---------- CORE TASK / MODE ----------
   task: "detect"      # detection task
-  mode: "train"       # always "train" here
 
   # ---------- DEVICE ----------
   # Use "cpu" for CPU-only, 0 or "0" for the first CUDA GPU, "0,1" for multi-GPU.
-  device: "0"
+  device: "auto"
 
   # ---------- DATA INPUT / LOADING ----------
   imgsz: 640          # input size (long side)
-  batch: 4            # batch size
+  batch: 64            # batch size
   rect: false         # rectangular batching (True disables mosaic)
   workers: 2          # dataloader workers
   cache: false        # False | True | "ram" | "disk"
@@ -83,17 +51,17 @@ training:
 
   # ---------- TRAINING SCHEDULE ----------
   epochs: 800        # total epochs
-  patience: 5         # early stopping patience (epochs without mAP improvement)
+  patience: 50         # early stopping patience (epochs without mAP improvement)
   resume: false       # resume from last checkpoint in project/name
 
   # ---------- OPTIMIZER & LR ----------
   optimizer: "AdamW"  # SGD | Adam | AdamW | etc.
-  lr0: 0.0020         # initial learning rate
+  lr0: 0.0005         # initial learning rate
   lrf: 0.05           # final LR factor (lr_final = lr0 * lrf)
   cos_lr: true        # cosine LR schedule if True
 
   momentum: 0.9       # SGD momentum or Adam/AdamW beta1
-  weight_decay: 0.01  # L2 regularization on weights
+  weight_decay: 0.001  # L2 regularization on weights
 
   warmup_epochs: 2    # number of warmup epochs
   warmup_momentum: 0.8
@@ -144,7 +112,6 @@ training:
   close_mosaic: 40
 
   # ---------- PERFORMANCE / MISC ----------
-  amp: false          # Automatic Mixed Precision
   verbose: false      # verbose logs
   deterministic: true # reproducible training (may be slightly slower)
   profile: false      # profile speed
