@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import torch
 import tqdm
 from torch.utils.data import DataLoader
 from ultralytics import YOLO
