@@ -36,3 +36,13 @@ class DisplayColor:
 
         # Final output
         print(f"{rgb_code}{bold_code}{prefix}{text}{self.RESET}")
+
+
+    def colored(self, text: str, color_spec: ColorSpec, bold: bool = False) -> str:
+        """
+        Renvoie le texte avec les codes ANSI pour couleur et bold (sans print).
+        """
+        r, g, b, prefix = color_spec
+        rgb_code  = f"\033[38;2;{r};{g};{b}m"
+        bold_code = self.BOLD if bold else ""
+        return f"{rgb_code}{bold_code}{prefix}{text}{self.RESET}"        

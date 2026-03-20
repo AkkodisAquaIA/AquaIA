@@ -4,13 +4,12 @@ import re
 import numpy as np
 from pathlib import Path
 from collections import Counter, defaultdict
-import matplotlib.pyplot as plt
 import yaml
 
 import tools.display_color as dc
 from tools import constants as ct
 from tools.constants import DISPLAY_COLORS as colors
-
+from graphe import graphe as gr
 
 #==========================================================================================
 def load_class_names(dataset_yaml_path):
@@ -26,6 +25,17 @@ def load_class_names(dataset_yaml_path):
         names = [names[i] for i in sorted(names.keys())]
 
     return names
+
+# --- fonction utilitaire pour stats ---
+def compute_stats(values):
+    arr = np.array(values)
+    return {
+        "mean": float(np.mean(arr)),
+        "std": float(np.std(arr)),
+        "min": float(np.min(arr)),
+        "max": float(np.max(arr))
+    }
+
 
 
 def dataset_statistics_yolo(DATASET_DIR):
@@ -82,40 +92,33 @@ def dataset_statistics_yolo(DATASET_DIR):
                 total_boxes += 1
 
 
-    image_count = len(list(Path(images_dir).rglob("*.*")))
+    image_count = len([
+        f for f in Path(images_dir).rglob("*.*")
+        if f.suffix.lower() in ct.IMAGE_EXT
+        ])
     label_count = len(list(Path(labels_dir).rglob("*.txt")))
 
 
     # --- statistiques générales ---
     stats = {
-
         "images": image_count,
         "labels": label_count,
         "bounding_boxes": total_boxes,
-
-        "bbox_width_mean": float(np.mean(bbox_widths)),
-        "bbox_height_mean": float(np.mean(bbox_heights)),
-        "bbox_area_mean": float(np.mean(bbox_areas)),
-
-        "bbox_width_min": float(np.min(bbox_widths)),
-        "bbox_width_max": float(np.max(bbox_widths)),
-
-        "bbox_height_min": float(np.min(bbox_heights)),
-        "bbox_height_max": float(np.max(bbox_heights)),
+        "bbox_width": compute_stats(bbox_widths),
+        "bbox_height": compute_stats(bbox_heights),
+        "bbox_area": compute_stats(bbox_areas)
     }
 
-
+    
     class_distribution = Counter(classes)
 
     anomalies = []
 
     # --- détection anomalies bbox ---
     for img_name, w, h in zip(image_paths, bbox_widths, bbox_heights):
-
         area = w * h
 
         if w < ct.MIN_BBOX or h < ct.MIN_BBOX:
-
             anomalies.append({
                 "type": "bbox_trop_petite",
                 "width": w,
@@ -126,7 +129,6 @@ def dataset_statistics_yolo(DATASET_DIR):
 
 
         if w > ct.MAX_BBOX or h > ct.MAX_BBOX:
-
             anomalies.append({
                 "type": "bbox_trop_grande",
                 "width": w,
@@ -137,7 +139,6 @@ def dataset_statistics_yolo(DATASET_DIR):
 
 
         if area < ct.MIN_BBOX_AREA:
-
             anomalies.append({
                 "type": "bbox_surface_trop_petite",
                 "width": w,
@@ -148,7 +149,6 @@ def dataset_statistics_yolo(DATASET_DIR):
 
 
         if area > ct.MAX_BBOX_AREA:
-
             anomalies.append({
                 "type": "bbox_surface_trop_grande",
                 "width": w,
@@ -158,41 +158,60 @@ def dataset_statistics_yolo(DATASET_DIR):
             })
 
 
-        # --- dépassement des limites YOLO ---
-        overflow = max(w - 1, h - 1, 0) * 100
+       # --- Détection des bbox hors limites (YOLO) ---
+        x_min = x - w / 2
+        x_max = x + w / 2
+        y_min = y - h / 2
+        y_max = y + h / 2
 
-        if overflow > ct.BBOX_OVERFLOW_ERROR:
+        # --- Overflow par côté ---
+        overflow_left   = max(0 - x_min, 0)
+        overflow_right  = max(x_max - 1, 0)
+        overflow_top    = max(0 - y_min, 0)
+        overflow_bottom = max(y_max - 1, 0)
 
+        # --- Overflow max et total ---
+        overflow_max = max(overflow_left, overflow_right, overflow_top, overflow_bottom)
+        overflow_sum = overflow_left + overflow_right + overflow_top + overflow_bottom
+
+        overflow_max_pct = overflow_max * 100
+        overflow_sum_pct = overflow_sum * 100
+
+        # --- Surface visible et ratio hors image ---
+        visible_w = max(0, min(x_max, 1) - max(x_min, 0))
+        visible_h = max(0, min(y_max, 1) - max(y_min, 0))
+        visible_area = visible_w * visible_h
+        bbox_area = w * h
+        outside_ratio = 1 - (visible_area / bbox_area) if bbox_area > 0 else 0
+        outside_ratio_pct = outside_ratio * 100
+
+
+       
+
+        # --- Détection anomalies ---
+        # ERROR
+        if outside_ratio_pct > ct.BBOX_OVERFLOW_ERROR:
             anomalies.append({
                 "type": "bbox_hors_limite_error",
                 "width": w,
                 "height": h,
-                "area": area,
+                "overflow_max_pct": overflow_max_pct,
+                "overflow_sum_pct": overflow_sum_pct,
+                "outside_ratio_pct": outside_ratio_pct,
                 "image": img_name
             })
 
-        elif overflow > ct.BBOX_OVERFLOW_WARNING:
-
+        # WARNING
+        elif outside_ratio_pct >= ct.BBOX_OVERFLOW_WARNING:
             anomalies.append({
                 "type": "bbox_hors_limite_warning",
                 "width": w,
                 "height": h,
-                "area": area,
+                "overflow_max_pct": overflow_max_pct,
+                "overflow_sum_pct": overflow_sum_pct,
+                "outside_ratio_pct": outside_ratio_pct,
                 "image": img_name
             })
-
-
-    # --- histogramme bbox ---
-    plt.figure()
-
-    plt.hist(bbox_areas, bins=50)
-
-    plt.title("Distribution des tailles de bounding boxes")
-    plt.xlabel("aire bbox")
-    plt.ylabel("nombre")
-
-    plt.show()
-
 
     return {
 
@@ -218,6 +237,59 @@ def print_multi_columns(items, values=None, class_names=None, per_line=5):
     for i in range(0, len(texts), per_line):
         print(" | ".join(f"{t:<{max_width}}" for t in texts[i:i+per_line]))
 
+def afficher_stats_bbox(stats):
+
+    label_width = 10
+    col_width = 11
+
+    def upper_line():
+        print("┌" + "─" * label_width +
+              "┬" + "─" * col_width +
+              "┬" + "─" * col_width +
+              "┬" + "─" * col_width +
+              "┬" + "─" * col_width + "┐")
+
+    def inter_line():
+        print("├" + "─" * label_width +
+              "┼" + "─" * col_width +
+              "┼" + "─" * col_width +
+              "┼" + "─" * col_width +
+              "┼" + "─" * col_width + "┤")
+
+    def down_line():
+        print("└" + "─" * label_width +
+              "┴" + "─" * col_width +
+              "┴" + "─" * col_width +
+              "┴" + "─" * col_width +
+              "┴" + "─" * col_width + "┘")
+
+
+
+    def ligne_header():
+        print(f"|{'':<{label_width}}"
+              f"|{'Mean':^{col_width}}"
+              f"|{'Std':^{col_width}}"
+              f"|{'Min':^{col_width}}"
+              f"|{'Max':^{col_width}}|")
+
+    def ligne_data(label, data):
+        print(f"|{label:<{label_width}}"
+              f"|{data['mean']:>{col_width}.4f}"
+              f"|{data['std']:>{col_width}.4f}"
+              f"|{data['min']:>{col_width}.4f}"
+              f"|{data['max']:>{col_width}.4f}|")
+
+    upper_line()
+    ligne_header()
+    inter_line()
+
+    ligne_data("Width", stats["bbox_width"])
+    ligne_data("Height", stats["bbox_height"])
+    ligne_data("Area", stats["bbox_area"])
+
+    down_line()
+
+
 def verifier_classes_dataset(class_distribution, class_names):
     n_classes = len(class_names)
     classes_presentes = set(class_distribution.keys())
@@ -227,8 +299,42 @@ def verifier_classes_dataset(class_distribution, class_names):
     valides = classes_presentes & classes_yaml
     return {"inutilisees": inutilisees, "manquantes": manquantes, "valides": valides}
 
-#==========================================================================================
-def afficher_dataset_statistics(resultats, class_names=None, classes_par_ligne=3, afficher_hist=True):
+def afficher_tableau_croise_anomalies(resultats):
+    anomalies = resultats.get("anomalies", [])
+    images = sorted(set(resultats.get("image_names", [])))
+    types_anomalies = [
+        "bbox_trop_petite",
+        "bbox_trop_grande",
+        "bbox_surface_trop_petite",
+        "bbox_surface_trop_grande",
+        "bbox_hors_limite_warning",
+        "bbox_hors_limite_error"
+    ]
+
+    # Création du dictionnaire croisé
+    tableau = {img: {t: 0 for t in types_anomalies} for img in images}
+    for a in anomalies:
+        img = a["image"]
+        t = a["type"]
+        if t in types_anomalies:
+            tableau[img][t] += 1
+
+    # Affichage
+    header = ["Image"] + [t.replace("bbox_", "") for t in types_anomalies]
+    col_widths = [max(len(h), 12) for h in header]
+
+    # Ligne d'entête
+    header_line = " | ".join(f"{h:<{w}}" for h, w in zip(header, col_widths))
+    print(header_line)
+    print("-" * len(header_line))
+
+    # Lignes par image
+    for img in images:
+        row = [img] + [str(tableau[img][t]) for t in types_anomalies]
+        print(" | ".join(f"{c:<{w}}" for c, w in zip(row, col_widths)))
+
+
+def afficher_dataset_statistics(resultats, class_names=None, classes_par_ligne=3, afficher_hist=False):
 
     display = dc.DisplayColor()
 
@@ -239,201 +345,235 @@ def afficher_dataset_statistics(resultats, class_names=None, classes_par_ligne=3
 
     total_boxes = stats["bounding_boxes"]
     total = sum(class_distribution.values())
-
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
-
-    print("\n================ DATASET SUMMARY ================\n")
-
+    print("\n================ DATASET SUMMARY ================")
     print(f"{'Images':18}: {stats['images']}")
     print(f"{'Labels':18}: {stats['labels']}")
     print(f"{'Bounding boxes':18}: {total_boxes}")
     print(f"{'BBox / image':18}: {total_boxes / stats['images']:.2f}")
     print(f"{'Classes':18}: {total_classes}")
 
-
-    print("\n--------------- BBOX STATISTICS -----------------\n")
-
-    print(f"{'Width mean':18}: {stats['bbox_width_mean']:.4f}")
-    print(f"{'Height mean':18}: {stats['bbox_height_mean']:.4f}")
-    print(f"{'Area mean':18}: {stats['bbox_area_mean']:.4f}")
-
-    print(f"{'Width min':18}: {stats['bbox_width_min']:.4f}")
-    print(f"{'Width max':18}: {stats['bbox_width_max']:.4f}")
-
-    print(f"{'Height min':18}: {stats['bbox_height_min']:.4f}")
-    print(f"{'Height max':18}: {stats['bbox_height_max']:.4f}")
-
+    # --- statistiques BBOX ---
+    print("\n--------------- BBOX STATISTICS -----------------")
+    afficher_stats_bbox(stats)
 
     # --- Vérification YAML ---
     if class_names:
         verif = verifier_classes_dataset(class_distribution, class_names)
-
         # Classes inutilisées
         if verif["inutilisees"]:
             print("")
-            display.print(f"Classes définies dans YAML mais jamais utilisées {len(verif['inutilisees'])} : ", colors["warning"])
+            display.print(f"Classes définies dans YAML mais jamais utilisées ({len(verif['inutilisees'])}) : ", colors["warning"])
             inutilisees = [f"{cls} {class_names[cls]}" for cls in sorted(verif["inutilisees"])]
             max_width = max(len(t) for t in inutilisees) + 2
             for i in range(0, len(inutilisees), 5):
                 print(" | ".join(f"{entry:<{max_width}}" for entry in inutilisees[i:i+5]))
-
-        # Classes présentes dans labels mais absentes du YAML
+        # Classes manquantes
         if verif["manquantes"]:
             print("")
-            display.print(f"Classes présentes dans labels mais absentes du YAML {len(verif['manquantes'])} : ", colors["error"])
+            display.print(f"Classes présentes dans labels mais absentes du YAML ({len(verif['manquantes'])}) : ", colors["error"])
             manquantes = [str(cls) for cls in sorted(verif["manquantes"])]
             max_width = max(len(t) for t in manquantes) + 2
             for i in range(0, len(manquantes), 5):
                 print(" | ".join(f"{entry:<{max_width}}" for entry in manquantes[i:i+5]))
 
-
-
+    # --- distribution par classe ---
     print("\n---------------- CLASS DISTRIBUTION -------------")
-
     items = sorted(class_distribution.items())
-
     ligne_texts = []
-
     for cls, count in items:
-
         pct = (count / total) * 100
-
         name = class_names[cls] if class_names and cls < len(class_names) else f"UNKNOWN_{cls}"
-
         bar = "█" * int(pct / 2)
-
-        ligne_texts.append(
-            f"{cls} {name} {count} ({pct:.2f}%) {bar}"
-        )
-
-
+        ligne_texts.append(f"{cls} {name} {count} ({pct:.2f}%) {bar}")
     max_width = max(len(t) for t in ligne_texts) + 2
-
     for i in range(0, len(ligne_texts), classes_par_ligne):
-
         print(" | ".join(f"{t:<{max_width}}" for t in ligne_texts[i:i+classes_par_ligne]))
 
+    # --- histogramme bbox ---
+    if afficher_hist and bbox_areas:
+        
+        gr.histograme(bbox_areas,
+                      "Distribution des tailles de bounding boxes",
+                      "Aire bbox",
+                      "Nombre"
+                      )
 
-
-    # --- classes rares ---
-    # --- Classes rares ---
-    classes_rares = {cls: (count/total)*100 for cls,count in class_distribution.items() if (count/total)*100 < 1}
-    if classes_rares:
-        print("")
-        display.print(f"Classes rares (<1% des annotations) {len(classes_rares)} :", colors["warning"])
-        # Trier les IDs de classes rares
-        classes_rares_sorted = sorted(classes_rares.keys())
-        print_multi_columns(classes_rares_sorted, values=classes_rares, class_names=class_names, per_line=5)
-
-    # --- Dataset déséquilibré (>60%) ---
-    if items:
-        max_cls, max_count = max(items, key=lambda x:x[1])
-        pct_max = (max_count/total)*100
-        if pct_max > 20:
-            print("")
-            name = class_names[max_cls] if class_names and max_cls < len(class_names) else f"UNKNOWN_{max_cls}"
-            display.print(f"Dataset très déséquilibré :", colors["warning"])
-            print(f" classe {max_cls} '{name}' domine ({pct_max:.1f}%)")
-
-
-    # --- anomalies ---
-    print("\n---------------- ANOMALIES ----------------------")
-
-    # regroupement des images par type d'anomalie
-    anomaly_images = {
-        "bbox_trop_petite": set(),
-        "bbox_trop_grande": set(),
-        "bbox_hors_limite_warning": set(),
-        "bbox_hors_limite_error": set(),
-    }
-
+    # --- anomalies ---------------------------------------------------------------
+        # regroupement anomalies par image et type
+    anomaly_images = defaultdict(lambda: defaultdict(int))
     for a in anomalies:
-        t = a["type"]
-        if t in anomaly_images:
-            anomaly_images[t].add(a["image"])
+        img = a["image"]
+        typ = a["type"]
+        anomaly_images[img][typ] += 1
 
-    # libellés d'affichage
-    labels = {
-        "bbox_trop_petite": ("Bboxe trop petites", colors["warning"]),
-        "bbox_trop_grande": ("Bboxe trop grandes", colors["warning"]),
-        "bbox_hors_limite_warning": ("Bboxe hors limite (warning)", colors["warning"]),
-        "bbox_hors_limite_error": ("Bboxe hors limite (error)", colors["error"]),
-    }
+    print()
+    if not anomaly_images :
+        display.print('Aucune anomalie trouvé !!', colors['ok'])
+    else :
+        # --- Types d'anomalies à afficher dans le tableau croisé
+        types_anomalies = [
+            "bbox_trop_petite",
+            "bbox_surface_trop_petite",
+            "bbox_trop_grande",
+            "bbox_surface_trop_grande",
+            "bbox_hors_limite_warning",
+            "bbox_hors_limite_error"
+    ]
+        print()
+        display.print("---------------- ANOMALIES ----------------------", colors['warning'])
+        print("------ LEGENDES ------")
+        print("1 : bbox_trop_petite        | 2 : bbox_trop_grande")
+        print("3 : surface_trop_petite     | 4 : surface_trop_grande")
+        print("5 : bbox_warning_hors_zone  | 6 : bbox_error_hors_zone")
+        print()
 
-    # affichage
-    for key, images in anomaly_images.items():
+        type_to_id = {
+            "bbox_trop_petite": 1, "bbox_trop_grande": 2,
+            "bbox_surface_trop_petite": 3, "bbox_surface_trop_grande": 4,
+            "bbox_hors_limite_warning": 5, "bbox_hors_limite_error": 6,
+        }
 
-        if not images:
-            continue
+        id_to_type = {v: k for k, v in type_to_id.items()}
 
-        title, color = labels[key]
-        display.print(f"{title} {len(images)} : ", color)
-        items = sorted(images)
-        max_width = max(len(t) for t in items) + 2
-        for i in range(0, len(items), 5):
-            print(" | ".join(f"{entry:<{max_width}}" for entry in items[i:i+5]))
+        # --- construction d'un dictionnaire comptant les anomalies par image et type ---
+        anomaly_count_per_image = defaultdict(lambda: {t: 0 for t in types_anomalies})
+        for a in anomalies:
+            img = a["image"]
+            t = a["type"]
+            anomaly_count_per_image[img][t] += 1
 
-    #---- pire image ---
-    #---- QUALITE DES IMAGES ---
-    print("\n---------------- QUALITE DES IMAGES -------------")
+        # --- initialisation des totaux ---
+        totaux = {i: 0 for i in range(1, 7)}
 
-    score_images = defaultdict(int)
+        col_width = 5
 
-    # attribution des points selon type d'anomalie
-    points = {
-        "bbox_trop_petite": 1,
-        "bbox_surface_trop_petite": 1,
-        "bbox_trop_grande": 2,
-        "bbox_surface_trop_grande": 2,
-        "bbox_hors_limite_warning": 2,
-        "bbox_hors_limite_error": 4
-    }
+        # header
+        header = f"{'Image':25} | " + " | ".join(f"{i:^{col_width}}" for i in range(1, 7))
+        print(header)
+        print("-" * len(header))
 
-    for a in anomalies:
-        t = a["type"]
-        score_images[a["image"]] += points.get(t, 0)
+        # lignes
+        for img, anomalies_dict in sorted(anomaly_images.items()):
+            line_parts = [f"{img:25}"]
+            row_sum = 0
 
-    # pénalisation images avec classes rares
-    if classes_rares:
-        for cls in classes_rares:
-            for img_name, img_cls in zip(resultats.get("image_names", []), resultats.get("classes", [])):
-                if img_cls == cls:
-                    score_images[img_name] += 1
+            for i in range(1, 7):
+                t = id_to_type[i]
+                count = anomalies_dict.get(t, 0)
+                row_sum += count
 
-    if score_images:
-        display.print("Images les plus problématiques :", colors["warning"])
-        worst_images = sorted(score_images.items(), key=lambda x: x[1], reverse=True)
+                # accumulation des totaux
+                totaux[i] += count
 
-        # Affiche seulement les 10 pires images
-        for img, score in worst_images[:10]:
-            print(f"{img:<25} score = {score}")
+                if count > 0:
+                    color = colors["error"] if i == 6 else colors["warning"]
 
-    # Statistiques globales
-    images_problematiques = len(score_images)              # images avec au moins une bbox problématique
-    total_bboxes_problematiques = sum(score_images.values())  # total de bboxes problématiques
-    pct_images = (images_problematiques / stats["images"]) * 100
+                    r, g, b, _ = color
+                    rgb = f"\033[38;2;{r};{g};{b}m"
 
-    print(f"\nNombre d'images avec au moins une bbox problématique : {images_problematiques} ({pct_images:.2f}%)")
-    print(f"Total de bboxes problématiques : {total_bboxes_problematiques}")
+                    cell = f"{count:^{col_width}}"
+                    cell = f"{rgb}{cell}\033[0m"
+                else:
+                    cell = f"{0:^{col_width}}"
 
-
-    if afficher_hist:
-
-        plt.figure()
-
-        plt.hist(bbox_areas, bins=50)
-
-        plt.title("Distribution des tailles de bounding boxes")
-        plt.xlabel("Aire bbox")
-        plt.ylabel("Nombre")
-
-        plt.show()
+                line_parts.append(cell)
 
 
-    print("\n=================================================\n")
+            # ajouter la colonne SUM
+            line_parts.append(f"{row_sum:^{col_width}}")
+            print(" | ".join(line_parts))      
 
+            # print(" | ".join(line_parts))
 
+        # --- ligne de séparation ---
+        print("-" * len(header))
 
-#==========================================================================================
+        # --- ligne TOTAL ---
+        total_line = [f"{'TOTAL':25}"]
+
+        for i in range(1, 7):
+            total = totaux[i]
+
+            if total > 0:
+                color = colors["error"] if i == 6 else colors["warning"]
+                r, g, b, _ = color
+                rgb = f"\033[38;2;{r};{g};{b}m"
+
+                cell = f"{total:^{col_width}}"
+                cell = f"{rgb}{cell}\033[0m"
+            else:
+                cell = f"{0:^{col_width}}"
+
+            total_line.append(cell)
+
+        print(" | ".join(total_line))
+    
+
+        # --- pire images ---
+        weights = {
+            "bbox_trop_petite": 1,
+            "bbox_surface_trop_petite": 1,
+            "bbox_trop_grande": 2,
+            "bbox_surface_trop_grande": 2,
+            "bbox_hors_limite_warning": 3,
+            "bbox_hors_limite_error": 5
+        }
+
+        bbox_per_image = defaultdict(int)
+        for img in resultats.get("image_names", []):
+            bbox_per_image[img] += 1
+
+        score_images = defaultdict(lambda: {"count":0, "severity":0, "bbox_total":0, "score":0})
+        for a in anomalies:
+            img = a["image"]
+            t = a["type"]
+            score_images[img]["count"] += 1
+            score_images[img]["severity"] += weights.get(t,0)
+        for img, total_bbox in bbox_per_image.items():
+            score_images[img]["bbox_total"] = total_bbox
+        for img, data in score_images.items():
+            if data["bbox_total"] == 0:
+                continue
+            error_ratio = data["count"] / data["bbox_total"]
+            avg_severity = data["severity"] / data["count"] if data["count"]>0 else 0
+            data["score"] = error_ratio * avg_severity
+
+        worst_images = sorted(score_images.items(), key=lambda x:x[1]["score"], reverse=True)
+        if worst_images:
+            print("\n-------------------------- QUALITE DES IMAGES -----------------------")
+            for img,d in worst_images[:10]:
+                if d["score"] == 0:
+                    continue
+                ratio = (d['count'] / d['bbox_total']) *100
+                print(   
+                    f"score = {d['score']:.2f} : "
+                    f"anomalies = {d['count']:<3} "
+                    f"| Nb bbox = {d['bbox_total']:<3} | ration {ratio:6.2f}% : "
+                    f"{img:<25}"
+                )
+            print("---------------------------------------------------------------------")
+        images_problematiques = sum(1 for d in score_images.values() if d["count"] > 0)
+        total_bboxes_problematiques = len(anomalies)
+        pct_images = (images_problematiques / stats["images"]) * 100 if stats["images"] else 0
+        dataset_score = (sum(d["score"] for d in score_images.values()) / len(score_images)) if score_images else 0
+        
+        text = f"Nombre d'images avec au moins une bbox problématique : {images_problematiques} ({pct_images:.2f}%)" 
+        display.print(text, colors['warning'])
+        
+        text = f"Total de bboxes problématiques : {total_bboxes_problematiques}"
+        display.print(text, colors['warning'])
+        
+        print(f"Score moyen du dataset : {dataset_score:.3f}")
+
+        # --- histogramme anomalies par type ---
+        if afficher_hist : 
+            type_counts = Counter(a["type"] for a in anomalies)
+            if type_counts:
+
+                gr.histo_multipl(type_counts,
+                                 "Nombre",
+                                 anomalies)        
+
 

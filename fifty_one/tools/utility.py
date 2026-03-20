@@ -1,10 +1,13 @@
 import os
 import sys
+import numpy as np
 import socket
 import traceback
 from collections import Counter
 from colorama import init, Style
 from pathlib import Path
+import shutil
+# import textwrap
 import argparse
 import fiftyone as fo
 
@@ -15,6 +18,84 @@ from tools.constants import DISPLAY_COLORS as colors
 from tools import constants as ct
 
 #==========================================================================================
+
+
+# def calibrer_seuils_overflow(resultats, warning_percentile=90, error_percentile=99):
+#     """
+#     Calibre automatiquement les seuils warning / error pour le dépassement des bbox (hors limites YOLO)
+#     en fonction de la distribution des bbox hors image (outside_ratio_pct).
+
+#     Args:
+#         resultats (dict) : résultat de dataset_statistics_yolo (avec anomalies et bbox)
+#         warning_percentile (float) : percentile pour définir le seuil warning (default=90)
+#         error_percentile (float) : percentile pour définir le seuil error (default=99)
+
+#     Returns:
+#         dict : {'BBOX_OVERFLOW_WARNING': float, 'BBOX_OVERFLOW_ERROR': float}
+#     """
+
+#     # Extraire toutes les bbox hors image
+#     outside_ratios = []
+
+#     # Parcours de toutes les images / bbox
+#     for img_name, bbox_list in zip(resultats.get('image_names', []), resultats.get('bbox_areas', [])):
+#         # On récupère outside_ratio_pct si déjà calculé
+#         for a in resultats.get('anomalies', []):
+#             if 'outside_ratio_pct' in a:
+#                 outside_ratios.append(a['outside_ratio_pct'])
+
+#     # Si aucune donnée, on retourne des seuils par défaut
+#     if not outside_ratios:
+#         print("Aucun outside_ratio_pct trouvé, utiliser des seuils par défaut")
+#         return {
+#             'BBOX_OVERFLOW_WARNING': ct.BBOX_OVERFLOW_WARNING,
+#             'BBOX_OVERFLOW_ERROR': ct.BBOX_OVERFLOW_ERROR
+#         }
+
+#     # Calcul des percentiles
+#     warning_value = np.percentile(outside_ratios, warning_percentile)
+#     error_value = np.percentile(outside_ratios, error_percentile)
+
+#     print(f" Calibration automatique des seuils :")
+#     print(f"  - Warning ({warning_percentile} percentile) : {warning_value:.2f}%")
+#     print(f"  - Error   ({error_percentile} percentile) : {error_value:.2f}%")
+
+#     return {
+#         'BBOX_OVERFLOW_WARNING': warning_value,
+#         'BBOX_OVERFLOW_ERROR': error_value
+#     }
+
+def calibrer_seuils_overflow(resultats, warning_percentile=90, error_percentile=99):
+
+    outside_ratios = [
+        a['outside_ratio_pct']
+        for a in resultats.get('anomalies', [])
+        if 'outside_ratio_pct' in a
+    ]
+
+    if not outside_ratios:
+        print("Aucun outside_ratio_pct trouvé, utiliser des seuils par défaut")
+        return {
+            'BBOX_OVERFLOW_WARNING': ct.BBOX_OVERFLOW_WARNING,
+            'BBOX_OVERFLOW_ERROR': ct.BBOX_OVERFLOW_ERROR
+        }
+
+    warning_value = np.percentile(outside_ratios, warning_percentile)
+    error_value   = np.percentile(outside_ratios, error_percentile)
+
+    # garde-fous
+    warning_value = np.clip(warning_value, 5, 25)
+    error_value   = np.clip(error_value, 20, 60)
+
+    print(f" Calibration automatique des seuils :")
+    print(f"  - Warning ({warning_percentile} percentile) : {warning_value:.2f}%")
+    print(f"  - Error   ({error_percentile} percentile) : {error_value:.2f}%")
+
+    return {
+        'BBOX_OVERFLOW_WARNING': float(warning_value),
+        'BBOX_OVERFLOW_ERROR': float(error_value)
+    }
+
 
 # ------------------------------
 # Function to find a free port
@@ -188,11 +269,11 @@ def display_and_save_errors(
     if sort:
         items = sorted(items, key=lambda p: str(p))
 
-    display.print(f"{title}: {len(items)} item(s) detected", colors['warning'], bold=True)
-    for i in range(0, len(items), ct.n_per_line):
-        line_items = items[i:i + ct.n_per_line]
-        line = " | ".join(str(x) if full_path else Path(x).name for x in line_items)
-        print(line)
+    # display.print(f"{title}: {len(items)} item(s) detected", colors['warning'], bold=True)
+    # for i in range(0, len(items), ct.n_per_line):
+    #     line_items = items[i:i + ct.n_per_line]
+    #     line = " | ".join(str(x) if full_path else Path(x).name for x in line_items)
+    #     print(line)
     
     # Save to file
     if ct.REPORT_MODE:
@@ -202,8 +283,8 @@ def display_and_save_errors(
                 f.write("\n")
 
         print(f"List saved to '{file_name}'\n")
-    else:
-        print()
+    # else:
+    #     print()
 
 
 
@@ -234,38 +315,48 @@ def format_and_display_error(texte : str, rep= "") -> None  :
 
     display.print(prompt, colors['error'])
 
-    
-def afficher_bbox_erreurs_compact(bbox_erreurs, noms_par_ligne=5):
+def afficher_bbox_erreurs_compact(bbox_erreurs, largeur_max_ligne=None):
     """
-    Affiche les erreurs de bbox par catégorie, plusieurs noms d'images par ligne.
-    
-    bbox_erreurs : dict retourné par detect_bbox_problemes_detail()
-    noms_par_ligne : nombre de noms d'images affichés par ligne
+    Affiche les erreurs de bbox par catégorie.
+    Adaptation automatique à la largeur sans couper les noms.
     """
 
     display = dc.DisplayColor()
 
-    # Calculer largeur max pour aligner les catégories
+    if largeur_max_ligne is None:
+        largeur_max_ligne = shutil.get_terminal_size().columns / 2
+
     categorie_max_len = max(len(cat) for cat in bbox_erreurs.keys())
-    
-    display.print("Erreurs de bbox détectées :", colors["warning"])
-    
+    indent = " " * (categorie_max_len + 3)
+    separateur = " | "
+
+    display.print("Erreurs de bbox détectées :", colors["error"])
+
     for categorie, chemins in bbox_erreurs.items():
         if not chemins:
-            continue  # ignorer les catégories sans erreur
-        
-        # Titre catégorie + nombre d'images
-        print(f"{categorie.capitalize().ljust(categorie_max_len)} ({len(chemins)} images) :")
-        
-        # Extraire uniquement les noms de fichiers
+            continue
+
+        display.print(f"{categorie.capitalize().ljust(categorie_max_len)} ({len(chemins)} images) :", colors["error"])
+
         noms_images = [os.path.basename(chemin) for chemin in chemins]
-        
-        # Affichage en blocs de plusieurs noms par ligne
-        for i in range(0, len(noms_images), noms_par_ligne):
-            ligne = "  ".join(noms_images[i:i+noms_par_ligne])
-            print(f"{' ' * (categorie_max_len + 3)}{ligne}")
-        
-        print()  # ligne vide entre catégories
+
+        ligne = ""
+        for nom in noms_images:
+
+            element = nom if not ligne else separateur + nom
+
+            # Vérifie si ajouter l'élément dépasse la largeur autorisée
+            if len(indent) + len(ligne) + len(element) > largeur_max_ligne:
+                print(f"{indent}{ligne}")
+                ligne = nom  # recommencer sans séparateur
+            else:
+                ligne += element
+
+        # Afficher la dernière ligne
+        if ligne:
+            print(f"{indent}{ligne}")
+
+        print()
 
 
 

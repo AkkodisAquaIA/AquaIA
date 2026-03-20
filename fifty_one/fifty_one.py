@@ -15,21 +15,20 @@ import tkinter as tk
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 import time
 
+import matplotlib.pyplot as plt
+
 import fiftyone as fo
 from fiftyone import ViewField as F
 
-
-
-
 from bboxes import bboxes as bb
 from statistics_yolo import dataset_statistics_yolo as ds
-
-
 
 from tools import utility as util
 from tools import constants as ct
 import tools.display_color as dc
 from tools.constants import DISPLAY_COLORS as colors
+from graphe import graphe as gr
+
 
 #==========================================================================================
 # ================= FONCTIONS =================
@@ -123,8 +122,6 @@ def fade_out(window, steps):
             window.attributes("-alpha", alpha)
             window.after(50, fade)
     fade()
-
-
 
 # --- Chargement image RGB avec gestion erreurs ---
 def load_rgb(path):
@@ -220,6 +217,43 @@ def encoding(dataset, batch_size=ct.BATCH_SIZE):
     executor.shutdown()
     display.print("Embeddings enregistrés.\n", colors['info'])
 
+def create_dataset(DATASET_DIR):
+
+    display = dc.DisplayColor()
+
+    dataset_name = "coco128_local"
+    yaml_path = Path(DATASET_DIR) / "dataset.yaml"
+    if not yaml_path.exists():
+        display.print(f"dataset.yaml introuvable dans {DATASET_DIR}", colors['error'])
+        exit(1)
+        
+    if dataset_name in fo.list_datasets():
+        display.print(f"Suppression du dataset existant '{dataset_name}'", colors['info'])
+        fo.delete_dataset(dataset_name)    
+
+def statistique(DATASET_DIR):
+     # ================= STATISTICS =================
+    dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
+    class_names = ds.load_class_names(dataset_yaml)
+
+    results = ds.dataset_statistics_yolo(DATASET_DIR)
+    seuils = util.calibrer_seuils_overflow(results,
+                                            warning_percentile=ct.PERCILE_WARNING, 
+                                            error_percentile=ct.PERCILE_ERROR)
+    
+    BBOX_OVERFLOW_WARNING = seuils['BBOX_OVERFLOW_WARNING']
+    BBOX_OVERFLOW_ERROR   = seuils['BBOX_OVERFLOW_ERROR']
+
+    outside_ratios = [a['outside_ratio_pct'] for a in results.get('anomalies',
+                                            []) if 'outside_ratio_pct' in a]
+
+    
+    gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
+
+    ds.afficher_dataset_statistics(results, class_names, classes_par_ligne=3, afficher_hist=True)
+
+
+
 def maain():
     # ================= CONFIG =================
 
@@ -244,9 +278,7 @@ def maain():
     print()
     splash_screen_circle("Image.png", duration=2500)
 
-    display.print("Analyse des micro-invertébrés aquatiques", colors['aqua'])
-    display.print("Version : 0.5.00 Beta", colors['aqua_dark'])
-    print()
+    display.print(ct.logo, colors['aqua'])
 
     display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
 
@@ -259,176 +291,54 @@ def maain():
     display.print(prompt, colors['warning'])
 
 
+    if ct.TEST_MODE :
+        # Pour les simulation 
+        DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
+        MODEL_PATH = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3\dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+    else :
+        DATASET_DIR = util.get_path_color("Entrée le chemin du dataset")
+        MODEL_PATH = util.get_path_color("Entrée le chemin du modèle DINOv3")
 
-    DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
-    MODEL_PATH = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3\dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
-
-
-    # DATASET_DIR = util.get_path_color("Entrée le chemin du dataset")
-    # MODEL_PATH = util.get_path_color("Entrée le chemin du modèle DINOv3")
-
-    print()
     display.print("Démarrage du traitement ...", colors['info'])
-
-    dataset_name = "coco128_local"
-
 
     # Chargement des noms de classes pour les stats
     dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
     class_names = ds.load_class_names(dataset_yaml)
 
-    # ================= DATASET =================
-    yaml_path = Path(DATASET_DIR) / "dataset.yaml"
-    if not yaml_path.exists():
-        display.print(f"dataset.yaml introuvable dans {DATASET_DIR}", colors['error'])
-        exit(1)
-        
-    if dataset_name in fo.list_datasets():
-        display.print(f"Suppression du dataset existant '{dataset_name}'", colors['info'])
-        fo.delete_dataset(dataset_name)
-
-
+    
     # validation des labels avant création du dataset FiftyOne
     erreur, all_bboxes, rapport, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR)
-
-    print("===== RESUME VALIDATION =====")
-    total_errors = sum(len(v) for v in erreur.values())
-    print(f"Total types warning/erreurs : {len(erreur)}")
-    print(f"Total warning/erreurs : {total_errors}")
-
-    for k,v in erreur.items():
-        print(f"{k:25} : {len(v)}")
-    print()
-
+ 
     if not ctrl_ok:
-        display.print("Erreurs détectées dans les labels. Arrêt du programme.", colors['error'])
+        display.print(f"Erreurs détectées dans les labels. Arrêt du programme {ct.BELL}", colors['error'])
+        total_errors = sum(len(v) for v in erreur.values())
+        
+        label1 = "Total Types           :"
+        label2 = "Total warning/erreurs :"
+                
+        value1 = len(erreur)
+        value2 = total_errors
+
+        label_width = max(len(label1), len(label2))
+        value_width = max(len(str(value1)), len(str(value2)))
+
+        display.print(f"{label1:<{label_width}} {value1:>{value_width}}", colors['error'])
+        display.print(f"{label2:<{label_width}} {value2:>{value_width}}", colors['error'])    
+        print()
         util.afficher_bbox_erreurs_compact(erreur)
-        exit(1) 
+     
     else:    
         display.print("Aucune erreur de label détectée. Création du dataset FiftyOne...\n", colors['ok'])
+        create_dataset(DATASET_DIR)
 
-
-    display.print(f"Création du dataset FiftyOne à partir du dossier '{DATASET_DIR}'...", colors['info'])
-    with yaspin(text="Chargement en cours...", color="cyan") as spinner:
-        try:
-            dataset = fo.Dataset.from_dir(
-                dataset_type=fo.types.YOLOv5Dataset,
-                dataset_dir=str(DATASET_DIR),
-                name=dataset_name,
-                progress=False  
-            )
-            spinner.text = " "
-            spinner.ok("Ok ") 
-        except Exception as e:
-            spinner.fail("Out ")
-            util.format_and_display_error(f"création  ", rep="default_reports")
-            exit(1)
-    
-    total_images = len(dataset)
-    display.print(f"Dataset chargé avec succès : {total_images} images", colors['info'])
-
-    # ================= STATISTICS =================
-    dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
-    class_names = ds.load_class_names(dataset_yaml)
-
-    results = ds.dataset_statistics_yolo(DATASET_DIR)
-    ds.afficher_dataset_statistics(results, class_names, classes_par_ligne=3, afficher_hist=False)
+        statistique(DATASET_DIR)
 
 
     print()
     prompt = f"Script terminé.{ct.BELL}"
     display.print(prompt, colors['goodbye'])
 
-
 #==========================================================================================
 if __name__ == "__main__":
     maain()
-
-
-# # ================= ENCODING =================
-# encoding(dataset)
-
-
-# # ================= FAISS OPTIMISE =================
-# display.print("Détection doublons FAISS...", colors['info'])
-# embeddings = np.array(dataset.values(VEC_FIELD), dtype="float32")
-# num_embeddings, dim = embeddings.shape
-
-# # Paramètres FAISS IVF
-# nlist = int(np.sqrt(num_embeddings))
-# nprobe = max(5, nlist // 20)
-
-# quantizer = faiss.IndexFlatIP(dim)
-# index = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_INNER_PRODUCT)
-
-# # GPU optionnel
-# try:
-#     if faiss.get_num_gpus() > 0:
-#         display.print("Utilisation FAISS GPU", colors['info'])
-#         res = faiss.StandardGpuResources()
-#         index = faiss.index_cpu_to_gpu(res, 0, index)
-# except Exception as e:
-#     display.print(f"FAISS GPU indisponible → CPU : {e}", colors['warning'])
-
-# # Train et ajout embeddings
-# display.print("Training index FAISS...", colors['info'])
-# index.train(embeddings)
-# index.add(embeddings)
-# index.nprobe = nprobe
-
-# display.print(f"Recherche FAISS (nprobe={nprobe})...", colors['info'])
-# D, I = index.search(embeddings, NEIGHBORS)
-
-# # ================= CLUSTERING =================
-# parent = np.arange(num_embeddings)
-
-# def find(x):
-#     while parent[x] != x:
-#         parent[x] = parent[parent[x]]
-#         x = parent[x]
-#     return x
-
-# def union(x, y):
-#     parent[find(x)] = find(y)
-
-# for i in range(num_embeddings):
-#     for j in range(1, NEIGHBORS):
-#         if I[i, j] <= i:
-#             continue
-#         if D[i, j] >= DUP_THRESHOLD:
-#             union(i, I[i, j])
-
-# clusters = {}
-# sample_ids = dataset.values("id")
-# for i in range(num_embeddings):
-#     root = find(i)
-#     clusters.setdefault(root, []).append(sample_ids[i])
-
-# dup_ids = []
-# for group in clusters.values():
-#     if len(group) > 1:
-#         dup_ids.extend(group)
-
-# dataset.select(list(dup_ids)).tag_samples("dups")
-
-# # --- Affichage et sauvegarde ---
-# dup_paths = [p for p in dataset.select(list(dup_ids)).values("filepath")]
-# util.display_and_save_errors(
-#     dup_paths,
-#     "images_doublons.txt",
-#     f"Images doublons (seuil {DUP_THRESHOLD})"
-# )
-
-# # --- Vue combinée : doublons + bbox hors limites ---
-# combined_view = dataset.match(
-#     (F("tags").contains("dups")) # |
-#    # (F("filepath").is_in(invalid_bbox_paths))
-# )
-
-# if len(combined_view) > 0:
-#     display.print(f"Lancement de l'interface FiftyOne pour les doublons et bbox hors limites ({len(combined_view)} images)...", colors['info'])
-#     util.launch_fiftyone_interface(combined_view)
-# else:
-#     display.print("Aucun doublon ni bbox hors limites à afficher.", colors['info'])
-
 

@@ -8,17 +8,10 @@ import tools.display_color as dc
 from tools import constants as ct
 from tools.constants import DISPLAY_COLORS as colors
 
+#==================================================================================
 
-#-----------------------------------------------------------------------------------
+
 def check_bbox_overflow(x, y, w, h):
-    """
-    Vérifie si une bbox dépasse légèrement l'image.
-    Retourne :
-        "ok"    → bbox entièrement dans tolérance warning
-        "warning" → débordement < BBOX_OVERFLOW_ERROR
-        "error" → débordement > BBOX_OVERFLOW_ERROR
-    """
-    # convertir % → fraction
     warn_tol = ct.BBOX_OVERFLOW_WARNING / 100
     err_tol  = ct.BBOX_OVERFLOW_ERROR / 100
 
@@ -27,7 +20,6 @@ def check_bbox_overflow(x, y, w, h):
     ymin = y - h/2
     ymax = y + h/2
 
-    # débordement réel
     overflow = max(-xmin, xmax-1, -ymin, ymax-1, 0)
 
     if overflow <= warn_tol:
@@ -37,196 +29,48 @@ def check_bbox_overflow(x, y, w, h):
     else:
         return "error"
 
+def bbox_iou(box1, box2):
+    x1, y1, w1, h1 = box1
+    x2, y2, w2, h2 = box2
+
+    x1_min, x1_max = x1 - w1/2, x1 + w1/2
+    y1_min, y1_max = y1 - h1/2, y1 + h1/2
+    x2_min, x2_max = x2 - w2/2, x2 + w2/2
+    y2_min, y2_max = y2 - h2/2, y2 + h2/2
+
+    inter_xmin = max(x1_min, x2_min)
+    inter_ymin = max(y1_min, y2_min)
+    inter_xmax = min(x1_max, x2_max)
+    inter_ymax = min(y1_max, y2_max)
+
+    inter_w = max(0, inter_xmax - inter_xmin)
+    inter_h = max(0, inter_ymax - inter_ymin)
+    inter_area = inter_w * inter_h
+
+    union = w1*h1 + w2*h2 - inter_area
+    if union == 0:
+        return 0
+    return inter_area / union
+
+def round_bbox(cls, x, y, w, h, decimals=4):
+    return (cls, round(x, decimals), round(y, decimals), round(w, decimals), round(h, decimals))
+
+def round_coords(x, y, w, h, decimals=4):
+    return (round(x, decimals), round(y, decimals), round(w, decimals), round(h, decimals))
 
 
-
+#==================================================================================
 #-----------------------------------------------------------------------------------
-
 display = dc.DisplayColor()
 
-
-# def validate_yolo_dataset_detailed(DATASET_DIR):
-#     """
-#     Validation détaillée d'un dataset YOLO.
-#     Retourne un dictionnaire d'erreurs par type et un rapport complet par fichier/ligne.
-#     """
-
-#     labels_dir = os.path.join(DATASET_DIR, "labels", "train2017")
-#     images_dir = os.path.join(DATASET_DIR, "images", "train2017")
-#     split_pattern = re.compile(r"[,\s]+")
-
-#     erreurs = defaultdict(list)  # erreurs par type
-#     rapport_detail = defaultdict(lambda: defaultdict(list))  # rapport[fichier][ligne] = [erreurs]
-
-#     Ctrl_ok = True
-#     label_stems = set()
-
-#     for entry in os.scandir(labels_dir):
-#         if not entry.name.lower().endswith(".txt"):
-#             continue
-#         label_stems.add(Path(entry.name).stem)
-#         path = entry.path
-#         has_content = False
-#         seen_boxes = set()
-
-#         with open(path, "r", encoding="utf-8") as f:
-#             for i, line in enumerate(f, start=1):
-#                 line = line.strip()
-#                 if not line:
-#                     continue
-#                 has_content = True
-#                 parts = split_pattern.split(line)
-
-#                 erreurs_ligne = []
-
-#                 # valeurs par défaut
-#                 cls, x, y, w, h = -1, -1, -1, 0, 0
-
-#                 # --- Colonnes ---
-#                 if len(parts) != 5:
-#                     erreurs["colonnes_incorrectes"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("colonnes_incorrectes")
-#                     Ctrl_ok = False
-#                 else:
-#                     # --- Classe ---
-#                     try:
-#                         cls = int(parts[0])
-#                         if ct.nb_classes is not None and cls >= ct. nb_classes:
-#                             erreurs["classe_hors_plage"].append(f"{entry.name} (ligne {i})")
-#                             erreurs_ligne.append("classe_hors_plage")
-#                             Ctrl_ok = False
-#                     except ValueError:
-#                         erreurs["classe_invalide"].append(f"{entry.name} (ligne {i})")
-#                         erreurs_ligne.append("classe_invalide")
-#                         Ctrl_ok = False
-
-#                     # --- Conversion bbox ---
-#                     try:
-#                         x, y, w, h = map(float, parts[1:])
-#                     except ValueError:
-#                         erreurs["valeurs_non_numeriques"].append(f"{entry.name} (ligne {i})")
-#                         erreurs_ligne.append("valeurs_non_numeriques")
-#                         Ctrl_ok = False
-
-#                 # --- Tests bbox ---
-#                 if x < 0 or y < 0:
-#                     erreurs["coord_negatives"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("coord_negatives")
-#                     Ctrl_ok = False
-#                 if w <= 0 or h <= 0:
-#                     erreurs["taille_non_positive"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("taille_non_positive")
-#                     Ctrl_ok = False
-
-#                 if cls < 0:
-#                     erreurs["classe_negative"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("classe_negative")
-#                     Ctrl_ok = False
-                    
-#                 if w < ct.MIN_BBOX or h < ct.MIN_BBOX:
-#                     erreurs["bbox_trop_petites"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("bbox_trop_petites")
-#                     Ctrl_ok = False
-#                 if w > ct.MAX_BBOX or h > ct.MAX_BBOX:
-#                     erreurs["bbox_trop_grandes"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("bbox_trop_grandes")
-#                     Ctrl_ok = False
-#                 if x > 1 or y > 1 or w > 1 or h > 1:
-#                     erreurs["hors_limites"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("hors_limites")
-#                     Ctrl_ok = False
-
-#                 if w * h < ct.MIN_BBOX_AREA:
-#                     erreurs["bbox_surface_trop_petite"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("bbox_surface_trop_petite")
-#                     # Ctrl_ok = False
-
-#                 status = check_bbox_overflow(x, y, w, h)
-
-#                 if status == "warning":
-#                     erreurs["bbox_sort_image_warning"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("bbox_sort_image_warning")
-
-#                 elif status == "error":
-#                     erreurs["bbox_sort_image"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("bbox_sort_image")
-#                     Ctrl_ok = False
-
-#                 # --- Dupliquées ---
-#                 bbox = (cls, x, y, w, h)
-#                 if bbox in seen_boxes:
-#                     erreurs["bbox_dupliquees"].append(f"{entry.name} (ligne {i})")
-#                     erreurs_ligne.append("bbox_dupliquees")
-#                 seen_boxes.add(bbox)
-
-#                 if erreurs_ligne:
-#                     rapport_detail[entry.name][i].extend(erreurs_ligne)
-
-#         if not has_content:
-#             erreurs["labels_vides"].append(entry.name)
-#             rapport_detail[entry.name][0].append("labels_vides")
-#             Ctrl_ok = False
-
-#     # --- Analyse images ---
-#     image_paths = [p for p in Path(images_dir).rglob("*") if p.suffix.lower() in ct.IMAGE_EXT]
-#     image_stems = {p.stem for p in image_paths}
-
-#     # labels orphelins
-#     orphan_labels = sorted(label_stems - image_stems)
-#     if orphan_labels:
-#         erreurs["labels_orphelins"] = orphan_labels
-#         # Ctrl_ok = False
-#         for lbl in orphan_labels:
-#             rapport_detail[lbl][0].append("labels_orphelins")
-
-#     # images sans label
-#     images_sans_label = sorted(image_stems - label_stems)
-#     if images_sans_label:
-#         erreurs["images_sans_label"] = images_sans_label
-#         Ctrl_ok = False
-
-#     # images dupliquées
-#     image_names = [p.name for p in image_paths]
-#     duplicates = [k for k, v in Counter(image_names).items() if v > 1]
-#     if duplicates:
-#         erreurs["images_dupliquees"] = duplicates
-
-#     # --- Affichage des erreurs par type ---
-#     for key, values in erreurs.items():
-#         if values:
-#             util.display_and_save_errors(
-#                 sorted(values),
-#                 f"{key}.txt",
-#                 key.replace("_", " ").capitalize()
-#             )
-
-#     # # --- Rapport détaillé ligne par ligne ---
-#     # # Exemple d'affichage console, vous pouvez le sauvegarder dans un fichier CSV ou JSON
-#     # print("\n--- Rapport détaillé des erreurs par fichier/ligne ---")
-#     # for fichier, lignes in rapport_detail.items():
-#     #     print(f"\nFichier: {fichier}")
-#     #     for ligne, err_list in lignes.items():
-#     #         print(f"  Ligne {ligne}: {', '.join(err_list)}")
-
-#     return erreurs, rapport_detail, Ctrl_ok
-
 def validate_yolo_dataset_detailed(DATASET_DIR):
-    """
-    Lecture détaillée d'un dataset YOLO.
-    Retourne :
-        - erreurs_syntaxe : dict par type d'erreur (colonnes, classe, coord)
-        - all_bboxes     : liste de tuples (cls, x, y, w, h, image_name)
-        - rapport_detail : dict[fichier][ligne] -> liste d'erreurs
-        - Ctrl_ok        : bool global (True si pas d'erreurs syntaxiques graves)
-    """
-
     labels_dir = os.path.join(DATASET_DIR, "labels", "train2017")
     images_dir = os.path.join(DATASET_DIR, "images", "train2017")
     split_pattern = re.compile(r"[,\s]+")
     
     erreurs_syntaxe = defaultdict(list)
     rapport_detail = defaultdict(lambda: defaultdict(list))
-    Ctrl_ok = True
+    ctrl_ok = True
     label_stems = set()
     all_bboxes = []
 
@@ -236,9 +80,14 @@ def validate_yolo_dataset_detailed(DATASET_DIR):
         label_stems.add(Path(entry.name).stem)
         path = entry.path
         has_content = False
-        seen_boxes = set()
 
         with open(path, "r", encoding="utf-8") as f:
+
+            seen_boxes = set()
+            seen_coords_classes = {}            
+            seen_boxes_list = []
+            seen_boxes_by_class = defaultdict(list)  # <--- INITIALISÉ ICI, UNE FOIS PAR FICHIER
+
             for i, line in enumerate(f, start=1):
                 line = line.strip()
                 if not line:
@@ -247,67 +96,106 @@ def validate_yolo_dataset_detailed(DATASET_DIR):
                 parts = split_pattern.split(line)
                 erreurs_ligne = []
 
-                # valeurs par défaut
                 cls, x, y, w, h = -1, -1, -1, 0, 0
 
                 # --- Colonnes ---
                 if len(parts) != 5:
                     erreurs_syntaxe["colonnes_incorrectes"].append(f"{entry.name} (ligne {i})")
                     erreurs_ligne.append("colonnes_incorrectes")
-                    Ctrl_ok = False
-                    continue  # on ne peut pas continuer sur cette ligne
-                else:
-                    # --- Classe ---
-                    try:
-                        cls = int(parts[0])
-                        if ct.nb_classes is not None and cls >= ct.nb_classes:
-                            erreurs_syntaxe["classe_hors_plage"].append(f"{entry.name} (ligne {i})")
-                            erreurs_ligne.append("classe_hors_plage")
-                            Ctrl_ok = False
-                    except ValueError:
-                        erreurs_syntaxe["classe_invalide"].append(f"{entry.name} (ligne {i})")
-                        erreurs_ligne.append("classe_invalide")
-                        Ctrl_ok = False
+                    ctrl_ok = False
+                    continue 
 
-                    # --- Conversion bbox ---
-                    try:
-                        x, y, w, h = map(float, parts[1:])
-                    except ValueError:
-                        erreurs_syntaxe["valeurs_non_numeriques"].append(f"{entry.name} (ligne {i})")
-                        erreurs_ligne.append("valeurs_non_numeriques")
-                        Ctrl_ok = False
+                # --- Classe ---
+                try:
+                    cls = int(parts[0])
+                    if ct.nb_classes is not None and cls >= ct.nb_classes:
+                        erreurs_syntaxe["classe_hors_plage"].append(f"{entry.name} (ligne {i})")
+                        erreurs_ligne.append("classe_hors_plage")
+                        ctrl_ok = False
+                except ValueError:
+                    erreurs_syntaxe["classe_invalide"].append(f"{entry.name} (ligne {i})")
+                    erreurs_ligne.append("classe_invalide")
+                    ctrl_ok = False
+                    continue
 
+                # if classe_ok : 
+                # --- Conversion bbox ---
+                float_ok = True
+                try:
+                    x, y, w, h = map(float, parts[1:])
+                except ValueError:
+                    erreurs_syntaxe["valeurs_non_numeriques"].append(f"{entry.name} (ligne {i})")
+                    erreurs_ligne.append("valeurs_non_numeriques")
+                    float_ok = False
+                    ctrl_ok = False
+
+                if float_ok:
                     # --- Coordonnées négatives ou taille nulle ---
-                    if x < 0 or y < 0:
-                        erreurs_syntaxe["coord_negatives"].append(f"{entry.name} (ligne {i})")
-                        erreurs_ligne.append("coord_negatives")
-                        Ctrl_ok = False
-                    if w <= 0 or h <= 0:
-                        erreurs_syntaxe["taille_non_positive"].append(f"{entry.name} (ligne {i})")
-                        erreurs_ligne.append("taille_non_positive")
-                        Ctrl_ok = False
                     if cls < 0:
                         erreurs_syntaxe["classe_negative"].append(f"{entry.name} (ligne {i})")
                         erreurs_ligne.append("classe_negative")
-                        Ctrl_ok = False
+                        ctrl_ok = False
 
-                # --- BBox dupliquées ---
-                bbox_tuple = (cls, x, y, w, h)
-                if bbox_tuple in seen_boxes:
+                    if x < 0 or y < 0:
+                        erreurs_syntaxe["coord_negatives"].append(f"{entry.name} (ligne {i})")
+                        erreurs_ligne.append("coord_negatives")
+                        ctrl_ok = False
+                    if x > 1 or y > 1:
+                        erreurs_syntaxe["coord_>_1"].append(f"{entry.name} (ligne {i})")
+                        erreurs_ligne.append("coord_>_1")
+                        ctrl_ok = False
+
+                    if w <= 0 or h <= 0:
+                        erreurs_syntaxe["taille_negatives"].append(f"{entry.name} (ligne {i})")
+                        erreurs_ligne.append("taille_negatives")
+                        ctrl_ok = False
+                    if w > 1 or h > 1:
+                        erreurs_syntaxe["taille_>_1"].append(f"{entry.name} (ligne {i})")
+                        erreurs_ligne.append("taille_>_1")
+                        ctrl_ok = False
+
+                #--- BBox dupliquées ---
+                bbox_tuple_rounded = round_bbox(cls, x, y, w, h)
+                if bbox_tuple_rounded in seen_boxes:
                     erreurs_syntaxe["bbox_dupliquees"].append(f"{entry.name} (ligne {i})")
                     erreurs_ligne.append("bbox_dupliquees")
-                seen_boxes.add(bbox_tuple)
+                    ctrl_ok = False
+                seen_boxes.add(bbox_tuple_rounded)
 
-                # --- Collecte de toutes les bboxes pour statistiques ---
+                # --- Classes différentes sur mêmes coordonnées ---
+                coords_tuple = round_coords(x, y, w, h)
+                if coords_tuple not in seen_coords_classes:
+                    seen_coords_classes[coords_tuple] = set()
+                seen_coords_classes[coords_tuple].add(cls)
+                if len(seen_coords_classes[coords_tuple]) > 1:
+                    erreurs_syntaxe["bbox_classes_differentes"].append(f"{entry.name} (ligne {i})")
+                    erreurs_ligne.append("bbox_classes_differentes")
+                    ctrl_ok = False
+
+                # --- IoU suspect ---
+                current_box = (x, y, w, h)
+                for prev_box, prev_line in seen_boxes_by_class[cls]:
+                    iou = bbox_iou(current_box, prev_box)
+                    if iou > ct.IOU_THRESHOLD:
+                        erreurs_syntaxe["bbox_IoU_suspect"].append(
+                            f"{entry.name} (classe {cls}, lignes {prev_line}-{i}) IoU={iou:.3f}"
+                        )
+                        erreurs_ligne.append("bbox_IoU_suspect")
+                        ctrl_ok = False
+
+                # Ajout de la bbox courante
+                seen_boxes_by_class[cls].append((current_box, i))
+                seen_boxes_list.append((cls, current_box, i))
+
+                # --- Collecte bboxes ---
                 all_bboxes.append((cls, x, y, w, h, entry.name))
-
                 if erreurs_ligne:
                     rapport_detail[entry.name][i].extend(erreurs_ligne)
 
         if not has_content:
             erreurs_syntaxe["labels_vides"].append(entry.name)
             rapport_detail[entry.name][0].append("labels_vides")
-            Ctrl_ok = False
+            ctrl_ok = False
 
     # --- Analyse images ---
     image_paths = [p for p in Path(images_dir).rglob("*") if p.suffix.lower() in ct.IMAGE_EXT]
@@ -324,7 +212,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR):
     images_sans_label = sorted(image_stems - label_stems)
     if images_sans_label:
         erreurs_syntaxe["images_sans_label"] = images_sans_label
-        Ctrl_ok = False
+        ctrl_ok = False
         
     # images dupliquées
     image_names = [p.name for p in image_paths]
@@ -332,7 +220,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR):
     if duplicates:
         erreurs_syntaxe["images_dupliquees"] = duplicates
 
-    # --- Affichage des erreurs syntaxiques ---
+    # --- Affichage erreurs ---
     for key, values in erreurs_syntaxe.items():
         if values:
             util.display_and_save_errors(
@@ -341,5 +229,4 @@ def validate_yolo_dataset_detailed(DATASET_DIR):
                 key.replace("_", " ").capitalize()
             )
 
-    return erreurs_syntaxe, all_bboxes, rapport_detail, Ctrl_ok
-
+    return erreurs_syntaxe, all_bboxes, rapport_detail, ctrl_ok
