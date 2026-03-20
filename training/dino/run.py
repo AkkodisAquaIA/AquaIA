@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -7,15 +8,16 @@ import tqdm
 from torch.utils.data import DataLoader
 from transformers import get_scheduler
 
-from dataloading.datasets import NpyDetectionDataset, dataset_config_from_path, detection_collate_fn
+from dataloading.datasets import NpyDetectionDataset, detection_collate_fn
 from Detection.DINO.dino_detector import DINODetector
 from Detection.loss import SetCriterion
-from Detection.metric import evaluate_map, log_epoch, update_log_dict
+from Detection.metric import evaluate_map, log_epoch, print_metrics, update_log_dict
 from Detection.utils.matcher import HungarianMatcher
 from training.checkpoint import get_model_state_dict, save_model_checkpoint, save_training_state_checkpoint, update_best_checkpoint
 from training.config_utils import save_resolved_config
+    
 
-
+# TODO : the image size specified inside the trainin_conig.yaml and the npy is not the same
 def train_dino(config):
     training_config = config["training"]
     output_config = config["output"]
@@ -27,12 +29,9 @@ def train_dino(config):
         device = configured_device
 
     use_amp = device == "cuda"
-    dataset_config = dataset_config_from_path(config["data"]["dataset_yaml"])
     dataset = NpyDetectionDataset(
-        dataset_name=dataset_config.dataset_name,
-        root_folder=dataset_config.root_folder,
-        stats_file=dataset_config.stats_file,
-        load_targets=True,
+        dataset_root=str(Path(config["data"]["dataset_yaml"])),
+        device=device,
     )
     dataloader = DataLoader(
         dataset,
@@ -51,10 +50,10 @@ def train_dino(config):
 
     run_dir = os.path.join(output_config["project"], datetime.now().strftime("%Y%m%d_%H%M%S"))
     os.makedirs(run_dir, exist_ok=output_config.get("exist_ok", True))
-    last_model_path = os.path.join(run_dir, "last_model.pt")
-    best_model_path = os.path.join(run_dir, "best_model.pt")
+    last_model_path = os.path.join(run_dir, "weights", "last.pt")
+    best_model_path = os.path.join(run_dir, "weights", "best.pt")
     training_state_path = os.path.join(run_dir, "last_training_state.pt")
-    resolved_config_path = os.path.join(run_dir, output_config.get("config_filename", "train_config.yaml"))
+    resolved_config_path = os.path.join(run_dir, "resolved_config.yaml")
 
     model = DINODetector(
         img_size=dataset.imgs.shape[-1],
@@ -115,7 +114,7 @@ def train_dino(config):
         epoch_loss = 0.0
         log_dict = {"avg": 0.0}
         progress = tqdm.tqdm(dataloader, desc=f"Epoch {epoch + 1}/{training_config['epochs']}")
-        for images, targets in progress:
+        for images, targets, _ in progress:
             images = images.to(device, non_blocking=True)
 
             optimizer.zero_grad(set_to_none=True)
@@ -142,6 +141,7 @@ def train_dino(config):
             )
         )
         epoch_metrics["epoch"] = epoch + 1
+        print_metrics(epoch_metrics)
         metrics_history.append(epoch_metrics)
 
         best_loss, best_epoch, best_model_state_dict = update_best_checkpoint(
@@ -155,31 +155,27 @@ def train_dino(config):
         if scheduler is not None:
             scheduler.step()
 
-    if output_config.get("save", True):
-        save_model_checkpoint(path=last_model_path, model_state_dict=get_model_state_dict(model))
-        save_model_checkpoint(
-            path=best_model_path,
-            model_state_dict=best_model_state_dict if best_model_state_dict is not None else get_model_state_dict(model),
-        )
-        save_training_state_checkpoint(
-            path=training_state_path,
-            epoch=training_config["epochs"],
-            optimizer_state_dict=optimizer.state_dict(),
-            scaler_state_dict=scaler.state_dict(),
-            scheduler_state_dict=scheduler.state_dict() if scheduler is not None else None,
-        )
+    save_model_checkpoint(path=last_model_path, model_state_dict=get_model_state_dict(model))
+    save_model_checkpoint(
+        path=best_model_path,
+        model_state_dict=best_model_state_dict if best_model_state_dict is not None else get_model_state_dict(model),
+    )
+    save_training_state_checkpoint(
+        path=training_state_path,
+        epoch=training_config["epochs"],
+        optimizer_state_dict=optimizer.state_dict(),
+        scaler_state_dict=scaler.state_dict(),
+        scheduler_state_dict=scheduler.state_dict() if scheduler is not None else None,
+    )
 
     np.save(metrics_path, metrics_history, allow_pickle=True)
 
-    if output_config.get("write_config", True):
-        save_resolved_config(
-            path=resolved_config_path,
-            config=config,
-            device=device,
-            use_amp=use_amp,
-            run_dir=run_dir,
-            img_size=dataset.imgs.shape[-1],
-            num_classes=dataset.num_classes,
-        )
+    save_resolved_config(
+        path=resolved_config_path,
+        config=config,
+        device=device,
+        use_amp=use_amp,
+        run_dir=run_dir,
+    )
 
     return model

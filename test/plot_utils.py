@@ -2,12 +2,13 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image
 from ultralytics.utils.plotting import Annotator
 
 from Detection.utils.box_ops import box_cxcywh_to_xyxy
 
 
-def annotate_images_with_predictions(images, outputs, class_names, conf_thres, output_dir, image_ids):
+def annotate_images_with_predictions(images, outputs, class_names, conf_thres, output_dir, image_files):
     images = images.detach().cpu().float()
     pred_boxes = outputs["pred_boxes"].detach().cpu()
     pred_logits = outputs["pred_logits"].detach().cpu()
@@ -42,8 +43,27 @@ def annotate_images_with_predictions(images, outputs, class_names, conf_thres, o
             label_name = class_names[label_idx] if label_idx < len(class_names) else str(label_idx)
             annotator.box_label([x1, y1, x2, y2], label=f"{label_name} {float(score):.2f}")
 
-        output_path = output_dir / f"{image_ids[i]}.png"
+        output_path = output_dir / f"{Path(image_files[i]).stem}.png"
         plt.imsave(output_path, annotator.result())
+
+
+def annotate_yolo_predictions(results, class_names, conf_thres, output_dir, image_files):
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for result, image_file in zip(results, image_files):
+        annotator = Annotator(result.orig_img.copy(), line_width=2)
+        boxes = result.boxes
+        if boxes is not None:
+            for box, score, label in zip(boxes.xyxy, boxes.conf, boxes.cls):
+                if float(score) < conf_thres:
+                    continue
+                label_idx = int(label)
+                label_name = class_names[label_idx] if label_idx < len(class_names) else str(label_idx)
+                annotator.box_label(box.tolist(), label=f"{label_name} {float(score):.2f}")
+
+        output_path = output_dir / f"{Path(image_file).stem}.png"
+        Image.fromarray(annotator.result()).save(output_path)
 
 
 def plot_metrics(run_dir, metrics_filename="metrics.npy"):

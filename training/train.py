@@ -1,10 +1,6 @@
 from training.config_utils import load_train_config
 from training.dino.run import train_dino
-
-
-def train_yolo(config):
-    print("Pas encore refactored")
-    raise NotImplementedError
+from training.yolo.run import train_yolo
 
 
 def train(config):

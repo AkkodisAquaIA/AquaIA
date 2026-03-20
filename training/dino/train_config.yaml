@@ -1,15 +1,10 @@
-# AquaIA - Generic DETR+DINO training config
-#
-# This file follows the same structure and naming convention as
-# Detection/YOLO/yolo_train_config.yaml wherever the concepts match.
-
 # ----------------------------------------------------------------------
-# Model section: detector choice / initialization
+# Model section: 
 # ----------------------------------------------------------------------
 model:
   family: "dinov3"
   size : "s"
-  init: "random"
+  init: "pretrained"
 
 # ----------------------------------------------------------------------
 # Data section: train/val dataset
@@ -23,15 +18,9 @@ data:
 # ----------------------------------------------------------------------
 output:
   # Output directory. Relative path is resolved from YAML directory.
-  project: "results/detection/detr"
   exist_ok: true
-  save: true
   save_period: 0
   plots: false
-
-  # Optional: export the fully-resolved config used at runtime.
-  write_config: true
-  config_filename: "resolved_config.yaml"
 
 # ----------------------------------------------------------------------
 # Training section: arguments used by the DINO trainer

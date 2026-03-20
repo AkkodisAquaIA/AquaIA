@@ -18,15 +18,9 @@ data:
 # ----------------------------------------------------------------------
 output:
   # Output directory. Relative path is resolved from YAML directory.
-  project: "results/detection/detr"
   exist_ok: true
-  save: true
   save_period: 0
   plots: false
-
-  # Optional: export the fully-resolved config used at runtime.
-  write_config: true
-  config_filename: "resolved_config.yaml"
 
 # ----------------------------------------------------------------------
 # Training section: arguments used by the DINO trainer
@@ -40,12 +34,12 @@ training:
   device: "auto"
 
   # ---------- DATA INPUT / LOADING ----------
-  imgsz: 640
+  imgsz: 304
   batch: 64
   workers: 0
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 3500
+  epochs: 1500
   warmup_ratio: 0.05
 
   # ---------- OPTIMIZER & LR ----------

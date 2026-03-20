@@ -64,7 +64,11 @@ class DINODetector(nn.Module):
         return features, self.pe.unsqueeze(0).expand(features.shape[0], -1, -1) # (B, H*W, 2*num_pos_feats) add batch dimension with broadcasting
 
     def forward(self, images):
-        with torch.nn.attention.sdpa_kernel(backends=[attn.SDPBackend.FLASH_ATTENTION]):
+        if images.device.type == "cuda":
+            backends = [attn.SDPBackend.FLASH_ATTENTION]
+        else:
+            backends = [attn.SDPBackend.MATH]
+        with torch.nn.attention.sdpa_kernel(backends=backends):
             embeddings, pe = self._forward_backbone(images)
             out = self.detector(embeddings, pe)
         return out

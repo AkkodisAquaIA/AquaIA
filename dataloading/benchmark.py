@@ -115,9 +115,9 @@ if __name__ == "__main__":
         sys.exit(1)
     
     datasets = [
-        NpyDetectionDataset(folder, working_path, load_targets=False),
-        PilDetectionDataset(folder, working_path, (304, 304)),
-        RAMDetectionDataset(folder, working_path, (304, 304))
+        NpyDetectionDataset(os.path.join(working_path, folder), load_targets=False),
+        PilDetectionDataset(os.path.join(working_path, folder), (304, 304)),
+        RAMDetectionDataset(os.path.join(working_path, folder), (304, 304))
     ]
 
     results: List[Dict[str, Any]] = []
