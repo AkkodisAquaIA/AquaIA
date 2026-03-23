@@ -1,4 +1,5 @@
 from training.config_utils import load_train_config
+from training.config_printer import print_train_config
 from training.dino.run import train_dino
 from training.yolo.run import train_yolo
 
@@ -14,6 +15,6 @@ def train(config):
 
 def train_from_config(config_path):
     config = load_train_config(config_path)
+    print_train_config(config)
     return train(config)
-
 

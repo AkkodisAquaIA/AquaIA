@@ -17,6 +17,20 @@ from training.checkpoint import get_model_state_dict, save_model_checkpoint, sav
 from training.config_utils import save_resolved_config
     
 
+def normalize_imgsz(config):
+    model_family = str(config.get("model", {}).get("family", "")).lower()
+    patch_size = 14 if model_family == "dinov2" else 16
+    imgsz = int(config["training"]["imgsz"])
+    rounded_imgsz = max(patch_size, round(imgsz / patch_size) * patch_size)
+    if rounded_imgsz != imgsz:
+        print(
+            f"Warning: imgsz={imgsz} is not divisible by patch size {patch_size}. "
+            f"Using imgsz={rounded_imgsz} instead."
+        )
+        config["training"]["imgsz"] = rounded_imgsz
+    return int(config["training"]["imgsz"])
+
+
 # TODO : the image size specified inside the trainin_conig.yaml and the npy is not the same
 def train_dino(config):
     training_config = config["training"]
@@ -50,13 +64,20 @@ def train_dino(config):
 
     run_dir = os.path.join(output_config["project"], datetime.now().strftime("%Y%m%d_%H%M%S"))
     os.makedirs(run_dir, exist_ok=output_config.get("exist_ok", True))
-    last_model_path = os.path.join(run_dir, "weights", "last.pt")
-    best_model_path = os.path.join(run_dir, "weights", "best.pt")
+    weights_dir = os.path.join(run_dir, "weights")
+    os.makedirs(weights_dir, exist_ok=True)
+    last_model_path = os.path.join(weights_dir, "last.pt")
+    best_model_path = os.path.join(weights_dir, "best.pt")
     training_state_path = os.path.join(run_dir, "last_training_state.pt")
     resolved_config_path = os.path.join(run_dir, "resolved_config.yaml")
+    backbone_config = config.get("model", {})
+    backbone_family = str(backbone_config.get("family", "")).lower()
+    backbone_size = str(backbone_config.get("size", "").lower())
+    imgsz = normalize_imgsz(config)
 
     model = DINODetector(
-        img_size=dataset.imgs.shape[-1],
+        backbone_id = backbone_family + "_" + backbone_size,
+        img_size=imgsz,
         device=device,
         num_classes=dataset.num_classes,
     ).to(device)
@@ -137,7 +158,7 @@ def train_dino(config):
                 dataloader=eval_dataloader,
                 device=device,
                 num_classes=dataset.num_classes,
-                conf_thres=training_config["conf"],
+                conf_thresh=training_config["conf"],
             )
         )
         epoch_metrics["epoch"] = epoch + 1

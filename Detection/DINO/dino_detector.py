@@ -14,7 +14,7 @@ class DINODetector(nn.Module):
     def __init__(
         self, 
         img_size,
-        backbone_id="v3_small", 
+        backbone_id="dinov3_small", 
         detector_head_id="detr",
         positional_encoding_id="sine",
         d_model=256, # Transformer hidden dimension
