@@ -51,9 +51,9 @@ def compute_class_weights_from_imagefolder(train_ds, num_classes: int) -> torch.
 # =========================
 @dataclass
 class Config:
-    run_dir: str = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3"
+    run_dir: str = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/focal_auto"
     make_subrun_with_timestamp: bool = True
-    data_dir: str = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/AQUA-IA_dataset/FIN-Benthic_clean_splited"
+    data_dir: str = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited"
     model_id: str = "facebook/dinov3-vits16-pretrain-lvd1689m"
 
     epochs: int = 25
@@ -83,7 +83,7 @@ class Config:
     # --- loss config
     loss_name: str = "focal"   # "ce" | "focal"
     focal_gamma: float = 2.0
-    focal_alpha_mode: str = "none"   # "none" | "scalar" | "auto"
+    focal_alpha_mode: str = "auto"   # "none" | "scalar" | "auto"
     focal_alpha_scalar: Optional[float] = None
     focal_ignore_index: int = -100
 

@@ -34,8 +34,8 @@ from sklearn.neighbors import NearestNeighbors
 # =========================
 # CONFIG A MODIFIER
 # =========================
-DATA_DIR = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/FIN Benthic2/IDA/Images_per_class"
-DEST_DIR = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/FIN Benthic2/IDA/dataset_clean"
+DATA_DIR = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/AQUA-IA_dataset/FIN-Benthic2"
+DEST_DIR = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/AQUA-IA_dataset/Combined_dataset"
 
 model_name = "dinov3"
 if model_name == "dinov2":
@@ -48,20 +48,32 @@ else:
 EMB_FIELD = model_name + "_embedding"   # ListField (legacy)
 VEC_FIELD = "dinov3_vec"               # VectorField (recommandé)
 
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 
 LABEL_IN = "ground_truth"
 LABEL_OUT = "clean_label"
 REDUNDANT_TAG = "redundant"
 KEPT_TAG = "kept"
 
-SIM_THRESHOLD = 0.985
 K = 30
 MIN_CLASS_SIZE = 2
 
 # Si tu veux garder les datasets temporaires (pour debug) mets True
-KEEP_TEMP_DATASETS = True
+KEEP_TEMP_DATASETS = False
 
+def knn_percentile_for_class(n):
+    if n < 50:
+        return 99
+    elif n < 200:
+        return 97.5
+    elif n < 400:
+        return 95
+    elif n < 700:
+        return 92.5
+    elif n < 1500:
+        return 90
+    else:
+        return 85
 
 def safe_key(s: str) -> str:
     """brain_key safe: pas d'espaces / caractères bizarres"""
@@ -146,6 +158,7 @@ def compute_embeddings_for_dataset(dataset, model, processor, device):
 
 def greedy_dedup_from_knn(X, ids, sim_threshold=0.985, k=30):
     n = X.shape[0]
+
     if n == 0:
         return [], []
     if n == 1:
@@ -221,8 +234,10 @@ def deduplicate_dataset_single_class(dataset):
     ids = base_view.values("id")
     X = np.stack(base_view.values(VEC_FIELD)).astype(np.float32)
 
+    sim_threshold = knn_percentile_for_class(n)
+        
     kept_ids, redundant_ids = greedy_dedup_from_knn(
-        X, ids, sim_threshold=SIM_THRESHOLD, k=K
+        X, ids, sim_threshold=sim_threshold, k=K
     )
 
     if redundant_ids:

@@ -9,3 +9,8 @@ coco128
 
 #Linter
 .ruff_cache/
+
+.env
+docker/.env
+*.tar
+docker/build/
