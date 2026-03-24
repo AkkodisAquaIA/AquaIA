@@ -7,10 +7,10 @@ from transformers import AutoImageProcessor, AutoModel
 import fiftyone as fo
 import fiftyone.brain as fob
 
-import hdbscan
 
 
 # =========================
+# CONFIG A MODIFIER
 # CONFIG A MODIFIER
 # =========================
 DATA_DIR = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/FIN-Benthic/Cropped images"  # racine: class_a/, class_b/, ...
