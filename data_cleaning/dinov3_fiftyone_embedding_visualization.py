@@ -7,7 +7,6 @@ from transformers import AutoImageProcessor, AutoModel
 import fiftyone as fo
 import fiftyone.brain as fob
 
-from sklearn.neighbors import NearestNeighbors
 import hdbscan
 
 
