@@ -11,6 +11,10 @@ coco128
 #Linter
 .ruff_cache/
 
+.env
+docker/.env
+*.tar
+docker/build/
 /results
 /datasets
 # detection_promptable
