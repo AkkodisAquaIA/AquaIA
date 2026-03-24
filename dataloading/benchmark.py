@@ -90,7 +90,8 @@ def benchmark_dataset(
     start_time = time.time()
 
     for _ in range(cfg.num_epochs):
-        for images in loader:
+        for batch in loader:
+            images = batch[0] if isinstance(batch, (tuple, list)) else batch
             _ = images * 2  # simulate workload
 
     total_time = time.time() - start_time
@@ -114,9 +115,9 @@ if __name__ == "__main__":
         sys.exit(1)
     
     datasets = [
-        NpyDetectionDataset(folder, working_path),
-        PilDetectionDataset(folder, working_path, (304, 304)),
-        RAMDetectionDataset(folder, working_path, (304, 304))
+        NpyDetectionDataset(os.path.join(working_path, folder)),
+        PilDetectionDataset(os.path.join(working_path, folder), (304, 304)),
+        RAMDetectionDataset(os.path.join(working_path, folder), (304, 304))
     ]
 
     results: List[Dict[str, Any]] = []
@@ -132,4 +133,3 @@ if __name__ == "__main__":
             f"Avg/Epoch={r['avg_time']:.2f}s | "
             f"RAM={r['ram_dataset']:.1f} MB"
         )
-
