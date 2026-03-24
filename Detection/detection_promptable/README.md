@@ -4,7 +4,7 @@ This folder provides a promptable detection workflow:
 2. Configure the model and inference settings in `model_cfg.yaml`.
 3. Run detection with `detection_entry.py`. A custom non-native per-class NMS is optionally applied.
 4. Crop detected boxes with `crop.py`.
-5. Count empty detections with `count_empty.py`.
+5. Count no detection images with `count_nodet.py`.
 6. Compare crop outputs with `check_image.py`.
 7. Evaluate results with `metric.py`.
 
@@ -59,19 +59,19 @@ Notes:
 - Crop filename format is `<image_stem>_<class_name>_<index>.ext`.
 - Confidence is ignored during cropping (boxes are read from the first 5 label columns: `cls cx cy w h`).
 
-## 5. Count empty detections (count_empty.py)
-`count_empty.py` checks how many images have empty detection labels (no boxes).
+## 5. Count no detection images (count_nodet.py)
+`count_nodet.py` checks how many images have 0 detection labels (no boxes).
 
 Notes:
 - It scans images recursively from the `IMAGES_FOLDER` stored in the selected result folder's `model_cfg.yaml` when available.
 - You can choose a result folder via GUI, or it automatically uses the latest `*_result_det_YYYYMMDDHHmm` folder.
 - For each image, it reads prediction labels from `<result_dir>/<relative_image_folder>/labels/<image_name>.txt`.
-- Empty label files are counted as empties.
+- Empty label files are counted as no detection images.
 - Missing label files are reported as warnings and skipped.
 
 Output:
-- A summary file `empty_detection.txt` is saved inside the selected result folder.
-- Format includes per-subfolder counts: `Subfolder, Empty, Total, Crop boxes`, plus a `TOTAL` line.
+- A summary file `no_detection.txt` is saved inside the selected result folder.
+- Format includes per-subfolder counts: `Subfolder, No detection, Total, Crop boxes`, plus a `TOTAL` line.
 
 ## 6. Compare crop outputs (check_image.py)
 `check_image.py` compares the cropped detection images in two result folders and reports what is extra or missing relative to a reference run.

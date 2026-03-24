@@ -15,10 +15,10 @@ if __name__ == "__main__":
     images_folder = cfg_data["IMAGES_FOLDER"]
 
     # All images in IMAGES_FOLDER (recursive)
-    image_files, _ = collect_image_files(images_folder, stage="checking empty detection images")
+    image_files, _ = collect_image_files(images_folder, stage="checking no detection images")
 
-    # Use dictionaries to count empties, totals, and predicted boxes per subfolder
-    subfolder_empty_counts = defaultdict(int)
+    # Use dictionaries to count no detection images, totals, and predicted boxes per subfolder
+    subfolder_nodet_counts = defaultdict(int)
     subfolder_total_counts = defaultdict(int)
     subfolder_box_counts = defaultdict(int)
 
@@ -46,31 +46,31 @@ if __name__ == "__main__":
 
         # File is empty or contains only whitespace = no detections
         if labels.shape[0] == 0:
-            subfolder_empty_counts[subfolder_name] += 1
+            subfolder_nodet_counts[subfolder_name] += 1
 
     # Write the results to a file
-    output_dir = det_dir / "empty_detection.txt"
+    output_dir = det_dir / "no_detection.txt"
     with output_dir.open("w", encoding="utf-8") as f:
-        f.write("Empty detections:"
-        "\n(Subfolder, Empty, Total, Crop boxes)\n")
+        f.write("No detections:"
+        "\n(Subfolder, No detection, Total, Crop boxes)\n")
 
-        total_all_empties = 0
+        total_all_nodets = 0
         total_all_images = 0
         total_all_boxes = 0
 
         # Sort subfolders by name
         for subfolder in sorted(subfolder_total_counts.keys()):
             total = subfolder_total_counts[subfolder]
-            empties = subfolder_empty_counts[subfolder]
+            nodet = subfolder_nodet_counts[subfolder]
             box_count = subfolder_box_counts[subfolder]
-            line = f"{subfolder}, {empties}, {total}, {box_count}\n"
+            line = f"{subfolder}, {nodet}, {total}, {box_count}\n"
             f.write(line)
             total_all_images += total
-            total_all_empties += empties
+            total_all_nodets += nodet
             total_all_boxes += box_count
 
         f.write("-" * 30)
-        f.write(f"\nTOTAL, {total_all_empties}, {total_all_images}, {total_all_boxes}\n")
+        f.write(f"\nTOTAL, {total_all_nodets}, {total_all_images}, {total_all_boxes}\n")
 
-    print(f"\nEmpty images: {total_all_empties}, Total images: {total_all_images}, Total crop boxes: {total_all_boxes}")
+    print(f"\nNo detection images: {total_all_nodets}, Total images: {total_all_images}, Total crop boxes: {total_all_boxes}")
     print(f"\nDone! Saved summary to: {output_dir}")
