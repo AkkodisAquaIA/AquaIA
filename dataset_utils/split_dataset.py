@@ -134,7 +134,6 @@ def split_files(files: List[Path], train_ratio: float, val_ratio: float, test_ra
 
     n_train = min(n_train, n_total)
     n_val = min(n_val, n_total - n_train)
-    n_test = n_total - n_train - n_val
 
     train_files = files[:n_train]
     val_files = files[n_train:n_train + n_val]
