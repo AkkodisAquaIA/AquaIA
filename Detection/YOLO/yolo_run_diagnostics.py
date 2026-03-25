@@ -5,13 +5,15 @@ import csv
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Tuple
-import logging
+from typing import List, Tuple
+from scipy.optimize import linear_sum_assignment
+from ultralytics.engine.results import Results
+
 
 import numpy as np
 import torch
 import yaml
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import make_grid
 from ultralytics import YOLO
@@ -65,6 +67,42 @@ def yolo_norm_to_xyxy(
     return boxes, cls_ids
 
 
+def _derive_labels_dir_from_images_dir(images_dir: Path) -> Path:
+    """Derive the matching YOLO labels directory from an images directory."""
+    parts = list(images_dir.resolve().parts)
+    if "images" in parts:
+        idx = len(parts) - 1 - parts[::-1].index("images")
+        parts[idx] = "labels"
+        return Path(*parts)
+
+    # Fallback for custom dataset layouts that do not contain a literal "images" directory.
+    return images_dir.parent / "labels" / images_dir.name
+
+
+def match_iou_pairs(iou_mat: np.ndarray) -> list[tuple[int, int, float]]:
+    """Return the globally optimal one-to-one assignment using Hungarian matching."""
+    if iou_mat.size == 0:
+        return []
+
+    # Use a global one-to-one assignment so each prediction and GT box is matched at most once.
+    cost = 1.0 - np.clip(iou_mat, 0.0, 1.0)
+    row_ind, col_ind = linear_sum_assignment(cost)
+    return [(int(i), int(j), float(iou_mat[i, j])) for i, j in zip(row_ind, col_ind)]
+
+
+def greedy_match_iou(iou_mat: np.ndarray, iou_thr: float) -> tuple[int, int, float]:
+    """Match predictions to GT boxes with a global one-to-one IoU assignment."""
+    if iou_mat.size == 0:
+        return 0, 0, 0.0
+
+    matched_ious = [iou for _, _, iou in match_iou_pairs(iou_mat) if iou >= iou_thr]
+    if not matched_ious:
+        return 0, 0, 0.0
+
+    mean_iou = float(np.mean(matched_ious))
+    return len(matched_ious), len(matched_ious), mean_iou
+
+
 def compute_iou_matrix(boxes1: np.ndarray, boxes2: np.ndarray) -> np.ndarray:
     """Compute the pairwise IoU matrix between two sets of xyxy boxes."""
 
@@ -80,47 +118,6 @@ def compute_iou_matrix(boxes1: np.ndarray, boxes2: np.ndarray) -> np.ndarray:
     area2 = (boxes2[:, 2] - boxes2[:, 0]) * (boxes2[:, 3] - boxes2[:, 1])
     union = np.clip(area1[:, None] + area2[None, :] - inter, 1e-6, None)
     return inter / union
-
-
-def greedy_match_iou(iou_mat: np.ndarray, iou_thr: float) -> tuple[int, int, float]:
-    """Greedily match predictions to ground-truth boxes using IoU.
-
-    Matching is one-to-one: once a prediction or GT box is matched, it cannot be reused.
-    Only pairs with IoU >= iou_thr are kept.
-
-    Returns:
-        A tuple containing:
-        - number of matches,
-        - number of matched ground-truth boxes,
-        - mean IoU over matched pairs.
-    """
-    if iou_mat.size == 0:
-        return 0, 0, 0.0
-
-    iou = iou_mat.copy()
-    n_pred, n_gt = iou.shape
-    pred_used = np.zeros(n_pred, dtype=bool)
-    gt_used = np.zeros(n_gt, dtype=bool)
-
-    matches = []
-    while True:
-        # Select the highest-IoU unmatched prediction/GT pair.
-        i, j = np.unravel_index(np.argmax(iou), iou.shape)
-        best = iou[i, j]
-        if best < iou_thr:
-            break
-        if pred_used[i] or gt_used[j]:
-            iou[i, j] = -1.0
-            continue
-        pred_used[i] = True
-        gt_used[j] = True
-        matches.append(best)
-        iou[i, :] = -1.0
-        iou[:, j] = -1.0
-
-    if matches:
-        return len(matches), int(gt_used.sum()), float(np.mean(matches))
-    return 0, int(gt_used.sum()), 0.0
 
 
 def list_image_files(images_dir: Path) -> List[Path]:
@@ -164,7 +161,7 @@ def categorize_image(
         return "missed", 0.0
 
     iou_mat = compute_iou_matrix(pred_boxes_f, gt_boxes)
-    n_matches, n_gt_matched, mean_iou = greedy_match_iou(iou_mat, iou_thr=iou_thr)
+    _, n_gt_matched, mean_iou = greedy_match_iou(iou_mat, iou_thr=iou_thr)
 
     # Mark the image as good only if every GT box is matched.
     if n_gt_matched == gt_boxes.shape[0]:
@@ -173,24 +170,27 @@ def categorize_image(
 
 
 def collect_iou_stats_for_result(
-    r: Any,
+    r: Results,
     labels_root: Path,
     labels_folder: str,
     ious_all: List[float],
-    bad_examples: List[Tuple[float, np.ndarray]],
+    bad_examples: List[Tuple[float, np.ndarray, str]],
     confs_all: List[np.ndarray],
     low_iou_thresh: float = 0.5,
     conf_thres_iou: float = 0.25,
 ) -> None:
     """Collect IoU and confidence diagnostics from one Ultralytics result.
 
-    Predictions are filtered by confidence, then each remaining prediction is paired
-    with its best-IoU ground-truth box. The resulting IoUs are appended to ious_all.
-    Low-IoU cases can be stored in bad_examples for later visualization.
+    Predictions are filtered by confidence, then matched to ground-truth boxes using
+    an optimal one-to-one IoU assignment. The matched IoUs are appended to ious_all.
+    Low-IoU cases can be stored in bad_examples, together with the source filename,
+    for later visualization.
     """
+
     img = r.orig_img
     if img is None:
         return
+
     h, w = img.shape[:2]
     img_path = Path(r.path) if r.path else None
     if img_path is None:
@@ -204,29 +204,35 @@ def collect_iou_stats_for_result(
         return
 
     pred_boxes = r.boxes.xyxy.cpu().numpy().astype(np.float32)
-    pred_conf = r.boxes.conf.cpu().numpy().astype(np.float32)
+    pred_conf_arr = r.boxes.conf.cpu().numpy().astype(np.float32)
 
-    if pred_conf.size > 0:
-        confs_all.append(pred_conf)
+    if pred_conf_arr.size > 0:
+        confs_all.append(pred_conf_arr)
 
     if gt_boxes.size == 0 or pred_boxes.size == 0:
         return
 
-    # Keep only predictions above the analysis confidence threshold.
-    keep = pred_conf >= conf_thres_iou
+    keep = pred_conf_arr >= conf_thres_iou
     pred_boxes_f = pred_boxes[keep]
-
     if pred_boxes_f.size == 0:
         return
 
     iou_mat = compute_iou_matrix(pred_boxes_f, gt_boxes)
-    best_iou = iou_mat[np.arange(pred_boxes_f.shape[0]), np.argmax(iou_mat, axis=1)]
+    matched_pairs = match_iou_pairs(iou_mat)
+    if not matched_pairs:
+        return
 
-    for iou in best_iou:
-        iou = float(iou)
-        ious_all.append(iou)
-        if iou < low_iou_thresh and len(bad_examples) < 256:
-            bad_examples.append((iou, img))
+    # Keep all matched IoUs for error inspection, but only keep IoUs above the threshold for aggregate stats.
+    all_matched_ious = [iou for _, _, iou in matched_pairs]
+    matched_ious = [iou for iou in all_matched_ious if iou >= low_iou_thresh]
+    if matched_ious:
+        ious_all.extend(matched_ious)
+
+    min_iou = min(all_matched_ious)
+    if min_iou < low_iou_thresh and len(bad_examples) < 256:
+        img_plot = r.plot()
+        bad_img = img_plot if img_plot is not None else img
+        bad_examples.append((min_iou, bad_img, img_path.name))
 
 
 def _infer_model_tag_from_path(p: Path) -> str:
@@ -288,8 +294,8 @@ def infer_final_epoch(
                         last_epoch = int(float(value))
                 if last_epoch is not None:
                     return last_epoch
-        except Exception as exc:
-            logging.debug("Failed to infer final epoch from %s: %s", results_csv, exc)
+        except Exception:
+            pass
 
     epoch_from_path = _infer_epoch_from_path_or_step(weights_path, 0)
     if epoch_from_path is not None:
@@ -302,15 +308,27 @@ def infer_final_epoch(
 
 
 def _build_run_name(
-    weights_path: Path, epoch: int | None, user_base: str | None
+    weights_path: Path,
+    epoch: int | None,
+    user_base: str | None,
+    pred_conf: float | None = None,
+    pred_iou: float | None = None,
 ) -> str:
     """Build a TensorBoard run name from a user label or inferred run metadata."""
 
-    ts = datetime.now().strftime("%Y%m%d-%H%M")
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    suffix_parts = []
+    if pred_conf is not None:
+        suffix_parts.append("conf" + str(pred_conf).replace(".", ""))
+    if pred_iou is not None:
+        suffix_parts.append("iou" + str(pred_iou).replace(".", ""))
+    suffix = ("_" + "_".join(suffix_parts)) if suffix_parts else ""
+
     if user_base:
-        if re.match(r"^\d{8}-\d{4}(\d{2})?_", user_base):
-            return user_base
-        return f"{ts}_{user_base}"
+        if re.match(r"^\d{8}-\d{6}_", user_base):
+            return user_base + suffix
+        return f"{ts}_{user_base}{suffix}"
 
     model_tag = _infer_model_tag_from_path(weights_path)
     init_tag = _infer_init_tag_from_path(weights_path)
@@ -318,7 +336,8 @@ def _build_run_name(
     base = f"{model_tag}_{init_tag}"
     if epoch is not None:
         base += f"_e{epoch}"
-    return f"{ts}_{base}"
+
+    return f"{ts}_{base}{suffix}"
 
 
 def load_train_run(
@@ -351,7 +370,6 @@ def load_train_run(
     )
     data_block = cfg.get("data", {}) if isinstance(cfg.get("data", {}), dict) else {}
 
-    # ---- Resolve weights path.
     if weights_override:
         weights_path = Path(weights_override).expanduser().resolve()
     else:
@@ -363,8 +381,6 @@ def load_train_run(
         try:
             weights_path = weights_path.resolve()
         except Exception:
-            # Resolution can legitimately fail on some platforms or for malformed paths;
-            # this is non-fatal because we will fall back to the run directory below.
             pass
 
     # If not found (typical on Windows), fallback to local run folder
@@ -374,7 +390,6 @@ def load_train_run(
     if not weights_path.is_file():
         raise FileNotFoundError(f"best.pt not found: {weights_path}")
 
-    # ---- Resolve dataset YAML path.
     if dataset_yaml_override:
         dataset_yaml_path = Path(dataset_yaml_override).expanduser().resolve()
     else:
@@ -383,12 +398,8 @@ def load_train_run(
         if dataset_yaml_path is not None:
             try:
                 dataset_yaml_path = dataset_yaml_path.resolve()
-            except Exception as exc:
-                logging.debug(
-                    "Failed to resolve dataset YAML path %s: %s",
-                    dataset_yaml_path,
-                    exc,
-                )
+            except Exception:
+                pass
 
     if dataset_yaml_path is None or not dataset_yaml_path.is_file():
         raise FileNotFoundError(
@@ -409,6 +420,54 @@ def _log_grid(
     writer.add_image(tag, grid, global_step)
 
 
+def draw_filename_overlay(
+    img: np.ndarray,
+    filename: str,
+    max_chars: int = 28,
+) -> np.ndarray:
+    """Overlay a readable filename label on an RGB image before TensorBoard logging."""
+    pil_img = Image.fromarray(img).convert("RGBA")
+    overlay = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+
+    text = filename
+    if len(text) > max_chars:
+        text = text[: max_chars - 3] + "..."
+
+    x, y = 8, 8
+
+    if font is not None:
+        bbox = draw.textbbox((x, y), text, font=font)
+    else:
+        bbox = draw.textbbox((x, y), text)
+
+    pad_x = 6
+    pad_y = 4
+    draw.rounded_rectangle(
+        [
+            bbox[0] - pad_x,
+            bbox[1] - pad_y,
+            bbox[2] + pad_x,
+            bbox[3] + pad_y,
+        ],
+        radius=6,
+        fill=(0, 0, 0, 170),
+    )
+
+    if font is not None:
+        draw.text((x, y), text, fill=(255, 255, 255, 255), font=font)
+    else:
+        draw.text((x, y), text, fill=(255, 255, 255, 255))
+
+    out = Image.alpha_composite(pil_img, overlay).convert("RGB")
+    return np.array(out)
+
+
 def select_image_subset(
     img_paths: List[Path], k: int, mode: str, seed: int
 ) -> List[Path]:
@@ -425,6 +484,32 @@ def select_image_subset(
     return [img_paths[i] for i in sorted(idx)]
 
 
+def save_image_list(img_paths: List[Path], out_path: Path) -> None:
+    """Save the selected image paths so future runs can reuse the exact same subset."""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        "\n".join(str(p.resolve()) for p in img_paths),
+        encoding="utf-8",
+    )
+
+
+def load_image_list(list_path: Path) -> List[Path]:
+    """Load a previously saved fixed image list and keep only existing files."""
+    if not list_path.is_file():
+        raise FileNotFoundError(f"Image list not found: {list_path}")
+    paths = []
+    for line in list_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        p = Path(line).expanduser().resolve()
+        if p.is_file():
+            paths.append(p)
+    if not paths:
+        raise ValueError(f"No valid image paths found in: {list_path}")
+    return paths
+
+
 def run_yolo_diagnostics(
     weights_path: str,
     dataset_yaml: str,
@@ -435,10 +520,17 @@ def run_yolo_diagnostics(
     global_step: int = 0,
     workers: int = 8,
     conf_thres_iou: float = 0.25,
+    pred_conf: float = 0.001,
+    pred_iou: float = 0.7,
+    match_iou: float = 0.5,
     log_images: bool = True,
     subset_mode: str = "random",
     subset_seed: int = 123,
     images_dir_override: str | None = None,
+    image_list_file: str | None = None,
+    fixed_compare_count: int = 32,
+    category_grid_count: int = 32,
+    run_val_metrics: bool = True,
 ) -> None:
     """Run evaluation diagnostics on a YOLO checkpoint and export them to TensorBoard.
 
@@ -449,7 +541,12 @@ def run_yolo_diagnostics(
       and low-IoU examples.
     """
     weights_path = Path(weights_path)
-    log_dir = (Path(log_dir).expanduser().resolve() / run_name).resolve()
+
+    # Keep shared artifacts (like the fixed image list) in base_log_dir,
+    # while TensorBoard outputs for this run go into run_log_dir.
+    base_log_dir = Path(log_dir).expanduser().resolve()
+    run_log_dir = (base_log_dir / run_name).resolve()
+    log_dir = run_log_dir
 
     if not weights_path.is_file():
         print(f"[ERROR] Weights not found: {weights_path}")
@@ -471,7 +568,6 @@ def run_yolo_diagnostics(
     dataset_yaml_path = Path(dataset_yaml).expanduser().resolve()
     dataset_root = dataset_yaml_path.parent
 
-    # Read the dataset YAML to locate the effective validation/test split folder.
     if not dataset_yaml_path.is_file():
         raise FileNotFoundError(
             f"[CONFIG ERROR] Dataset YAML not found: {dataset_yaml_path}"
@@ -488,24 +584,25 @@ def run_yolo_diagnostics(
             f"[CONFIG ERROR] Dataset YAML root must be a dict: {dataset_yaml_path}"
         )
 
-    raw_val = config.get("val", split)
-    labels_folder = Path(raw_val).name
-    print(f"[INFO] Running Ultralytics validation on split='{split}'")
-    print(f"[INFO] Validation split folder: {labels_folder}")
-    print(f"[INFO] Dataset root: {dataset_root}")
-    print(f"[INFO] YAML val: '{labels_folder}'")
-    labels_root = dataset_root / "labels"
-    images_root = dataset_root / "images"
+    raw_split = str(config.get(split, split))
+    yaml_images_dir = Path(raw_split)
+    if not yaml_images_dir.is_absolute():
+        yaml_images_dir = (dataset_yaml_path.parent / yaml_images_dir).resolve()
+    else:
+        yaml_images_dir = yaml_images_dir.resolve()
 
-    yaml_images_dir = images_root / labels_folder
     analysis_images_dir = (
         Path(images_dir_override).expanduser().resolve()
         if images_dir_override
         else yaml_images_dir
     )
-    analysis_folder = analysis_images_dir.name
-    analysis_labels_dir = labels_root / analysis_folder
+    analysis_labels_dir = _derive_labels_dir_from_images_dir(analysis_images_dir)
+    analysis_folder = analysis_labels_dir.name
+    labels_root = analysis_labels_dir.parent
 
+    print(f"[INFO] Running Ultralytics validation on split='{split}'")
+    print(f"[INFO] Dataset root: {dataset_root}")
+    print(f"[INFO] YAML {split}: '{raw_split}'")
     print(f"[INFO] Labels directory: {analysis_labels_dir}")
     print(
         f"[INFO] Label files found: {len(list(analysis_labels_dir.glob('*.txt'))) if analysis_labels_dir.exists() else 0}"
@@ -523,24 +620,33 @@ def run_yolo_diagnostics(
     ultra_val_project = (log_dir / "ultralytics").resolve()
     ultra_val_project.mkdir(parents=True, exist_ok=True)
 
-    print(f"[INFO] model.val() -> {ultra_val_project / 'val'}")
-    try:
-        metrics = model.val(
-            data=str(dataset_yaml_path),
-            split=split,
-            plots=False,
-            save_json=False,
-            save=False,
-            workers=min(workers, 4),
-            verbose=True,
-            project=str(ultra_val_project),
-            name="val",
-        )
+    metrics = None
 
-    except Exception as e:
-        raise RuntimeError(
-            f"[VALIDATION ERROR] model.val() failed for dataset={dataset_yaml_path}, split={split}"
-        ) from e
+    # Allow skipping model.val() to iterate faster on custom diagnostics only.
+    if run_val_metrics:
+        print(f"[INFO] model.val() -> {ultra_val_project / 'val'}")
+        try:
+            metrics = model.val(
+                data=str(dataset_yaml_path),
+                split=split,
+                conf=pred_conf,
+                iou=pred_iou,
+                plots=False,
+                save_json=False,
+                save=False,
+                workers=min(workers, 4),
+                verbose=True,
+                project=str(ultra_val_project),
+                name="val",
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"[VALIDATION ERROR] model.val() failed for dataset={dataset_yaml_path}, split={split}"
+            ) from e
+    else:
+        print("[INFO] Skipping model.val(); running custom diagnostics only")
+
+    # Initialize writer early so cleanup in finally stays safe if SummaryWriter creation fails.
     writer = None
     try:
         writer = SummaryWriter(log_dir=str(log_dir))
@@ -550,17 +656,17 @@ def run_yolo_diagnostics(
         ) from e
 
     try:
-        # Log core Ultralytics validation metrics.
-        writer.add_scalar("kpi/map50_95", float(metrics.box.map), global_step)
-        writer.add_scalar("kpi/map50", float(metrics.box.map50), global_step)
-        writer.add_scalar("kpi/precision", float(metrics.box.mp), global_step)
-        writer.add_scalar("kpi/recall", float(metrics.box.mr), global_step)
+        if metrics is not None:
+            writer.add_scalar("kpi/map50_95", float(metrics.box.map), global_step)
+            writer.add_scalar("kpi/map50", float(metrics.box.map50), global_step)
+            writer.add_scalar("kpi/precision", float(metrics.box.mp), global_step)
+            writer.add_scalar("kpi/recall", float(metrics.box.mr), global_step)
 
         # Compute custom IoU and image-level diagnostics on the selected image subset.
         ious_all: List[float] = []
-        bad_examples: List[Tuple[float, np.ndarray]] = []
+        bad_examples: List[Tuple[float, np.ndarray, str]] = []
         confs_all: List[np.ndarray] = []
-        images_for_vis: List[np.ndarray] = []
+        fixed_compare_imgs: List[np.ndarray] = []
         good_imgs: List[np.ndarray] = []
         missed_imgs: List[np.ndarray] = []
         fp_imgs: List[np.ndarray] = []
@@ -573,21 +679,41 @@ def run_yolo_diagnostics(
 
         print(f"[INFO] Found {len(all_imgs)} images in: {val_images_dir}")
 
-        picked = select_image_subset(
-            all_imgs, k=max_images, mode=subset_mode, seed=subset_seed
+        # Reuse the same image subset across runs so TensorBoard comparisons stay stable.
+        image_list_path = (
+            Path(image_list_file).expanduser().resolve()
+            if image_list_file
+            else (base_log_dir / f"selected_images_{split}.txt").resolve()
         )
+        if image_list_path.is_file():
+            picked = load_image_list(image_list_path)
+            if max_images > 0:
+                picked = picked[: min(max_images, len(picked))]
+            print(f"[INFO] Reusing fixed image list: {image_list_path}")
+        else:
+            picked = select_image_subset(
+                all_imgs, k=max_images, mode=subset_mode, seed=subset_seed
+            )
+            save_image_list(picked, image_list_path)
+            print(f"[INFO] Saved fixed image list: {image_list_path}")
+
         print(f"[INFO] Selected {len(picked)} images for TensorBoard analysis")
 
-        results = []
+        results_iter = model(
+            picked,
+            conf=pred_conf,
+            iou=pred_iou,
+            verbose=False,
+            stream=True,
+        )
 
-        for i, img_path in enumerate(picked):
-            result = model(img_path, verbose=False)
-            results.append(result[0])
-            print(f"[INFO] Processed {i + 1}/{len(picked)}: {img_path.name}")
-        print(f"[INFO] Images processed: {len(results)}")
+        for i, r in enumerate(results_iter, start=1):
+            if i == 1 or i % 25 == 0 or i == len(picked):
+                current_name = (
+                    Path(r.path).name if getattr(r, "path", None) else "<unknown>"
+                )
+                print(f"[INFO] Processed {i}/{len(picked)}: {current_name}")
 
-        # Aggregate IoU and confidence diagnostics for each prediction result.
-        for r in results:
             collect_iou_stats_for_result(
                 r,
                 labels_root,
@@ -595,7 +721,7 @@ def run_yolo_diagnostics(
                 ious_all,
                 bad_examples,
                 confs_all,
-                low_iou_thresh=0.5,
+                low_iou_thresh=match_iou,
                 conf_thres_iou=conf_thres_iou,
             )
 
@@ -603,12 +729,14 @@ def run_yolo_diagnostics(
                 continue
 
             img = r.orig_img
-            if img is None or not r.path:
+            if img is None:
                 continue
 
-            # Load GT boxes for image-level categorization and visualization.
+            img_path = Path(r.path) if r.path else None
+            if img_path is None:
+                continue
+
             h, w = img.shape[:2]
-            img_path = Path(r.path)
             label_path = labels_root / analysis_folder / f"{img_path.stem}.txt"
             labels = load_yolo_labels(label_path)
             gt_boxes, _ = yolo_norm_to_xyxy(labels, w, h)
@@ -617,14 +745,14 @@ def run_yolo_diagnostics(
                 continue
 
             pred_boxes = r.boxes.xyxy.cpu().numpy().astype(np.float32)
-            pred_conf = r.boxes.conf.cpu().numpy().astype(np.float32)
+            pred_conf_arr = r.boxes.conf.cpu().numpy().astype(np.float32)
 
             cat, _ = categorize_image(
                 pred_boxes=pred_boxes,
-                pred_conf=pred_conf,
+                pred_conf=pred_conf_arr,
                 gt_boxes=gt_boxes,
                 conf_thr=conf_thres_iou,
-                iou_thr=0.5,
+                iou_thr=match_iou,
             )
 
             img_plot = r.plot()
@@ -632,19 +760,18 @@ def run_yolo_diagnostics(
                 continue
 
             img_resized = np.array(Image.fromarray(img_plot).resize((640, 640)))
-            chw = img_resized.transpose(2, 0, 1)
+            img_annotated = draw_filename_overlay(img_resized, img_path.name)
+            chw = img_annotated.transpose(2, 0, 1)
 
-            # Store a limited number of images per diagnostic category.
-            if cat == "good" and len(good_imgs) < 64:
+            if cat == "good" and len(good_imgs) < category_grid_count:
                 good_imgs.append(chw)
-            elif cat == "missed" and len(missed_imgs) < 64:
+            elif cat == "missed" and len(missed_imgs) < category_grid_count:
                 missed_imgs.append(chw)
-            elif cat == "fp_only" and len(fp_imgs) < 64:
+            elif cat == "fp_only" and len(fp_imgs) < category_grid_count:
                 fp_imgs.append(chw)
 
-            # Keep a small generic prediction grid for quick visual inspection.
-            if len(images_for_vis) < min(32, max_images):
-                images_for_vis.append(chw)
+            if len(fixed_compare_imgs) < fixed_compare_count:
+                fixed_compare_imgs.append(chw)
 
         print(
             f"[INFO] Categorized images: good={len(good_imgs)}, missed={len(missed_imgs)}, fp_only={len(fp_imgs)}"
@@ -675,21 +802,22 @@ def run_yolo_diagnostics(
             confs = np.concatenate(confs_all)
             writer.add_histogram("diag/conf_all", confs, global_step)
 
-        # Log a generic prediction overview grid.
-        if log_images and images_for_vis:
+        # Log one fixed comparison grid for all runs, using the same image order.
+        if log_images and fixed_compare_imgs:
             grid = make_grid(
-                torch.tensor(np.stack(images_for_vis), dtype=torch.uint8), nrow=4
+                torch.tensor(np.stack(fixed_compare_imgs), dtype=torch.uint8), nrow=4
             )
-            writer.add_image("viz/predictions", grid, global_step)
+            writer.add_image("viz/fixed_compare", grid, global_step)
 
         # Log the lowest-IoU examples to help inspect localization failures.
         if log_images and bad_examples:
             bad_sorted = sorted(bad_examples, key=lambda x: x[0])[:16]
             bad_imgs = []
-            for _, img in bad_sorted:
-                # Resize images to a common shape before building the grid.
-                img_resized = Image.fromarray(img).resize((640, 640))
-                bad_imgs.append(np.array(img_resized).transpose(2, 0, 1))
+            for _, img, filename in bad_sorted:
+                # Resize images to a common shape and overlay the filename before building the grid.
+                img_resized = np.array(Image.fromarray(img).resize((640, 640)))
+                img_annotated = draw_filename_overlay(img_resized, filename)
+                bad_imgs.append(img_annotated.transpose(2, 0, 1))
             grid = make_grid(
                 torch.tensor(np.stack(bad_imgs), dtype=torch.uint8), nrow=4
             )
@@ -697,13 +825,13 @@ def run_yolo_diagnostics(
             print(f"[INFO] Low-IoU examples logged: {len(bad_examples)}")
 
         print(
-            f"[INFO] TensorBoard export complete: iou_samples={len(ious_all)}, image_grids={len(images_for_vis)}, log_dir={log_dir}"
+            f"[INFO] TensorBoard export complete: iou_samples={len(ious_all)}, "
+            f"fixed_compare_images={len(fixed_compare_imgs)}, log_dir={log_dir}"
         )
 
     finally:
         if writer is not None:
             writer.close()
-
 
 
 def parse_args() -> argparse.Namespace:
@@ -726,22 +854,69 @@ def parse_args() -> argparse.Namespace:
         action="store_false",
         help="Disable image logging (faster).",
     )
+    parser.add_argument(
+        "--skip-val",
+        dest="run_val_metrics",
+        action="store_false",
+        help="Skip model.val() and only run custom per-image diagnostics.",
+    )
+    parser.set_defaults(run_val_metrics=True)
+
     parser.set_defaults(log_images=True)
+
+    parser.add_argument(
+        "--image-list-file",
+        default=None,
+        help="Path to a fixed image list (.txt). If it exists, reuse it; otherwise create it.",
+    )
+
+    parser.add_argument(
+        "--fixed-compare-count",
+        type=int,
+        default=32,
+        help="Number of images to include in the fixed comparison grid.",
+    )
+    parser.add_argument(
+        "--category-grid-count",
+        type=int,
+        default=32,
+        help="Maximum number of images to include in good/missed/fp_only grids.",
+    )
 
     parser.add_argument(
         "--run-name",
         default=None,
         help="Optional TB run name. Default: folder name of train-run-dir.",
     )
-
     parser.add_argument(
         "--conf-thres-iou",
         type=float,
         default=0.25,
         help="Confidence threshold for filtering predictions before IoU calculation.",
     )
-    parser.add_argument("--log-dir", default="runs/diagnostics", help="Root directory for diagnostic logs.")
-
+    parser.add_argument(
+        "--pred-conf",
+        type=float,
+        default=0.001,
+        help="Confidence threshold used by model.val() and per-image inference.",
+    )
+    parser.add_argument(
+        "--pred-iou",
+        type=float,
+        default=0.7,
+        help="IoU threshold used by model.val() and per-image inference NMS.",
+    )
+    parser.add_argument(
+        "--match-iou",
+        type=float,
+        default=0.5,
+        help="IoU threshold used to match predictions to GT for good/missed categorization.",
+    )
+    parser.add_argument(
+        "--log-dir",
+        default="runs/diagnostics",
+        help="Root directory for diagnostic logs.",
+    )
     parser.add_argument("--split", default="val", choices=["val", "test"])
     parser.add_argument("--max-images", type=int, default=128)
     parser.add_argument(
@@ -806,8 +981,9 @@ def main() -> None:
         weights_path=weights_path,
         epoch=effective_step if effective_step > 0 else None,
         user_base=run_base,
+        pred_conf=args.pred_conf,
+        pred_iou=args.pred_iou,
     )
-
     run_yolo_diagnostics(
         weights_path=str(weights_path),
         dataset_yaml=str(dataset_yaml_path),
@@ -818,12 +994,18 @@ def main() -> None:
         global_step=effective_step,
         workers=args.workers,
         conf_thres_iou=args.conf_thres_iou,
+        pred_conf=args.pred_conf,
+        pred_iou=args.pred_iou,
+        match_iou=args.match_iou,
         log_images=args.log_images,
         subset_mode=args.subset_mode,
         subset_seed=args.subset_seed,
         images_dir_override=args.images_dir_override,
+        image_list_file=args.image_list_file,
+        fixed_compare_count=args.fixed_compare_count,
+        category_grid_count=args.category_grid_count,
+        run_val_metrics=args.run_val_metrics,
     )
-
 
 
 if __name__ == "__main__":
