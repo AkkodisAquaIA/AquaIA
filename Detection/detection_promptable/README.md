@@ -2,7 +2,7 @@
 This folder provides a promptable detection workflow:
 1. Define the classes you want to detect in `dataset_dict.yaml` (COCO128 is provided as an example).
 2. Configure the model and inference settings in `model_cfg.yaml`.
-3. Run detection with `detection_entry.py`. A custom non-native per-class NMS is optionally applied.
+3. Run detection with `detection_entry.py`. Custom non-native per-class and global NMS can be optionally applied.
 4. Crop detected boxes with `crop.py`.
 5. Count no detection images with `count_nodet.py`.
 6. Compare crop outputs with `check_image.py`.
@@ -22,14 +22,17 @@ Key settings:
 - `IMAGES_FOLDER`: folder with images to run inference on.
 - `MODEL_NAME`: `"sam3"` or `"yoloe26"`.
 - `MODEL_CFG`: per-model settings.
-- `sam3`: `CONF`, `TASK`, `MODE`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `NMS`, `UNIC`.
-- `yoloe26`: `CONF`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `BATCH`, `NMS`, `UNIC`.
+- `sam3`: `CONF`, `TASK`, `MODE`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `NMS_CLS`, `NMS_GLB`, `UNIC`.
+- `yoloe26`: `CONF`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `BATCH`, `NMS_CLS`, `NMS_GLB`, `UNIC`.
 
 Notes:
 - The config is loaded from YAML by both `detection_entry.py` and `metric.py`.
-- `NMS` in this project is **not** the native model NMS. It is a custom per-class NMS applied after inference:
-- Set `NMS` to a float IoU threshold (e.g., `0.7`) to enable.
-- Set `NMS` to `False` to disable.
+- `NMS_CLS` in this project is **not** the native model NMS. It is a custom per-class NMS applied after inference:
+- Set `NMS_CLS` to a float IoU threshold (e.g., `0.7`) to enable.
+- Set `NMS_CLS` to `False` to disable.
+- `NMS_GLB` is a custom global NMS applied after inference, regardless of class:
+- Set `NMS_GLB` to a float IoU threshold (e.g., `0.7`) to enable.
+- Set `NMS_GLB` to `False` to disable.
 - `UNIC` keeps only one bbox per image after all other post-processing:
 - Set `UNIC` to `True` to keep only the bbox with the highest `conf`.
 - Set `UNIC` to `False` to keep the original behavior.
@@ -37,7 +40,8 @@ Notes:
 ## 3. Run detection (detection_entry.py)
 - Builds text prompts from `DATASET_DICT`.
 - Runs the selected model on all images under `IMAGES_FOLDER`.
-- Optionally applies the custom NMS.
+- Optionally applies the custom `NMS_CLS`.
+- Optionally applies the custom `NMS_GLB`.
 - Optionally applies `UNIC` after NMS and keeps only the highest-confidence bbox for each image.
 - Saves labels under `detection_promptable/[MODEL]_result_det_YYYYMMDDHHmm/.../labels`.
 - If images are directly under `IMAGES_FOLDER`, labels are in `.../labels`.
@@ -47,8 +51,8 @@ Notes:
 Notes:
 - Label format (per image, normalized): cls cx cy w h conf
 - If no detections are found, an empty `.txt` file is created for that image.
-- Inference terminal logs are generated before custom post-processing (NMS or UNIC).
-- Saved labels and visualizations are generated after custom post-processing (`NMS`, then `UNIC` if enabled).
+- Inference terminal logs are generated before custom post-processing (`NMS_CLS`, `NMS_GLB`, or `UNIC`).
+- Saved labels and visualizations are generated after custom post-processing (`NMS_CLS`, then `NMS_GLB`, then `UNIC` if enabled).
 
 ## 4. Crop detections (crop.py)
 `crop.py` reads detection labels and writes cropped image patches.

@@ -13,7 +13,8 @@ MODEL_CFG:
     HALF: true  # Use FP16 for faster inference
     SAVE: true  # Save results to project folder
     IMGSZ: 1008
-    NMS: false  # Not native NMS
+    NMS_CLS: false  # Not native per-class NMS
+    NMS_GLB: false  # Not native global NMS
     UNIC: true # If true, keep only the highest-confidence bbox per image
   yoloe26:  # TASK and DEVICE seems have no effect
     CONF: 0.2
@@ -22,5 +23,6 @@ MODEL_CFG:
     SAVE: true
     IMGSZ: 640
     BATCH: 16
-    NMS: 0.7  # Not native NMS
+    NMS_CLS: 0.7  # Not native per-class NMS
+    NMS_GLB: false  # Not native global NMS
     UNIC: false # If true, keep only the highest-confidence bbox per image

@@ -18,7 +18,7 @@ DATASET_DICT_PATH = PARENT_FOLDER / "dataset_dict.yaml"
 DATASET_DICT_RAW = yaml.safe_load(DATASET_DICT_PATH.read_text(encoding="utf-8"))
 DATASET_DICT = {int(key): value for key, value in DATASET_DICT_RAW.items()}
 
-def post_nms(result, iou_threshold):
+def post_nms_cls(result, iou_threshold):
     """Per-class NMS for detection results; keeps cls/conf, optional masks.
     Args:
         result: The prediction result object (1 image) containing boxes, scores, classes, and optional masks.
@@ -45,6 +45,28 @@ def post_nms(result, iou_threshold):
 
     # Concatenate all kept indices and filter results
     keep = torch.cat(keep_all) if keep_all else torch.empty(0, dtype=torch.long, device=bboxes.device)
+    result.boxes = result.boxes[keep]
+    if result.masks is not None:
+        result.masks = result.masks[keep]
+
+    return result
+
+def post_nms_glb(result, iou_threshold):
+    """Global NMS for detection results; keeps cls/conf, optional masks.
+    Args:
+        result: The prediction result object (1 image) containing boxes, scores, classes, and optional masks.
+        iou_threshold: IoU threshold for NMS.
+    """
+    # If no boxes, return as is
+    if result.boxes is None or result.boxes.shape[0] == 0:
+        return result
+
+    # Extract box coordinates and scores
+    bboxes = result.boxes.xyxy
+    scores = result.boxes.conf
+
+    # Run NMS on all boxes regardless of class
+    keep = TorchNMS.fast_nms(bboxes, scores, iou_threshold=iou_threshold)
     result.boxes = result.boxes[keep]
     if result.masks is not None:
         result.masks = result.masks[keep]
@@ -136,9 +158,9 @@ if __name__ == "__main__":
 
     # Print information once
     info_device = True
-    if cfg["NMS"] != False or cfg["UNIC"] == True:
+    if cfg["NMS_CLS"] != False or cfg["NMS_GLB"] != False or cfg["UNIC"] == True:
         print("\n" + "=" * 100)
-        print("The terminal logs during inference are still the results before custom post-processing (NMS or UNIC).")
+        print("The terminal logs during inference are still the results before custom post-processing (NMS_CLS, NMS_GLB, or UNIC).")
         print("=" * 100 + "\n")
 
     if MODEL_NAME == "sam3":
@@ -170,9 +192,13 @@ if __name__ == "__main__":
             # Run prediction
             results = predictor(text=text_prompts)
 
-            # Apply NMS only when enabled and keep updated result in-place
-            if cfg["NMS"] != False:
-                results[0] = post_nms(results[0], cfg["NMS"])
+            # Apply per-class NMS only when enabled and keep updated result in-place
+            if cfg["NMS_CLS"] != False:
+                results[0] = post_nms_cls(results[0], cfg["NMS_CLS"])
+
+            # Apply global NMS only when enabled and keep updated result in-place
+            if cfg["NMS_GLB"] != False:
+                results[0] = post_nms_glb(results[0], cfg["NMS_GLB"])
 
             # Keep only the highest-confidence bbox when UNIC is enabled
             if cfg["UNIC"] == True:
@@ -223,9 +249,13 @@ if __name__ == "__main__":
             # Print device info (only once)
             info_device = print_device_info(model, info_device)
 
-            # Apply NMS only when enabled and keep updated result in-place
-            if cfg["NMS"] != False:
-                result = post_nms(result, cfg["NMS"])
+            # Apply per-class NMS only when enabled and keep updated result in-place
+            if cfg["NMS_CLS"] != False:
+                result = post_nms_cls(result, cfg["NMS_CLS"])
+
+            # Apply global NMS only when enabled and keep updated result in-place
+            if cfg["NMS_GLB"] != False:
+                result = post_nms_glb(result, cfg["NMS_GLB"])
 
             # Keep only the highest-confidence bbox when UNIC is enabled
             if cfg["UNIC"] == True:
