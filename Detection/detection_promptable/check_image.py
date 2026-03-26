@@ -4,7 +4,7 @@ from collections import defaultdict
 from pathlib import Path
 from utils import collect_image_files, select_or_latest
 
-PARENT_FOLDER = Path(__file__).resolve().parent
+PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 
 def get_source_stem(stem: str) -> str:
     """Extract the original image stem from [original]_[class]_[index].

@@ -5,8 +5,9 @@ This folder provides a promptable detection workflow:
 3. Run detection with `detection_entry.py`. Custom non-native per-class and global NMS can be optionally applied.
 4. Crop detected boxes with `crop.py`.
 5. Count no detection images with `count_nodet.py`.
-6. Compare crop outputs with `check_image.py`.
-7. Evaluate results with `metric.py`.
+6. Count predicted classes with `count_class.py`.
+7. Compare crop outputs with `check_image.py`.
+8. Evaluate results with `metric.py`.
 
 ## 1. Configure classes (dataset_dict.yaml)
 Maps class IDs to class names. The keys are the class IDs used in labels.
@@ -77,7 +78,20 @@ Output:
 - A summary file `no_detection.txt` is saved inside the selected result folder.
 - Format includes per-subfolder counts: `Subfolder, No detection, Total, Crop boxes`, plus a `TOTAL` line.
 
-## 6. Compare crop outputs (check_image.py)
+## 6. Count predicted classes (count_class.py)
+`count_class.py` counts how many times each predicted class appears across all `labels/*.txt` files under the selected result folder.
+
+Notes:
+- You can choose a result folder via GUI, or it automatically uses the latest `*_result_det_YYYYMMDDHHmm` folder.
+- It scans recursively for every `labels` folder under the selected result folder.
+- Empty label files are ignored for class totals.
+- If `dataset_dict.yaml` exists in the selected result folder, class names are included in the output.
+
+Output:
+- A summary file `class_count.txt` is saved inside the selected result folder.
+- Format includes `Class ID, Class name, Count` and predicted boxes.
+
+## 7. Compare crop outputs (check_image.py)
 `check_image.py` compares the cropped detection images in two result folders and reports what is extra or missing relative to a reference run.
 
 Notes:
@@ -97,7 +111,7 @@ Output:
 - Original directory structure under `00crop` is preserved in both output folders.
 - A summary file `chek_image.txt` is saved in `00check_image/`.
 
-## 7. Evaluate metrics (metric.py)
+## 8. Evaluate metrics (metric.py)
 `metric.py` compares predictions to ground-truth labels and outputs:
 - `mAP50-95(B)`, `mAP50(B)`, `precision(B)`, `recall(B)`, and number of images.
 
