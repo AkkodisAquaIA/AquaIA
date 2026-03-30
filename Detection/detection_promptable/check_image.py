@@ -100,4 +100,4 @@ if __name__ == "__main__":
     summary_text = "\n".join(summary_lines)
 
     print(f"\n{summary_text}")
-    (det_dir / "docs_run" / "chek_image.txt").write_text(summary_text + "\n", encoding="utf-8")
+    (det_dir / "docs_run" / "check_image.txt").write_text(summary_text + "\n", encoding="utf-8")
