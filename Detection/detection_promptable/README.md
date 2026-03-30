@@ -75,8 +75,8 @@ Notes:
 - Missing label files are reported as warnings and skipped.
 
 Output:
-- A summary file `no_detection.txt` is saved inside the selected result folder.
-- Format includes per-subfolder counts: `Subfolder, No detection, Total, Crop boxes`, plus a `TOTAL` line.
+- A summary file `results_statistics_detection.csv` is saved inside the selected result folder, under `detection_result/`.
+- Format includes per-subfolder counts with columns `Subfolder, No detection, Total, Crop boxes`, plus a `TOTAL` line.
 
 ## 6. Count predicted classes (count_class.py)
 `count_class.py` counts how many times each predicted class appears across all `labels/*.txt` files under `<result_dir>/detection_result/`.

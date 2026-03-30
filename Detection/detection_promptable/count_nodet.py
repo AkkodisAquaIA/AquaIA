@@ -1,4 +1,5 @@
 ﻿import yaml
+import csv
 from pathlib import Path
 from collections import defaultdict
 from utils import select_or_latest, collect_image_files, load_label_txt
@@ -48,11 +49,11 @@ if __name__ == "__main__":
         if labels.shape[0] == 0:
             subfolder_nodet_counts[subfolder_name] += 1
 
-    # Write the results to a file
-    output_dir = det_dir / "no_detection.txt"
-    with output_dir.open("w", encoding="utf-8") as f:
-        f.write("No detections:"
-        "\n(Subfolder, No detection, Total, Crop boxes)\n")
+    # Write the results to a CSV file
+    output_dir = det_dir / "docs_run" / "results_statistics_detection.csv"
+    with output_dir.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Subfolder", "No detection", "Total", "Crop boxes"])
 
         total_all_nodets = 0
         total_all_images = 0
@@ -63,14 +64,12 @@ if __name__ == "__main__":
             total = subfolder_total_counts[subfolder]
             nodet = subfolder_nodet_counts[subfolder]
             box_count = subfolder_box_counts[subfolder]
-            line = f"{subfolder}, {nodet}, {total}, {box_count}\n"
-            f.write(line)
+            writer.writerow([subfolder, nodet, total, box_count])
             total_all_images += total
             total_all_nodets += nodet
             total_all_boxes += box_count
 
-        f.write("-" * 30)
-        f.write(f"\nTOTAL, {total_all_nodets}, {total_all_images}, {total_all_boxes}\n")
+        writer.writerow(["TOTAL", total_all_nodets, total_all_images, total_all_boxes])
 
     print(f"\nNo detection images: {total_all_nodets}, Total images: {total_all_images}, Total crop boxes: {total_all_boxes}")
     print(f"\nDone! Saved summary to: {output_dir}")
