@@ -10,60 +10,13 @@ import shutil
 # import textwrap
 import argparse
 import fiftyone as fo
+from collections import defaultdict
 
 from typing import Tuple, List
 
 import tools.display_color as dc
 from tools.constants import DISPLAY_COLORS as colors
 from tools import constants as ct
-
-#==========================================================================================
-
-
-# def calibrer_seuils_overflow(resultats, warning_percentile=90, error_percentile=99):
-#     """
-#     Calibre automatiquement les seuils warning / error pour le dépassement des bbox (hors limites YOLO)
-#     en fonction de la distribution des bbox hors image (outside_ratio_pct).
-
-#     Args:
-#         resultats (dict) : résultat de dataset_statistics_yolo (avec anomalies et bbox)
-#         warning_percentile (float) : percentile pour définir le seuil warning (default=90)
-#         error_percentile (float) : percentile pour définir le seuil error (default=99)
-
-#     Returns:
-#         dict : {'BBOX_OVERFLOW_WARNING': float, 'BBOX_OVERFLOW_ERROR': float}
-#     """
-
-#     # Extraire toutes les bbox hors image
-#     outside_ratios = []
-
-#     # Parcours de toutes les images / bbox
-#     for img_name, bbox_list in zip(resultats.get('image_names', []), resultats.get('bbox_areas', [])):
-#         # On récupère outside_ratio_pct si déjà calculé
-#         for a in resultats.get('anomalies', []):
-#             if 'outside_ratio_pct' in a:
-#                 outside_ratios.append(a['outside_ratio_pct'])
-
-#     # Si aucune donnée, on retourne des seuils par défaut
-#     if not outside_ratios:
-#         print("Aucun outside_ratio_pct trouvé, utiliser des seuils par défaut")
-#         return {
-#             'BBOX_OVERFLOW_WARNING': ct.BBOX_OVERFLOW_WARNING,
-#             'BBOX_OVERFLOW_ERROR': ct.BBOX_OVERFLOW_ERROR
-#         }
-
-#     # Calcul des percentiles
-#     warning_value = np.percentile(outside_ratios, warning_percentile)
-#     error_value = np.percentile(outside_ratios, error_percentile)
-
-#     print(f" Calibration automatique des seuils :")
-#     print(f"  - Warning ({warning_percentile} percentile) : {warning_value:.2f}%")
-#     print(f"  - Error   ({error_percentile} percentile) : {error_value:.2f}%")
-
-#     return {
-#         'BBOX_OVERFLOW_WARNING': warning_value,
-#         'BBOX_OVERFLOW_ERROR': error_value
-#     }
 
 def calibrer_seuils_overflow(resultats, warning_percentile=90, error_percentile=99):
 
@@ -242,6 +195,7 @@ def get_path_color(prompt: str, color_key: str = 'input') -> Path:
 # Function to display and save problematic items
 # ------------------------------
 def display_and_save_errors(
+    path_user,    
     items: List[str],
     file_name: str,
     title: str,
@@ -257,7 +211,7 @@ def display_and_save_errors(
         title (str): Title to display
         sort (bool): Whether to sort items before displaying
         full_path (bool): Display/write full paths if True, else only file names
-        n_per_line (int): Number of items per line when printing
+
     """
 
     display = dc.DisplayColor()
@@ -269,6 +223,7 @@ def display_and_save_errors(
     if sort:
         items = sorted(items, key=lambda p: str(p))
 
+    # # Affichage de infos
     # display.print(f"{title}: {len(items)} item(s) detected", colors['warning'], bold=True)
     # for i in range(0, len(items), ct.n_per_line):
     #     line_items = items[i:i + ct.n_per_line]
@@ -277,15 +232,13 @@ def display_and_save_errors(
     
     # Save to file
     if ct.REPORT_MODE:
-        with open(file_name, "w") as f:
+        file_path = Path(path_user) / file_name
+        with open(file_path, "w") as f:
             for x in items:
                 f.write(str(x) if full_path else Path(x).name)
                 f.write("\n")
 
-        print(f"List saved to '{file_name}'\n")
-    # else:
-    #     print()
-
+        display.print(f"List saved to '{file_name}'\n", colors["warning"])
 
 
 def format_and_display_error(texte : str, rep= "") -> None  :
@@ -385,7 +338,7 @@ def afficher_distribution_classes(class_distribution, classes_par_ligne=4):
 
 
 
-def afficher_dataset_statistics(resultats):
+def afficher_dataset_statistics(resultats, path_user):
 
     display = dc.DisplayColor()
 
@@ -432,5 +385,44 @@ def afficher_dataset_statistics(resultats):
                 colors["warning"]
             )
 
+def save_anomalies_readable(anomalies, file_name, path_user):
+    """
+    Sauvegarde les anomalies dans un fichier texte lisible :
+    - Résumé des anomalies par type
+    - Images regroupées par type
+    - Plusieurs images par ligne (configurable via per_line)
+    """
+    
+    display = dc.DisplayColor()
+   
+    per_line = ct.n_per_line
 
+    # Regroupement par type
+    anomalies_by_type = defaultdict(set)
+    for a in anomalies:
+        typ = a.get("type")
+        img_name = os.path.basename(a.get("image", "unknown"))
+        if typ and img_name:
+            anomalies_by_type[typ].add(img_name)
 
+    # Tri alphabétique des images par type
+    for typ in anomalies_by_type:
+        anomalies_by_type[typ] = sorted(anomalies_by_type[typ])
+
+    output_path = Path(path_user, file_name)
+    with open(output_path, "w", encoding="utf-8") as f:
+        # --- Résumé ---
+        f.write("=== RÉSUMÉ DES ANOMALIES ===\n")
+        for typ, images in anomalies_by_type.items():
+            f.write(f"{typ}: {len(images)} image(s)\n")
+        f.write("\n")
+
+        # --- Détails par type ---
+        for typ, images in anomalies_by_type.items():
+            f.write(f"--- {typ} ---\n")
+            for i in range(0, len(images), per_line):
+                line_images = images[i:i+per_line]
+                f.write(" | ".join(line_images) + "\n")
+            f.write("\n")
+
+    display.print(f"List saved to '{file_name}'\n", colors["warning"])        

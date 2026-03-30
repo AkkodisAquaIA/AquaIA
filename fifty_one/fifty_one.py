@@ -1,21 +1,14 @@
 import os
 from pathlib import Path
-import time
 import torch
 from PIL import Image
 import numpy as np
-# from torchvision import transforms
-import timm
 from concurrent.futures import ThreadPoolExecutor
-# import faiss
+import faiss
 from tqdm import tqdm
-from yaspin import yaspin
 import random
 import tkinter as tk
 from PIL import Image, ImageTk, ImageDraw, ImageFont
-import time
-
-import matplotlib.pyplot as plt
 
 import fiftyone as fo
 from fiftyone import ViewField as F
@@ -32,12 +25,16 @@ from graphe import graphe as gr
 
 #==========================================================================================
 # ================= FONCTIONS =================
-
+  
     
  # image_path = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Image1.png"
-def splash_screen_circle(image_path, duration=2000, fade_steps=20):
+import tkinter as tk
+from PIL import Image, ImageTk, ImageDraw, ImageFont
+
+def splash_screen_circle(image_path, duration=2000):
     """
-    Splash screen circulaire en couleur avec texte Aqua-IA.
+    Splash screen circulaire avec un cercle extérieur clair
+    et texte centré foncé.
     """
     splash = tk.Tk()
     splash.overrideredirect(True)
@@ -45,22 +42,35 @@ def splash_screen_circle(image_path, duration=2000, fade_steps=20):
     transparent_color = "magenta"
     splash.configure(bg=transparent_color)
 
-    # --- Charger l'image et créer un cercle ---
-    image_path = "Image1.png"    
+    # --- Charger l'image ---
+    image_path = "Image1.png" 
     img = Image.open(image_path).convert("RGBA")
     size = min(img.width, img.height)
     img = img.resize((size, size))
 
-    # Masque circulaire
-    mask = Image.new("L", (size, size), 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((0, 0, size, size), fill=255)
-
-
+    # --- Créer image finale ---
     img_circle = Image.new("RGBA", (size, size), (0,0,0,0))
-    img_circle.paste(img, (0,0), mask=mask)
+    draw = ImageDraw.Draw(img_circle)
 
-    # Ajouter le texte "Aqua-IA" centré
+    # Couleurs
+    circle_color = (64, 224, 208, 255)  # Turquoise clair
+    text_color = (0, 102, 102, 255)     # Bleu-vert foncé
+
+    # Dessiner le cercle extérieur
+    border_width = size // 20
+    draw.ellipse((0, 0, size, size), fill=circle_color)
+
+    # Masque circulaire pour l'image
+    inner_size = size - 2*border_width
+    img_resized = img.resize((inner_size, inner_size))
+    mask_inner = Image.new("L", (inner_size, inner_size), 0)
+    draw_mask_inner = ImageDraw.Draw(mask_inner)
+    draw_mask_inner.ellipse((0,0,inner_size, inner_size), fill=255)
+
+    # Coller l'image centrée
+    img_circle.paste(img_resized, (border_width, border_width), mask_inner)
+
+    # Ajouter le texte centré
     draw_text = ImageDraw.Draw(img_circle)
     font_size = size // 8
     try:
@@ -71,10 +81,12 @@ def splash_screen_circle(image_path, duration=2000, fade_steps=20):
     bbox = draw_text.textbbox((0,0), text, font=font)
     w = bbox[2] - bbox[0]
     h = bbox[3] - bbox[1]
-    draw_text.text(((size-w)/2, (size-h)/2), text, font=font, fill=(0,204,153,255))
+    draw_text.text(((size-w)/2, (size-h)/2), text, font=font, fill=text_color)
 
+    # Conversion en image Tkinter
     photo = ImageTk.PhotoImage(img_circle)
 
+    # Affichage
     label = tk.Label(splash, image=photo, bg=transparent_color, bd=0)
     label.pack()
     splash.wm_attributes("-transparentcolor", transparent_color)
@@ -86,11 +98,8 @@ def splash_screen_circle(image_path, duration=2000, fade_steps=20):
     y = (screen_height - size) // 2
     splash.geometry(f"{size}x{size}+{x}+{y}")
 
-
-
-    splash.update()
-    fade_in(splash)
-    splash.after(duration, lambda: fade_out(splash, fade_steps))
+    # Afficher le splash screen pour la durée
+    splash.after(duration, splash.destroy)
     splash.mainloop()
 
 def fade_in(window, steps=40, delay=50):
@@ -231,7 +240,7 @@ def create_dataset(DATASET_DIR):
         display.print(f"Suppression du dataset existant '{dataset_name}'", colors['info'])
         fo.delete_dataset(dataset_name)    
 
-def statistique(DATASET_DIR):
+def statistique(DATASET_DIR, path_user):
      # ================= STATISTICS =================
     dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
     class_names = ds.load_class_names(dataset_yaml)
@@ -250,8 +259,7 @@ def statistique(DATASET_DIR):
     
     gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
 
-    ds.afficher_dataset_statistics(results, class_names, classes_par_ligne=3, afficher_hist=True)
-
+    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=3, afficher_hist=True)
 
 
 def maain():
@@ -273,16 +281,20 @@ def maain():
     torch.backends.cudnn.benchmark = False
 
 
-
-    # # Display du logo et infos système
     print()
+    # Display du logo et infos système
     splash_screen_circle("Image.png", duration=2500)
-
-    display.print(ct.logo, colors['aqua'])
+    display.print(ct.INFO_PROD, colors['aqua'])
 
     display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
+ 
+    path_user = ct.PATH_USER
+    if not os.path.exists(path_user):
+        path_user = Path.cwd()
+        display.print(f"Utilisation du répertoire de travail", colors["warning"])
+    status = f"ON : Sauvegarde dans :\n   {path_user}" if ct.REPORT_MODE else "OFF"
+    display.print(f"Report mode {status}.", colors['warning'])
 
-    display.print(f"Report mode {'ON' if ct.REPORT_MODE else 'OFF'}.", colors['warning'])
 
     prompt = (
             f"CUDA{'' if torch.cuda.is_available() else ' not'} available"
@@ -307,7 +319,7 @@ def maain():
 
     
     # validation des labels avant création du dataset FiftyOne
-    erreur, all_bboxes, rapport, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR)
+    erreur, all_bboxes, rapport, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_user)
  
     if not ctrl_ok:
         display.print(f"Erreurs détectées dans les labels. Arrêt du programme {ct.BELL}", colors['error'])
@@ -331,7 +343,7 @@ def maain():
         display.print("Aucune erreur de label détectée. Création du dataset FiftyOne...\n", colors['ok'])
         create_dataset(DATASET_DIR)
 
-        statistique(DATASET_DIR)
+        statistique(DATASET_DIR, path_user)
 
 
     print()

@@ -1,5 +1,3 @@
-# tools/display_color.py
-
 from typing import Tuple
 
 # A color spec is (red, green, blue, prefix_str)

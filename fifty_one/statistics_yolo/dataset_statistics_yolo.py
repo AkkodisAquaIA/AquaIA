@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 import yaml
 
 import tools.display_color as dc
+from tools import utility as util
 from tools import constants as ct
 from tools.constants import DISPLAY_COLORS as colors
 from graphe import graphe as gr
@@ -272,12 +273,20 @@ def afficher_stats_bbox(stats):
               f"|{'Min':^{col_width}}"
               f"|{'Max':^{col_width}}|")
 
+    def format_value(v, width):
+        if v == 0:
+            return f"{0:>{width}.4f}"
+        elif abs(v) < 1e-2:
+            return f"{v:>{width}.2e}"   # scientifique
+        else:
+            return f"{v:>{width}.4f}"   # normal
+
     def ligne_data(label, data):
         print(f"|{label:<{label_width}}"
-              f"|{data['mean']:>{col_width}.4f}"
-              f"|{data['std']:>{col_width}.4f}"
-              f"|{data['min']:>{col_width}.4f}"
-              f"|{data['max']:>{col_width}.4f}|")
+            f"|{format_value(data['mean'], col_width)}"
+            f"|{format_value(data['std'], col_width)}"
+            f"|{format_value(data['min'], col_width)}"
+            f"|{format_value(data['max'], col_width)}|")
 
     upper_line()
     ligne_header()
@@ -334,7 +343,7 @@ def afficher_tableau_croise_anomalies(resultats):
         print(" | ".join(f"{c:<{w}}" for c, w in zip(row, col_widths)))
 
 
-def afficher_dataset_statistics(resultats, class_names=None, classes_par_ligne=3, afficher_hist=False):
+def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_par_ligne=3, afficher_hist=False):
 
     display = dc.DisplayColor()
 
@@ -393,7 +402,6 @@ def afficher_dataset_statistics(resultats, class_names=None, classes_par_ligne=3
 
     # --- histogramme bbox ---
     if afficher_hist and bbox_areas:
-        
         gr.histograme(bbox_areas,
                       "Distribution des tailles de bounding boxes",
                       "Aire bbox",
@@ -401,7 +409,7 @@ def afficher_dataset_statistics(resultats, class_names=None, classes_par_ligne=3
                       )
 
     # --- anomalies ---------------------------------------------------------------
-        # regroupement anomalies par image et type
+    # regroupement anomalies par image et type
     anomaly_images = defaultdict(lambda: defaultdict(int))
     for a in anomalies:
         img = a["image"]
@@ -485,8 +493,6 @@ def afficher_dataset_statistics(resultats, class_names=None, classes_par_ligne=3
             line_parts.append(f"{row_sum:^{col_width}}")
             print(" | ".join(line_parts))      
 
-            # print(" | ".join(line_parts))
-
         # --- ligne de séparation ---
         print("-" * len(header))
 
@@ -511,7 +517,8 @@ def afficher_dataset_statistics(resultats, class_names=None, classes_par_ligne=3
         print(" | ".join(total_line))
     
 
-        # --- pire images ---
+        # --- pire images ----------------------------------------------
+        # pondération des erreurs
         weights = {
             "bbox_trop_petite": 1,
             "bbox_surface_trop_petite": 1,
@@ -565,15 +572,16 @@ def afficher_dataset_statistics(resultats, class_names=None, classes_par_ligne=3
         text = f"Total de bboxes problématiques : {total_bboxes_problematiques}"
         display.print(text, colors['warning'])
         
-        print(f"Score moyen du dataset : {dataset_score:.3f}")
-
+        print(f"Score moyen du dataset : {dataset_score:.3f}\n")
+        
         # --- histogramme anomalies par type ---
         if afficher_hist : 
             type_counts = Counter(a["type"] for a in anomalies)
             if type_counts:
-
                 gr.histo_multipl(type_counts,
                                  "Nombre",
-                                 anomalies)        
+                                 anomalies) 
 
-
+        # anomalies = resultats['anomalies'] après dataset_statistics_yolo
+        if ct.REPORT_MODE :
+            util.save_anomalies_readable(anomalies, "erreurs_dataset.txt", path_user)

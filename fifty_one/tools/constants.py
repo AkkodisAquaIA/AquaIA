@@ -1,14 +1,15 @@
 
 #==========================================================================================
 # Logo
-logo = r"""
-____________________________________________
-Analyse des micro-invertébrés aquatiques
-
-    Version : 0.05 Beta
-
-                   by AKKODIS-Research
-____________________________________________
+INFO_PROD = r"""
+┌────────────────────────────────────────────┐
+│  Indice macro-invertébrés par ADNe et IA   │  
+│       Agence de l'Eau Adour Garonne        │
+│                                            │
+│ Version : 0.05 Beta                        │
+│                                            │  
+│                        by AKKODIS-Research │
+└────────────────────────────────────────────┘
 """
 
 #-----------------------------------------------------------------------------------
@@ -34,7 +35,8 @@ DEBUG_MODE = False
 BELL = "\a"
 
 # required imports 
-REPORT_MODE  = False
+REPORT_MODE  = True
+PATH_USER = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Data/coco128"
 
 # Constants and configuration for the FiftyOne project
 BATCH_SIZE = 64
@@ -50,17 +52,17 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 IOU_THRESHOLD = 0.9
 
 # Bounding box size limits (relative to image dimensions) 
-MIN_BBOX =  0.009  # 0.00192189
-MAX_BBOX =  0.9    # 1
+MIN_BBOX =   0.00192186
+MAX_BBOX =   1
 
 # Bounding box area limits (relative to image area)
-MIN_BBOX_AREA = 0.00001 # MIN_BBOX ** 2 
-MAX_BBOX_AREA = 1       # MAX_BBOX ** 2
+MIN_BBOX_AREA = MIN_BBOX ** 2 
+MAX_BBOX_AREA = MAX_BBOX ** 2
 
 
 # percentiles erreur et warnig en %
 PERCILE_WARNING = 90
-PERCILE_ERROR   = 99.99
+PERCILE_ERROR   = 99
 
 # Valeur par défaut
 # Tolérance maximale avant d’émettre un warning (en %)

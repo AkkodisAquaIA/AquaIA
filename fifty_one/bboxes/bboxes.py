@@ -63,7 +63,7 @@ def round_coords(x, y, w, h, decimals=4):
 #-----------------------------------------------------------------------------------
 display = dc.DisplayColor()
 
-def validate_yolo_dataset_detailed(DATASET_DIR):
+def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
     labels_dir = os.path.join(DATASET_DIR, "labels", "train2017")
     images_dir = os.path.join(DATASET_DIR, "images", "train2017")
     split_pattern = re.compile(r"[,\s]+")
@@ -224,6 +224,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR):
     for key, values in erreurs_syntaxe.items():
         if values:
             util.display_and_save_errors(
+                path_user,
                 sorted(values),
                 f"{key}.txt",
                 key.replace("_", " ").capitalize()
