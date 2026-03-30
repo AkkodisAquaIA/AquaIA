@@ -1,6 +1,13 @@
 import cv2
 from pathlib import Path
-from utils import select_or_latest, load_yaml_from_result, collect_image_files, load_label_txt, xywh_norm_to_xyxy_norm
+from utils import (
+    select_or_latest,
+    load_yaml_from_result,
+    collect_image_files,
+    load_label_txt,
+    to_long_path,
+    xywh_norm_to_xyxy_norm,
+)
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 
@@ -57,7 +64,7 @@ if __name__ == "__main__":
 
         # Define and create the specific crop directory maintaining recursive structure
         crop_dir = det_dir / "crop_result" / rel_dir
-        crop_dir.mkdir(parents=True, exist_ok=True)
+        Path(to_long_path(crop_dir)).mkdir(parents=True, exist_ok=True)
 
         # For each detected box
         for i in range(labels.shape[0]):
@@ -83,7 +90,7 @@ if __name__ == "__main__":
             crop_filepath = crop_dir / crop_filename
 
             # Save the cropped image
-            cv2.imwrite(str(crop_filepath), crop_img)
+            cv2.imwrite(to_long_path(crop_filepath), crop_img)
             crop_count += 1
 
     print(f"\nCropping completed successfully!")

@@ -4,6 +4,10 @@ import numpy as np
 import yaml
 from ultralytics.utils.ops import xywh2xyxy
 
+def to_long_path(p: Path) -> str:
+    """Convert a Path to a long path string for Windows to handle paths longer than 260 characters."""
+    return "\\\\?\\" + str(p.resolve())
+
 def get_latest_result_dir(base_dir: Path) -> Path:
     """Return the newest [model]_result_det_YYYYMMDDHHmm folder directory under base_dir."""
     candidates = [
@@ -62,7 +66,8 @@ def load_label_txt(path: Path, with_conf: bool, conf_threshold: float | None = N
         return np.zeros((0, dim), dtype=np.float32)
 
     # If file is empty, return empty array
-    txt = path.read_text(encoding="utf-8").strip()
+    with open(to_long_path(path), encoding="utf-8") as f:
+        txt = f.read().strip()
     if not txt:
         return np.zeros((0, dim), dtype=np.float32)
 

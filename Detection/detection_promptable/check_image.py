@@ -2,7 +2,7 @@ import hashlib
 import shutil
 from collections import defaultdict
 from pathlib import Path
-from utils import collect_image_files, select_or_latest
+from utils import to_long_path, collect_image_files, select_or_latest
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 
@@ -15,7 +15,8 @@ def get_source_stem(stem: str) -> str:
 
 def file_sha256(path: Path) -> str:
     """Return the SHA256 hash of a file."""
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    with open(to_long_path(path), "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
 
 def collect_crop_groups(crop_dir: Path) -> dict[tuple[str, str, str, str], list[Path]]:
     """Collect crop images and group them by comparison key."""
@@ -37,11 +38,8 @@ def copy_with_structure(crop_dir: Path, rel_paths: list[Path], output_dir: Path)
     for rel_path in rel_paths:
         src = (crop_dir / rel_path).resolve()
         dst = (output_dir / rel_path).resolve()
-        # Use extended-length path prefix to handle long paths on Windows
-        src_str = "\\\\?\\" + str(src)
-        dst_str = "\\\\?\\" + str(dst)
-        Path(dst_str).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src_str, dst_str)
+        Path(to_long_path(dst.parent)).mkdir(parents=True, exist_ok=True)
+        shutil.copy2(to_long_path(src), to_long_path(dst))
 
 def get_unmatched_rel_paths(
     ref_groups: dict[tuple[str, str, str, str], list[Path]],

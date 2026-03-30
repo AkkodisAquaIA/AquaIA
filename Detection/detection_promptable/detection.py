@@ -6,7 +6,7 @@ import torch
 from ultralytics.models.sam import SAM3SemanticPredictor
 from ultralytics import YOLOE
 from ultralytics.utils.nms import TorchNMS
-from utils import collect_image_files
+from utils import to_long_path, collect_image_files
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
@@ -106,7 +106,7 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_so
     # Always create the label file; keep it empty if no boxes detected
     label_path = labels_folder / f"{Path(img_path).stem}.txt"
     if result.boxes is None or result.boxes.shape[0] == 0:
-        label_path.open("w").close()
+        open(to_long_path(label_path), "w").close()
         return
 
     xywh = result.boxes.xywh.cpu().numpy()
@@ -124,7 +124,7 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_so
         dataset_bboxes_norm.append([cx / img_w, cy / img_h, w / img_w, h / img_h])
 
     # Write to label file
-    with label_path.open("w") as f:
+    with open(to_long_path(label_path), "w") as f:
         for cid, bbox, score in zip(dataset_ids, dataset_bboxes_norm, conf):
             f.write(f"{cid} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f} {score:.6f}\n")
 
@@ -186,7 +186,7 @@ if __name__ == "__main__":
             rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))   # Image folder name
             vis_dir = run_dir / "detection_result" / rel_dir
             label_dir = vis_dir / "labels"
-            label_dir.mkdir(parents=True, exist_ok=True)
+            Path(to_long_path(label_dir)).mkdir(parents=True, exist_ok=True)
             predictor.set_image(str(img_path))
 
             # Print device info (only once)
@@ -247,7 +247,7 @@ if __name__ == "__main__":
             rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))
             vis_dir = run_dir / "detection_result" / rel_dir
             label_dir = vis_dir / "labels"
-            label_dir.mkdir(parents=True, exist_ok=True)
+            Path(to_long_path(label_dir)).mkdir(parents=True, exist_ok=True)
 
             # Print device info (only once)
             info_device = print_device_info(model, info_device)
