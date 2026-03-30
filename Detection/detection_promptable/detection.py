@@ -143,9 +143,12 @@ if __name__ == "__main__":
     run_dir = Path(PARENT_FOLDER) / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    # Folder to save non-visualisation files
+    (run_dir / "docs_run").mkdir(parents=True, exist_ok=True)
+
     # Copy config files to run_dir for record-keeping
-    shutil.copy2(CFG_PATH, run_dir / CFG_PATH.name)
-    shutil.copy2(DATASET_DICT_PATH, run_dir / DATASET_DICT_PATH.name)
+    shutil.copy2(CFG_PATH, run_dir / "docs_run" / CFG_PATH.name)
+    shutil.copy2(DATASET_DICT_PATH, run_dir / "docs_run" / DATASET_DICT_PATH.name)
 
     # Text prompts (string) sourced from the dataset dictionary (sorted for stable order)
     text_prompts = [DATASET_DICT[idx] for idx in sorted(DATASET_DICT.keys())]
@@ -181,7 +184,7 @@ if __name__ == "__main__":
         # For each image
         for index, img_path in enumerate(image_files, start=1):
             rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))   # Image folder name
-            vis_dir = run_dir / rel_dir
+            vis_dir = run_dir / "detection_result" / rel_dir
             label_dir = vis_dir / "labels"
             label_dir.mkdir(parents=True, exist_ok=True)
             predictor.set_image(str(img_path))
@@ -242,7 +245,7 @@ if __name__ == "__main__":
         for result in results:
             img_path = Path(result.path)
             rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))
-            vis_dir = run_dir / rel_dir
+            vis_dir = run_dir / "detection_result" / rel_dir
             label_dir = vis_dir / "labels"
             label_dir.mkdir(parents=True, exist_ok=True)
 

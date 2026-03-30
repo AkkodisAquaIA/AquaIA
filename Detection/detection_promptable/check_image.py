@@ -33,7 +33,7 @@ def collect_crop_groups(crop_dir: Path) -> dict[tuple[str, str, str, str], list[
     return crop_groups
 
 def copy_with_structure(crop_dir: Path, rel_paths: list[Path], output_dir: Path) -> None:
-    """Copy images while preserving the directory structure under 00crop."""
+    """Copy images while preserving the directory structure under crop_result."""
     for rel_path in rel_paths:
         target_path = output_dir / rel_path
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -66,9 +66,9 @@ if __name__ == "__main__":
     det_dir_ref = select_or_latest(PARENT_FOLDER, "Select REFERENCE result_det folder")
     det_dir = select_or_latest(PARENT_FOLDER, "Select CURRENT result_det folder")
 
-    # Get the 00crop subdirectories
-    crop_dir_ref = det_dir_ref / "00crop"
-    crop_dir = det_dir / "00crop"
+    # Get the crop_result subdirectories
+    crop_dir_ref = det_dir_ref / "crop_result"
+    crop_dir = det_dir / "crop_result"
 
     # Collect crop groups for both reference and current
     ref_groups = collect_crop_groups(crop_dir_ref)

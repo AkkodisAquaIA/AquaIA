@@ -7,7 +7,7 @@ PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 
 def load_dataset_dict(det_dir: Path) -> dict[int, str]:
     """Load class-id to class-name mapping from the selected result folder."""
-    dataset_dict_path = det_dir / "dataset_dict.yaml"
+    dataset_dict_path = det_dir / "docs_run" / "dataset_dict.yaml"
     if not dataset_dict_path.exists():
         print(f"Warning: Dataset dict file not found at: {dataset_dict_path}")
         return {}
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     dataset_dict = load_dataset_dict(det_dir)
 
     # Recursively find all labels folders under the selected result folder
-    label_dirs = sorted(label_dir for label_dir in det_dir.rglob("labels")
+    label_dirs = sorted(label_dir for label_dir in (det_dir / "detection_result").rglob("labels")
         if label_dir.is_dir())
 
     class_counts = Counter()

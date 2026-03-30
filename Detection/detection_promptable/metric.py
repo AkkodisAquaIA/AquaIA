@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
     # Read config file to get CONF
     cfg_conf = None
-    cfg_path = det_dir / "model_cfg.yaml"
+    cfg_path = det_dir / "docs_run" / "model_cfg.yaml"
     if cfg_path.exists():
         cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
         model_name = cfg_data.get("MODEL_NAME")
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     if det_conf_threshold is not None:
         suffix = f"_conf{int(round(det_conf_threshold * 100)):03d}"
 
-    det_labels_folder = det_dir / "labels"
+    det_labels_folder = det_dir / "detection_result" / "labels"
     gt_labels_folder = Path(str(IMAGES_FOLDER).replace("images", "labels"))
 
     out = evaluate_two_folders_intersection(

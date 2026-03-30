@@ -10,7 +10,7 @@ if __name__ == "__main__":
     det_dir = select_or_latest(base_dir=PARENT_FOLDER, title="Select result_det folder (Cancel to use latest)")
 
     # Read config file
-    cfg_path = det_dir / "model_cfg.yaml"
+    cfg_path = det_dir / "docs_run" / "model_cfg.yaml"
     cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     images_folder = cfg_data["IMAGES_FOLDER"]
 
@@ -31,8 +31,8 @@ if __name__ == "__main__":
         # Count total images for subfolder
         subfolder_total_counts[subfolder_name] += 1
 
-        # In detection_entry.py, labels are saved in: run_dir (here det_dir) / rel_dir / "labels"
-        label_dir = det_dir / rel_dir / "labels"
+        # In detection.py, labels are saved in: run_dir (here det_dir) / "detection_result" / rel_dir / "labels"
+        label_dir = det_dir / "detection_result" / rel_dir / "labels"
         label_path = label_dir / f"{img_path.stem}.txt"
 
         # Skip if label file does not exist
