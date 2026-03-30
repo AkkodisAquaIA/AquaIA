@@ -42,7 +42,7 @@ if __name__ == "__main__":
             classes = labels[:, 0].astype(int)
             class_counts.update(classes.tolist())
 
-    output_path = det_dir / "class_count.txt"
+    output_path = det_dir / "docs_run" / "class_count.txt"
     with output_path.open("w", encoding="utf-8") as f:
         f.write("Predicted class counts:\n")
         f.write("(Class ID, Class name, Count)\n")

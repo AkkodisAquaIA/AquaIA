@@ -88,7 +88,7 @@ Notes:
 - If `dataset_dict.yaml` exists in `<result_dir>/docs_run/`, class names are included in the output.
 
 Output:
-- A summary file `class_count.txt` is saved inside the selected result folder.
+- A summary file `class_count.txt` is saved inside the selected result folder's `docs_run/` folder.
 - Format includes `Class ID, Class name, Count` and predicted boxes.
 
 ## 7. Compare crop outputs (check_image.py)
