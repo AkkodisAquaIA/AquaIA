@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 import numpy as np
+import yaml
 from ultralytics.utils.ops import xywh2xyxy
 
 def get_latest_result_dir(base_dir: Path) -> Path:
@@ -28,6 +29,16 @@ def select_or_latest(base_dir: Path, title: str) -> Path:
     root.destroy()
     det_dir = Path(chosen_dir) if chosen_dir else get_latest_result_dir(base_dir)
     return det_dir
+
+def load_yaml_from_result(det_dir: Path) -> tuple[dict, str, dict[int, str]]:
+    """Load config and dataset metadata from docs_run inside a result folder."""
+    cfg_path = det_dir / "docs_run" / "model_cfg.yaml"
+    cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    images_folder = cfg_data["IMAGES_FOLDER"]
+    dataset_dict_path = det_dir / "docs_run" / "dataset_dict.yaml"
+    dataset_dict_raw = yaml.safe_load(dataset_dict_path.read_text(encoding="utf-8"))
+    dataset_dict = {int(key): value for key, value in dataset_dict_raw.items()}
+    return cfg_data, images_folder, dataset_dict
 
 def collect_image_files(base_dir: str | Path, stage: str = "processing") -> tuple[list[Path], int]:
     """Collect image files recursively and print summary."""

@@ -1,7 +1,6 @@
 import cv2
 from pathlib import Path
-import yaml
-from utils import select_or_latest, collect_image_files, load_label_txt, xywh_norm_to_xyxy_norm
+from utils import select_or_latest, load_yaml_from_result, collect_image_files, load_label_txt, xywh_norm_to_xyxy_norm
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 
@@ -10,12 +9,7 @@ if __name__ == "__main__":
     det_dir = select_or_latest(base_dir=PARENT_FOLDER, title="Select result_det folder (Cancel to use latest)")
 
     # Read config files
-    cfg_path = det_dir / "docs_run" / "model_cfg.yaml"
-    cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-    images_folder = cfg_data["IMAGES_FOLDER"]
-    dataset_dict_path = det_dir / "docs_run" / "dataset_dict.yaml"
-    dataset_dict_raw = yaml.safe_load(dataset_dict_path.read_text(encoding="utf-8"))
-    dataset_dict = {int(key): value for key, value in dataset_dict_raw.items()}
+    _, images_folder, dataset_dict = load_yaml_from_result(det_dir)
 
     # All images in IMAGES_FOLDER (recursive)
     image_files, _ = collect_image_files(images_folder, stage="cropping")

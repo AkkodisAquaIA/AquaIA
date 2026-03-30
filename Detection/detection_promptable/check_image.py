@@ -35,9 +35,13 @@ def collect_crop_groups(crop_dir: Path) -> dict[tuple[str, str, str, str], list[
 def copy_with_structure(crop_dir: Path, rel_paths: list[Path], output_dir: Path) -> None:
     """Copy images while preserving the directory structure under crop_result."""
     for rel_path in rel_paths:
-        target_path = output_dir / rel_path
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(crop_dir / rel_path, target_path)
+        src = (crop_dir / rel_path).resolve()
+        dst = (output_dir / rel_path).resolve()
+        # Use extended-length path prefix to handle long paths on Windows
+        src_str = "\\\\?\\" + str(src)
+        dst_str = "\\\\?\\" + str(dst)
+        Path(dst_str).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_str, dst_str)
 
 def get_unmatched_rel_paths(
     ref_groups: dict[tuple[str, str, str, str], list[Path]],

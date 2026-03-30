@@ -1,24 +1,15 @@
 from collections import Counter
 from pathlib import Path
-import yaml
-from utils import select_or_latest, load_label_txt
+from utils import select_or_latest, load_yaml_from_result, load_label_txt
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
-
-def load_dataset_dict(det_dir: Path) -> dict[int, str]:
-    """Load class-id to class-name mapping from the selected result folder."""
-    dataset_dict_path = det_dir / "docs_run" / "dataset_dict.yaml"
-    if not dataset_dict_path.exists():
-        print(f"Warning: Dataset dict file not found at: {dataset_dict_path}")
-        return {}
-
-    dataset_dict_raw = yaml.safe_load(dataset_dict_path.read_text(encoding="utf-8")) or {}
-    return {int(k): v for k, v in dataset_dict_raw.items()}
 
 if __name__ == "__main__":
     # Select result_det folder or automatically use the latest one
     det_dir = select_or_latest(base_dir=PARENT_FOLDER, title="Select result_det folder (Cancel to use latest)")
-    dataset_dict = load_dataset_dict(det_dir)
+
+    # Read config files
+    _, _, dataset_dict = load_yaml_from_result(det_dir)
 
     # Recursively find all labels folders under the selected result folder
     label_dirs = sorted(label_dir for label_dir in (det_dir / "detection_result").rglob("labels")
