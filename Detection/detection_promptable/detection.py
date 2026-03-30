@@ -224,7 +224,7 @@ if __name__ == "__main__":
         model.set_classes(text_prompts, model.get_text_pe(text_prompts))
 
         # Write all image paths to a txt file for efficient processing
-        imgpath_dir = run_dir / "imgpath.txt"
+        imgpath_dir = run_dir / "docs_run" / "yolo_imgpath.txt"
         with imgpath_dir.open("w", encoding="utf-8") as f:
             for img_path in image_files:
                 f.write(f"{img_path}\n")

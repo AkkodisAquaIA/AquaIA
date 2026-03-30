@@ -78,7 +78,7 @@ if __name__ == "__main__":
     extra_rel_paths, missing_rel_paths = get_unmatched_rel_paths(ref_groups, cur_groups)
 
     # Prepare comparison directories and copy unmatched images
-    compare_dir = det_dir / "00check_image"
+    compare_dir = det_dir / "check_image_result"
     extra_dir = compare_dir / "ref+"
     missing_dir = compare_dir / "ref-"
 
@@ -96,4 +96,4 @@ if __name__ == "__main__":
     summary_text = "\n".join(summary_lines)
 
     print(f"\n{summary_text}")
-    (compare_dir / "chek_image.txt").write_text(summary_text + "\n", encoding="utf-8")
+    (det_dir / "docs_run" / "chek_image.txt").write_text(summary_text + "\n", encoding="utf-8")

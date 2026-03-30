@@ -198,6 +198,6 @@ if __name__ == "__main__":
 
     # Save metrics to txt file
     metrics_txt = "\n".join(f"{key}: {out.get(key)}" for key in keys)
-    metrics_path = det_dir / f"metrics{suffix}.txt"
+    metrics_path = det_dir / "docs_run" / f"metrics{suffix}.txt"
     metrics_path.write_text(metrics_txt + "\n", encoding="utf-8")
     print(f"Saved metrics to {metrics_path}")

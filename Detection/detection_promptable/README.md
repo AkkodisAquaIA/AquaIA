@@ -47,7 +47,8 @@ Notes:
 - Saves detection visualizations and labels under `detection_promptable/[MODEL]_result_det_YYYYMMDDHHmm/detection_result/`.
 - If images are directly under `IMAGES_FOLDER`, labels are in `.../detection_result/labels`.
 - If images are in subfolders, output mirrors subfolder structure under `detection_result/` (each subfolder has its own `labels` folder).
-- Copies `model_cfg.yaml` and `dataset_dict.yaml` into the result folder for traceability.
+- Copies `model_cfg.yaml` and `dataset_dict.yaml` into `<result_dir>/docs_run/` for traceability.
+- For `yoloe26`, the generated `yolo_imgpath.txt` is saved in `<result_dir>/docs_run/`.
 
 Notes:
 - Label format (per image, normalized): cls cx cy w h conf
@@ -75,7 +76,7 @@ Notes:
 - Missing label files are reported as warnings and skipped.
 
 Output:
-- A summary file `results_statistics_detection.csv` is saved inside the selected result folder, under `detection_result/`.
+- A summary file `results_statistics_detection.csv` is saved inside the selected result folder's `docs_run/` folder.
 - Format includes per-subfolder counts with columns `Subfolder, No detection, Total, Crop boxes`, plus a `TOTAL` line.
 
 ## 6. Count predicted classes (count_class.py)
@@ -105,11 +106,11 @@ Notes:
 - This means crops with the same source image stem but different content are treated as different images.
 
 Output:
-- A folder `<current_result_dir>/00check_image/` is created.
+- A folder `<current_result_dir>/check_image_result/` is created.
 - `ref+` contains crops present in `CURRENT` but not matched in `REFERENCE`.
 - `ref-` contains crops present in `REFERENCE` but not matched in `CURRENT`.
 - Original directory structure under `crop_result` is preserved in both output folders.
-- A summary file `chek_image.txt` is saved in `00check_image/`.
+- A summary file `chek_image.txt` is saved in the selected result folder's `docs_run/` folder.
 
 ## 8. Evaluate metrics (metric.py)
 `metric.py` compares predictions to ground-truth labels and outputs:
@@ -126,4 +127,4 @@ Notes:
 
 Output:
 - Metrics are printed to console.
-- Metrics are saved to `metrics[_confXXX].txt` inside the selected result folder.
+- Metrics are saved to `metrics[_confXXX].txt` inside the selected result folder's `docs_run/` folder.
