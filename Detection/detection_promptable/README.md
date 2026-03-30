@@ -27,7 +27,7 @@ Key settings:
 - `yoloe26`: `CONF`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `BATCH`, `NMS_CLS`, `NMS_GLB`, `UNIC`.
 
 Notes:
-- The config is loaded from YAML by both `detection_entry.py` and `metric.py`.
+- The config is loaded from YAML by both `detection.py` and `metric.py`.
 - `NMS_CLS` in this project is **not** the native model NMS. It is a custom per-class NMS applied after inference:
 - Set `NMS_CLS` to a float IoU threshold (e.g., `0.7`) to enable.
 - Set `NMS_CLS` to `False` to disable.
