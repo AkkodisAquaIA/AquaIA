@@ -104,7 +104,7 @@ Output:
 - `ref+` contains crops present in `CURRENT` but not matched in `REFERENCE`.
 - `ref-` contains crops present in `REFERENCE` but not matched in `CURRENT`.
 - Original directory structure under `crop_result` is preserved in both output folders.
-- A summary file `chek_image.txt` is saved in the selected result folder's `docs_run/` folder.
+- A summary file `check_image.txt` is saved in the selected result folder's `docs_run/` folder.
 
 ## 8. Evaluate metrics (metric.py)
 `metric.py` compares predictions to ground-truth labels and outputs:
