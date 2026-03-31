@@ -222,13 +222,6 @@ def display_and_save_errors(
 
     if sort:
         items = sorted(items, key=lambda p: str(p))
-
-    # # Affichage de infos
-    # display.print(f"{title}: {len(items)} item(s) detected", colors['warning'], bold=True)
-    # for i in range(0, len(items), ct.n_per_line):
-    #     line_items = items[i:i + ct.n_per_line]
-    #     line = " | ".join(str(x) if full_path else Path(x).name for x in line_items)
-    #     print(line)
     
     # Save to file
     if ct.REPORT_MODE:
@@ -390,13 +383,11 @@ def save_anomalies_readable(anomalies, file_name, path_user):
     Sauvegarde les anomalies dans un fichier texte lisible :
     - Résumé des anomalies par type
     - Images regroupées par type
-    - Plusieurs images par ligne (configurable via per_line)
+    - Plusieurs images par ligne (configurable via ct.N_PER_LINE)
     """
     
     display = dc.DisplayColor()
-   
-    per_line = ct.n_per_line
-
+    
     # Regroupement par type
     anomalies_by_type = defaultdict(set)
     for a in anomalies:
@@ -420,8 +411,8 @@ def save_anomalies_readable(anomalies, file_name, path_user):
         # --- Détails par type ---
         for typ, images in anomalies_by_type.items():
             f.write(f"--- {typ} ---\n")
-            for i in range(0, len(images), per_line):
-                line_images = images[i:i+per_line]
+            for i in range(0, len(images), ct.N_PER_LINE):
+                line_images = images[i:i+ ct.N_PER_LINE]
                 f.write(" | ".join(line_images) + "\n")
             f.write("\n")
 

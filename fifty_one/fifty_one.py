@@ -31,7 +31,7 @@ from graphe import graphe as gr
 import tkinter as tk
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 
-def splash_screen_circle(image_path, duration=2000):
+def splash_screen_circle(image_path, duration=3000):
     """
     Splash screen circulaire avec un cercle extérieur clair
     et texte centré foncé.
@@ -39,6 +39,9 @@ def splash_screen_circle(image_path, duration=2000):
     splash = tk.Tk()
     splash.overrideredirect(True)
     splash.attributes("-topmost", True)
+
+    splash.attributes("-alpha", 0.0)
+
     transparent_color = "magenta"
     splash.configure(bg=transparent_color)
 
@@ -98,11 +101,13 @@ def splash_screen_circle(image_path, duration=2000):
     y = (screen_height - size) // 2
     splash.geometry(f"{size}x{size}+{x}+{y}")
 
+    splash.after(10, lambda: fade_in(splash, steps=60, delay=30))
+    
     # Afficher le splash screen pour la durée
-    splash.after(duration, splash.destroy)
+    splash.after(duration, lambda: fade_out(splash, steps=40))
     splash.mainloop()
 
-def fade_in(window, steps=40, delay=50):
+def fade_in(window, steps=60, delay=30):
     alpha = 0.0
     window.attributes("-alpha", alpha)
 
@@ -247,8 +252,8 @@ def statistique(DATASET_DIR, path_user):
 
     results = ds.dataset_statistics_yolo(DATASET_DIR)
     seuils = util.calibrer_seuils_overflow(results,
-                                            warning_percentile=ct.PERCILE_WARNING, 
-                                            error_percentile=ct.PERCILE_ERROR)
+                                            warning_percentile=ct.PERCENTILE_WARNING, 
+                                            error_percentile=ct.PERCENTILE_ERROR)
     
     BBOX_OVERFLOW_WARNING = seuils['BBOX_OVERFLOW_WARNING']
     BBOX_OVERFLOW_ERROR   = seuils['BBOX_OVERFLOW_ERROR']
@@ -259,7 +264,7 @@ def statistique(DATASET_DIR, path_user):
     
     gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
 
-    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=3, afficher_hist=True)
+    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=True)
 
 
 def maain():
@@ -280,28 +285,30 @@ def maain():
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-
-    print()
+    
     # Display du logo et infos système
-    splash_screen_circle("Image.png", duration=2500)
+    print()
+    splash_screen_circle("Image.png", duration=3000)
     display.print(ct.INFO_PROD, colors['aqua'])
 
+    # Affichge du mode de débugage
     display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
  
-    path_user = ct.PATH_USER
-    if not os.path.exists(path_user):
-        path_user = Path.cwd()
-        display.print(f"Utilisation du répertoire de travail", colors["warning"])
-    status = f"ON : Sauvegarde dans :\n   {path_user}" if ct.REPORT_MODE else "OFF"
-    display.print(f"Report mode {status}.", colors['warning'])
-
-
+    # Affichage type de device utilisé
     prompt = (
             f"CUDA{'' if torch.cuda.is_available() else ' not'} available"
             f" - Running on {'GPU' if torch.cuda.is_available() else 'CPU'}.\n"
         )
     display.print(prompt, colors['warning'])
 
+    # Affichage si mode de rapport actif
+    path_user = ct.PATH_USER
+    if not os.path.exists(path_user):
+        path_user = Path.cwd()
+        display.print(f"Utilisation du répertoire de travail", colors["warning"])
+    status = f"ON : Sauvegarde dans :\n    {path_user}" if ct.REPORT_MODE else "OFF"
+    display.print(f"Report mode {status}.\n", colors['warning'])
+ 
 
     if ct.TEST_MODE :
         # Pour les simulation 
@@ -340,7 +347,7 @@ def maain():
         util.afficher_bbox_erreurs_compact(erreur)
      
     else:    
-        display.print("Aucune erreur de label détectée. Création du dataset FiftyOne...\n", colors['ok'])
+        display.print("Aucune erreur de label détectée. Analyse du Dataset...\n", colors['ok'])
         create_dataset(DATASET_DIR)
 
         statistique(DATASET_DIR, path_user)

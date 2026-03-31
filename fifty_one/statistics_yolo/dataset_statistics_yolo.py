@@ -1,9 +1,11 @@
 
 import os
 import re
+from networkx import display
 import numpy as np
 from pathlib import Path
 from collections import Counter, defaultdict
+from sklearn import metrics
 import yaml
 
 import tools.display_color as dc
@@ -37,7 +39,174 @@ def compute_stats(values):
         "max": float(np.max(arr))
     }
 
+def imbalance_metrics(class_distribution):
+    counts = np.array(list(class_distribution.values()))
+    total = np.sum(counts)
 
+    # probabilités
+    p = counts / total
+
+    # ratio
+    ratio = np.max(counts) / np.min(counts)
+
+    # entropie
+    entropy = -np.sum(p * np.log(p + 1e-9))
+    max_entropy = np.log(len(counts))
+    entropy_norm = entropy / max_entropy
+
+    return {
+        "ratio": ratio,
+        "entropy": entropy,
+        "entropy_norm": entropy_norm
+    }
+
+
+def compute_global_score(ratio, entropy_norm):
+    """
+    Score global 0 → 100
+    """
+    # ratio pénalisé (log pour éviter explosion)
+    ratio_score = max(0, 1 - (np.log10(ratio) / 3))  # ratio ~1000 → 0
+
+    # entropie directe
+    entropy_score = entropy_norm
+
+    # pondération
+    score = (0.6 * entropy_score + 0.4 * ratio_score) * 100
+
+    return max(0, min(100, score))
+
+def draw_bar(value, vmin, vmax, length=40):
+    """
+    Barre visuelle normalisée
+    """
+    ratio = (value - vmin) / (vmax - vmin)
+    ratio = max(0, min(1, ratio))
+
+    filled = int(ratio * length)
+    empty = length - filled
+
+    scale = "█" * filled + "░" * empty
+    print(f"{'':25}  {scale}\n")
+
+def evaluate_metric(
+    label,
+    value,
+    thresholds,
+    statuses,
+    colors_map,
+    bar_min,
+    bar_max,
+    display,
+    higher_is_better=True,
+    value_format="8.2f",
+    suffix=""
+):
+    warning_th, ok_th = thresholds
+    error_status, warning_status, ok_status = statuses
+
+    if higher_is_better:
+        if value >= ok_th:
+            status = ok_status
+            color = colors_map["ok"]
+        elif value >= warning_th:
+            status = warning_status
+            color = colors_map["warning"]
+        else:
+            status = error_status
+            color = colors_map["error"]
+    else:
+        # ✅ Cas inverse (ex: ratio)
+        if value <= ok_th:
+            status = ok_status
+            color = colors_map["ok"]
+        elif value <= warning_th:
+            status = warning_status
+            color = colors_map["warning"]
+        else:
+            status = error_status
+            color = colors_map["error"]
+
+    print(f"{label:25}: {value:{value_format}}{suffix}   ", end="")
+    display.print(status, color)
+    draw_bar(value, bar_min, bar_max)
+
+
+def afficher_imbalance_avance(metrics, display, colors):
+
+    ratio = float(metrics["ratio"])
+    entropy_norm = float(metrics["entropy_norm"])
+
+    print("\n---------------- DATASET IMBALANCE ----------------\n")
+
+    # --- RATIO (plus petit = mieux) ---
+    evaluate_metric(
+    label="Ratio max/min",
+    value=min(ratio, 300),
+    thresholds=(ct.RATIO_WARNING, ct.RATIO_OK),
+    statuses=("Très déséquilibré", "Déséquilibré", "Équilibré"),
+    colors_map=colors,
+    bar_min=1,
+    bar_max=300,
+    display=display,
+    higher_is_better=False
+)
+
+    # --- ENTROPIE (plus grand = mieux) ---
+    evaluate_metric(
+    label="Entropie normalisée",
+    value=entropy_norm,
+    thresholds=(ct.ENTROPY_WARNING, ct.ENTROPY_OK),
+    statuses=("Déséquilibré", "Moyennement équilibré", "Équilibré"),
+    colors_map=colors,
+    bar_min=0,
+    bar_max=1,
+    display=display,
+    higher_is_better=True
+)
+
+    # --- SCORE GLOBAL ---
+    score = compute_global_score(ratio, entropy_norm)
+
+    evaluate_metric(
+        label="Score global",
+        value=score,
+        thresholds=(ct.SCORE_WARNING, ct.SCORE_OK),
+        statuses=("Faible", "Moyen", "Bon"),
+        colors_map=colors,
+        bar_min=0,
+        bar_max=100,
+        value_format="6.1f",
+        suffix=" / 100",
+        display=display,
+        higher_is_better=True
+    )
+
+    # --- DIAGNOSTIC ---
+    print("Diagnostic :")
+
+    if ratio > 100:
+        print("- Dataset très déséquilibré (ratio élevé)")
+
+    if entropy_norm < 0.7:
+        print("- Distribution globale déséquilibrée")
+
+    if entropy_norm > 0.75 and ratio > 100:
+        print("- Beaucoup de classes rares malgré une diversité correcte")
+
+    # --- RECOMMANDATIONS ---
+    print("\nRecommandations :")
+
+    if ratio > 100:
+        print("- Augmenter les classes très rares (< 1%)")
+
+    if entropy_norm < 0.7:
+        print("- Rééquilibrer globalement le dataset")
+
+    print("- Utiliser data augmentation ciblée")
+    print("- Envisager un sampling équilibré")
+
+    print("--------------------------------------------------\n")
 
 def dataset_statistics_yolo(DATASET_DIR):
 
@@ -264,8 +433,6 @@ def afficher_stats_bbox(stats):
               "┴" + "─" * col_width +
               "┴" + "─" * col_width + "┘")
 
-
-
     def ligne_header():
         print(f"|{'':<{label_width}}"
               f"|{'Mean':^{col_width}}"
@@ -297,7 +464,6 @@ def afficher_stats_bbox(stats):
     ligne_data("Area", stats["bbox_area"])
 
     down_line()
-
 
 def verifier_classes_dataset(class_distribution, class_names):
     n_classes = len(class_names)
@@ -343,7 +509,7 @@ def afficher_tableau_croise_anomalies(resultats):
         print(" | ".join(f"{c:<{w}}" for c, w in zip(row, col_widths)))
 
 
-def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_par_ligne=3, afficher_hist=False):
+def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_par_ligne=4, afficher_hist=False):
 
     display = dc.DisplayColor()
 
@@ -368,6 +534,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     afficher_stats_bbox(stats)
 
     # --- Vérification YAML ---
+    missing_label  = False
     if class_names:
         verif = verifier_classes_dataset(class_distribution, class_names)
         # Classes inutilisées
@@ -381,7 +548,8 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         # Classes manquantes
         if verif["manquantes"]:
             print("")
-            display.print(f"Classes présentes dans labels mais absentes du YAML ({len(verif['manquantes'])}) : ", colors["error"])
+            missing_label  = True
+            display.print(f"Classes présentes dans labels mais absentes du YAML ({len(verif['manquantes'])}) : ", colors["warning"])
             manquantes = [str(cls) for cls in sorted(verif["manquantes"])]
             max_width = max(len(t) for t in manquantes) + 2
             for i in range(0, len(manquantes), 5):
@@ -400,6 +568,44 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     for i in range(0, len(ligne_texts), classes_par_ligne):
         print(" | ".join(f"{t:<{max_width}}" for t in ligne_texts[i:i+classes_par_ligne]))
 
+    # --- classes sous-représentées ---------------------------
+    if ct.SEUIL_PCT is not None:
+        classes_faibles = []
+        print()
+        for cls, count in items:
+            pct = (count / total) * 100
+            if pct < ct.SEUIL_PCT:
+                name = class_names[cls] if class_names and cls < len(class_names) else f"UNKNOWN_{cls}"
+                classes_faibles.append((cls, name, count, pct))
+
+        if not classes_faibles:
+            display.print(f"Aucune classe sous {ct.SEUIL_PCT}% ", colors['ok'])
+        else:
+            message = f"------- CLASSES SOUS-REPRÉSENTÉES < {ct.SEUIL_PCT}% -------"
+            display.print(message, colors['warning'])
+            # tri optionnel (du pire au moins pire)
+            classes_faibles.sort(key=lambda x: x[3])  # tri par %
+
+            # --- regroupement par pourcentage ---
+            grouped = defaultdict(list)
+
+            for cls, name, count, pct in classes_faibles:
+                key = round(pct, 2)  # regroupe par % arrondi
+                grouped[key].append((cls, name, count))
+
+            # tri par % croissant
+            for pct in sorted(grouped.keys()):
+                print(f"--- {pct:.2f}% ---")
+
+                entries = grouped[pct]
+                texts = [f"{cls} {name}" for cls, name, _ in entries]
+
+                max_width = max(len(t) for t in texts) + 2
+                for i in range(0, len(texts), ct.N_PER_LINE):
+                    print(" | ".join(f"{t:<{max_width}}" for t in texts[i:i+ ct.N_PER_LINE]))
+                print("")
+
+
     # --- histogramme bbox ---
     if afficher_hist and bbox_areas:
         gr.histograme(bbox_areas,
@@ -416,7 +622,12 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         typ = a["type"]
         anomaly_images[img][typ] += 1
 
+    # ---- 
     print()
+    display.print('-' * 120, colors['info'])
+    if missing_label :
+        display.print('Attention : des classes sont présentes dans les labels mais absentes du YAML !!', colors['error'])
+
     if not anomaly_images :
         display.print('Aucune anomalie trouvé !!', colors['ok'])
     else :
@@ -428,7 +639,8 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
             "bbox_surface_trop_grande",
             "bbox_hors_limite_warning",
             "bbox_hors_limite_error"
-    ]
+        ]
+
         print()
         display.print("---------------- ANOMALIES ----------------------", colors['warning'])
         print("------ LEGENDES ------")
@@ -460,7 +672,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         # header
         header = f"{'Image':25} | " + " | ".join(f"{i:^{col_width}}" for i in range(1, 7))
         print(header)
-        print("-" * len(header))
+        print("─" * len(header))
 
         # lignes
         for img, anomalies_dict in sorted(anomaly_images.items()):
@@ -494,7 +706,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
             print(" | ".join(line_parts))      
 
         # --- ligne de séparation ---
-        print("-" * len(header))
+        print("─" * len(header))
 
         # --- ligne TOTAL ---
         total_line = [f"{'TOTAL':25}"]
@@ -574,14 +786,21 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         
         print(f"Score moyen du dataset : {dataset_score:.3f}\n")
         
-        # --- histogramme anomalies par type ---
-        if afficher_hist : 
-            type_counts = Counter(a["type"] for a in anomalies)
-            if type_counts:
-                gr.histo_multipl(type_counts,
-                                 "Nombre",
-                                 anomalies) 
 
-        # anomalies = resultats['anomalies'] après dataset_statistics_yolo
-        if ct.REPORT_MODE :
-            util.save_anomalies_readable(anomalies, "erreurs_dataset.txt", path_user)
+    # --- histogramme anomalies par type ---
+    if afficher_hist : 
+        type_counts = Counter(a["type"] for a in anomalies)
+        if type_counts:
+            gr.histo_multipl(type_counts,
+                            "Nombre",
+                            anomalies) 
+
+    # anomalies = resultats['anomalies'] après dataset_statistics_yolo
+    if ct.REPORT_MODE :
+        util.save_anomalies_readable(anomalies, "erreurs_dataset.txt", path_user)
+
+    metrics = imbalance_metrics(class_distribution)
+    afficher_imbalance_avance(metrics, display, colors)
+
+    display.print('-' * 120, colors['info'])
+

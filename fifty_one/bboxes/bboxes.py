@@ -108,7 +108,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
                 # --- Classe ---
                 try:
                     cls = int(parts[0])
-                    if ct.nb_classes is not None and cls >= ct.nb_classes:
+                    if ct.NB_CLASSES is not None and cls >= ct.NB_CLASSES:
                         erreurs_syntaxe["classe_hors_plage"].append(f"{entry.name} (ligne {i})")
                         erreurs_ligne.append("classe_hors_plage")
                         ctrl_ok = False
