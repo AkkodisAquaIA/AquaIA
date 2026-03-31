@@ -17,7 +17,8 @@ docker/.env
 docker/build/
 /results
 /datasets
-# detection_promptable
+
+# Detection/promptable
 Detection/runs/
 Detection/promptable/*_result_det_*/
 Detection/promptable/*_result_det/
