@@ -137,7 +137,7 @@ def print_device_info(model_instance, info_device: bool) -> bool:
 
 if __name__ == "__main__":
     # Initialization parameters
-    timestamp = datetime.now().strftime("%Y%m%d%H%M")
+    timestamp = datetime.now().strftime("%y%m%d%H%M")
     cfg = MODEL_CFG[MODEL_NAME]
     run_name = f"{MODEL_NAME}_result_det_{timestamp}"
     run_dir = Path(PARENT_FOLDER) / run_name
