@@ -9,12 +9,12 @@ def to_long_path(p: Path) -> str:
     return "\\\\?\\" + str(p.resolve())
 
 def get_latest_result_dir(base_dir: Path) -> Path:
-    """Return the newest [model]_result_det_YYYYMMDDHHmm folder directory under base_dir."""
+    """Return the newest [model]_result_det_[date] folder directory under base_dir."""
     candidates = [
         p for p in base_dir.glob("*_result_det_*")
         if p.is_dir() and p.name.split("_result_det_")[-1].isdigit()]
     if not candidates:
-        print("No [model]_result_det_YYYYMMDDHHmm directories found. Exiting.")
+        print("No [model]_result_det_[date] directories found. Exiting.")
         sys.exit(1)
     latest = max(candidates, key=lambda p: p.name.split("_result_det_")[-1])
     return latest
