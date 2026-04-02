@@ -1,11 +1,9 @@
 
 import os
 import re
-from networkx import display
 import numpy as np
 from pathlib import Path
 from collections import Counter, defaultdict
-from sklearn import metrics
 import yaml
 
 import tools.display_color as dc
@@ -138,7 +136,10 @@ def afficher_imbalance_avance(metrics, display, colors):
     entropy_norm = float(metrics["entropy_norm"])
 
     print("\n---------------- DATASET IMBALANCE ----------------\n")
-
+    print('Ration max/min (plus petit = mieux) : indique le déséquilibre entre la classe la plus fréquente et la moins fréquente.')
+    print('Entropie normalisée (plus grand = mieux) : mesure la diversité globale des classes, en tenant compte de leur distribution.')
+    print('Score global : combinaison pondérée des deux métriques précédentes pour une évaluation synthétique du déséquilibre du dataset.\n')
+    
     # --- RATIO (plus petit = mieux) ---
     evaluate_metric(
     label="Ratio max/min",

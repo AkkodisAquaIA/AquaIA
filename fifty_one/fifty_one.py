@@ -1,11 +1,14 @@
 import os
 from pathlib import Path
 import torch
+from torchvision import transforms
 from PIL import Image
 import numpy as np
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import faiss
 from tqdm import tqdm
+import timm
 import random
 import tkinter as tk
 from PIL import Image, ImageTk, ImageDraw, ImageFont
@@ -25,11 +28,9 @@ from graphe import graphe as gr
 
 #==========================================================================================
 # ================= FONCTIONS =================
-  
+ 
     
  # image_path = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Image1.png"
-import tkinter as tk
-from PIL import Image, ImageTk, ImageDraw, ImageFont
 
 def splash_screen_circle(image_path, duration=3000):
     """
@@ -137,113 +138,6 @@ def fade_out(window, steps):
             window.after(50, fade)
     fade()
 
-# --- Chargement image RGB avec gestion erreurs ---
-def load_rgb(path):
-    try:
-        return Image.open(path).convert("RGB")
-    except Exception:
-        display.print(f"Impossible de charger l'image : {path}", colors['error'])
-        return None
-
-# --- Normalisation L2 ---
-def l2_normalize(x):
-    return x / np.clip(np.linalg.norm(x, axis=1, keepdims=True), 1e-12, None)
-
-# --- Encodage des images avec skip intelligent et batch save ---
-def encoding(dataset, batch_size=ct.BATCH_SIZE):
-    # Sélection des images à encoder
-    missing_view = dataset.match(F(VEC_FIELD) == None)
-    total_missing = len(missing_view)
-
-    if total_missing == 0:
-        display.print("Tous les embeddings existent déjà, skip encodage.", colors['warning'])
-        return
-
-    display.print(f"Encodage des {total_missing} images manquantes...", colors['info'])
-    
-    missing_ids = missing_view.values("id")
-    missing_paths = missing_view.values("filepath")
-
-    executor = ThreadPoolExecutor(max_workers=ct.NUM_WORKERS)
-
-    # Barre de progression
-    with tqdm(
-        total=total_missing,
-        desc="Images encodées",
-        unit="img",
-        position=0,
-        leave=True,
-        ncols=ct.TQDM_NCOLS,
-        dynamic_ncols=False
-    ) as pbar, tqdm(
-        total=0,
-        desc="",
-        position=1,
-        bar_format="{desc}",
-        leave=False,
-        ncols=ct.TQDM_NCOLS,
-        dynamic_ncols=False
-    ) as mbar:
-
-        total_batches = (total_missing + batch_size - 1) // batch_size
-
-        for batch_idx, start in enumerate(range(0, total_missing, batch_size), 1):
-            end = min(start + batch_size, total_missing)
-            batch_paths = missing_paths[start:end]
-            batch_ids = missing_ids[start:end]
-
-            mbar.set_description(f"Batch {batch_idx}/{total_batches}")
-            mbar.refresh()
-
-            # --- Chargement images et filtrage celles corrompues ---
-            loaded_images = list(executor.map(load_rgb, batch_paths))
-            loaded_images = [img for img in loaded_images if img is not None]
-
-            if len(loaded_images) == 0:
-                pbar.update(len(batch_paths))  # avance barre même si toutes corrompues
-                continue
-
-            # --- Prétraitement ---
-            images = [preprocess(img) for img in loaded_images]
-            x = torch.stack(images).to(DEVICE)
-
-            # --- Passage dans le modèle ---
-            with torch.no_grad():
-                if DEVICE == "cuda":
-                    with torch.autocast(device_type="cuda"):
-                        feats = model(x)
-                else:
-                    feats = model(x)
-
-            if feats.ndim == 3:
-                feats = feats[:, 0, :]
-
-            feats = feats.float().cpu().numpy()
-            feats = l2_normalize(feats)
-
-            # --- Sauvegarde batch par batch ---
-            batch_embeddings = {sid: vec.tolist() for sid, vec in zip(batch_ids, feats)}
-            dataset.set_values(VEC_FIELD, batch_embeddings, key_field="id")
-            dataset.save()
-
-            pbar.update(len(batch_paths))
-
-    executor.shutdown()
-    display.print("Embeddings enregistrés.\n", colors['info'])
-
-def create_dataset(DATASET_DIR):
-
-    display = dc.DisplayColor()
-
-    dataset_name = "coco128_local"
-    yaml_path = Path(DATASET_DIR) / "dataset.yaml"
-    if not yaml_path.exists():
-        display.print(f"dataset.yaml introuvable dans {DATASET_DIR}", colors['error'])
-        exit(1)
-        
-    if dataset_name in fo.list_datasets():
-        display.print(f"Suppression du dataset existant '{dataset_name}'", colors['info'])
-        fo.delete_dataset(dataset_name)    
 
 def statistique(DATASET_DIR, path_user):
      # ================= STATISTICS =================
@@ -261,15 +155,160 @@ def statistique(DATASET_DIR, path_user):
     outside_ratios = [a['outside_ratio_pct'] for a in results.get('anomalies',
                                             []) if 'outside_ratio_pct' in a]
 
+    #TODO
+    # gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
+
+    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=False)
+
+
+def create_dataset(DATASET_DIR):
+    display = dc.DisplayColor()
+
+    dataset_name = "coco128_local"
+
+    display.print(f"Création du dataset FiftyOne à partir du dossier :\n   '{DATASET_DIR}'...", colors['info'])
+
+    if dataset_name in fo.list_datasets():
+        display.print(f"Suppression du dataset existant '{dataset_name}'", colors['info'])
+        fo.delete_dataset(dataset_name)    
     
-    gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
+    dataset = fo.Dataset.from_dir(
+        dataset_type=fo.types.YOLOv5Dataset,
+        dataset_dir=str(DATASET_DIR),
+        name=dataset_name
+    )
 
-    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=True)
+    total_images = len(dataset)
+    display.print(f"Dataset chargé avec succès : {total_images} images", colors['info'])
+
+    return dataset
+
+def load_model(MODEL_PATH, total_images, DEVICE):
+
+    display = dc.DisplayColor()
+    # ================= MODEL =================
+    display.print("Chargement du modèle DINOv3...", colors['info'])
+    model = timm.create_model("vit_small_patch16_224", pretrained=False, num_classes=0)
+    state_dict = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
+    model.load_state_dict(state_dict, strict=False)
+    model = model.to(DEVICE).eval()
+    display.print(f"Vérification de la complétude du dataset...", colors['info'])
+    display.print(f"Total images dans le dataset : {total_images}\n", colors['info'])
+
+    return model    
 
 
+
+
+# --- Chargement image RGB avec gestion erreurs ---
+def load_rgb(path):
+    
+    display = dc.DisplayColor()
+
+    try:
+        return Image.open(path).convert("RGB")
+    except Exception:
+        display.print(f"Impossible de charger l'image : {path}", colors['error'])
+        return None
+
+# --- Normalisation L2 ---
+def l2_normalize(x):
+    return x / np.clip(np.linalg.norm(x, axis=1, keepdims=True), 1e-12, None)
+
+# --- Encodage des images avec skip intelligent et batch save ---
+def encoding(dataset, VEC_FIELD, total_images, DEVICE, model):
+
+    # --- Prétraitement standard pour DINOv3 ---
+    preprocess = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406),
+                            (0.229, 0.224, 0.225)),
+    ])
+
+    display = dc.DisplayColor()
+    existing = dataset.match(F(VEC_FIELD) != None)
+
+    if len(existing) == total_images:
+        display.print(f"Embeddings déjà présents, skip encodage.", colors['warning'])
+    else:
+
+        filepaths = dataset.values("filepath")
+        sample_ids = dataset.values("id")
+        display.print(f"Encodage des {total_images} images...", colors['info'])
+        
+        executor = ThreadPoolExecutor(max_workers=ct.NUM_WORKERS)
+        all_embeddings = {}
+
+        batch_size = ct.BATCH_SIZE
+        total_batches = (total_images + batch_size - 1) // batch_size
+
+        # --- Barre principale sur images, secondaire sur batch ---
+        with tqdm(
+            total=total_images,
+            desc="Images encodées",
+            unit="img",
+            position=0,
+            leave=True,
+            ncols=100,
+            dynamic_ncols=False
+        ) as pbar, tqdm(
+            total=0,
+            desc="",
+            position=1,
+            bar_format="{desc}",
+            leave=False,
+            ncols=100,
+            dynamic_ncols=False
+        ) as mbar:
+
+            for batch_idx, start in enumerate(range(0, total_images, batch_size), 1):
+                end = min(start + batch_size, total_images)
+                batch_paths = filepaths[start:end]
+                batch_ids = sample_ids[start:end]
+
+                # Mettre à jour la barre secondaire avec le batch courant
+                mbar.set_description(f"Batch {batch_idx}/{total_batches}")
+                mbar.refresh()
+
+                # Chargement + prétraitement
+                images = list(executor.map(lambda p: preprocess(load_rgb(p)), batch_paths))
+                x = torch.stack(images).to(DEVICE)
+
+                # Passage dans le modèle
+                with torch.no_grad():
+                    if DEVICE == "cuda":
+                        with torch.autocast(device_type="cuda"):
+                            feats = model(x)
+                    else:
+                        feats = model(x)
+
+                if feats.ndim == 3:
+                    feats = feats[:, 0, :]
+
+                feats = feats.float().cpu().numpy()
+                feats = l2_normalize(feats)
+
+                for sid, vec in zip(batch_ids, feats):
+                    all_embeddings[sid] = vec.tolist()
+
+                # Mise à jour de la barre principale par le nombre d'images traitées
+                pbar.update(len(batch_paths))
+
+        # Enregistrement
+        dataset.set_values(VEC_FIELD, all_embeddings, key_field="id")
+        dataset.save()
+        executor.shutdown()
+        display.print("Embeddings enregistrés.\n", colors['info'])
+
+
+
+#------------------------------------------------------------------------------------------------
 def maain():
     # ================= CONFIG =================
 
+    dataset_name = "coco128_local"
     VEC_FIELD = "emb_dinov3"
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     DUP_THRESHOLD = 0.98
@@ -290,7 +329,7 @@ def maain():
     print()
     splash_screen_circle("Image.png", duration=3000)
     display.print(ct.INFO_PROD, colors['aqua'])
-
+    
     # Affichge du mode de débugage
     display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
  
@@ -322,9 +361,12 @@ def maain():
 
     # Chargement des noms de classes pour les stats
     dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
-    class_names = ds.load_class_names(dataset_yaml)
+    try:
+        class_names = ds.load_class_names(dataset_yaml)
+    except Exception as e:
+        display.print(f"dataset.yaml introuvable dans {DATASET_DIR}", colors['error'])
+        exit(1)
 
-    
     # validation des labels avant création du dataset FiftyOne
     erreur, all_bboxes, rapport, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_user)
  
@@ -348,9 +390,22 @@ def maain():
      
     else:    
         display.print("Aucune erreur de label détectée. Analyse du Dataset...\n", colors['ok'])
-        create_dataset(DATASET_DIR)
+        # create_dataset(DATASET_DIR)
 
         statistique(DATASET_DIR, path_user)
+
+        # Création du dataset FiftyOne
+        dataset = create_dataset(DATASET_DIR)
+
+        total_images = len(dataset)
+        # sample_ids = dataset.values("id")
+        # filepaths = dataset.values("filepath")
+
+        model = load_model(MODEL_PATH, total_images, DEVICE)
+
+        # ================= ENCODING =================
+        encoding(dataset, VEC_FIELD, total_images, DEVICE, model )
+ 
 
 
     print()
