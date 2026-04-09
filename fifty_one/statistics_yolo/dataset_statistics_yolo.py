@@ -74,7 +74,7 @@ def compute_global_score(ratio, entropy_norm):
 
     return max(0, min(100, score))
 
-def draw_bar(value, vmin, vmax, length=40):
+def draw_bar(value, vmin, vmax, length=50):
     """
     Barre visuelle normalisée
     """
@@ -189,7 +189,7 @@ def afficher_imbalance_avance(metrics, display, colors):
     if ratio > 100:
         print("- Dataset très déséquilibré (ratio élevé)")
 
-    if entropy_norm < 0.7:
+    if entropy_norm < 0.75:
         print("- Distribution globale déséquilibrée")
 
     if entropy_norm > 0.75 and ratio > 100:

@@ -156,7 +156,7 @@ def statistique(DATASET_DIR, path_user):
                                             []) if 'outside_ratio_pct' in a]
 
     #TODO
-    # gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
+    gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
 
     ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=False)
 
@@ -196,8 +196,6 @@ def load_model(MODEL_PATH, total_images, DEVICE):
     display.print(f"Total images dans le dataset : {total_images}\n", colors['info'])
 
     return model    
-
-
 
 
 # --- Chargement image RGB avec gestion erreurs ---
@@ -305,7 +303,7 @@ def encoding(dataset, VEC_FIELD, total_images, DEVICE, model):
 
 
 #------------------------------------------------------------------------------------------------
-def maain():
+def main():
     # ================= CONFIG =================
 
     dataset_name = "coco128_local"
@@ -333,13 +331,6 @@ def maain():
     # Affichge du mode de débugage
     display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
  
-    # Affichage type de device utilisé
-    prompt = (
-            f"CUDA{'' if torch.cuda.is_available() else ' not'} available"
-            f" - Running on {'GPU' if torch.cuda.is_available() else 'CPU'}.\n"
-        )
-    display.print(prompt, colors['warning'])
-
     # Affichage si mode de rapport actif
     path_user = ct.PATH_USER
     if not os.path.exists(path_user):
@@ -371,7 +362,7 @@ def maain():
     erreur, all_bboxes, rapport, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_user)
  
     if not ctrl_ok:
-        display.print(f"Erreurs détectées dans les labels. Arrêt du programme {ct.BELL}", colors['error'])
+        display.print(f"Erreurs détectées dans les images/labels. Arrêt du programme {ct.BELL}", colors['error'])
         total_errors = sum(len(v) for v in erreur.values())
         
         label1 = "Total Types           :"
@@ -414,5 +405,5 @@ def maain():
 
 #==========================================================================================
 if __name__ == "__main__":
-    maain()
+    main()
 

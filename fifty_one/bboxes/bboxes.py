@@ -1,5 +1,7 @@
 import os
 import re
+from PIL import Image
+from PIL import UnidentifiedImageError
 from pathlib import Path
 from collections import Counter, defaultdict
 
@@ -10,6 +12,13 @@ from tools.constants import DISPLAY_COLORS as colors
 
 #==================================================================================
 
+def is_valid_image(path):
+    try:
+        with Image.open(path) as img:
+            img.verify()  # vérifie structure interne
+        return True
+    except (UnidentifiedImageError, OSError):
+        return False
 
 def check_bbox_overflow(x, y, w, h):
     warn_tol = ct.BBOX_OVERFLOW_WARNING / 100
@@ -200,6 +209,17 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
     # --- Analyse images ---
     image_paths = [p for p in Path(images_dir).rglob("*") if p.suffix.lower() in ct.IMAGE_EXT]
     image_stems = {p.stem for p in image_paths}
+
+     # Vérification images invalides / corrompues
+    images_invalides = []
+
+    for p in image_paths:
+        if not is_valid_image(p):
+            images_invalides.append(p.name)
+
+    if images_invalides:
+        erreurs_syntaxe["images_invalides"] = sorted(images_invalides)
+        ctrl_ok = False
 
     # labels orphelins
     orphan_labels = sorted(label_stems - image_stems)
