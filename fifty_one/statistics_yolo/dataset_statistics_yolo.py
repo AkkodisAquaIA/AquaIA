@@ -5,12 +5,16 @@ import numpy as np
 from pathlib import Path
 from collections import Counter, defaultdict
 import yaml
+import shutil
+from colorama import Fore, Style, init
 
 import tools.display_color as dc
 from tools import utility as util
 from tools import constants as ct
 from tools.constants import DISPLAY_COLORS as colors
 from graphe import graphe as gr
+
+init(autoreset=True)
 
 #==========================================================================================
 def load_class_names(dataset_yaml_path):
@@ -85,7 +89,9 @@ def draw_bar(value, vmin, vmax, length=50):
     empty = length - filled
 
     scale = "█" * filled + "░" * empty
-    print(f"{'':25}  {scale}\n")
+    
+    return scale
+    
 
 def evaluate_metric(
     label,
@@ -127,8 +133,8 @@ def evaluate_metric(
 
     print(f"{label:25}: {value:{value_format}}{suffix}   ", end="")
     display.print(status, color)
-    draw_bar(value, bar_min, bar_max)
-
+    bare = draw_bar(value, bar_min, bar_max)   
+    print(f"{'':25}  {bare}\n")
 
 def afficher_imbalance_avance(metrics, display, colors):
 
@@ -557,33 +563,81 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
                 print(" | ".join(f"{entry:<{max_width}}" for entry in manquantes[i:i+5]))
 
     # --- distribution par classe ---
-    print("\n---------------- CLASS DISTRIBUTION -------------")
     items = sorted(class_distribution.items())
-    ligne_texts = []
+   
+    max_name_len = max(
+        len(class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}")
+        for cls, _ in items
+    )
+    
+    blocs = []
+    dom, moy, rary = 0, 0, 0
+    
     for cls, count in items:
         pct = (count / total) * 100
-        name = class_names[cls] if class_names and cls < len(class_names) else f"UNKNOWN_{cls}"
-        bar = "█" * int(pct / 2)
-        ligne_texts.append(f"{cls} {name} {count} ({pct:.2f}%) {bar}")
-    max_width = max(len(t) for t in ligne_texts) + 2
-    for i in range(0, len(ligne_texts), classes_par_ligne):
-        print(" | ".join(f"{t:<{max_width}}" for t in ligne_texts[i:i+classes_par_ligne]))
+        name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
 
-    # --- classes sous-représentées ---------------------------
-    if ct.SEUIL_PCT is not None:
+        # Couleur automatique selon importance
+        if pct < ct.RARE:
+            color = Fore.RED
+            rary +=1
+        elif pct < ct.DOMINANT:
+            color = Fore.YELLOW
+            moy +=1
+        else:
+            color = Fore.GREEN
+            dom +=1
+
+        BAR_WIDTH = 20 # largeur maximale de la barre pour 100% (ajustable)
+        bbare = draw_bar(pct, 0, 100, BAR_WIDTH)
+        # bar_len = int((pct / 100) * BAR_WIDTH)
+        # bar = "█" * bar_len
+        # bar = f"{bar:<{BAR_WIDTH}}"
+
+        bloc = (
+            f"{color}"
+            f"{cls:>2} "
+            f"{name:<{max_name_len}} "
+            f"{pct:5.2f}% "
+            f"{bbare}"
+            f"{Style.RESET_ALL}"
+        )
+
+        blocs.append(bloc)
+
+    print(f"\n----------- CLASS DISTRIBUTION ({rary + moy + dom}) -----------")
+    legend_colored = (
+        f"    {Fore.GREEN}■ ({dom}) ≥ {ct.DOMINANT}% Dominant{Style.RESET_ALL}   "
+        f"| {Fore.YELLOW}■ ({moy}) {ct.RARE}–{ct.DOMINANT}% Moyen{Style.RESET_ALL}   "
+        f"| {Fore.RED}■ ({rary}) < {ct.RARE}% Rare{Style.RESET_ALL}"
+    )
+    print(f"{legend_colored}\n")
+
+    # Largeur terminal
+    term_width = shutil.get_terminal_size().columns
+    bloc_width = max(len(b) for b in blocs) + 1
+    classes_par_ligne = max(1, term_width // bloc_width)
+
+    for i in range(0, len(blocs), classes_par_ligne):
+        ligne = blocs[i:i + classes_par_ligne]
+        print("| ".join(f"{b:<{bloc_width}}" for b in ligne))
+
+
+    # --- classes Rares ---------------------------------------
+    if ct.RARE is not None:
         classes_faibles = []
         print()
         for cls, count in items:
             pct = (count / total) * 100
-            if pct < ct.SEUIL_PCT:
+            if pct < ct.RARE:
                 name = class_names[cls] if class_names and cls < len(class_names) else f"UNKNOWN_{cls}"
                 classes_faibles.append((cls, name, count, pct))
 
         if not classes_faibles:
-            display.print(f"Aucune classe sous {ct.SEUIL_PCT}% ", colors['ok'])
+            display.print(f"Aucune classe sous {ct.RARE}% ", colors['ok'])
         else:
-            message = f"------- CLASSES SOUS-REPRÉSENTÉES < {ct.SEUIL_PCT}% -------"
-            display.print(message, colors['warning'])
+            message = f"------- CLASSES RARES ({rary}) < {ct.RARE}% -------"
+            display.print(message, colors['error'])
             # tri optionnel (du pire au moins pire)
             classes_faibles.sort(key=lambda x: x[3])  # tri par %
 
@@ -610,7 +664,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     # --- histogramme bbox ---
     if afficher_hist and bbox_areas:
         gr.histograme(bbox_areas,
-                      "Distribution des tailles de bounding boxes",
+                      "Distribution des tailles de BBox",
                       "Aire bbox",
                       "Nombre"
                       )
@@ -627,7 +681,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     print()
     display.print('-' * 120, colors['info'])
     if missing_label :
-        display.print('Attention : des classes sont présentes dans les labels mais absentes du YAML !!', colors['error'])
+        display.print('Attention : des classes sont présentes dans les labels mais absentes du YAML !!', colors['warning'])
 
     if not anomaly_images :
         display.print('Aucune anomalie trouvé !!', colors['ok'])
@@ -642,7 +696,6 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
             "bbox_hors_limite_error"
         ]
 
-        print()
         display.print("---------------- ANOMALIES ----------------------", colors['warning'])
         print("------ LEGENDES ------")
         print("1 : bbox_trop_petite        | 2 : bbox_trop_grande")
@@ -804,4 +857,3 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     afficher_imbalance_avance(metrics, display, colors)
 
     display.print('-' * 120, colors['info'])
-

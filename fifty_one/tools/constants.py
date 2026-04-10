@@ -38,7 +38,7 @@ DEBUG_MODE = False
 #-----------------------------------------------------------------------------------
 
 # Enable/disable report generation (e.g., anomaly logs)
-REPORT_MODE = True
+REPORT_MODE = False
 
 # Root path to the dataset (user-specific)
 PATH_USER = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Data/coco128"
@@ -69,20 +69,20 @@ IOU_THRESHOLD = 0.9
 #-----------------------------------------------------------------------------------
 
 # Minimum and maximum bounding box width/height (relative to image size)
-MIN_BBOX = 0.00192186
-MAX_BBOX = 1
+MIN_BBOX = 0.0   # 0.00192186
+MAX_BBOX = 1.0   # 0.99807814
 
 # Minimum and maximum bounding box area (relative to image area)
-MIN_BBOX_AREA = MIN_BBOX ** 2
-MAX_BBOX_AREA = MAX_BBOX ** 2
+MIN_BBOX_AREA = 0.0 # MIN_BBOX ** 2
+MAX_BBOX_AREA = 1.0 #MAX_BBOX ** 2
 
 #-----------------------------------------------------------------------------------
 # Percentile Thresholds for Anomaly Detection
 #-----------------------------------------------------------------------------------
 
 # Percentile thresholds used to detect outliers
-PERCENTILE_WARNING = 90   # Warning threshold
-PERCENTILE_ERROR   = 85   # Critical threshold
+PERCENTILE_WARNING = 25   # Warning threshold
+PERCENTILE_ERROR   = 25   # Critical threshold
 
 #-----------------------------------------------------------------------------------
 # Bounding Box Overflow Tolerance (in %)
@@ -90,11 +90,12 @@ PERCENTILE_ERROR   = 85   # Critical threshold
 
 # Maximum tolerated overflow before raising a warning
 # (bounding box partially outside image)
-BBOX_OVERFLOW_WARNING = 32.150  # Typical range: 10–20%
+BBOX_OVERFLOW_WARNING = 25 # 32.150  # Typical range: 10–20%
 
 # Maximum tolerated overflow before marking as error
 # (bounding box significantly outside image)
-BBOX_OVERFLOW_ERROR   = 32.155  # Typical range: 30–35%
+BBOX_OVERFLOW_ERROR   = 30  # 32.155  # Typical range: 30–35%
+
 
 #-----------------------------------------------------------------------------------
 # Dataset Constraints
@@ -105,7 +106,8 @@ NB_CLASSES = 100
 
 # Threshold (%) to consider a class as underrepresented
 # Set to None to disable filtering
-SEUIL_PCT = 0.5
+DOMINANT = 1
+RARE = 0.25
 
 
 RATIO_OK = 10

@@ -155,10 +155,10 @@ def statistique(DATASET_DIR, path_user):
     outside_ratios = [a['outside_ratio_pct'] for a in results.get('anomalies',
                                             []) if 'outside_ratio_pct' in a]
 
-    #TODO
+    
     gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
 
-    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=False)
+    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=True)
 
 
 def create_dataset(DATASET_DIR):
@@ -380,7 +380,7 @@ def main():
         util.afficher_bbox_erreurs_compact(erreur)
      
     else:    
-        display.print("Aucune erreur de label détectée. Analyse du Dataset...\n", colors['ok'])
+        display.print("Aucune erreur détectée. Analyse du Dataset...\n", colors['ok'])
         # create_dataset(DATASET_DIR)
 
         statistique(DATASET_DIR, path_user)

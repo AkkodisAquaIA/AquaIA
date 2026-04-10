@@ -7,7 +7,6 @@ from collections import Counter
 from colorama import init, Style
 from pathlib import Path
 import shutil
-# import textwrap
 import argparse
 import fiftyone as fo
 from collections import defaultdict
@@ -276,7 +275,7 @@ def afficher_bbox_erreurs_compact(bbox_erreurs, largeur_max_ligne=None):
     indent = " " * (categorie_max_len + 3)
     separateur = " | "
 
-    display.print("Erreurs de bbox détectées :", colors["error"])
+    display.print("Erreurs détectées :", colors["error"])
 
     for categorie, chemins in bbox_erreurs.items():
         if not chemins:
