@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 import csv
 
@@ -20,14 +21,17 @@ def get_run_context(config):
     if run_config is None:
         raise ValueError("resolved_config.yaml is required to run inference.")
 
-    output_dir = Path(output_cfg["output_dir"]) if output_cfg.get("output_dir") else run_dir
+    test_data_root = Path(data_cfg["test_data_root"])
+    output_root = Path(output_cfg["output_dir"]) if output_cfg.get("output_dir") else run_dir / "inference"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = output_root / f"{test_data_root.name}_{timestamp}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     return {
         "run_dir": run_dir,
         "run_config": run_config,
         "train_data_root": run_config["data"]["dataset_yaml"],
-        "test_data_root": data_cfg["test_data_root"],
+        "test_data_root": str(test_data_root),
         "output_dir": output_dir,
         "device": device,
         "use_amp": use_amp,

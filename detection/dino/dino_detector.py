@@ -65,7 +65,7 @@ class DINODetector(nn.Module):
 
     def forward(self, images):
         if images.device.type == "cuda":
-            backends = [attn.SDPBackend.FLASH_ATTENTION]
+            backends = [attn.SDPBackend.FLASH_ATTENTION, attn.SDPBackend.EFFICIENT_ATTENTION]
         else:
             backends = [attn.SDPBackend.MATH]
         with torch.nn.attention.sdpa_kernel(backends=backends):

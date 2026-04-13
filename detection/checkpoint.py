@@ -1,7 +1,7 @@
 import torch
 
 
-def get_model_state_dict(model, clone_to_cpu=False):
+def _get_model_state_dict(model, clone_to_cpu=False):
     # Model compilation add some additional attr, take original model for saving
     state_dict_model = model._orig_mod if hasattr(model, "_orig_mod") else model
     state_dict = state_dict_model.state_dict()
@@ -10,21 +10,11 @@ def get_model_state_dict(model, clone_to_cpu=False):
     return {key: value.detach().cpu().clone() for key, value in state_dict.items()}
 
 
-def update_best_checkpoint(best_loss, best_epoch, best_model_state_dict, epoch, epoch_metrics, model):
-    if epoch_metrics["avg"] >= best_loss:
-        return best_loss, best_epoch, best_model_state_dict
-
-    return (
-        epoch_metrics["avg"],
-        epoch + 1,
-        get_model_state_dict(model, clone_to_cpu=True),
-    )
-
-
 def save_model_checkpoint(
     path,
-    model_state_dict,
+    model,
 ):
+    model_state_dict = _get_model_state_dict(model, clone_to_cpu=True)
     checkpoint = {"model_state_dict": model_state_dict}
     torch.save(checkpoint, path)
 

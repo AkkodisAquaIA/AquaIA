@@ -1,7 +1,7 @@
-from training.config_utils import load_train_config
-from training.config_printer import print_train_config
-from training.dino.run import train_dino
-from training.yolo.run import train_yolo
+from detection.utils.config_utils import load_train_config
+from detection.config_printer import print_train_config
+from detection.dino.training.run import train_dino
+from detection.yolo.training.run import train_yolo
 
 
 def train(config):

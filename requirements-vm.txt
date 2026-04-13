@@ -1,0 +1,10 @@
+# torch==2.10.0 --index-url https://download.pytorch.org/whl/cu130
+# torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cu130
+torchmetrics
+transformers
+ultralytics
+tqdm
+matplotlib
+scipy
+termcolor
+pycocotools

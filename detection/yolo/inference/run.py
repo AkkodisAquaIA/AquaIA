@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -6,10 +7,11 @@ from torch.utils.data import DataLoader
 from ultralytics import YOLO
 
 from dataloading.datasets import NpyDetectionDataset, detection_collate_fn, sample_dataset
-from Detection.metric import evaluate_map, print_metrics
+from detection.metric import evaluate_map, print_metrics
+from detection.utils.config_utils import find_latest_run_dir, load_run_config
 from test.config_utils import load_class_names
 from test.plot_utils import annotate_yolo_predictions
-from test.run_utils import build_splits, get_run_context, print_test_header, save_metrics
+from test.run_utils import build_splits, print_test_header, save_metrics
 
 
 def load_model(run_dir, device):
@@ -67,16 +69,33 @@ def evaluate_dataset(model, dataset, split_name, inference_config, device, num_c
 
 def test_yolo(config):
     inference_config = dict(config["inference"])
-    ctx = get_run_context(config)
-    metric_conf = float(ctx["run_config"].get("training", {}).get("conf", 0.001))
+    run_cfg = config["run"]
+    output_cfg = config["output"]
+    data_cfg = config["data"]
 
-    train_class_names = load_class_names(ctx["train_data_root"])
-    test_class_names = load_class_names(ctx["test_data_root"])
-    model = load_model(ctx["run_dir"], ctx["device"])
-    train_dataset = NpyDetectionDataset(dataset_root=str(Path(ctx["train_data_root"])), device=ctx["device"])
-    test_dataset = NpyDetectionDataset(dataset_root=str(Path(ctx["test_data_root"])), device=ctx["device"])
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    use_amp = device == "cuda"
 
-    print_test_header(ctx)
+    run_dir = Path(run_cfg["run_dir"]) if run_cfg.get("run_dir") else find_latest_run_dir(run_cfg["runs_root"])
+    run_config = load_run_config(run_dir)
+    if run_config is None:
+        raise ValueError("resolved_config.yaml is required to run inference.")
+
+    train_data_root = run_config["data"]["dataset_yaml"]
+    test_data_root = str(Path(data_cfg["test_data_root"]))
+    output_root = Path(output_cfg["output_dir"]) if output_cfg.get("output_dir") else run_dir / "inference"
+    output_dir = output_root / f"{Path(test_data_root).name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    metric_conf = float(run_config.get("training", {}).get("conf", 0.001))
+
+    train_class_names = load_class_names(train_data_root)
+    test_class_names = load_class_names(test_data_root)
+    model = load_model(run_dir, device)
+    train_dataset = NpyDetectionDataset(dataset_root=str(Path(train_data_root)), device=device)
+    test_dataset = NpyDetectionDataset(dataset_root=str(Path(test_data_root)), device=device)
+
+    print_test_header(run_dir, device, use_amp, train_data_root, test_data_root, output_dir)
 
     metrics = {}
     for split_name, dataset, class_names, seed in build_splits(
@@ -92,19 +111,19 @@ def test_yolo(config):
             split_name=split_name,
             class_names=class_names,
             inference_config=inference_config,
-            output_dir=ctx["output_dir"],
+            output_dir=output_dir,
             seed=seed,
-            device=ctx["device"],
+            device=device,
         )
         metrics[split_name] = evaluate_dataset(
             model=model,
             dataset=dataset,
             split_name=split_name,
             inference_config=inference_config,
-            device=ctx["device"],
+            device=device,
             num_classes=len(class_names),
             metric_conf=metric_conf,
         )
 
-    save_metrics(metrics, ctx["output_dir"])
-    return ctx["run_dir"]
+    save_metrics(metrics, output_dir)
+    return output_dir

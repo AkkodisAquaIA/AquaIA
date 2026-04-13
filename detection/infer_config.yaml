@@ -1,11 +1,11 @@
 # AquaIA - DETR+DINO inference config
 
 run:
-  runs_root: "results/detect/yolo11_n_random"
+  runs_root: "results/detect/dinov3_plus_pretrained"
   run_dir: null
 
 data:
-  test_data_root: "datasets/coco1k"
+  test_data_root: "datasets/coco_small"
 
 inference:
   batch: 8

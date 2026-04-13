@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 from ultralytics.utils.plotting import Annotator
 
-from Detection.utils.box_ops import box_cxcywh_to_xyxy
+from detection.utils.box_ops import box_cxcywh_to_xyxy
 
 
 def annotate_images_with_predictions(images, outputs, class_names, conf_thres, output_dir, image_files):
@@ -66,8 +66,10 @@ def annotate_yolo_predictions(results, class_names, conf_thres, output_dir, imag
         Image.fromarray(annotator.result()).save(output_path)
 
 
-def plot_metrics(run_dir, metrics_filename="metrics.npy"):
+def plot_metrics(run_dir, output_dir=None, metrics_filename="metrics.npy"):
     run_dir = Path(run_dir)
+    output_dir = Path(output_dir) if output_dir is not None else run_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
     metrics_path = run_dir / metrics_filename
     if not metrics_path.exists():
         return None
@@ -91,7 +93,10 @@ def plot_metrics(run_dir, metrics_filename="metrics.npy"):
     for key in metric_keys:
         values = np.asarray([entry[key] for entry in metrics_history], dtype=np.float32)
         max_value = float(np.max(np.abs(values))) if values.size else 0.0
-        normalized_values = values if max_value == 0.0 else values / max_value
+        if max_value == 0.0 or max_value <= 1.0:
+            normalized_values = values
+        else:
+            normalized_values = values / max_value
         ax.plot(epochs, normalized_values, label=key)
 
     ax.set_title("Training Metrics")
@@ -101,7 +106,7 @@ def plot_metrics(run_dir, metrics_filename="metrics.npy"):
     ax.legend()
     fig.tight_layout()
 
-    output_path = run_dir / "metrics.png"
+    output_path = output_dir / "metrics.png"
     fig.savefig(output_path, dpi=200)
     plt.close(fig)
     return output_path

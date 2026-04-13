@@ -5,7 +5,7 @@ from typing import Any, Dict
 import torch
 from ultralytics import YOLO
 from datetime import datetime
-from training.config_utils import save_resolved_config
+from detection.utils.config_utils import save_resolved_config
 
 # -----------------------------
 # Model resolution (family/size/init)

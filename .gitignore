@@ -11,6 +11,7 @@ coco128
 #Linter
 .ruff_cache/
 
+/.cache
 /results
 /datasets
 # detection_promptable
