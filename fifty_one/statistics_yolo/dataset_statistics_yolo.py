@@ -598,6 +598,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
             f"{color}"
             f"{cls:>2} "
             f"{name:<{max_name_len}} "
+            f'{count:5} '
             f"{pct:5.2f}% "
             f"{bbare}"
             f"{Style.RESET_ALL}"
@@ -841,17 +842,18 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         print(f"Score moyen du dataset : {dataset_score:.3f}\n")
         
 
-    # --- histogramme anomalies par type ---
-    if afficher_hist : 
-        type_counts = Counter(a["type"] for a in anomalies)
-        if type_counts:
-            gr.histo_multipl(type_counts,
-                            "Nombre",
-                            anomalies) 
+        # --- histogramme anomalies par type ---
+        if afficher_hist : 
+            type_counts = Counter(a["type"] for a in anomalies)
+            if type_counts:
+                gr.histo_multipl(type_counts,
+                                "Nombre",
+                                anomalies) 
 
-    # anomalies = resultats['anomalies'] après dataset_statistics_yolo
-    if ct.REPORT_MODE :
-        util.save_anomalies_readable(anomalies, "erreurs_dataset.txt", path_user)
+        # anomalies = resultats['anomalies'] après dataset_statistics_yolo
+        if ct.REPORT_MODE :
+            util.save_anomalies_readable(anomalies, "erreurs_dataset.txt", path_user)
+
 
     metrics = imbalance_metrics(class_distribution)
     afficher_imbalance_avance(metrics, display, colors)

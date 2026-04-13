@@ -74,7 +74,15 @@ display = dc.DisplayColor()
 
 def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
     labels_dir = os.path.join(DATASET_DIR, "labels", "train2017")
+    if not os.path.isdir(labels_dir):
+        display.print(f"Directory not found: {labels_dir}", colors['error'])
+        exit(1)
+
     images_dir = os.path.join(DATASET_DIR, "images", "train2017")
+    if not os.path.isdir(labels_dir): 
+        display.print(f"Directory not found: {labels_dir}", colors['error'])
+        exit(1)
+    
     split_pattern = re.compile(r"[,\s]+")
     
     erreurs_syntaxe = defaultdict(list)
@@ -82,6 +90,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
     ctrl_ok = True
     label_stems = set()
     all_bboxes = []
+
 
     for entry in os.scandir(labels_dir):
         if not entry.name.lower().endswith(".txt"):
@@ -210,6 +219,14 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
     image_paths = [p for p in Path(images_dir).rglob("*") if p.suffix.lower() in ct.IMAGE_EXT]
     image_stems = {p.stem for p in image_paths}
 
+    # labels orphelins
+    orphan_labels = sorted(label_stems - image_stems)
+    if orphan_labels:
+        erreurs_syntaxe["labels_orphelins"] = orphan_labels
+        for lbl in orphan_labels:
+            rapport_detail[lbl][0].append("labels_orphelins")
+
+
      # Vérification images invalides / corrompues
     images_invalides = []
 
@@ -220,34 +237,28 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
     if images_invalides:
         erreurs_syntaxe["images_invalides"] = sorted(images_invalides)
         ctrl_ok = False
+    else:
 
-    # labels orphelins
-    orphan_labels = sorted(label_stems - image_stems)
-    if orphan_labels:
-        erreurs_syntaxe["labels_orphelins"] = orphan_labels
-        for lbl in orphan_labels:
-            rapport_detail[lbl][0].append("labels_orphelins")
+        # images sans label
+        images_sans_label = sorted(image_stems - label_stems)
+        if images_sans_label:
+            erreurs_syntaxe["images_sans_label"] = images_sans_label
+            ctrl_ok = False
+            
+        # images dupliquées
+        image_names = [p.name for p in image_paths]
+        duplicates = [k for k, v in Counter(image_names).items() if v > 1]
+        if duplicates:
+            erreurs_syntaxe["images_dupliquees"] = duplicates
 
-    # images sans label
-    images_sans_label = sorted(image_stems - label_stems)
-    if images_sans_label:
-        erreurs_syntaxe["images_sans_label"] = images_sans_label
-        ctrl_ok = False
-        
-    # images dupliquées
-    image_names = [p.name for p in image_paths]
-    duplicates = [k for k, v in Counter(image_names).items() if v > 1]
-    if duplicates:
-        erreurs_syntaxe["images_dupliquees"] = duplicates
-
-    # --- Affichage erreurs ---
-    for key, values in erreurs_syntaxe.items():
-        if values:
-            util.display_and_save_errors(
-                path_user,
-                sorted(values),
-                f"{key}.txt",
-                key.replace("_", " ").capitalize()
-            )
+        # --- Affichage erreurs ---
+        for key, values in erreurs_syntaxe.items():
+            if values:
+                util.display_and_save_errors(
+                    path_user,
+                    sorted(values),
+                    f"{key}.txt",
+                    key.replace("_", " ").capitalize()
+                )
 
     return erreurs_syntaxe, all_bboxes, rapport_detail, ctrl_ok

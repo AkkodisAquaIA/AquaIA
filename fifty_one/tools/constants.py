@@ -30,7 +30,7 @@ BELL = "\a"
 # Debug mode
 # True  -> Full error messages (detailed stack traces)
 # False -> Short and user-friendly error messages
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 
 #-----------------------------------------------------------------------------------
@@ -38,10 +38,10 @@ DEBUG_MODE = False
 #-----------------------------------------------------------------------------------
 
 # Enable/disable report generation (e.g., anomaly logs)
-REPORT_MODE = False
+REPORT_MODE = True
 
 # Root path to the dataset (user-specific)
-PATH_USER = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Data/coco128"
+PATH_USER = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Data/"
 
 
 #-----------------------------------------------------------------------------------
@@ -81,8 +81,8 @@ MAX_BBOX_AREA = 1.0 #MAX_BBOX ** 2
 #-----------------------------------------------------------------------------------
 
 # Percentile thresholds used to detect outliers
-PERCENTILE_WARNING = 25   # Warning threshold
-PERCENTILE_ERROR   = 25   # Critical threshold
+PERCENTILE_WARNING = 90   # Warning threshold
+PERCENTILE_ERROR   = 99   # Critical threshold
 
 #-----------------------------------------------------------------------------------
 # Bounding Box Overflow Tolerance (in %)
@@ -90,11 +90,11 @@ PERCENTILE_ERROR   = 25   # Critical threshold
 
 # Maximum tolerated overflow before raising a warning
 # (bounding box partially outside image)
-BBOX_OVERFLOW_WARNING = 25 # 32.150  # Typical range: 10–20%
+BBOX_OVERFLOW_WARNING = 32.159 # 32.150  # Typical range: 10–20%
 
 # Maximum tolerated overflow before marking as error
 # (bounding box significantly outside image)
-BBOX_OVERFLOW_ERROR   = 30  # 32.155  # Typical range: 30–35%
+BBOX_OVERFLOW_ERROR   = 32.159  # 32.155  # Typical range: 30–35%
 
 
 #-----------------------------------------------------------------------------------
@@ -107,7 +107,7 @@ NB_CLASSES = 100
 # Threshold (%) to consider a class as underrepresented
 # Set to None to disable filtering
 DOMINANT = 1
-RARE = 0.25
+RARE = 0.50
 
 
 RATIO_OK = 10
