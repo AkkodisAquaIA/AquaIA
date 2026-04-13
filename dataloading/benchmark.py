@@ -115,7 +115,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     datasets = [
-        NpyDetectionDataset(os.path.join(working_path, folder), load_targets=False),
+        NpyDetectionDataset(os.path.join(working_path, folder)),
         PilDetectionDataset(os.path.join(working_path, folder), (304, 304)),
         RAMDetectionDataset(os.path.join(working_path, folder), (304, 304))
     ]
