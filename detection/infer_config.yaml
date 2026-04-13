@@ -1,0 +1,18 @@
+# AquaIA - DETR+DINO inference config
+
+run:
+  runs_root: "results/detect/dinov3_plus_pretrained"
+  run_dir: null
+
+data:
+  test_data_root: "datasets/coco_small"
+
+inference:
+  batch: 8
+  imgsz : 304
+  conf: 0.3
+  num_samples: 20
+  seed: 0
+
+output:
+  output_dir: null
