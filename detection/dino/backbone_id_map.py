@@ -1,0 +1,61 @@
+import os
+
+
+# TODO : temporaire, DINOv3 sera téléchargé depuis le sharepoint idéalement
+ROOT_DIR = os.path.expanduser("~/.cache/torch/hub")
+DINOV2_LOCAL_REPO = os.path.join(ROOT_DIR, "facebookresearch_dinov2_main")
+DINOV3_LOCAL_REPO = os.path.join(ROOT_DIR, "facebookresearch_dinov3_main")
+
+DINO_ID_MAPPING = {
+	"dinov2_small" : 
+		{
+			"repo_or_dir" : DINOV2_LOCAL_REPO, 
+			"model" :  "dinov2_vits14_reg",
+			"source" : "local",
+		},
+	"dinov2_base" : 
+		{
+			"repo_or_dir" : DINOV2_LOCAL_REPO, 
+			"model" :  "dinov2_vitb14_reg",
+			"source" : "local",
+		},
+	"dinov2_large" : 
+		{
+			"repo_or_dir" : DINOV2_LOCAL_REPO, 
+			"model" :  "dinov2_vitl14_reg",
+			"source" : "local",
+		},
+	"dinov3_small" : 
+		{
+			"repo_or_dir" : DINOV3_LOCAL_REPO, 
+			"model" :  "dinov3_vits16",
+			"source" : "local",
+			"weights" : os.path.join(ROOT_DIR, "checkpoints/dinov3_vits16_pretrain_lvd1689m-08c60483.pth")
+		},
+	"dinov3_plus" : 
+		{
+			"repo_or_dir" : DINOV3_LOCAL_REPO, 
+			"model" :  "dinov3_vits16plus",
+			"source" : "local",
+			"weights" : os.path.join(ROOT_DIR, "checkpoints/dinov3_vits16plus_pretrain_lvd1689m-4057cbaa.pth")
+		},
+	"dinov3_base" : 
+		{
+			"repo_or_dir" : DINOV3_LOCAL_REPO, 
+			"model" :  "dinov3_vitb16",
+			"source" : "local",
+			"weights" : os.path.join(ROOT_DIR, "checkpoints/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth")
+		},
+	"dinov3_large" : 
+		{
+			"repo_or_dir" : DINOV3_LOCAL_REPO, 
+			"model" :  "dinov3_vitl16",
+			"source" : "local",
+			"weights" : os.path.join(ROOT_DIR, "checkpoints/dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd.pth")
+		},
+}
+
+def resolve_backbone_id(backbone_id):
+	if backbone_id not in DINO_ID_MAPPING:
+		raise ValueError(f"Backbone id {backbone_id} not found in mapping")
+	return DINO_ID_MAPPING[backbone_id]

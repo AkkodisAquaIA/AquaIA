@@ -1,7 +1,9 @@
 import torch
+import yaml
+from pathlib import Path
+import csv
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
-
-from Detection.utils.box_ops import box_cxcywh_to_xyxy
+from detection.utils.box_ops import box_cxcywh_to_xyxy
 
 
 def update_log_dict(log_dict, loss_dict, epoch_loss):
@@ -27,6 +29,22 @@ def log_epoch(log_dict, num_batch):
 def print_metrics(metrics):
     summary = " | ".join(f"{key}={metrics[key]:.4f}" for key in sorted(metrics) if isinstance(metrics[key], (int, float)))
     print(summary)
+
+def save_metrics(metrics, output_dir):
+    print_metrics(metrics)
+    with (Path(output_dir) / "inference_metrics.yaml").open("w", encoding="utf-8") as f:
+        yaml.safe_dump(metrics, f, sort_keys=False)
+
+    with (Path(output_dir) / "inference_metrics.csv").open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["split", "map_50", "map_50_95", "num_samples"])
+        writer.writeheader()
+        writer.writerow(
+            {
+                "map_50": metrics["map_50"],
+                "map_50_95": metrics["map_50_95"],
+                "num_samples": metrics["num_samples"],
+            }
+        )
 
 
 def _build_refs(targets, shapes):

@@ -8,6 +8,7 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 import random
+from detection.utils.config_utils import load_class_names
 
 class BaseDetectionDataset(Dataset):
     """
@@ -25,6 +26,7 @@ class BaseDetectionDataset(Dataset):
         self.device = torch.device(device)
         self.num_classes = 0
         self.load_stats()
+        self.class_names = load_class_names(dataset_root)
         self.image_files = self.list_image_files()
         self.load_targets()
 

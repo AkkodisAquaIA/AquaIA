@@ -19,7 +19,7 @@ def _get_sorted_jpg_files(root_dir):
 
 
 @pipeline_def
-def _transform_jpeg(files, size=304):
+def _transform_jpeg(files, size=640):
 	jpegs = fn.readers.file(files=files, name="Reader")[0]
 	images = fn.decoders.image(jpegs, device="mixed", output_type=types.RGB)
 	images = fn.transpose(images, device="gpu", perm=[2, 0, 1])
@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser(description="Preprocess jpeg images to .npy format using DALI")
 	parser.add_argument("--data-dir", type=str, default="datasets", help="Directory containing datasets")
-	parser.add_argument("--dataset", type=str, default="coco1k", help="Name of the dataset")
+	parser.add_argument("--dataset", type=str, default="coco_small", help="Name of the dataset")
 	parser.add_argument("--batch-size", type=int, default=128, help="Batch size for DALI pipeline")
 	parser.add_argument("--num-threads", type=int, default=4, help="Number of threads for DALI pipeline")
 	args = parser.parse_args()

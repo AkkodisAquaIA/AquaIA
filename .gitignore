@@ -11,10 +11,14 @@ coco128
 #Linter
 .ruff_cache/
 
+<<<<<<< HEAD
+/.cache
+=======
 .env
 docker/.env
 *.tar
 docker/build/
+>>>>>>> development
 /results
 /datasets
 
