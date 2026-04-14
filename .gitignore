@@ -18,9 +18,9 @@ docker/build/
 /results
 /datasets
 
-# Detection/promptable
-Detection/runs/
-Detection/promptable/*_result_det_*/
-Detection/promptable/*_result_det/
-Detection/promptable/useless/
+# detection/sam3
+detection/runs/
+detection/sam3/*_result_det_*/
+detection/sam3/*_result_det/
+detection/sam3/useless/
 *.ts
