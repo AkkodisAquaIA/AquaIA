@@ -21,7 +21,7 @@ docker/build/
 >>>>>>> development
 /results
 /datasets
-# detection_promptable
+# sam
 detection/sam/*_result_det_*/
 detection/sam/*_result_det/
 *.ts
