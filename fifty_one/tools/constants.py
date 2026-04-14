@@ -30,7 +30,7 @@ BELL = "\a"
 # Debug mode
 # True  -> Full error messages (detailed stack traces)
 # False -> Short and user-friendly error messages
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
 #-----------------------------------------------------------------------------------

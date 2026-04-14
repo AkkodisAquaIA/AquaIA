@@ -401,19 +401,6 @@ def dataset_statistics_yolo(DATASET_DIR):
         "image_names": image_paths
     }
 
-def print_multi_columns(items, values=None, class_names=None, per_line=5):
-    texts = []
-    for cls in items:
-        name = class_names[cls] if class_names and cls < len(class_names) else f"UNKNOWN_{cls}"
-        if values:
-            entry = f"{cls} {name} ({values[cls]:.2f}%)"
-        else:
-            entry = f"{cls} {name}"
-        texts.append(entry)
-    max_width = max(len(t) for t in texts) + 2
-    for i in range(0, len(texts), per_line):
-        print(" | ".join(f"{t:<{max_width}}" for t in texts[i:i+per_line]))
-
 def afficher_stats_bbox(stats):
 
     label_width = 10
@@ -480,41 +467,6 @@ def verifier_classes_dataset(class_distribution, class_names):
     manquantes = classes_presentes - classes_yaml
     valides = classes_presentes & classes_yaml
     return {"inutilisees": inutilisees, "manquantes": manquantes, "valides": valides}
-
-def afficher_tableau_croise_anomalies(resultats):
-    anomalies = resultats.get("anomalies", [])
-    images = sorted(set(resultats.get("image_names", [])))
-    types_anomalies = [
-        "bbox_trop_petite",
-        "bbox_trop_grande",
-        "bbox_surface_trop_petite",
-        "bbox_surface_trop_grande",
-        "bbox_hors_limite_warning",
-        "bbox_hors_limite_error"
-    ]
-
-    # Création du dictionnaire croisé
-    tableau = {img: {t: 0 for t in types_anomalies} for img in images}
-    for a in anomalies:
-        img = a["image"]
-        t = a["type"]
-        if t in types_anomalies:
-            tableau[img][t] += 1
-
-    # Affichage
-    header = ["Image"] + [t.replace("bbox_", "") for t in types_anomalies]
-    col_widths = [max(len(h), 12) for h in header]
-
-    # Ligne d'entête
-    header_line = " | ".join(f"{h:<{w}}" for h, w in zip(header, col_widths))
-    print(header_line)
-    print("-" * len(header_line))
-
-    # Lignes par image
-    for img in images:
-        row = [img] + [str(tableau[img][t]) for t in types_anomalies]
-        print(" | ".join(f"{c:<{w}}" for c, w in zip(row, col_widths)))
-
 
 def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_par_ligne=4, afficher_hist=False):
 
@@ -615,7 +567,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     print(f"{legend_colored}\n")
 
     # Largeur terminal
-    term_width = shutil.get_terminal_size().columns
+    term_width = 220 #shutil.get_terminal_size().columns (317)
     bloc_width = max(len(b) for b in blocs) + 1
     classes_par_ligne = max(1, term_width // bloc_width)
 

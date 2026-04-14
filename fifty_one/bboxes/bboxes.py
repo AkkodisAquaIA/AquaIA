@@ -20,23 +20,6 @@ def is_valid_image(path):
     except (UnidentifiedImageError, OSError):
         return False
 
-def check_bbox_overflow(x, y, w, h):
-    warn_tol = ct.BBOX_OVERFLOW_WARNING / 100
-    err_tol  = ct.BBOX_OVERFLOW_ERROR / 100
-
-    xmin = x - w/2
-    xmax = x + w/2
-    ymin = y - h/2
-    ymax = y + h/2
-
-    overflow = max(-xmin, xmax-1, -ymin, ymax-1, 0)
-
-    if overflow <= warn_tol:
-        return "ok"
-    elif overflow <= err_tol:
-        return "warning"
-    else:
-        return "error"
 
 def bbox_iou(box1, box2):
     x1, y1, w1, h1 = box1
@@ -79,8 +62,8 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
         exit(1)
 
     images_dir = os.path.join(DATASET_DIR, "images", "train2017")
-    if not os.path.isdir(labels_dir): 
-        display.print(f"Directory not found: {labels_dir}", colors['error'])
+    if not os.path.isdir(images_dir): 
+        display.print(f"Directory not found: {images_dir}", colors['error'])
         exit(1)
     
     split_pattern = re.compile(r"[,\s]+")
@@ -136,7 +119,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
                     ctrl_ok = False
                     continue
 
-                # if classe_ok : 
+                # Classe_ok : 
                 # --- Conversion bbox ---
                 float_ok = True
                 try:
@@ -148,25 +131,29 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
                     ctrl_ok = False
 
                 if float_ok:
-                    # --- Coordonnées négatives ou taille nulle ---
+                    # --- Classe négative ---
                     if cls < 0:
                         erreurs_syntaxe["classe_negative"].append(f"{entry.name} (ligne {i})")
                         erreurs_ligne.append("classe_negative")
                         ctrl_ok = False
 
+                    # --- Coordonnées négatives ---
                     if x < 0 or y < 0:
                         erreurs_syntaxe["coord_negatives"].append(f"{entry.name} (ligne {i})")
                         erreurs_ligne.append("coord_negatives")
                         ctrl_ok = False
+                    # --- Coordonnées > 1 ---
                     if x > 1 or y > 1:
                         erreurs_syntaxe["coord_>_1"].append(f"{entry.name} (ligne {i})")
                         erreurs_ligne.append("coord_>_1")
                         ctrl_ok = False
 
+                    # --- Taille négative ---
                     if w <= 0 or h <= 0:
                         erreurs_syntaxe["taille_negatives"].append(f"{entry.name} (ligne {i})")
                         erreurs_ligne.append("taille_negatives")
                         ctrl_ok = False
+                    # --- Taille > 1 ---    
                     if w > 1 or h > 1:
                         erreurs_syntaxe["taille_>_1"].append(f"{entry.name} (ligne {i})")
                         erreurs_ligne.append("taille_>_1")

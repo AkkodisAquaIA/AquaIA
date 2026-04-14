@@ -1,20 +1,25 @@
 import os
+# os.environ.setdefault("FIFTYONE_DATABASE_URI", "mongodb://127.0.0.1:27017")
+
+# TOUT le reste des imports AVANT fiftyone
+import platform
 from pathlib import Path
 import torch
 from torchvision import transforms
 from PIL import Image
 import numpy as np
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import faiss
 from tqdm import tqdm
 import timm
 import random
 import tkinter as tk
-from PIL import Image, ImageTk, ImageDraw, ImageFont
 
+# ONLY HERE
 import fiftyone as fo
 from fiftyone import ViewField as F
+from PIL import Image, ImageTk, ImageDraw, ImageFont
+
 
 from bboxes import bboxes as bb
 from statistics_yolo import dataset_statistics_yolo as ds
@@ -29,9 +34,9 @@ from graphe import graphe as gr
 #==========================================================================================
 # ================= FONCTIONS =================
  
+def est_windows():
+    return platform.system().lower() == "windows"
     
- # image_path = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Image1.png"
-
 def splash_screen_circle(image_path, duration=3000):
     """
     Splash screen circulaire avec un cercle extérieur clair
@@ -155,10 +160,10 @@ def statistique(DATASET_DIR, path_user):
     outside_ratios = [a['outside_ratio_pct'] for a in results.get('anomalies',
                                             []) if 'outside_ratio_pct' in a]
 
-    
-    gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
+    # TODO
+    # gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
 
-    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=True)
+    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=False)
 
 
 def create_dataset(DATASET_DIR):
@@ -166,7 +171,7 @@ def create_dataset(DATASET_DIR):
 
     dataset_name = "coco128_local"
 
-    display.print(f"Création du dataset FiftyOne à partir du dossier :\n   '{DATASET_DIR}'...", colors['info'])
+    display.print(f"Création du dataset FiftyOne à partir du dossier :\n   '{DATASET_DIR}' ...", colors['info'])
 
     if dataset_name in fo.list_datasets():
         display.print(f"Suppression du dataset existant '{dataset_name}'", colors['info'])
@@ -192,8 +197,6 @@ def load_model(MODEL_PATH, total_images, DEVICE):
     state_dict = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
     model.load_state_dict(state_dict, strict=False)
     model = model.to(DEVICE).eval()
-    display.print(f"Vérification de la complétude du dataset...", colors['info'])
-    display.print(f"Total images dans le dataset : {total_images}\n", colors['info'])
 
     return model    
 
@@ -298,7 +301,7 @@ def encoding(dataset, VEC_FIELD, total_images, DEVICE, model):
         dataset.set_values(VEC_FIELD, all_embeddings, key_field="id")
         dataset.save()
         executor.shutdown()
-        display.print("Embeddings enregistrés.\n", colors['info'])
+        display.print("Embeddings terminés et enregistrés.\n", colors['ok'])
 
 
 
@@ -325,7 +328,8 @@ def main():
     
     # Display du logo et infos système
     print()
-    splash_screen_circle("Image.png", duration=3000)
+    if est_windows():
+        splash_screen_circle("Image.png", duration=3000)
     display.print(ct.INFO_PROD, colors['aqua'])
     
     # Affichge du mode de débugage
@@ -341,9 +345,13 @@ def main():
  
 
     if ct.TEST_MODE :
-        # Pour les simulation 
-        DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
-        MODEL_PATH = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3\dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+        # Pour les simulation
+        if est_windows(): 
+            DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
+            MODEL_PATH = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3\dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+        else :
+            DATASET_DIR = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/2026/Aqua-/AQUA/datasets/coco128"
+            MODEL_PATH = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/2026/Aqua-/Fitty_One/Model/DINOv3/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
     else :
         DATASET_DIR = util.get_path_color("Entrée le chemin du dataset")
         MODEL_PATH = util.get_path_color("Entrée le chemin du modèle DINOv3")
@@ -381,17 +389,13 @@ def main():
      
     else:    
         display.print("Aucune erreur détectée. Analyse du Dataset...\n", colors['ok'])
-        # create_dataset(DATASET_DIR)
-
+       
         statistique(DATASET_DIR, path_user)
 
-        # Création du dataset FiftyOne
         dataset = create_dataset(DATASET_DIR)
 
         total_images = len(dataset)
-        # sample_ids = dataset.values("id")
-        # filepaths = dataset.values("filepath")
-
+      
         model = load_model(MODEL_PATH, total_images, DEVICE)
 
         # ================= ENCODING =================
