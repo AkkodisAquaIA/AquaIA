@@ -1,4 +1,4 @@
-﻿## detection_promptable
+﻿## sam
 This folder provides a promptable detection workflow:
 1. Define the classes you want to detect in `dataset_dict.yaml` (COCO128 is provided as an example).
 2. Configure the model and inference settings in `model_cfg.yaml`.
