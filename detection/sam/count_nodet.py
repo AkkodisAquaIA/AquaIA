@@ -1,7 +1,7 @@
-﻿import yaml
+﻿import csv
 from pathlib import Path
 from collections import defaultdict
-from utils import select_or_latest, collect_image_files, load_label_txt
+from utils import select_or_latest, load_yaml_from_result, collect_image_files, load_label_txt
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 
@@ -10,9 +10,7 @@ if __name__ == "__main__":
     det_dir = select_or_latest(base_dir=PARENT_FOLDER, title="Select result_det folder (Cancel to use latest)")
 
     # Read config file
-    cfg_path = det_dir / "model_cfg.yaml"
-    cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-    images_folder = cfg_data["IMAGES_FOLDER"]
+    _, images_folder, _ = load_yaml_from_result(det_dir)
 
     # All images in IMAGES_FOLDER (recursive)
     image_files, _ = collect_image_files(images_folder, stage="checking no detection images")
@@ -31,8 +29,8 @@ if __name__ == "__main__":
         # Count total images for subfolder
         subfolder_total_counts[subfolder_name] += 1
 
-        # In detection_entry.py, labels are saved in: run_dir (here det_dir) / rel_dir / "labels"
-        label_dir = det_dir / rel_dir / "labels"
+        # In detection.py, labels are saved in: run_dir (here det_dir) / "detection_result" / rel_dir / "labels"
+        label_dir = det_dir / "detection_result" / rel_dir / "labels"
         label_path = label_dir / f"{img_path.stem}.txt"
 
         # Skip if label file does not exist
@@ -48,11 +46,11 @@ if __name__ == "__main__":
         if labels.shape[0] == 0:
             subfolder_nodet_counts[subfolder_name] += 1
 
-    # Write the results to a file
-    output_dir = det_dir / "no_detection.txt"
-    with output_dir.open("w", encoding="utf-8") as f:
-        f.write("No detections:"
-        "\n(Subfolder, No detection, Total, Crop boxes)\n")
+    # Write the results to a CSV file
+    output_dir = det_dir / "docs_run" / "results_statistics_detection.csv"
+    with output_dir.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Subfolder", "No detection", "Total", "Crop boxes"])
 
         total_all_nodets = 0
         total_all_images = 0
@@ -63,14 +61,12 @@ if __name__ == "__main__":
             total = subfolder_total_counts[subfolder]
             nodet = subfolder_nodet_counts[subfolder]
             box_count = subfolder_box_counts[subfolder]
-            line = f"{subfolder}, {nodet}, {total}, {box_count}\n"
-            f.write(line)
+            writer.writerow([subfolder, nodet, total, box_count])
             total_all_images += total
             total_all_nodets += nodet
             total_all_boxes += box_count
 
-        f.write("-" * 30)
-        f.write(f"\nTOTAL, {total_all_nodets}, {total_all_images}, {total_all_boxes}\n")
+        writer.writerow(["TOTAL", total_all_nodets, total_all_images, total_all_boxes])
 
     print(f"\nNo detection images: {total_all_nodets}, Total images: {total_all_images}, Total crop boxes: {total_all_boxes}")
     print(f"\nDone! Saved summary to: {output_dir}")

@@ -1,15 +1,20 @@
 import sys
 from pathlib import Path
 import numpy as np
+import yaml
 from ultralytics.utils.ops import xywh2xyxy
 
+def to_long_path(p: Path) -> str:
+    """Convert a Path to a long path string for Windows to handle paths longer than 260 characters."""
+    return "\\\\?\\" + str(p.resolve())
+
 def get_latest_result_dir(base_dir: Path) -> Path:
-    """Return the newest [model]_result_det_YYYYMMDDHHmm folder directory under base_dir."""
+    """Return the newest [model]_result_det_[date] folder directory under base_dir."""
     candidates = [
         p for p in base_dir.glob("*_result_det_*")
         if p.is_dir() and p.name.split("_result_det_")[-1].isdigit()]
     if not candidates:
-        print("No [model]_result_det_YYYYMMDDHHmm directories found. Exiting.")
+        print("No [model]_result_det_[date] directories found. Exiting.")
         sys.exit(1)
     latest = max(candidates, key=lambda p: p.name.split("_result_det_")[-1])
     return latest
@@ -28,6 +33,16 @@ def select_or_latest(base_dir: Path, title: str) -> Path:
     root.destroy()
     det_dir = Path(chosen_dir) if chosen_dir else get_latest_result_dir(base_dir)
     return det_dir
+
+def load_yaml_from_result(det_dir: Path) -> tuple[dict, str, dict[int, str]]:
+    """Load config and dataset metadata from docs_run inside a result folder."""
+    cfg_path = det_dir / "docs_run" / "model_cfg.yaml"
+    cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    images_folder = cfg_data["IMAGES_FOLDER"]
+    dataset_dict_path = det_dir / "docs_run" / "dataset_dict.yaml"
+    dataset_dict_raw = yaml.safe_load(dataset_dict_path.read_text(encoding="utf-8"))
+    dataset_dict = {int(key): value for key, value in dataset_dict_raw.items()}
+    return cfg_data, images_folder, dataset_dict
 
 def collect_image_files(base_dir: str | Path, stage: str = "processing") -> tuple[list[Path], int]:
     """Collect image files recursively and print summary."""
@@ -51,7 +66,8 @@ def load_label_txt(path: Path, with_conf: bool, conf_threshold: float | None = N
         return np.zeros((0, dim), dtype=np.float32)
 
     # If file is empty, return empty array
-    txt = path.read_text(encoding="utf-8").strip()
+    with open(to_long_path(path), encoding="utf-8") as f:
+        txt = f.read().strip()
     if not txt:
         return np.zeros((0, dim), dtype=np.float32)
 

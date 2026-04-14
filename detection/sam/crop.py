@@ -1,7 +1,13 @@
 import cv2
 from pathlib import Path
-import yaml
-from utils import select_or_latest, collect_image_files, load_label_txt, xywh_norm_to_xyxy_norm
+from utils import (
+    select_or_latest,
+    load_yaml_from_result,
+    collect_image_files,
+    load_label_txt,
+    to_long_path,
+    xywh_norm_to_xyxy_norm,
+)
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 
@@ -10,12 +16,7 @@ if __name__ == "__main__":
     det_dir = select_or_latest(base_dir=PARENT_FOLDER, title="Select result_det folder (Cancel to use latest)")
 
     # Read config files
-    cfg_path = det_dir / "model_cfg.yaml"
-    cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-    images_folder = cfg_data["IMAGES_FOLDER"]
-    dataset_dict_path = det_dir / "dataset_dict.yaml"
-    dataset_dict_raw = yaml.safe_load(dataset_dict_path.read_text(encoding="utf-8"))
-    dataset_dict = {int(key): value for key, value in dataset_dict_raw.items()}
+    _, images_folder, dataset_dict = load_yaml_from_result(det_dir)
 
     # All images in IMAGES_FOLDER (recursive)
     image_files, _ = collect_image_files(images_folder, stage="cropping")
@@ -27,8 +28,8 @@ if __name__ == "__main__":
         # Get relative directory to maintain the original folder structure
         rel_dir = img_path.parent.relative_to(Path(images_folder))   # Image folder name
 
-        # In detection_entry.py, labels are saved in: run_dir (here det_dir) / rel_dir / "labels"
-        label_dir = det_dir / rel_dir / "labels"
+        # In detection.py, labels are saved in: run_dir (here det_dir) / "detection_result" / rel_dir / "labels"
+        label_dir = det_dir / "detection_result" / rel_dir / "labels"
         label_path = label_dir / f"{img_path.stem}.txt"
 
         # Skip if label file does not exist
@@ -62,8 +63,8 @@ if __name__ == "__main__":
         classes = labels[:, 0].astype(int)
 
         # Define and create the specific crop directory maintaining recursive structure
-        crop_dir = det_dir / "00crop" / rel_dir
-        crop_dir.mkdir(parents=True, exist_ok=True)
+        crop_dir = det_dir / "crop_result" / rel_dir
+        Path(to_long_path(crop_dir)).mkdir(parents=True, exist_ok=True)
 
         # For each detected box
         for i in range(labels.shape[0]):
@@ -89,8 +90,8 @@ if __name__ == "__main__":
             crop_filepath = crop_dir / crop_filename
 
             # Save the cropped image
-            cv2.imwrite(str(crop_filepath), crop_img)
+            cv2.imwrite(to_long_path(crop_filepath), crop_img)
             crop_count += 1
 
     print(f"\nCropping completed successfully!")
-    print(f"\nTotal {crop_count} bounding boxes cropped and saved in: {det_dir / '00crop'}")
+    print(f"\nTotal {crop_count} bounding boxes cropped and saved in: {det_dir / 'crop_result'}")

@@ -6,7 +6,7 @@ import torch
 from ultralytics.models.sam import SAM3SemanticPredictor
 from ultralytics import YOLOE
 from ultralytics.utils.nms import TorchNMS
-from utils import collect_image_files
+from utils import to_long_path, collect_image_files
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
@@ -18,7 +18,7 @@ DATASET_DICT_PATH = PARENT_FOLDER / "dataset_dict.yaml"
 DATASET_DICT_RAW = yaml.safe_load(DATASET_DICT_PATH.read_text(encoding="utf-8"))
 DATASET_DICT = {int(key): value for key, value in DATASET_DICT_RAW.items()}
 
-def post_nms(result, iou_threshold):
+def post_nms_cls(result, iou_threshold):
     """Per-class NMS for detection results; keeps cls/conf, optional masks.
     Args:
         result: The prediction result object (1 image) containing boxes, scores, classes, and optional masks.
@@ -45,6 +45,28 @@ def post_nms(result, iou_threshold):
 
     # Concatenate all kept indices and filter results
     keep = torch.cat(keep_all) if keep_all else torch.empty(0, dtype=torch.long, device=bboxes.device)
+    result.boxes = result.boxes[keep]
+    if result.masks is not None:
+        result.masks = result.masks[keep]
+
+    return result
+
+def post_nms_glb(result, iou_threshold):
+    """Global NMS for detection results; keeps cls/conf, optional masks.
+    Args:
+        result: The prediction result object (1 image) containing boxes, scores, classes, and optional masks.
+        iou_threshold: IoU threshold for NMS.
+    """
+    # If no boxes, return as is
+    if result.boxes is None or result.boxes.shape[0] == 0:
+        return result
+
+    # Extract box coordinates and scores
+    bboxes = result.boxes.xyxy
+    scores = result.boxes.conf
+
+    # Run NMS on all boxes regardless of class
+    keep = TorchNMS.fast_nms(bboxes, scores, iou_threshold=iou_threshold)
     result.boxes = result.boxes[keep]
     if result.masks is not None:
         result.masks = result.masks[keep]
@@ -84,7 +106,7 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_so
     # Always create the label file; keep it empty if no boxes detected
     label_path = labels_folder / f"{Path(img_path).stem}.txt"
     if result.boxes is None or result.boxes.shape[0] == 0:
-        label_path.open("w").close()
+        open(to_long_path(label_path), "w").close()
         return
 
     xywh = result.boxes.xywh.cpu().numpy()
@@ -102,7 +124,7 @@ def save_xywh_label(result, img_path: Path, labels_folder: Path, dataset_keys_so
         dataset_bboxes_norm.append([cx / img_w, cy / img_h, w / img_w, h / img_h])
 
     # Write to label file
-    with label_path.open("w") as f:
+    with open(to_long_path(label_path), "w") as f:
         for cid, bbox, score in zip(dataset_ids, dataset_bboxes_norm, conf):
             f.write(f"{cid} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f} {score:.6f}\n")
 
@@ -115,15 +137,18 @@ def print_device_info(model_instance, info_device: bool) -> bool:
 
 if __name__ == "__main__":
     # Initialization parameters
-    timestamp = datetime.now().strftime("%Y%m%d%H%M")
+    timestamp = datetime.now().strftime("%y%m%d%H%M")
     cfg = MODEL_CFG[MODEL_NAME]
     run_name = f"{MODEL_NAME}_result_det_{timestamp}"
     run_dir = Path(PARENT_FOLDER) / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    # Folder to save non-visualisation files
+    (run_dir / "docs_run").mkdir(parents=True, exist_ok=True)
+
     # Copy config files to run_dir for record-keeping
-    shutil.copy2(CFG_PATH, run_dir / CFG_PATH.name)
-    shutil.copy2(DATASET_DICT_PATH, run_dir / DATASET_DICT_PATH.name)
+    shutil.copy2(CFG_PATH, run_dir / "docs_run" / CFG_PATH.name)
+    shutil.copy2(DATASET_DICT_PATH, run_dir / "docs_run" / DATASET_DICT_PATH.name)
 
     # Text prompts (string) sourced from the dataset dictionary (sorted for stable order)
     text_prompts = [DATASET_DICT[idx] for idx in sorted(DATASET_DICT.keys())]
@@ -136,9 +161,9 @@ if __name__ == "__main__":
 
     # Print information once
     info_device = True
-    if cfg["NMS"] != False or cfg["UNIC"] == True:
+    if cfg["NMS_CLS"] != False or cfg["NMS_GLB"] != False or cfg["UNIC"] == True:
         print("\n" + "=" * 100)
-        print("The terminal logs during inference are still the results before custom post-processing (NMS or UNIC).")
+        print("The terminal logs during inference are still the results before custom post-processing (NMS_CLS, NMS_GLB, or UNIC).")
         print("=" * 100 + "\n")
 
     if MODEL_NAME == "sam3":
@@ -159,9 +184,9 @@ if __name__ == "__main__":
         # For each image
         for index, img_path in enumerate(image_files, start=1):
             rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))   # Image folder name
-            vis_dir = run_dir / rel_dir
+            vis_dir = run_dir / "detection_result" / rel_dir
             label_dir = vis_dir / "labels"
-            label_dir.mkdir(parents=True, exist_ok=True)
+            Path(to_long_path(label_dir)).mkdir(parents=True, exist_ok=True)
             predictor.set_image(str(img_path))
 
             # Print device info (only once)
@@ -170,9 +195,13 @@ if __name__ == "__main__":
             # Run prediction
             results = predictor(text=text_prompts)
 
-            # Apply NMS only when enabled and keep updated result in-place
-            if cfg["NMS"] != False:
-                results[0] = post_nms(results[0], cfg["NMS"])
+            # Apply per-class NMS only when enabled and keep updated result in-place
+            if cfg["NMS_CLS"] != False:
+                results[0] = post_nms_cls(results[0], cfg["NMS_CLS"])
+
+            # Apply global NMS only when enabled and keep updated result in-place
+            if cfg["NMS_GLB"] != False:
+                results[0] = post_nms_glb(results[0], cfg["NMS_GLB"])
 
             # Keep only the highest-confidence bbox when UNIC is enabled
             if cfg["UNIC"] == True:
@@ -195,7 +224,7 @@ if __name__ == "__main__":
         model.set_classes(text_prompts, model.get_text_pe(text_prompts))
 
         # Write all image paths to a txt file for efficient processing
-        imgpath_dir = run_dir / "imgpath.txt"
+        imgpath_dir = run_dir / "docs_run" / "yolo_imgpath.txt"
         with imgpath_dir.open("w", encoding="utf-8") as f:
             for img_path in image_files:
                 f.write(f"{img_path}\n")
@@ -216,16 +245,20 @@ if __name__ == "__main__":
         for result in results:
             img_path = Path(result.path)
             rel_dir = img_path.parent.relative_to(Path(IMAGES_FOLDER))
-            vis_dir = run_dir / rel_dir
+            vis_dir = run_dir / "detection_result" / rel_dir
             label_dir = vis_dir / "labels"
-            label_dir.mkdir(parents=True, exist_ok=True)
+            Path(to_long_path(label_dir)).mkdir(parents=True, exist_ok=True)
 
             # Print device info (only once)
             info_device = print_device_info(model, info_device)
 
-            # Apply NMS only when enabled and keep updated result in-place
-            if cfg["NMS"] != False:
-                result = post_nms(result, cfg["NMS"])
+            # Apply per-class NMS only when enabled and keep updated result in-place
+            if cfg["NMS_CLS"] != False:
+                result = post_nms_cls(result, cfg["NMS_CLS"])
+
+            # Apply global NMS only when enabled and keep updated result in-place
+            if cfg["NMS_GLB"] != False:
+                result = post_nms_glb(result, cfg["NMS_GLB"])
 
             # Keep only the highest-confidence bbox when UNIC is enabled
             if cfg["UNIC"] == True:

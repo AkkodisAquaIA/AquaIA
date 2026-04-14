@@ -2,9 +2,9 @@ import hashlib
 import shutil
 from collections import defaultdict
 from pathlib import Path
-from utils import collect_image_files, select_or_latest
+from utils import to_long_path, collect_image_files, select_or_latest
 
-PARENT_FOLDER = Path(__file__).resolve().parent
+PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
 
 def get_source_stem(stem: str) -> str:
     """Extract the original image stem from [original]_[class]_[index].
@@ -15,7 +15,8 @@ def get_source_stem(stem: str) -> str:
 
 def file_sha256(path: Path) -> str:
     """Return the SHA256 hash of a file."""
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    with open(to_long_path(path), "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
 
 def collect_crop_groups(crop_dir: Path) -> dict[tuple[str, str, str, str], list[Path]]:
     """Collect crop images and group them by comparison key."""
@@ -33,11 +34,12 @@ def collect_crop_groups(crop_dir: Path) -> dict[tuple[str, str, str, str], list[
     return crop_groups
 
 def copy_with_structure(crop_dir: Path, rel_paths: list[Path], output_dir: Path) -> None:
-    """Copy images while preserving the directory structure under 00crop."""
+    """Copy images while preserving the directory structure under crop_result."""
     for rel_path in rel_paths:
-        target_path = output_dir / rel_path
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(crop_dir / rel_path, target_path)
+        src = (crop_dir / rel_path).resolve()
+        dst = (output_dir / rel_path).resolve()
+        Path(to_long_path(dst.parent)).mkdir(parents=True, exist_ok=True)
+        shutil.copy2(to_long_path(src), to_long_path(dst))
 
 def get_unmatched_rel_paths(
     ref_groups: dict[tuple[str, str, str, str], list[Path]],
@@ -66,9 +68,9 @@ if __name__ == "__main__":
     det_dir_ref = select_or_latest(PARENT_FOLDER, "Select REFERENCE result_det folder")
     det_dir = select_or_latest(PARENT_FOLDER, "Select CURRENT result_det folder")
 
-    # Get the 00crop subdirectories
-    crop_dir_ref = det_dir_ref / "00crop"
-    crop_dir = det_dir / "00crop"
+    # Get the crop_result subdirectories
+    crop_dir_ref = det_dir_ref / "crop_result"
+    crop_dir = det_dir / "crop_result"
 
     # Collect crop groups for both reference and current
     ref_groups = collect_crop_groups(crop_dir_ref)
@@ -78,7 +80,7 @@ if __name__ == "__main__":
     extra_rel_paths, missing_rel_paths = get_unmatched_rel_paths(ref_groups, cur_groups)
 
     # Prepare comparison directories and copy unmatched images
-    compare_dir = det_dir / "00check_image"
+    compare_dir = det_dir / "check_image_result"
     extra_dir = compare_dir / "ref+"
     missing_dir = compare_dir / "ref-"
 
@@ -96,4 +98,4 @@ if __name__ == "__main__":
     summary_text = "\n".join(summary_lines)
 
     print(f"\n{summary_text}")
-    (compare_dir / "chek_image.txt").write_text(summary_text + "\n", encoding="utf-8")
+    (det_dir / "docs_run" / "check_image.txt").write_text(summary_text + "\n", encoding="utf-8")

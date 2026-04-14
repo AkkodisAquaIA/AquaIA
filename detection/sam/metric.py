@@ -1,17 +1,10 @@
 from pathlib import Path
 import numpy as np
-import yaml
 from ultralytics.utils.metrics import DetMetrics, box_iou
 import torch
-from utils import select_or_latest, load_label_txt, xywh_norm_to_xyxy_norm
+from utils import select_or_latest, load_yaml_from_result, load_label_txt, xywh_norm_to_xyxy_norm
 
 PARENT_FOLDER = Path(__file__).resolve().parent # Folder containing this script
-CFG_PATH = PARENT_FOLDER / "model_cfg.yaml"
-CFG_DATA = yaml.safe_load(CFG_PATH.read_text(encoding="utf-8"))
-IMAGES_FOLDER = CFG_DATA["IMAGES_FOLDER"]
-DATASET_DICT_PATH = PARENT_FOLDER / "dataset_dict.yaml"
-DATASET_DICT_RAW = yaml.safe_load(DATASET_DICT_PATH.read_text(encoding="utf-8"))
-DATASET_DICT = {int(key): value for key, value in DATASET_DICT_RAW.items()}
 
 def match_predictions(pred_xyxy, pred_cls, gt_xyxy, gt_cls, iouv):
     """
@@ -165,15 +158,15 @@ if __name__ == "__main__":
     # Select result_det folder or automatically use the latest one
     det_dir = select_or_latest(base_dir=PARENT_FOLDER, title="Select result_det folder (Cancel to use latest)")
 
+    # Read config files
+    cfg_data, images_folder, dataset_dict = load_yaml_from_result(det_dir)
+
     # Read config file to get CONF
     cfg_conf = None
-    cfg_path = det_dir / "model_cfg.yaml"
-    if cfg_path.exists():
-        cfg_data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-        model_name = cfg_data.get("MODEL_NAME")
-        model_cfg = cfg_data.get("MODEL_CFG", {}).get(model_name, {})
-        if "CONF" in model_cfg:
-            cfg_conf = float(model_cfg["CONF"])
+    model_name = cfg_data.get("MODEL_NAME")
+    model_cfg = cfg_data.get("MODEL_CFG", {}).get(model_name, {})
+    if "CONF" in model_cfg:
+        cfg_conf = float(model_cfg["CONF"])
 
     # Ask user for a new confidence threshold
     user_input = input(f"Inference model CONF = {cfg_conf}, define a new threshold? (blank to skip): ").strip()
@@ -182,13 +175,13 @@ if __name__ == "__main__":
     if det_conf_threshold is not None:
         suffix = f"_conf{int(round(det_conf_threshold * 100)):03d}"
 
-    det_labels_folder = det_dir / "labels"
-    gt_labels_folder = Path(str(IMAGES_FOLDER).replace("images", "labels"))
+    det_labels_folder = det_dir / "detection_result" / "labels"
+    gt_labels_folder = Path(str(images_folder).replace("images", "labels"))
 
     out = evaluate_two_folders_intersection(
         gt_labels_folder=str(gt_labels_folder),
         det_labels_folder=str(det_labels_folder),
-        names=DATASET_DICT,
+        names=dataset_dict,
         det_conf_threshold=det_conf_threshold,)
 
     # Print each metric on its own line for readability
@@ -198,6 +191,6 @@ if __name__ == "__main__":
 
     # Save metrics to txt file
     metrics_txt = "\n".join(f"{key}: {out.get(key)}" for key in keys)
-    metrics_path = det_dir / f"metrics{suffix}.txt"
+    metrics_path = det_dir / "docs_run" / f"metrics{suffix}.txt"
     metrics_path.write_text(metrics_txt + "\n", encoding="utf-8")
     print(f"Saved metrics to {metrics_path}")

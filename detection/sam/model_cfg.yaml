@@ -1,5 +1,5 @@
 # Images to be predicted with detection models
-IMAGES_FOLDER: "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/08_Data/FIN-Benthic_cleaned"
+IMAGES_FOLDER: "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/08_Data/PERLA"
 
 # Active model key: "sam3" or "yoloe26"
 MODEL_NAME: "sam3"
@@ -13,8 +13,9 @@ MODEL_CFG:
     HALF: true  # Use FP16 for faster inference
     SAVE: true  # Save results to project folder
     IMGSZ: 1008
-    NMS: false  # Not native NMS
-    UNIC: true # If true, keep only the highest-confidence bbox per image
+    NMS_CLS: false  # Not native per-class NMS
+    NMS_GLB: 0.05  # Not native global NMS
+    UNIC: false # If true, keep only the highest-confidence bbox per image
   yoloe26:  # TASK and DEVICE seems have no effect
     CONF: 0.2
     PATH: "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/yoloe-26x-seg.pt"
@@ -22,5 +23,6 @@ MODEL_CFG:
     SAVE: true
     IMGSZ: 640
     BATCH: 16
-    NMS: 0.7  # Not native NMS
+    NMS_CLS: 0.7  # Not native per-class NMS
+    NMS_GLB: false  # Not native global NMS
     UNIC: false # If true, keep only the highest-confidence bbox per image
