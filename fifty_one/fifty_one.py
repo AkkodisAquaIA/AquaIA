@@ -20,7 +20,6 @@ import fiftyone as fo
 from fiftyone import ViewField as F
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 
-
 from bboxes import bboxes as bb
 from statistics_yolo import dataset_statistics_yolo as ds
 
@@ -389,20 +388,19 @@ def main():
      
     else:    
         display.print("Aucune erreur détectée. Analyse du Dataset...\n", colors['ok'])
-       
+
         statistique(DATASET_DIR, path_user)
 
         dataset = create_dataset(DATASET_DIR)
 
         total_images = len(dataset)
-      
+        
         model = load_model(MODEL_PATH, total_images, DEVICE)
 
         # ================= ENCODING =================
         encoding(dataset, VEC_FIELD, total_images, DEVICE, model )
  
-
-
+ 
     print()
     prompt = f"Script terminé.{ct.BELL}"
     display.print(prompt, colors['goodbye'])

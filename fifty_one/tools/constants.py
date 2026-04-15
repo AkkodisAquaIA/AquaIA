@@ -90,11 +90,11 @@ PERCENTILE_ERROR   = 99   # Critical threshold
 
 # Maximum tolerated overflow before raising a warning
 # (bounding box partially outside image)
-BBOX_OVERFLOW_WARNING = 32.159 # 32.150  # Typical range: 10–20%
+BBOX_OVERFLOW_WARNING = 15.0 # 32.150  # Typical range: 10–20%
 
 # Maximum tolerated overflow before marking as error
 # (bounding box significantly outside image)
-BBOX_OVERFLOW_ERROR   = 32.159  # 32.155  # Typical range: 30–35%
+BBOX_OVERFLOW_ERROR   = 30.0  # 32.155  # Typical range: 30–35%
 
 
 #-----------------------------------------------------------------------------------

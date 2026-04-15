@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 import yaml
 import shutil
 from colorama import Fore, Style, init
+from collections import defaultdict
 
 import tools.display_color as dc
 from tools import utility as util
@@ -227,6 +228,9 @@ def dataset_statistics_yolo(DATASET_DIR):
     bbox_areas = []
     classes = []
     image_paths = []
+    class_to_images = defaultdict(set)
+    bbox_centers_x = []
+    bbox_centers_y = []
 
     total_boxes = 0
 
@@ -259,9 +263,12 @@ def dataset_statistics_yolo(DATASET_DIR):
                     continue
 
                 classes.append(cls)
+                class_to_images[cls].add(image_name)
 
                 bbox_widths.append(w)
                 bbox_heights.append(h)
+                bbox_centers_x.append(x)
+                bbox_centers_y.append(y)
                 bbox_areas.append(w * h)
 
                 image_paths.append(image_name)
@@ -286,13 +293,18 @@ def dataset_statistics_yolo(DATASET_DIR):
         "bbox_area": compute_stats(bbox_areas)
     }
 
-    
     class_distribution = Counter(classes)
-
     anomalies = []
 
     # --- détection anomalies bbox ---
-    for img_name, w, h in zip(image_paths, bbox_widths, bbox_heights):
+    for img_name, x, y, w, h in zip(
+        image_paths,
+        bbox_centers_x,
+        bbox_centers_y,
+        bbox_widths,
+        bbox_heights
+    ):
+
         area = w * h
 
         if w < ct.MIN_BBOX or h < ct.MIN_BBOX:
@@ -362,9 +374,6 @@ def dataset_statistics_yolo(DATASET_DIR):
         outside_ratio = 1 - (visible_area / bbox_area) if bbox_area > 0 else 0
         outside_ratio_pct = outside_ratio * 100
 
-
-       
-
         # --- Détection anomalies ---
         # ERROR
         if outside_ratio_pct > ct.BBOX_OVERFLOW_ERROR:
@@ -398,7 +407,8 @@ def dataset_statistics_yolo(DATASET_DIR):
         "bbox_areas": bbox_areas,
 
         "classes": classes,
-        "image_names": image_paths
+        "image_names": image_paths,
+        "class_to_images": class_to_images,
     }
 
 def afficher_stats_bbox(stats):
@@ -476,6 +486,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     class_distribution = resultats["class_distribution"]
     anomalies = resultats["anomalies"]
     bbox_areas = resultats.get("bbox_areas", [])
+    class_to_images = resultats.get("class_to_images", {})
 
     total_boxes = stats["bounding_boxes"]
     total = sum(class_distribution.values())
@@ -612,6 +623,32 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
                 for i in range(0, len(texts), ct.N_PER_LINE):
                     print(" | ".join(f"{t:<{max_width}}" for t in texts[i:i+ ct.N_PER_LINE]))
                 print("")
+
+            # # ----- IMAGES DES CLASSES RARES -------------------
+            # print("\n------ IMAGES POUR LES CLASSES RARES ------\n")
+
+            # MAX_IMAGES_DISPLAY = 10  # limite pour éviter affichage massif
+
+            # for cls, name, count, pct in classes_faibles:
+
+            #     images = sorted(class_to_images.get(cls, []))
+            #     total_images = len(images)
+
+            #     print(f"{cls} {name}  ({total_images} images)")
+
+            #     images_to_show = images[:MAX_IMAGES_DISPLAY]
+
+            #     if images_to_show:
+            #         max_width = max(len(img) for img in images_to_show) + 2
+            #         for i in range(0, len(images_to_show), 5):
+            #             ligne = images_to_show[i:i+5]
+            #             print(" | ".join(f"{img:<{max_width}}" for img in ligne))
+
+            #     if total_images > MAX_IMAGES_DISPLAY:
+            #         print(f"... + {total_images - MAX_IMAGES_DISPLAY} autres images")
+
+            #     print("")
+
 
 
     # --- histogramme bbox ---
@@ -806,6 +843,38 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         if ct.REPORT_MODE :
             util.save_anomalies_readable(anomalies, "erreurs_dataset.txt", path_user)
 
+
+    # # --- IMAGES PAR CLASSE --------------------------------------------------------
+    # print("\n------------- IMAGES PAR CLASSE -------------\n")
+
+    # MAX_CLASSES_DISPLAY = 10        # nombre max de classes à afficher
+    # MAX_IMAGES_DISPLAY = 20         # nombre max d'images par classe
+
+    # for idx, cls in enumerate(sorted(class_to_images.keys())):
+
+    #     if idx >= MAX_CLASSES_DISPLAY:
+    #         print(f"\n... + {len(class_to_images) - MAX_CLASSES_DISPLAY} autres classes")
+    #         break
+
+    #     name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
+    #     all_images = sorted(class_to_images[cls])
+
+    #     # ✅ on limite ici
+    #     images = all_images[:MAX_IMAGES_DISPLAY]
+
+    #     print(f"{cls:>2} {name}  ({len(all_images)} images)")
+
+    #     if images:
+    #         max_width = max(len(img) for img in images) + 2
+    #         for i in range(0, len(images), 5):
+    #             ligne = images[i:i+5]
+    #             print(" | ".join(f"{img:<{max_width}}" for img in ligne))
+
+    #     # ✅ s'il y a plus d'images
+    #     if len(all_images) > MAX_IMAGES_DISPLAY:
+    #         print(f"... + {len(all_images) - MAX_IMAGES_DISPLAY} autres images")
+
+    #     print("")
 
     metrics = imbalance_metrics(class_distribution)
     afficher_imbalance_avance(metrics, display, colors)

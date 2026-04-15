@@ -159,6 +159,21 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
                         erreurs_ligne.append("taille_>_1")
                         ctrl_ok = False
 
+                    # --- BBox dépasse réellement de l'image ---
+                    x_min = x - w / 2
+                    x_max = x + w / 2
+                    y_min = y - h / 2
+                    y_max = y + h / 2
+
+                    EPS = 1e-6
+                    if (x_min < -EPS or x_max > 1+EPS or
+                        y_min < -EPS or y_max > 1+EPS):
+                        erreurs_syntaxe["bbox_hors_limites_image"].append(
+                            f"{entry.name} (ligne {i})"
+                        )
+                        erreurs_ligne.append("bbox_hors_limites_image")
+                        ctrl_ok = False
+
                 #--- BBox dupliquées ---
                 bbox_tuple_rounded = round_bbox(cls, x, y, w, h)
                 if bbox_tuple_rounded in seen_boxes:
