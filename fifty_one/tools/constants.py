@@ -72,32 +72,25 @@ IOU_THRESHOLD = 0.9
 #-----------------------------------------------------------------------------------
 
 # Minimum and maximum bounding box width/height (relative to image size)
-MIN_BBOX = 0.0   # 0.00192186
-MAX_BBOX = 1.0  # 0.99807814
+MIN_BBOX = 0.002   # 0.00192186
+MAX_BBOX = 0.998  # 0.99807814
 
 # Minimum and maximum bounding box area (relative to image area)
 MIN_BBOX_AREA = 0.0 # MIN_BBOX ** 2
-MAX_BBOX_AREA = 1.0 #MAX_BBOX ** 2
+MAX_BBOX_AREA = 0.9 #MAX_BBOX ** 2
 
 #-----------------------------------------------------------------------------------
 # Percentile Thresholds for Anomaly Detection
 #-----------------------------------------------------------------------------------
 
 # Percentile thresholds used to detect outliers
-PERCENTILE_WARNING = 90   # Warning threshold
-PERCENTILE_ERROR   = 99   # Critical threshold
+# Percentile calibration
+PERCENTILE_WARNING = 80   # 80
+PERCENTILE_ERROR   = 95   # 95
 
-#-----------------------------------------------------------------------------------
-# Bounding Box Overflow Tolerance (in %)
-#-----------------------------------------------------------------------------------
-
-# Maximum tolerated overflow before raising a warning
-# (bounding box partially outside image)
-BBOX_OVERFLOW_WARNING = 2.0 # 32.150  # Typical range: 10–20%
-
-# Maximum tolerated overflow before marking as error
-# (bounding box significantly outside image)
-BBOX_OVERFLOW_ERROR   = 5.0  # 32.155  # Typical range: 30–35%
+# Minimum guaranteed thresholds (never go below this)
+MIN_BBOX_OVERFLOW_WARNING = 15.0   # 15.0
+MIN_BBOX_OVERFLOW_ERROR   = 30.0   # 30.0
 
 
 #-----------------------------------------------------------------------------------

@@ -376,7 +376,7 @@ def dataset_statistics_yolo(DATASET_DIR):
 
         # --- Détection anomalies ---
         # ERROR
-        if outside_ratio_pct > ct.BBOX_OVERFLOW_ERROR:
+        if outside_ratio_pct > ct.MIN_BBOX_OVERFLOW_ERROR:
             anomalies.append({
                 "type": "bbox_hors_limite_error",
                 "width": w,
@@ -388,7 +388,7 @@ def dataset_statistics_yolo(DATASET_DIR):
             })
 
         # WARNING
-        elif outside_ratio_pct >= ct.BBOX_OVERFLOW_WARNING:
+        elif outside_ratio_pct >= ct.MIN_BBOX_OVERFLOW_WARNING:
             anomalies.append({
                 "type": "bbox_hors_limite_warning",
                 "width": w,
@@ -569,7 +569,8 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
 
         blocs.append(bloc)
 
-    print(f"\n----------- CLASS DISTRIBUTION ({rary + moy + dom}) -----------")
+    print()
+    display.print(f"----------- CLASS DISTRIBUTION ({rary + moy + dom}) -----------", colors['info'])
     legend_colored = (
         f"    {Fore.GREEN}■ ({dom}) ≥ {ct.DOMINANT}% Dominant{Style.RESET_ALL}   "
         f"| {Fore.YELLOW}■ ({moy}) {ct.RARE}–{ct.DOMINANT}% Moyen{Style.RESET_ALL}   "
@@ -623,6 +624,116 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
                 for i in range(0, len(texts), ct.N_PER_LINE):
                     print(" | ".join(f"{t:<{max_width}}" for t in texts[i:i+ ct.N_PER_LINE]))
                 print("")
+
+# --- IMAGES PAR CLASSE --------------------------------------------------------
+    display.print("------------- IMAGES PAR CLASSE -------------", colors['info'])
+
+    MAX_IMAGES_DISPLAY = 30     # nombre max d'images par classe
+    MAX_CLASSES_SELECT = 6      # max classes que l'utilisateur peut demander
+
+    def parse_selection(user_input, available_classes):
+        """
+        Parse une entrée du type:
+        1 3-5 8
+        Retourne une liste d'entiers uniques et valides.
+        """
+        result = set()
+        parts = user_input.split()
+
+        for part in parts:
+            if "-" in part:
+                try:
+                    start, end = map(int, part.split("-"))
+                    for i in range(start, end + 1):
+                        if i in available_classes:
+                            result.add(i)
+                except ValueError:
+                    continue
+            else:
+                try:
+                    num = int(part)
+                    if num in available_classes:
+                        result.add(num)
+                except ValueError:
+                    continue
+
+        return sorted(result)
+
+    # available_classes = sorted(class_to_images.keys())
+    available_classes = sorted(
+        class_to_images.keys(),
+        key=lambda cls: (-len(class_to_images[cls]), cls)
+    )
+
+    # Compute max lengths dynamically
+    max_name_length = max(
+        len(class_names[cls]) if class_names and cls < len(class_names) else len(f"UNK_{cls}")
+        for cls in available_classes
+    )
+
+    max_count_length = max(
+        len(str(len(class_to_images[cls]))) 
+        for cls in available_classes
+    )
+
+    rows = []
+    for cls in available_classes:
+        name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
+        count = len(class_to_images[cls])
+        formatted = f"{cls:>3} - {name:<{max_name_length}} : {count:>{max_count_length}} imgs"
+        rows.append(formatted)
+
+    COLUMNS = 5
+    col_width = max(len(r) for r in rows) + 3
+
+    for i in range(0, len(rows), COLUMNS):
+        line = rows[i:i + COLUMNS]
+        print("|".join(f"{item:<{col_width}}" for item in line))
+
+    print()
+
+
+    while True:
+        tag = f"Entrez jusqu'à {MAX_CLASSES_SELECT} classes (ex: 1 3-5 8) ou 'q' pour quitter : "
+        display.print(tag, colors['input']) 
+        user_input = input("  > ").strip()
+
+        if user_input.lower() == 'q':
+            break
+
+        selected_classes = parse_selection(user_input, available_classes)            
+
+        if not selected_classes:
+            print()
+            display.print("Aucune classe valide sélectionnée.\n", colors['warning'])
+            continue
+
+        if len(selected_classes) > MAX_CLASSES_SELECT:
+            print()
+            display.print(f"Maximum {MAX_CLASSES_SELECT} classes autorisées.\n", colors['warning'])
+            continue    
+
+        for cls in selected_classes:
+
+            name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
+            all_images = sorted(class_to_images[cls])
+            images = all_images[:MAX_IMAGES_DISPLAY]
+
+            print(f"\n{cls:>2} {name}  ({len(all_images)} images)")
+
+            if images:
+                max_width = max(len(img) for img in images) + 1
+                for i in range(0, len(images), 5):
+                    ligne = images[i:i+5]
+                    print(" | ".join(f"{img:<{max_width}}" for img in ligne))
+                    
+            if len(all_images) > MAX_IMAGES_DISPLAY:
+                display.print(f"... + {len(all_images) - MAX_IMAGES_DISPLAY} autres images", colors['warning'])
+        
+        print()
+
+
+
 
     # --- histogramme bbox ---
     if afficher_hist and bbox_areas:
@@ -763,7 +874,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         for img in resultats.get("image_names", []):
             bbox_per_image[img] += 1
 
-        score_images = defaultdict(lambda: {"count":0, "severity":0, "bbox_total":0, "score":0})
+        score_images = defaultdict(lambda: {"count":0, "severity":0, "bbox_total":0, "score":0.0})
         for a in anomalies:
             img = a["image"]
             t = a["type"]
@@ -776,21 +887,30 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
                 continue
             error_ratio = data["count"] / data["bbox_total"]
             avg_severity = data["severity"] / data["count"] if data["count"]>0 else 0
-            data["score"] = int(error_ratio * avg_severity)
+            data["score"] = (error_ratio * avg_severity)
 
         worst_images = sorted(score_images.items(), key=lambda x:x[1]["score"], reverse=True)
         if worst_images:
             print("\n-------------------------- QUALITE DES IMAGES -----------------------")
-            for img,d in worst_images[:10]:
-                if d["score"] == 0:
-                    continue
-                ratio = (d['count'] / d['bbox_total']) *100
-                print(   
+            print("\n-------------------------- Les 10 pires images ----------------------")
+
+            # Filter first
+            valid_images = [
+                (img, d) for img, d in worst_images
+                if d["score"] != 0
+            ]
+
+            # Then limit to 10
+            for img, d in valid_images[:10]:
+                ratio = (d['count'] / d['bbox_total']) * 100
+
+                print(
                     f"score = {d['score']:.2f} : "
                     f"anomalies = {d['count']:<3} "
-                    f"| Nb bbox = {d['bbox_total']:<3} | ration {ratio:6.2f}% : "
+                    f"| Nb bbox = {d['bbox_total']:<3} | ratio {ratio:6.2f}% : "
                     f"{img:<25}"
                 )
+
             print("---------------------------------------------------------------------")
         images_problematiques = sum(1 for d in score_images.values() if d["count"] > 0)
         total_bboxes_problematiques = len(anomalies)
@@ -825,80 +945,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     afficher_imbalance_avance(metrics, display, colors)
 
 
-    # # --- IMAGES PAR CLASSE --------------------------------------------------------
-    display.print("------------- IMAGES PAR CLASSE -------------", colors['info'])
-
-    MAX_IMAGES_DISPLAY = 30     # nombre max d'images par classe
-    MAX_CLASSES_SELECT = 6      # max classes que l'utilisateur peut demander
-
-    def parse_selection(user_input, available_classes):
-        """
-        Parse une entrée du type:
-        1 3-5 8
-        Retourne une liste d'entiers uniques et valides.
-        """
-        result = set()
-        parts = user_input.split()
-
-        for part in parts:
-            if "-" in part:
-                try:
-                    start, end = map(int, part.split("-"))
-                    for i in range(start, end + 1):
-                        if i in available_classes:
-                            result.add(i)
-                except ValueError:
-                    continue
-            else:
-                try:
-                    num = int(part)
-                    if num in available_classes:
-                        result.add(num)
-                except ValueError:
-                    continue
-
-        return sorted(result)
-
-    available_classes = sorted(class_to_images.keys())
-
-    while True:
-        tag = f"Entrez jusqu'à {MAX_CLASSES_SELECT} classes (ex: 1 3-5 8) ou 'q' pour quitter : "
-        display.print(tag, colors['input']) 
-        user_input = input("  > ").strip()
-
-        if user_input.lower() == 'q':
-            break
-
-        selected_classes = parse_selection(user_input, available_classes)            
-
-        if not selected_classes:
-            print()
-            display.print("Aucune classe valide sélectionnée.\n", colors['warning'])
-            continue
-
-        if len(selected_classes) > MAX_CLASSES_SELECT:
-            print()
-            display.print(f"Maximum {MAX_CLASSES_SELECT} classes autorisées.\n", colors['warning'])
-            continue    
-
-        for cls in selected_classes:
-
-            name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
-            all_images = sorted(class_to_images[cls])
-            images = all_images[:MAX_IMAGES_DISPLAY]
-
-            print(f"\n{cls:>2} {name}  ({len(all_images)} images)")
-
-            if images:
-                max_width = max(len(img) for img in images) + 1
-                for i in range(0, len(images), 5):
-                    ligne = images[i:i+5]
-                    print(" | ".join(f"{img:<{max_width}}" for img in ligne))
-                    
-            if len(all_images) > MAX_IMAGES_DISPLAY:
-                display.print(f"... + {len(all_images) - MAX_IMAGES_DISPLAY} autres images", colors['warning'])
-        
-        print()
+    
 
     print()
     display.print('-' * 120, colors['info'])

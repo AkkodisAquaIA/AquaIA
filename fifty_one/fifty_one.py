@@ -142,6 +142,23 @@ def fade_out(window, steps):
             window.after(50, fade)
     fade()
 
+def def_status(etat, path_user):
+       
+    display = dc.DisplayColor()
+ 
+    status: str = (
+        f"ON : Saving to:\n    {path_user}"
+        if etat
+        else "OFF"
+    )
+ 
+    # # Report mode handling
+    # display.print(f"Report mode {status}.\n", colors['warning'])
+ 
+    return status
+
+
+
 
 def statistique(DATASET_DIR, path_user):
      # ================= STATISTICS =================
@@ -149,9 +166,13 @@ def statistique(DATASET_DIR, path_user):
     class_names = ds.load_class_names(dataset_yaml)
 
     results = ds.dataset_statistics_yolo(DATASET_DIR)
-    seuils = util.calibrer_seuils_overflow(results,
-                                            warning_percentile=ct.PERCENTILE_WARNING, 
-                                            error_percentile=ct.PERCENTILE_ERROR)
+    seuils = util.calibrer_seuils_overflow(
+        results,
+        warning_percentile=ct.PERCENTILE_WARNING,
+        error_percentile=ct.PERCENTILE_ERROR,
+        min_warning=ct.MIN_BBOX_OVERFLOW_WARNING,
+        min_error=ct.MIN_BBOX_OVERFLOW_ERROR
+    )
     
     BBOX_OVERFLOW_WARNING = seuils['BBOX_OVERFLOW_WARNING']
     BBOX_OVERFLOW_ERROR   = seuils['BBOX_OVERFLOW_ERROR']
@@ -159,8 +180,8 @@ def statistique(DATASET_DIR, path_user):
     outside_ratios = [a['outside_ratio_pct'] for a in results.get('anomalies',
                                             []) if 'outside_ratio_pct' in a]
 
-
-    gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR, path_user) 
+    if outside_ratios :
+        gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR, path_user) 
 
     ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=True)
 
@@ -351,23 +372,25 @@ def main():
     # Affichge du mode de débugage
     display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
  
-   # Report mode handling
-    path_user: Path = Path(ct.PATH_USER)
-
-    if not path_user.exists():
+    print()
+    # Contrôle répertoire de sauvegarde
+    try:
+        path_user: Path = Path(ct.PATH_USER)
+        if not path_user.exists():
+            path_user = Path.cwd()
+            display.print("Path not defied : Using current working directory", colors["error"])
+    except Exception as e : 
         path_user = Path.cwd()
-        display.print("Using current working directory", colors["warning"])
-
-    status: str = (
-        f"ON : Saving to:\n    {path_user}"
-        if ct.REPORT_MODE
-        else "OFF"
-    )
-
-    display.print(f"Report mode {status}.\n", colors['warning'])
-
-
+        display.print("Path not defied : Using current working directory", colors["error"])
  
+    # Report mode handling
+    status = def_status(ct.REPORT_MODE, path_user)
+    display.print(f"Report mode {status}.\n", colors['warning'])
+ 
+    # Graphe mode handling
+    status = def_status(ct.SAVE_PLOT, path_user)
+    display.print(f"Save Plot mode {status}.\n", colors['warning'])
+
 
     if ct.TEST_MODE :
         # Pour les simulation

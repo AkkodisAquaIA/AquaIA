@@ -106,51 +106,90 @@ def clear_screen() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def calibrer_seuils_overflow(
-    resultats: dict,
-    warning_percentile: float = 90,
-    error_percentile: float = 99
-) -> dict[str, float]:
+def calibrer_seuils_overflow(results : dict,
+                             warning_percentile : float,
+                             error_percentile : float,
+                             min_warning : float,
+                             min_error : float)-> dict[str, float]:
     """
-    Automatically calibrate bounding box overflow thresholds
-    based on anomaly statistics.
+    Automatically calibrate bounding box overflow thresholds based on anomaly statistics.
+
+    This function computes warning and error thresholds for bounding box overflow
+    using percentile values derived from detected anomalies. It extracts the
+    `outside_ratio_pct` values from the provided results and determines threshold
+    levels based on the specified percentiles. Minimum threshold values are enforced
+    to guarantee baseline sensitivity.
+
+    If no overflow anomalies are found, the function directly returns the provided
+    minimum thresholds.
 
     Args:
-        resultats (dict): Dictionary containing dataset analysis results.
-        warning_percentile (float): Percentile for warning threshold.
-        error_percentile (float): Percentile for error threshold.
+        results (dict):
+            A dictionary containing anomaly detection results. It is expected
+            to include a key `"anomalies"` mapped to a list of dictionaries,
+            each potentially containing an `"outside_ratio_pct"` value
+            representing the percentage of bounding box overflow.
+
+        warning_percentile (float):
+            The percentile used to compute the warning threshold.
+
+        error_percentile (float):
+            The percentile used to compute the error threshold.
+
+        min_warning (float):
+            The minimum allowed value for the warning threshold.
+
+        min_error (float):
+            The minimum allowed value for the error threshold.
 
     Returns:
-        dict[str, float]: Dictionary containing calibrated thresholds.
+        dict[str, float]:
+            A dictionary containing:
+                - "BBOX_OVERFLOW_WARNING": Final warning threshold (percentage)
+                - "BBOX_OVERFLOW_ERROR": Final error threshold (percentage)
+
+    Notes:
+        - The function ensures that the error threshold is strictly greater
+          than the warning threshold. If necessary, a small safety margin
+          is added to the error threshold.
+        - If no valid `outside_ratio_pct` values are found, the minimum
+          thresholds are returned without percentile computation.
     """
 
-    outside_ratios: list[float] = [
-    a["outside_ratio_pct"]
-    for a in resultats["anomalies"]
-    if "outside_ratio_pct" in a
+    outside_ratios = [
+        a['outside_ratio_pct']
+        for a in results.get('anomalies', [])
+        if 'outside_ratio_pct' in a
     ]
 
     if not outside_ratios:
-        print("No outside_ratio_pct found, using default thresholds")
+        print("⚠ No overflow detected, using minimum thresholds.")
         return {
-            'BBOX_OVERFLOW_WARNING': ct.BBOX_OVERFLOW_WARNING,
-            'BBOX_OVERFLOW_ERROR': ct.BBOX_OVERFLOW_ERROR
+            "BBOX_OVERFLOW_WARNING": min_warning,
+            "BBOX_OVERFLOW_ERROR": min_error
         }
 
-    warning_value: float = float(np.percentile(outside_ratios, warning_percentile))
-    error_value: float = float(np.percentile(outside_ratios, error_percentile))
+    # Percentile-based thresholds
+    warning_calculated = np.percentile(outside_ratios, warning_percentile)
+    error_calculated   = np.percentile(outside_ratios, error_percentile)
 
-    # Safety clamps to avoid extreme thresholds
-    warning_value = float(np.clip(warning_value, 5, 25))
-    error_value = float(np.clip(error_value, 20, 60))
+    # Apply minimum guarantee
+    warning_final = max(warning_calculated, min_warning)
+    error_final   = max(error_calculated, min_error)
+
+    # Security: ensure error > warning
+    if error_final <= warning_final:
+        error_final = warning_final + 5.0  # small safety margin
 
     print("Automatic threshold calibration:")
-    print(f"  - Warning ({warning_percentile} percentile): {warning_value:.2f}%")
-    print(f"  - Error   ({error_percentile} percentile): {error_value:.2f}%")
+    print(f"  - Warning ({warning_percentile} percentile): "
+          f"{warning_calculated:.2f}% → Final: {warning_final:.2f}%")
+    print(f"  - Error   ({error_percentile} percentile): "
+          f"{error_calculated:.2f}% → Final: {error_final:.2f}%")
 
     return {
-        'BBOX_OVERFLOW_WARNING': warning_value,
-        'BBOX_OVERFLOW_ERROR': error_value
+        "BBOX_OVERFLOW_WARNING": warning_final,
+        "BBOX_OVERFLOW_ERROR": error_final
     }
 
 
@@ -301,7 +340,6 @@ def get_path_color(prompt: str, color_key: str = 'input') -> Path:
 
         error_text: str = f"Invalid path: {path_input}. Please try again."
         display.print(error_text, colors['error'])
-
 
 
 # ------------------------------

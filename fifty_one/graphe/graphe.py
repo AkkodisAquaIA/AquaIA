@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 from collections.abc import Sequence
 from pathlib import Path
 from datetime import datetime
@@ -110,6 +111,7 @@ def bbox_overflow(
     plt.title("Bounding Box Overflow Distribution")
 
     plt.legend()
+    plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     plt.tight_layout()
     save_plot("bbox_overflow.png", path_user)
     plt.show()
@@ -142,6 +144,7 @@ def histogram(
     plt.xlabel(x_label)
     plt.ylabel(y_label)
 
+    plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     plt.tight_layout()
     save_plot("histogram.png", path_user)
     plt.show()
@@ -183,6 +186,7 @@ def histogram_multiple(
     plt.title("Number of anomalies per type")
     plt.ylabel(y_label)
 
+    plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     plt.tight_layout()
     save_plot("histogram_multiple", path_user)
     plt.show()
