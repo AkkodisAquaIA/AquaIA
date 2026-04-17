@@ -159,31 +159,43 @@ def statistique(DATASET_DIR, path_user):
     outside_ratios = [a['outside_ratio_pct'] for a in results.get('anomalies',
                                             []) if 'outside_ratio_pct' in a]
 
-    # TODO
-    # gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR ) 
 
-    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=False)
+    gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR, path_user) 
+
+    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=True)
 
 
 def create_dataset(DATASET_DIR):
     display = dc.DisplayColor()
-
     dataset_name = "coco128_local"
 
-    display.print(f"Création du dataset FiftyOne à partir du dossier :\n   '{DATASET_DIR}' ...", colors['info'])
+    display.print(
+        "Création du dataset FiftyOne :",
+        colors['info']
+    )
+    print(f"    '{DATASET_DIR}'")
 
     if dataset_name in fo.list_datasets():
-        display.print(f"Suppression du dataset existant '{dataset_name}'", colors['info'])
-        fo.delete_dataset(dataset_name)    
-    
+        fo.delete_dataset(dataset_name)
+
+    # ✅ mini barre
+    progress = util.MiniProgressBar("Chargement dataset", width=20)
+    progress.start()
+
     dataset = fo.Dataset.from_dir(
-        dataset_type=fo.types.YOLOv5Dataset,
+        dataset_type=fo.types.YOLOv5Dataset, # type: ignore
         dataset_dir=str(DATASET_DIR),
         name=dataset_name
     )
 
-    total_images = len(dataset)
-    display.print(f"Dataset chargé avec succès : {total_images} images", colors['info'])
+    progress.stop()
+
+    total_images = len(dataset) # type: ignore
+
+    display.print(
+        f"✅ Dataset chargé : {total_images} images",
+        colors['info']
+    )
 
     return dataset
 
@@ -274,7 +286,7 @@ def encoding(dataset, VEC_FIELD, total_images, DEVICE, model):
 
                 # Chargement + prétraitement
                 images = list(executor.map(lambda p: preprocess(load_rgb(p)), batch_paths))
-                x = torch.stack(images).to(DEVICE)
+                x = torch.stack(images).to(DEVICE) # type: ignore
 
                 # Passage dans le modèle
                 with torch.no_grad():
@@ -311,6 +323,9 @@ def main():
     dataset_name = "coco128_local"
     VEC_FIELD = "emb_dinov3"
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+    fo.config.show_progress_bars = False 
+
     DUP_THRESHOLD = 0.98
     NEIGHBORS = 20
 
@@ -324,6 +339,8 @@ def main():
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+    # Efface l'écran avant de commencer
+    util.clear_screen()
     
     # Display du logo et infos système
     print()
@@ -334,13 +351,22 @@ def main():
     # Affichge du mode de débugage
     display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
  
-    # Affichage si mode de rapport actif
-    path_user = ct.PATH_USER
-    if not os.path.exists(path_user):
+   # Report mode handling
+    path_user: Path = Path(ct.PATH_USER)
+
+    if not path_user.exists():
         path_user = Path.cwd()
-        display.print(f"Utilisation du répertoire de travail", colors["warning"])
-    status = f"ON : Sauvegarde dans :\n    {path_user}" if ct.REPORT_MODE else "OFF"
+        display.print("Using current working directory", colors["warning"])
+
+    status: str = (
+        f"ON : Saving to:\n    {path_user}"
+        if ct.REPORT_MODE
+        else "OFF"
+    )
+
     display.print(f"Report mode {status}.\n", colors['warning'])
+
+
  
 
     if ct.TEST_MODE :
@@ -393,7 +419,7 @@ def main():
 
         dataset = create_dataset(DATASET_DIR)
 
-        total_images = len(dataset)
+        total_images = len(dataset) # type: ignore
         
         model = load_model(MODEL_PATH, total_images, DEVICE)
 

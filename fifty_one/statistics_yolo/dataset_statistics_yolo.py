@@ -624,40 +624,15 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
                     print(" | ".join(f"{t:<{max_width}}" for t in texts[i:i+ ct.N_PER_LINE]))
                 print("")
 
-            # # ----- IMAGES DES CLASSES RARES -------------------
-            # print("\n------ IMAGES POUR LES CLASSES RARES ------\n")
-
-            # MAX_IMAGES_DISPLAY = 10  # limite pour éviter affichage massif
-
-            # for cls, name, count, pct in classes_faibles:
-
-            #     images = sorted(class_to_images.get(cls, []))
-            #     total_images = len(images)
-
-            #     print(f"{cls} {name}  ({total_images} images)")
-
-            #     images_to_show = images[:MAX_IMAGES_DISPLAY]
-
-            #     if images_to_show:
-            #         max_width = max(len(img) for img in images_to_show) + 2
-            #         for i in range(0, len(images_to_show), 5):
-            #             ligne = images_to_show[i:i+5]
-            #             print(" | ".join(f"{img:<{max_width}}" for img in ligne))
-
-            #     if total_images > MAX_IMAGES_DISPLAY:
-            #         print(f"... + {total_images - MAX_IMAGES_DISPLAY} autres images")
-
-            #     print("")
-
-
-
     # --- histogramme bbox ---
     if afficher_hist and bbox_areas:
-        gr.histograme(bbox_areas,
+        gr.histogram(bbox_areas,
                       "Distribution des tailles de BBox",
                       "Aire bbox",
-                      "Nombre"
+                      "Nombre",
+                      path_user
                       )
+
 
     # --- anomalies ---------------------------------------------------------------
     # regroupement anomalies par image et type
@@ -801,7 +776,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
                 continue
             error_ratio = data["count"] / data["bbox_total"]
             avg_severity = data["severity"] / data["count"] if data["count"]>0 else 0
-            data["score"] = error_ratio * avg_severity
+            data["score"] = int(error_ratio * avg_severity)
 
         worst_images = sorted(score_images.items(), key=lambda x:x[1]["score"], reverse=True)
         if worst_images:
@@ -835,48 +810,95 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         if afficher_hist : 
             type_counts = Counter(a["type"] for a in anomalies)
             if type_counts:
-                gr.histo_multipl(type_counts,
+                gr.histogram_multiple(type_counts,
                                 "Nombre",
-                                anomalies) 
+                                anomalies,
+                                path_user) 
 
         # anomalies = resultats['anomalies'] après dataset_statistics_yolo
         if ct.REPORT_MODE :
             util.save_anomalies_readable(anomalies, "erreurs_dataset.txt", path_user)
 
 
-    # # --- IMAGES PAR CLASSE --------------------------------------------------------
-    # print("\n------------- IMAGES PAR CLASSE -------------\n")
-
-    # MAX_CLASSES_DISPLAY = 10        # nombre max de classes à afficher
-    # MAX_IMAGES_DISPLAY = 20         # nombre max d'images par classe
-
-    # for idx, cls in enumerate(sorted(class_to_images.keys())):
-
-    #     if idx >= MAX_CLASSES_DISPLAY:
-    #         print(f"\n... + {len(class_to_images) - MAX_CLASSES_DISPLAY} autres classes")
-    #         break
-
-    #     name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
-    #     all_images = sorted(class_to_images[cls])
-
-    #     # ✅ on limite ici
-    #     images = all_images[:MAX_IMAGES_DISPLAY]
-
-    #     print(f"{cls:>2} {name}  ({len(all_images)} images)")
-
-    #     if images:
-    #         max_width = max(len(img) for img in images) + 2
-    #         for i in range(0, len(images), 5):
-    #             ligne = images[i:i+5]
-    #             print(" | ".join(f"{img:<{max_width}}" for img in ligne))
-
-    #     # ✅ s'il y a plus d'images
-    #     if len(all_images) > MAX_IMAGES_DISPLAY:
-    #         print(f"... + {len(all_images) - MAX_IMAGES_DISPLAY} autres images")
-
-    #     print("")
-
+    # --- AFFICHAGE DES METRIQUES D'IMBALANCE ---
     metrics = imbalance_metrics(class_distribution)
     afficher_imbalance_avance(metrics, display, colors)
 
+
+    # # --- IMAGES PAR CLASSE --------------------------------------------------------
+    display.print("------------- IMAGES PAR CLASSE -------------", colors['info'])
+
+    MAX_IMAGES_DISPLAY = 30     # nombre max d'images par classe
+    MAX_CLASSES_SELECT = 6      # max classes que l'utilisateur peut demander
+
+    def parse_selection(user_input, available_classes):
+        """
+        Parse une entrée du type:
+        1 3-5 8
+        Retourne une liste d'entiers uniques et valides.
+        """
+        result = set()
+        parts = user_input.split()
+
+        for part in parts:
+            if "-" in part:
+                try:
+                    start, end = map(int, part.split("-"))
+                    for i in range(start, end + 1):
+                        if i in available_classes:
+                            result.add(i)
+                except ValueError:
+                    continue
+            else:
+                try:
+                    num = int(part)
+                    if num in available_classes:
+                        result.add(num)
+                except ValueError:
+                    continue
+
+        return sorted(result)
+
+    available_classes = sorted(class_to_images.keys())
+
+    while True:
+        tag = f"Entrez jusqu'à {MAX_CLASSES_SELECT} classes (ex: 1 3-5 8) ou 'q' pour quitter : "
+        display.print(tag, colors['input']) 
+        user_input = input("  > ").strip()
+
+        if user_input.lower() == 'q':
+            break
+
+        selected_classes = parse_selection(user_input, available_classes)            
+
+        if not selected_classes:
+            print()
+            display.print("Aucune classe valide sélectionnée.\n", colors['warning'])
+            continue
+
+        if len(selected_classes) > MAX_CLASSES_SELECT:
+            print()
+            display.print(f"Maximum {MAX_CLASSES_SELECT} classes autorisées.\n", colors['warning'])
+            continue    
+
+        for cls in selected_classes:
+
+            name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
+            all_images = sorted(class_to_images[cls])
+            images = all_images[:MAX_IMAGES_DISPLAY]
+
+            print(f"\n{cls:>2} {name}  ({len(all_images)} images)")
+
+            if images:
+                max_width = max(len(img) for img in images) + 1
+                for i in range(0, len(images), 5):
+                    ligne = images[i:i+5]
+                    print(" | ".join(f"{img:<{max_width}}" for img in ligne))
+                    
+            if len(all_images) > MAX_IMAGES_DISPLAY:
+                display.print(f"... + {len(all_images) - MAX_IMAGES_DISPLAY} autres images", colors['warning'])
+        
+        print()
+
+    print()
     display.print('-' * 120, colors['info'])

@@ -30,7 +30,7 @@ BELL = "\a"
 # Debug mode
 # True  -> Full error messages (detailed stack traces)
 # False -> Short and user-friendly error messages
-DEBUG_MODE = False
+DEBUG_MODE: bool = False
 
 
 #-----------------------------------------------------------------------------------
@@ -38,7 +38,10 @@ DEBUG_MODE = False
 #-----------------------------------------------------------------------------------
 
 # Enable/disable report generation (e.g., anomaly logs)
-REPORT_MODE = True
+REPORT_MODE: bool = True
+
+# Enable/disable save plot
+SAVE_PLOT: bool = True
 
 # Root path to the dataset (user-specific)
 PATH_USER = "c:/Users/Pierre.FANCELLI/Documents/___Dev/Aqua-IA/Data/"
@@ -70,7 +73,7 @@ IOU_THRESHOLD = 0.9
 
 # Minimum and maximum bounding box width/height (relative to image size)
 MIN_BBOX = 0.0   # 0.00192186
-MAX_BBOX = 1.0   # 0.99807814
+MAX_BBOX = 1.0  # 0.99807814
 
 # Minimum and maximum bounding box area (relative to image area)
 MIN_BBOX_AREA = 0.0 # MIN_BBOX ** 2
@@ -90,11 +93,11 @@ PERCENTILE_ERROR   = 99   # Critical threshold
 
 # Maximum tolerated overflow before raising a warning
 # (bounding box partially outside image)
-BBOX_OVERFLOW_WARNING = 15.0 # 32.150  # Typical range: 10–20%
+BBOX_OVERFLOW_WARNING = 2.0 # 32.150  # Typical range: 10–20%
 
 # Maximum tolerated overflow before marking as error
 # (bounding box significantly outside image)
-BBOX_OVERFLOW_ERROR   = 30.0  # 32.155  # Typical range: 30–35%
+BBOX_OVERFLOW_ERROR   = 5.0  # 32.155  # Typical range: 30–35%
 
 
 #-----------------------------------------------------------------------------------

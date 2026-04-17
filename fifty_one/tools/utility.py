@@ -1,5 +1,7 @@
 import os
 import sys
+import threading
+import time
 import numpy as np
 import socket
 import traceback
@@ -11,41 +13,144 @@ import argparse
 import fiftyone as fo
 from collections import defaultdict
 
-from typing import Tuple, List
+# from typing import Tuple, List, Dict, Optional, Any
+from typing import TypedDict
 
 import tools.display_color as dc
 from tools.constants import DISPLAY_COLORS as colors
 from tools import constants as ct
 
-def calibrer_seuils_overflow(resultats, warning_percentile=90, error_percentile=99):
+#=====================================================================================================
 
-    outside_ratios = [
-        a['outside_ratio_pct']
-        for a in resultats.get('anomalies', [])
-        if 'outside_ratio_pct' in a
+class DatasetStats(TypedDict):
+    images: int
+    labels: int
+    bounding_boxes: int
+    bbox_width_mean: float
+    bbox_height_mean: float
+    bbox_area_mean: float
+    bbox_width_min: float
+    bbox_width_max: float
+    bbox_height_min: float
+    bbox_height_max: float
+
+class Anomaly(TypedDict, total=False):
+    type: str
+    image: str
+    outside_ratio_pct: float
+    class_id: int
+
+class ValidationResults(TypedDict):
+    stats: DatasetStats
+    class_distribution: dict[int, int]
+    anomalies: list[Anomaly]
+
+
+class MiniProgressBar:
+    """
+    Lightweight animated text progress bar displayed on a single console line.
+    """
+
+    def __init__(self, message: str = "Loading", width: int = 20) -> None:
+        self.message: str = message
+        self.width: int = width
+        self.running: bool = False
+        self.thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        """Start the progress bar animation in a separate thread."""
+        self.running = True
+        self.thread = threading.Thread(target=self._animate)
+        self.thread.start()
+
+    def _animate(self) -> None:
+        """Internal animation loop."""
+        spinner: str = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+        i: int = 0
+        progress: int = 0
+
+        while self.running:
+            fill: int = progress % (self.width + 1)
+            bar: str = "#" * fill + "." * (self.width - fill)
+            spin: str = spinner[i % len(spinner)]
+
+            sys.stdout.write(f"\r{self.message} [{bar}] {spin}")
+            sys.stdout.flush()
+
+            progress += 1
+            i += 1
+            time.sleep(0.1)
+
+    def stop(self) -> None:
+        """Stop the progress bar animation."""
+        assert self.thread is not None
+        self.running = False
+        self.thread.join()
+
+        # Clear the line
+        sys.stdout.write("\r" + " " * 80 + "\r")
+        sys.stdout.flush()
+#------------------------------------------------------------------------------------------
+
+#------------------------------
+# Function to clear the console screen
+#------------------------------
+def clear_screen() -> None:
+    """
+    Clear the console screen depending on the operating system.
+
+    Uses:
+        - 'cls' on Windows
+        - 'clear' on Unix-based systems (Linux / macOS)
+    """
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def calibrer_seuils_overflow(
+    resultats: dict,
+    warning_percentile: float = 90,
+    error_percentile: float = 99
+) -> dict[str, float]:
+    """
+    Automatically calibrate bounding box overflow thresholds
+    based on anomaly statistics.
+
+    Args:
+        resultats (dict): Dictionary containing dataset analysis results.
+        warning_percentile (float): Percentile for warning threshold.
+        error_percentile (float): Percentile for error threshold.
+
+    Returns:
+        dict[str, float]: Dictionary containing calibrated thresholds.
+    """
+
+    outside_ratios: list[float] = [
+    a["outside_ratio_pct"]
+    for a in resultats["anomalies"]
+    if "outside_ratio_pct" in a
     ]
 
     if not outside_ratios:
-        print("Aucun outside_ratio_pct trouvé, utiliser des seuils par défaut")
+        print("No outside_ratio_pct found, using default thresholds")
         return {
             'BBOX_OVERFLOW_WARNING': ct.BBOX_OVERFLOW_WARNING,
             'BBOX_OVERFLOW_ERROR': ct.BBOX_OVERFLOW_ERROR
         }
 
-    warning_value = np.percentile(outside_ratios, warning_percentile)
-    error_value   = np.percentile(outside_ratios, error_percentile)
+    warning_value: float = float(np.percentile(outside_ratios, warning_percentile))
+    error_value: float = float(np.percentile(outside_ratios, error_percentile))
 
-    # garde-fous
-    warning_value = np.clip(warning_value, 5, 25)
-    error_value   = np.clip(error_value, 20, 60)
+    # Safety clamps to avoid extreme thresholds
+    warning_value = float(np.clip(warning_value, 5, 25))
+    error_value = float(np.clip(error_value, 20, 60))
 
-    print(f" Calibration automatique des seuils :")
-    print(f"  - Warning ({warning_percentile} percentile) : {warning_value:.2f}%")
-    print(f"  - Error   ({error_percentile} percentile) : {error_value:.2f}%")
+    print("Automatic threshold calibration:")
+    print(f"  - Warning ({warning_percentile} percentile): {warning_value:.2f}%")
+    print(f"  - Error   ({error_percentile} percentile): {error_value:.2f}%")
 
     return {
-        'BBOX_OVERFLOW_WARNING': float(warning_value),
-        'BBOX_OVERFLOW_ERROR': float(error_value)
+        'BBOX_OVERFLOW_WARNING': warning_value,
+        'BBOX_OVERFLOW_ERROR': error_value
     }
 
 
@@ -103,12 +208,12 @@ def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
 # ------------------------------
 # Function to parse command-line arguments
 # ------------------------------
-def read_param() -> Tuple[Path, Path]:
+def read_param() -> tuple[Path, Path]:
     """
     Parses command-line arguments for base path and data folder.
 
     Returns:
-        Tuple[Path, Path]: base path and data folder path
+        tuple[Path, Path]: base path and data folder path
 
     Raises:
         FileNotFoundError: If paths do not exist
@@ -146,11 +251,11 @@ def read_param() -> Tuple[Path, Path]:
     return base_path, data_path
 
 
-def rgb_to_ansi(rgb: Tuple[int, int, int]) -> str:
+def rgb_to_ansi(rgb: tuple[int, int, int]) -> str:
     """Convert RGB color to ANSI escape code."""
     return f"\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
 
-def chck_color(color_key: str) -> Tuple[int, int, int]:
+def chck_color(color_key: str) -> tuple[int, int, int]:
     """
     Check if the color key exists in the DISPLAY_COLORS dictionary.
     If it does, return the corresponding RGB value.
@@ -170,23 +275,32 @@ def chck_color(color_key: str) -> Tuple[int, int, int]:
 
 def get_path_color(prompt: str, color_key: str = 'input') -> Path:
     """
-    Requests a valid path from the user.
-    Displays the prompt in the specified color.
-    If the specified color key is invalid, the prompt will be displayed in Light Green.
+    Prompt the user for a valid filesystem path.
+
+    The prompt is displayed in the specified color if available
+    in the DISPLAY_COLORS dictionary.
+
+    Args:
+        prompt (str): Message displayed to the user.
+        color_key (str): Key used to retrieve RGB color.
+
+    Returns:
+        Path: Validated path entered by the user.
     """
-    display = dc.DisplayColor()
-    color = chck_color(color_key)
+    display: dc.DisplayColor = dc.DisplayColor()
+    color: tuple[int, int, int] = chck_color(color_key)
+
     while True:
-        # Convert the input color from DISPLAY_COLORS to ANSI
-        input_color = rgb_to_ansi(color)
-        # Displays the prompt in color
-        colored_prompt = f"{input_color}[?] {prompt}: {Style.RESET_ALL}"
-        path_input = input(colored_prompt).strip()
+        input_color: str = rgb_to_ansi(color)
+        colored_prompt: str = f"{input_color}[?] {prompt}: {Style.RESET_ALL}"
+
+        path_input: str = input(colored_prompt).strip()
+
         if os.path.exists(path_input):
             return Path(path_input)
 
-        text = f"Invalid path: {path_input}. Please try again."
-        display.print(text, colors['error'])
+        error_text: str = f"Invalid path: {path_input}. Please try again."
+        display.print(error_text, colors['error'])
 
 
 
@@ -194,26 +308,26 @@ def get_path_color(prompt: str, color_key: str = 'input') -> Path:
 # Function to display and save problematic items
 # ------------------------------
 def display_and_save_errors(
-    path_user,    
-    items: List[str],
+    path_user: Path,
+    items: list[str],
     file_name: str,
     title: str,
     sort: bool = True,
     full_path: bool = False,
 ) -> None:
     """
-    Display and save a list of problematic items in a file.
+    Display and optionally save problematic items to a file.
 
     Args:
-        items (List[str]): List of file paths or names
-        file_name (str): Output file name
-        title (str): Title to display
-        sort (bool): Whether to sort items before displaying
-        full_path (bool): Display/write full paths if True, else only file names
-
+        path_user (Path): Base directory where the report will be saved.
+        items (List[str]): List of file paths or file names.
+        file_name (str): Output report file name.
+        title (str): Section title for display.
+        sort (bool): Whether to sort items alphabetically.
+        full_path (bool): If True, write full paths; otherwise file names only.
     """
 
-    display = dc.DisplayColor()
+    display: dc.DisplayColor = dc.DisplayColor()
 
     if not items:
         display.print(f"{title}: No issues detected.\n", colors['ok'])
@@ -221,91 +335,124 @@ def display_and_save_errors(
 
     if sort:
         items = sorted(items, key=lambda p: str(p))
-    
-    # Save to file
+
+    # Save to file if report mode is enabled
     if ct.REPORT_MODE:
-        file_path = Path(path_user) / file_name
-        with open(file_path, "w") as f:
+        file_path: Path = path_user / file_name
+
+        with open(file_path, "w", encoding="utf-8") as f:
             for x in items:
                 f.write(str(x) if full_path else Path(x).name)
                 f.write("\n")
 
-        display.print(f"List saved to '{file_name}'\n", colors["warning"])
+        display.print(f" ****** '{file_name}' create *****\n", colors["warning"])
 
 
-def format_and_display_error(texte : str, rep= "") -> None  :
+def format_and_display_error(texte: str, rep: str = "") -> None:
     """
-    Handles errors based on the specified level of detail.
+    Display error information depending on DEBUG_MODE.
+
+    In debug mode:
+        - Full traceback is displayed and saved.
+
+    In normal mode:
+        - Only exception type and message are shown.
+
+    Args:
+        texte (str): Custom error message prefix.
+        rep (str): Directory where fault report is stored (debug mode).
     """
 
-    display = dc.DisplayColor()
+    display: dc.DisplayColor = dc.DisplayColor()
 
-    # Retrieve the type, value, and traceback of the most recent exception
     exc_type, exc_value, exc_traceback = sys.exc_info()
- 
-    # --- Full mode (DEBUG) ---
+
     if ct.DEBUG_MODE:
-        tb = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-        prompt = f"{texte} :\n{tb}"
+        tb: str = ''.join(traceback.format_exception(
+            exc_type, exc_value, exc_traceback
+        ))
 
-        report = Path(rep, "fault.txt"  )
-        print(f' ---- Error report saved to: {report}     ')
+        prompt: str = f"{texte}:\n{tb}"
+
+        report: Path = Path(rep, "fault.txt")
+        print(f"---- Error report saved to: {report}")
+
         with open(report, "a", encoding="utf-8") as f:
-            f.write(f"{texte} :\n {''.join(tb)}\n")
+            f.write(f"{texte}:\n{tb}\n")
 
-    # --- Simplified mode (without traceback) ---                                             
     else:
-        # Only display the exception type and value
-        prompt = f"{texte} :\n{exc_type.__name__}: {exc_value}"
+        assert exc_type is not None
+        prompt = f"{texte}:\n{exc_type.__name__}: {exc_value}"
 
     display.print(prompt, colors['error'])
 
-def afficher_bbox_erreurs_compact(bbox_erreurs, largeur_max_ligne=None):
+
+def afficher_bbox_erreurs_compact(
+    bbox_erreurs: dict[str, list[str]],
+    largeur_max_ligne: int | None = None
+) -> None:
     """
-    Affiche les erreurs de bbox par catégorie.
-    Adaptation automatique à la largeur sans couper les noms.
+    Display bounding box errors grouped by category.
+
+    The display automatically adapts to terminal width
+    without cutting file names.
+
+    Args:
+        bbox_erreurs (Dict[str, List[str]]):
+            Dictionary mapping error categories to image path lists.
+        largeur_max_ligne (Optional[int]):
+            Maximum line width. If None, half terminal width is used.
     """
 
-    display = dc.DisplayColor()
+    display: dc.DisplayColor = dc.DisplayColor()
+
+    if not bbox_erreurs:
+        display.print("No bounding box errors detected.", colors["ok"])
+        return
 
     if largeur_max_ligne is None:
-        largeur_max_ligne = shutil.get_terminal_size().columns / 2
+        largeur_max_ligne = shutil.get_terminal_size().columns // 2
 
-    categorie_max_len = max(len(cat) for cat in bbox_erreurs.keys())
-    indent = " " * (categorie_max_len + 3)
-    separateur = " | "
+    categorie_max_len: int = max(len(cat) for cat in bbox_erreurs.keys())
+    indent: str = " " * (categorie_max_len + 3)
+    separateur: str = " | "
 
-    display.print("Erreurs détectées :", colors["error"])
+    display.print("Detected errors:", colors["error"])
 
     for categorie, chemins in bbox_erreurs.items():
         if not chemins:
             continue
 
-        display.print(f"{categorie.capitalize().ljust(categorie_max_len)} ({len(chemins)} images) :", colors["error"])
+        display.print(
+            f"{categorie.capitalize().ljust(categorie_max_len)} "
+            f"({len(chemins)} images):",
+            colors["error"]
+        )
 
-        noms_images = [os.path.basename(chemin) for chemin in chemins]
+        noms_images: list[str] = [Path(chemin).name for chemin in chemins]
 
-        ligne = ""
+        ligne: str = ""
+
         for nom in noms_images:
+            element: str = nom if not ligne else separateur + nom
 
-            element = nom if not ligne else separateur + nom
-
-            # Vérifie si ajouter l'élément dépasse la largeur autorisée
+            # Check if adding the element exceeds allowed width
             if len(indent) + len(ligne) + len(element) > largeur_max_ligne:
                 print(f"{indent}{ligne}")
-                ligne = nom  # recommencer sans séparateur
+                ligne = nom
             else:
                 ligne += element
 
-        # Afficher la dernière ligne
         if ligne:
             print(f"{indent}{ligne}")
 
         print()
 
 
-
-def afficher_distribution_classes(class_distribution, classes_par_ligne=4):
+def afficher_distribution_classes(
+    class_distribution: dict[int, int],
+    classes_par_ligne: int = 4
+) -> None:
 
     print("\n--- Distribution des classes ---")
 
@@ -329,55 +476,75 @@ def afficher_distribution_classes(class_distribution, classes_par_ligne=4):
         print("".join(morceaux))
 
 
+def afficher_dataset_statistics(
+    resultats: ValidationResults,
+    path_user: Path
+) -> None:
+    """
+    Display YOLO dataset statistics in a structured format.
 
-def afficher_dataset_statistics(resultats, path_user):
+    Args:
+        resultats (Dict[str, Any]):
+            Dictionary containing:
+                - "stats": dataset statistics
+                - "class_distribution": class frequency mapping
+                - "anomalies": anomaly list
+        path_user (Path):
+            Output directory (may be used later for reporting).
+    """
 
-    display = dc.DisplayColor()
+    display: dc.DisplayColor = dc.DisplayColor()
 
-    stats = resultats["stats"]
-    class_distribution = resultats["class_distribution"]
-    anomalies = resultats["anomalies"]
+    stats: DatasetStats = resultats["stats"]
+    class_distribution: dict[int, int] = resultats["class_distribution"]
+    anomalies: list[Anomaly] = resultats["anomalies"]
 
-    display.print("Statistiques du dataset YOLO", colors["info"])
+    display.print("YOLO Dataset Statistics", colors["info"])
 
     print("\n--- Dataset ---")
 
     print(f"{'Images':20}: {stats['images']}")
-    print(f"{'Fichiers labels':20}: {stats['labels']}")
+    print(f"{'Label files':20}: {stats['labels']}")
     print(f"{'Bounding boxes':20}: {stats['bounding_boxes']}")
 
-    print("\n--- Bounding boxes ---")
+    print("\n--- Bounding Boxes ---")
 
-    print(f"{'Largeur moyenne':20}: {stats['bbox_width_mean']:.4f}")
-    print(f"{'Hauteur moyenne':20}: {stats['bbox_height_mean']:.4f}")
-    print(f"{'Aire moyenne':20}: {stats['bbox_area_mean']:.4f}")
+    print(f"{'Width mean':20}: {stats['bbox_width_mean']:.4f}")
+    print(f"{'Height mean':20}: {stats['bbox_height_mean']:.4f}")
+    print(f"{'Area mean':20}: {stats['bbox_area_mean']:.4f}")
 
-    print(f"{'Largeur min':20}: {stats['bbox_width_min']:.4f}")
-    print(f"{'Largeur max':20}: {stats['bbox_width_max']:.4f}")
+    print(f"{'Width min':20}: {stats['bbox_width_min']:.4f}")
+    print(f"{'Width max':20}: {stats['bbox_width_max']:.4f}")
 
-    print(f"{'Hauteur min':20}: {stats['bbox_height_min']:.4f}")
-    print(f"{'Hauteur max':20}: {stats['bbox_height_max']:.4f}")
+    print(f"{'Height min':20}: {stats['bbox_height_min']:.4f}")
+    print(f"{'Height max':20}: {stats['bbox_height_max']:.4f}")
 
     afficher_distribution_classes(class_distribution, classes_par_ligne=4)
 
+    print("\n--- Suspicious Annotations ---")
 
-    print("\n--- Annotations suspectes ---")
+    total: int = sum(class_distribution.values())
 
-    total = sum(class_distribution.values())
     if not anomalies:
-        display.print("Aucune anomalie détectée", colors["ok"])
-    else:
+        display.print("No anomalies detected", colors["ok"])
+        return
 
-        anomalies_count = Counter(a[0] for a in anomalies)
+    anomalies_count: Counter[str] = Counter(a[0] for a in anomalies) # type: ignore
 
-        for type_anom, count in anomalies_count.items():
-            pct = (count / total) * 100
-            display.print(
-                f"{type_anom:<20}: {count} ({pct:.3f}%)",
-                colors["warning"]
-            )
+    for type_anom, count in anomalies_count.items():
+        pct: float = (count / total) * 100 if total > 0 else 0.0
 
-def save_anomalies_readable(anomalies, file_name, path_user):
+        display.print(
+            f"{type_anom:<20}: {count} ({pct:.3f}%)",
+            colors["warning"]
+        )
+
+
+def save_anomalies_readable(
+    anomalies: list[Anomaly],
+    file_name: str,
+    path_user: Path
+) -> None:
     """
     Sauvegarde les anomalies dans un fichier texte lisible :
     - Résumé des anomalies par type
@@ -397,9 +564,9 @@ def save_anomalies_readable(anomalies, file_name, path_user):
 
     # Tri alphabétique des images par type
     for typ in anomalies_by_type:
-        anomalies_by_type[typ] = sorted(anomalies_by_type[typ])
+        anomalies_by_type[typ] = sorted(anomalies_by_type[typ]) # type: ignore
 
-    output_path = Path(path_user, file_name)
+    output_path =  path_user / file_name
     with open(output_path, "w", encoding="utf-8") as f:
         # --- Résumé ---
         f.write("=== RÉSUMÉ DES ANOMALIES ===\n")
@@ -411,8 +578,8 @@ def save_anomalies_readable(anomalies, file_name, path_user):
         for typ, images in anomalies_by_type.items():
             f.write(f"--- {typ} ---\n")
             for i in range(0, len(images), ct.N_PER_LINE):
-                line_images = images[i:i+ ct.N_PER_LINE]
+                line_images = images[i:i+ ct.N_PER_LINE] # type: ignore
                 f.write(" | ".join(line_images) + "\n")
             f.write("\n")
 
-    display.print(f"List saved to '{file_name}'\n", colors["warning"])        
+    display.print(f" ****** '{file_name}' create *****\n", colors["warning"])        
