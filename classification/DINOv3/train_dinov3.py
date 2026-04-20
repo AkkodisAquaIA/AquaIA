@@ -50,12 +50,26 @@ def compute_class_weights_from_imagefolder(train_ds, num_classes: int) -> torch.
 # =========================
 @dataclass
 class Config:
-    run_dir: str = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/focal_auto"
+  
+    import os
+
+    run_dir: str = os.environ.get(
+        "RUN_DIR",
+        "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/focal_auto"
+    )
     make_subrun_with_timestamp: bool = True
-    data_dir: str = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited"
+    data_dir: str = os.environ.get(
+        "DATA_DIR",
+        "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited"
+    )
     model_id: str = "facebook/dinov3-vits16-pretrain-lvd1689m"
 
-    epochs: int = 25
+    os.makedirs(run_dir, exist_ok=True)
+
+    if not os.path.isdir(data_dir):
+        raise FileNotFoundError(f"data_dir introuvable : {data_dir}")
+
+    epochs: int = 150
     batch_size: int = 32
 
     lr_head: float = 1e-3
@@ -68,8 +82,8 @@ class Config:
     num_workers: int = 4
     seed: int = 42
 
-    early_patience: int = 7
-    early_min_delta: float = 1e-4
+    early_patience = 999
+    early_min_delta = 1e-5
 
     scheduler: str = "cosine"
     cosine_tmax_epochs: Optional[int] = None
