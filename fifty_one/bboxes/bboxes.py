@@ -7,8 +7,9 @@ from collections import Counter, defaultdict
 
 from tools import utility as util
 import tools.display_color as dc
-from tools import constants as ct
-from tools.constants import DISPLAY_COLORS as colors
+from config import process as pr
+from config import constants as ct
+from config.constants import DISPLAY_COLORS as colors
 
 #==================================================================================
 
@@ -56,15 +57,8 @@ def round_coords(x, y, w, h, decimals=4):
 display = dc.DisplayColor()
 
 def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
-    labels_dir = os.path.join(DATASET_DIR, "labels", "train2017")
-    if not os.path.isdir(labels_dir):
-        display.print(f"Directory not found: {labels_dir}", colors['error'])
-        exit(1)
 
-    images_dir = os.path.join(DATASET_DIR, "images", "train2017")
-    if not os.path.isdir(images_dir): 
-        display.print(f"Directory not found: {images_dir}", colors['error'])
-        exit(1)
+    images_dir, labels_dir = util.get_dataset_paths(DATASET_DIR)
     
     split_pattern = re.compile(r"[,\s]+")
     
@@ -109,7 +103,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
                 # --- Classe ---
                 try:
                     cls = int(parts[0])
-                    if ct.NB_CLASSES is not None and cls >= ct.NB_CLASSES:
+                    if pr.NB_CLASSES is not None and cls >= pr.NB_CLASSES:
                         erreurs_syntaxe["classe_hors_plage"].append(f"{entry.name} (ligne {i})")
                         erreurs_ligne.append("classe_hors_plage")
                         ctrl_ok = False
@@ -181,7 +175,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
                 current_box = (x, y, w, h)
                 for prev_box, prev_line in seen_boxes_by_class[cls]:
                     iou = bbox_iou(current_box, prev_box)
-                    if iou > ct.IOU_THRESHOLD:
+                    if iou > pr.IOU_THRESHOLD:
                         erreurs_syntaxe["bbox_IoU_suspect"].append(
                             f"{entry.name} (classe {cls}, lignes {prev_line}-{i}) IoU={iou:.3f}"
                         )

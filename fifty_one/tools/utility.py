@@ -6,19 +6,22 @@ import numpy as np
 import socket
 import traceback
 from collections import Counter
-from colorama import init, Style
+# from colorama import init, Style
+from colorama import Fore, Style
 from pathlib import Path
 import shutil
 import argparse
 import fiftyone as fo
 from collections import defaultdict
+from datetime import datetime
 
 # from typing import Tuple, List, Dict, Optional, Any
 from typing import TypedDict
 
 import tools.display_color as dc
-from tools.constants import DISPLAY_COLORS as colors
-from tools import constants as ct
+from config.constants import DISPLAY_COLORS as colors
+from config import constants as ct
+from config import process as pr
 
 #=====================================================================================================
 
@@ -44,7 +47,6 @@ class ValidationResults(TypedDict):
     stats: DatasetStats
     class_distribution: dict[int, int]
     anomalies: list[Anomaly]
-
 
 class MiniProgressBar:
     """
@@ -90,7 +92,105 @@ class MiniProgressBar:
         # Clear the line
         sys.stdout.write("\r" + " " * 80 + "\r")
         sys.stdout.flush()
+
+class TablePrinter:
+
+    def __init__(self, columns):
+        """
+        columns = liste de dictionnaires :
+        [
+            {"title": "Mean", "width": 11, "align": ">",},
+            ...
+        ]
+        align : "<" gauche | ">" droite | "^" centre
+        """
+        self.columns = columns
+
+    # ──────────────────────────────────────────
+    # Helpers
+    # ──────────────────────────────────────────
+
+    def _line(self, left, mid, right):
+        line = left
+        for i, col in enumerate(self.columns):
+            line += "─" * col["width"]
+            line += mid if i < len(self.columns) - 1 else right
+        print(line)
+
+    def _format_cell(self, text, width, align):
+        return f"{text:{align}{width}}"
+
+    def _color_if(self, text, width, align, ok):
+        formatted = self._format_cell(text, width, align)
+        if ok:
+            return formatted
+        return f"{Fore.RED}{Style.BRIGHT}{formatted}{Style.RESET_ALL}"
+
+    # ──────────────────────────────────────────
+    # Public API
+    # ──────────────────────────────────────────
+
+    def header(self):
+        self._line("┌", "┬", "┐")
+
+        row = "│"
+        for col in self.columns:
+            row += self._format_cell(
+                col["title"],
+                col["width"],
+                "^"
+            ) + "│"
+        print(row)
+
+        self._line("├", "┼", "┤")
+
+    def row(self, values):
+        """
+        values = liste de tuples :
+        [
+            ("Width", True),
+            ("0.1523", True),
+            ("0.0152", True),
+            ("0.1000", condition_ok),
+        ]
+        condition_ok → bool (True = normal, False = rouge)
+        """
+        row = "│"
+        for (value, ok), col in zip(values, self.columns):
+            cell = self._color_if(
+                str(value),
+                col["width"],
+                col["align"],
+                ok
+            )
+            row += cell + "│"
+        print(row)
+
+    def footer(self):
+        self._line("└", "┴", "┘")
+
+
+
+
+
 #------------------------------------------------------------------------------------------
+
+
+def get_dataset_paths(dataset_dir, split="train2017"):
+    dataset_dir = Path(dataset_dir)
+
+    images_dir = dataset_dir / "images" / split
+    labels_dir = dataset_dir / "labels" / split
+
+    if not images_dir.exists():
+        raise FileNotFoundError(f"Images dir introuvable : {images_dir}")
+
+    if not labels_dir.exists():
+        raise FileNotFoundError(f"Labels dir introuvable : {labels_dir}")
+
+    return images_dir, labels_dir
+
+
 
 #------------------------------
 # Function to clear the console screen
@@ -104,6 +204,21 @@ def clear_screen() -> None:
         - 'clear' on Unix-based systems (Linux / macOS)
     """
     os.system("cls" if os.name == "nt" else "clear")
+
+
+def horodatage(file_name: str) -> str:
+
+    # Generate a timestamp (format: YYYYMMDD_HHMMSS)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M") 
+
+    # Extract filename without extension and file extension
+    stem = Path(file_name).stem
+    suffix = Path(file_name).suffix
+
+    # Build a new filename including the timestamp
+    filename_with_timestamp = f"{timestamp}_{stem}_{suffix}"
+
+    return filename_with_timestamp
 
 
 def calibrer_seuils_overflow(results : dict,
@@ -163,7 +278,7 @@ def calibrer_seuils_overflow(results : dict,
     ]
 
     if not outside_ratios:
-        print("⚠ No overflow detected, using minimum thresholds.")
+        print(" No overflow detected, using minimum thresholds.")
         return {
             "BBOX_OVERFLOW_WARNING": min_warning,
             "BBOX_OVERFLOW_ERROR": min_error
@@ -341,6 +456,34 @@ def get_path_color(prompt: str, color_key: str = 'input') -> Path:
         error_text: str = f"Invalid path: {path_input}. Please try again."
         display.print(error_text, colors['error'])
 
+def get_file_name_color(prompt: str, color_key: str = 'input') -> str:
+    """
+    Requests a file name from the user.
+    Ensures it has a supported extension.
+    Displays the prompt in the specified color.
+    If the specified color key is invalid, the prompt will be displayed in Light Green.
+    """
+    display = dc.DisplayColor()
+
+    color = chck_color(color_key)
+    while True:
+        # Convert the input color from DISPLAY_COLORS to ANSI
+        input_color = rgb_to_ansi(color)
+
+        # Display the prompt in color
+        colored_prompt = f"{input_color}[?] {prompt}: {Style.RESET_ALL}"
+        file_name = input(colored_prompt).strip()
+
+        # Extract extension
+        _, ext = os.path.splitext(file_name)
+
+        # Validate extension
+        if ext.lower() == ".pth":
+            return file_name
+
+        text = f"Invalid file extension: {ext}. Please try again."
+        display.print(text, colors['error'])
+
 
 # ------------------------------
 # Function to display and save problematic items
@@ -375,8 +518,10 @@ def display_and_save_errors(
         items = sorted(items, key=lambda p: str(p))
 
     # Save to file if report mode is enabled
-    if ct.REPORT_MODE:
-        file_path: Path = path_user / file_name
+    if pr.REPORT_MODE:
+
+        new = horodatage(file_name)
+        file_path: Path = path_user / new
 
         with open(file_path, "w", encoding="utf-8") as f:
             for x in items:
@@ -384,45 +529,6 @@ def display_and_save_errors(
                 f.write("\n")
 
         display.print(f" ****** '{file_name}' create *****\n", colors["warning"])
-
-
-def format_and_display_error(texte: str, rep: str = "") -> None:
-    """
-    Display error information depending on DEBUG_MODE.
-
-    In debug mode:
-        - Full traceback is displayed and saved.
-
-    In normal mode:
-        - Only exception type and message are shown.
-
-    Args:
-        texte (str): Custom error message prefix.
-        rep (str): Directory where fault report is stored (debug mode).
-    """
-
-    display: dc.DisplayColor = dc.DisplayColor()
-
-    exc_type, exc_value, exc_traceback = sys.exc_info()
-
-    if ct.DEBUG_MODE:
-        tb: str = ''.join(traceback.format_exception(
-            exc_type, exc_value, exc_traceback
-        ))
-
-        prompt: str = f"{texte}:\n{tb}"
-
-        report: Path = Path(rep, "fault.txt")
-        print(f"---- Error report saved to: {report}")
-
-        with open(report, "a", encoding="utf-8") as f:
-            f.write(f"{texte}:\n{tb}\n")
-
-    else:
-        assert exc_type is not None
-        prompt = f"{texte}:\n{exc_type.__name__}: {exc_value}"
-
-    display.print(prompt, colors['error'])
 
 
 def afficher_bbox_erreurs_compact(
@@ -604,7 +710,12 @@ def save_anomalies_readable(
     for typ in anomalies_by_type:
         anomalies_by_type[typ] = sorted(anomalies_by_type[typ]) # type: ignore
 
-    output_path =  path_user / file_name
+    # Generate a timestamp (format: YYYYMMDD_HHMMSS)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+ 
+    new = horodatage(file_name)
+    output_path =  path_user / new
+
     with open(output_path, "w", encoding="utf-8") as f:
         # --- Résumé ---
         f.write("=== RÉSUMÉ DES ANOMALIES ===\n")

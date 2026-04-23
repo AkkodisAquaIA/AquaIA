@@ -4,7 +4,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from datetime import datetime
 
-import tools.constants as ct
+import config.process as pr
+import tools.utility as util
 
 
 def save_plot(filename: str, path_user: Path | None) -> None:
@@ -16,19 +17,10 @@ def save_plot(filename: str, path_user: Path | None) -> None:
         path_user (Path | None): Destination directory.
     """
 
-    if ct.SAVE_PLOT and path_user is not None:
-        # Generate a timestamp (format: YYYYMMDD_HHMMSS)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    if pr.SAVE_PLOT and path_user is not None:
 
-        # Extract filename without extension and file extension
-        stem = Path(filename).stem
-        suffix = Path(filename).suffix
-
-        # Build a new filename including the timestamp
-        filename_with_timestamp = f"{stem}_{timestamp}{suffix}"
-
-        # Build full file path
-        file_path: Path = path_user / filename_with_timestamp
+        new = util.horodatage(filename)
+        file_path: Path = path_user / new
 
         # Save the current matplotlib figure
         plt.savefig(file_path, dpi=300)

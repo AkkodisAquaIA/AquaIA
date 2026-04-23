@@ -9,6 +9,7 @@ from torchvision import transforms
 from PIL import Image
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
+from collections import defaultdict
 import faiss
 from tqdm import tqdm
 import timm
@@ -17,6 +18,7 @@ import tkinter as tk
 
 # ONLY HERE
 import fiftyone as fo
+import fiftyone.core.labels as fol
 from fiftyone import ViewField as F
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 
@@ -24,9 +26,10 @@ from bboxes import bboxes as bb
 from statistics_yolo import dataset_statistics_yolo as ds
 
 from tools import utility as util
-from tools import constants as ct
+from config import process as pr
+from config import constants as ct
 import tools.display_color as dc
-from tools.constants import DISPLAY_COLORS as colors
+from config.constants import DISPLAY_COLORS as colors
 from graphe import graphe as gr
 
 
@@ -151,14 +154,7 @@ def def_status(etat, path_user):
         if etat
         else "OFF"
     )
- 
-    # # Report mode handling
-    # display.print(f"Report mode {status}.\n", colors['warning'])
- 
     return status
-
-
-
 
 def statistique(DATASET_DIR, path_user):
      # ================= STATISTICS =================
@@ -168,10 +164,10 @@ def statistique(DATASET_DIR, path_user):
     results = ds.dataset_statistics_yolo(DATASET_DIR)
     seuils = util.calibrer_seuils_overflow(
         results,
-        warning_percentile=ct.PERCENTILE_WARNING,
-        error_percentile=ct.PERCENTILE_ERROR,
-        min_warning=ct.MIN_BBOX_OVERFLOW_WARNING,
-        min_error=ct.MIN_BBOX_OVERFLOW_ERROR
+        warning_percentile= pr.PERCENTILE_WARNING,
+        error_percentile= pr.PERCENTILE_ERROR,
+        min_warning= pr.MIN_BBOX_OVERFLOW_WARNING,
+        min_error= pr.MIN_BBOX_OVERFLOW_ERROR
     )
     
     BBOX_OVERFLOW_WARNING = seuils['BBOX_OVERFLOW_WARNING']
@@ -183,21 +179,95 @@ def statistique(DATASET_DIR, path_user):
     if outside_ratios :
         gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR, path_user) 
 
-    ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=True)
+    resultat = ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=True)
+
+    return resultat
+
+
+def group_anomalies(anomalies):
+    grouped = defaultdict(list)
+    for a in anomalies:
+        grouped[a["image"]].append(a)
+    return grouped
+
+def create_anomaly_dataset(anomalies, DATASET_DIR):
+
+    display = dc.DisplayColor()
+
+    dataset_name = "anomalies_dataset"
+
+    if dataset_name in fo.list_datasets():
+        fo.delete_dataset(dataset_name)
+
+    dataset = fo.Dataset(dataset_name)
+
+    grouped = group_anomalies(anomalies)
+
+    samples = []
+
+    for img_name, image_anomalies in grouped.items():
+
+        image_path = Path(DATASET_DIR) / "images/train2017"  /img_name
+        label_path = Path(DATASET_DIR) / "labels/train2017" / img_name.replace(".jpg", ".txt")
+
+        if not image_path.exists() or not label_path.exists():
+            print(f"Fichier manquant pour {img_name}")
+            continue
+
+        detections = []
+
+        # Lire fichier YOLO
+        with open(label_path, "r") as f:
+            lines = f.readlines()
+
+        for i, line in enumerate(lines):
+            parts = line.strip().split()
+
+            class_id = int(parts[0])
+            x_center, y_center, width, height = map(float, parts[1:5])
+
+            # Associer bbox aux anomalies via width/height
+            for anomaly in image_anomalies:
+                if abs(anomaly["width"] - width) < 1e-6 and \
+                   abs(anomaly["height"] - height) < 1e-6:
+
+                    # YOLO → FiftyOne format
+                    x = x_center - width / 2
+                    y = y_center - height / 2
+
+                    detection = fol.Detection(
+                        label=anomaly["type"],
+                        bounding_box=[x, y, width, height],
+                        confidence=1.0,
+                    )
+
+                    detections.append(detection)
+
+        sample = fo.Sample(filepath=str(image_path))
+        sample["anomalies"] = fol.Detections(detections=detections)
+
+        samples.append(sample)
+
+    dataset.add_samples(samples)
+
+    display.print(f"Dataset anomalies créé : {len(dataset)} images", colors['ok']) # type: ignore
+    
+    return dataset
+
+
+
 
 
 def create_dataset(DATASET_DIR):
     display = dc.DisplayColor()
-    dataset_name = "coco128_local"
+    dataset_name = "coco_small_local"
 
-    display.print(
-        "Création du dataset FiftyOne :",
-        colors['info']
-    )
+    display.print("Création du dataset FiftyOne :", colors['info'])
     print(f"    '{DATASET_DIR}'")
 
     if dataset_name in fo.list_datasets():
         fo.delete_dataset(dataset_name)
+    fo.close_app()     
 
     # ✅ mini barre
     progress = util.MiniProgressBar("Chargement dataset", width=20)
@@ -214,19 +284,22 @@ def create_dataset(DATASET_DIR):
     total_images = len(dataset) # type: ignore
 
     display.print(
-        f"✅ Dataset chargé : {total_images} images",
+        f" Dataset chargé : {total_images} images",
         colors['info']
     )
 
     return dataset
 
-def load_model(MODEL_PATH, total_images, DEVICE):
+
+
+def load_model(MODEL_NAME, total_images, DEVICE):
 
     display = dc.DisplayColor()
     # ================= MODEL =================
     display.print("Chargement du modèle DINOv3...", colors['info'])
+
     model = timm.create_model("vit_small_patch16_224", pretrained=False, num_classes=0)
-    state_dict = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
+    state_dict = torch.load(MODEL_NAME, map_location=DEVICE, weights_only=True)
     model.load_state_dict(state_dict, strict=False)
     model = model.to(DEVICE).eval()
 
@@ -271,7 +344,7 @@ def encoding(dataset, VEC_FIELD, total_images, DEVICE, model):
         sample_ids = dataset.values("id")
         display.print(f"Encodage des {total_images} images...", colors['info'])
         
-        executor = ThreadPoolExecutor(max_workers=ct.NUM_WORKERS)
+        executor = ThreadPoolExecutor(max_workers= ct.NUM_WORKERS)
         all_embeddings = {}
 
         batch_size = ct.BATCH_SIZE
@@ -369,13 +442,23 @@ def main():
         splash_screen_circle("Image.png", duration=3000)
     display.print(ct.INFO_PROD, colors['aqua'])
     
+
+    if torch.cuda.is_available: 
+        prompt = ("CUDA available - Running on 'GPU'")
+        display.print(prompt, colors['ok'])
+    else:
+        prompt = ("CUDA not available - Running on 'CPU'")
+        display.print(prompt, colors['warning'])
+    print()
+
+
     # Affichge du mode de débugage
     display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
  
     print()
     # Contrôle répertoire de sauvegarde
     try:
-        path_user: Path = Path(ct.PATH_USER)
+        path_user: Path = Path(pr.PATH_USER)
         if not path_user.exists():
             path_user = Path.cwd()
             display.print("Path not defied : Using current working directory", colors["error"])
@@ -384,30 +467,35 @@ def main():
         display.print("Path not defied : Using current working directory", colors["error"])
  
     # Report mode handling
-    status = def_status(ct.REPORT_MODE, path_user)
+    status = def_status(pr.REPORT_MODE, path_user)
     display.print(f"Report mode {status}.\n", colors['warning'])
  
     # Graphe mode handling
-    status = def_status(ct.SAVE_PLOT, path_user)
+    status = def_status(pr.SAVE_PLOT, path_user)
     display.print(f"Save Plot mode {status}.\n", colors['warning'])
 
 
     if ct.TEST_MODE :
         # Pour les simulation
         if est_windows(): 
-            DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
-            MODEL_PATH = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3\dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+            # DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
+            DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco_small"
+            MODEL_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3"
+            MODEL_NAME = r"dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
         else :
             DATASET_DIR = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/2026/Aqua-/AQUA/datasets/coco128"
-            MODEL_PATH = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/2026/Aqua-/Fitty_One/Model/DINOv3/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+            MODEL_NAME = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/2026/Aqua-/Fitty_One/Model/DINOv3/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
     else :
         DATASET_DIR = util.get_path_color("Entrée le chemin du dataset")
-        MODEL_PATH = util.get_path_color("Entrée le chemin du modèle DINOv3")
+        MODEL_DIR = util.get_path_color("Entrée le chemin du modèle")
+        MODEL_NAME = util.get_file_name_color("Entrée le nom du modèle DINOv3")
 
+    print()
     display.print("Démarrage du traitement ...", colors['info'])
 
     # Chargement des noms de classes pour les stats
-    dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
+    DATASET_DIR  = Path(DATASET_DIR )
+    dataset_yaml = DATASET_DIR / "dataset.yaml"
     try:
         class_names = ds.load_class_names(dataset_yaml)
     except Exception as e:
@@ -438,19 +526,34 @@ def main():
     else:    
         display.print("Aucune erreur détectée. Analyse du Dataset...\n", colors['ok'])
 
-        statistique(DATASET_DIR, path_user)
+        def_image = statistique(DATASET_DIR, path_user)
 
-        dataset = create_dataset(DATASET_DIR)
+        if not def_image:
+            display.print("Dataset Ok ", colors['ok'])
+            
+            dataset = create_dataset(DATASET_DIR)
 
-        total_images = len(dataset) # type: ignore
+            total_images = len(dataset) # type: ignore
+            MODEL_DIR = Path(MODEL_DIR) # type: ignore
+            model_ = MODEL_DIR / MODEL_NAME
+            # model_ =  os.path.join(MODEL_DIR, MODEL_NAME)
+            model = load_model(model_, total_images, DEVICE)
+
+            # ================= ENCODING =================
+            encoding(dataset, VEC_FIELD, total_images, DEVICE, model )
+
+        else:
+            display.print("Dataset Not Ok ", colors['warning'])
+            display.print(" Création d'un dataset d'anomalies ", colors['warning'])
+            dataset = create_anomaly_dataset(def_image, DATASET_DIR)
         
-        model = load_model(MODEL_PATH, total_images, DEVICE)
+            # launch interface FiftyOne
+            util.launch_fiftyone_interface(dataset)
 
-        # ================= ENCODING =================
-        encoding(dataset, VEC_FIELD, total_images, DEVICE, model )
- 
- 
+        
+
     print()
+
     prompt = f"Script terminé.{ct.BELL}"
     display.print(prompt, colors['goodbye'])
 
