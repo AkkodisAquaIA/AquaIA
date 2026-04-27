@@ -1,3 +1,9 @@
 # --- Code quality / development tools ---
 ruff>=0.14.9
 pre-commit>=4.5.1
+
+# --- Test tooling ---
+# Used by .github/workflows/ci.yml (job `test`). The runner installs torch
+# CPU separately before this file (cf. ci.yml comments).
+pytest>=8.0
+pytest-cov>=5.0
