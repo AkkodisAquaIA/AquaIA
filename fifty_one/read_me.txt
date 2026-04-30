@@ -1,3 +1,5 @@
+un ficiher 'aqua_ia_conf.ini' permet de régler certains paramètres. Si ce fichier n'est pas correcte ou absent, le programme s'arrête 
+
 Le programme commence par une analyse complète du dataset afin de vérifier sa conformité et sa qualité. 
 Cette analyse repose sur une série de contrôles classés en deux catégories :
 
@@ -14,17 +16,19 @@ Vérification que chaque image possède un label associé
 Validation du contenu des fichiers de labels (voir ci-dessous)
 
 👉 Important :
-Seuls les labels orphelins génèrent un warning.
-Tous les autres contrôles provoquent une erreur bloquante.
+
+Tous les contrôles provoquent une erreur bloquante.
 
 🧾 2. Contrôles sur les fichiers de labels
 
 Chaque fichier de label est analysé selon les règles suivantes :
 
+Pas de ligne vide
 Chaque ligne doit contenir exactement 5 champs
 La classe doit être dans les limites définies
 Tous les champs doivent être numériques
 Les valeurs doivent être positives
+
 Détection de bounding boxes (Bboxes) en double
 Détection de classes différentes pour une même coordonnée
 Identification d’un IoU suspect (Voir en fin de fichier)

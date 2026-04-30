@@ -3,10 +3,8 @@ import sys
 import threading
 import time
 import numpy as np
-import socket
-import traceback
+import platform
 from collections import Counter
-# from colorama import init, Style
 from colorama import Fore, Style
 from pathlib import Path
 import shutil
@@ -18,6 +16,7 @@ from datetime import datetime
 # from typing import Tuple, List, Dict, Optional, Any
 from typing import TypedDict
 
+from tools import system as syst
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 from config import constants as ct
@@ -67,7 +66,12 @@ class MiniProgressBar:
 
     def _animate(self) -> None:
         """Internal animation loop."""
-        spinner: str = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+        if platform.system().lower() == "windows":
+            spinner = "|/-\\"
+        else:
+            spinner = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+        
         i: int = 0
         progress: int = 0
 
@@ -169,11 +173,11 @@ class TablePrinter:
     def footer(self):
         self._line("└", "┴", "┘")
 
-
-
-
-
 #------------------------------------------------------------------------------------------
+
+# TODO A suprimer
+def quoi(valeur):
+    print(f"\n*-------------------\n {valeur} \n-------------------*\n")
 
 
 def get_dataset_paths(dataset_dir, split="train2017"):
@@ -190,26 +194,10 @@ def get_dataset_paths(dataset_dir, split="train2017"):
 
     return images_dir, labels_dir
 
-
-
-#------------------------------
-# Function to clear the console screen
-#------------------------------
-def clear_screen() -> None:
-    """
-    Clear the console screen depending on the operating system.
-
-    Uses:
-        - 'cls' on Windows
-        - 'clear' on Unix-based systems (Linux / macOS)
-    """
-    os.system("cls" if os.name == "nt" else "clear")
-
-
 def horodatage(file_name: str) -> str:
 
     # Generate a timestamp (format: YYYYMMDD_HHMMSS)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M") 
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") 
 
     # Extract filename without extension and file extension
     stem = Path(file_name).stem
@@ -309,18 +297,6 @@ def calibrer_seuils_overflow(results : dict,
 
 
 # ------------------------------
-# Function to find a free port
-# ------------------------------
-def get_free_port() -> int:
-    """
-    Returns an available port on the local machine.
-    """
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))  # Let OS assign a free port
-        return s.getsockname()[1]
-
-
-# ------------------------------
 # Function to launch FiftyOne web interface
 # ------------------------------
 def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
@@ -335,7 +311,7 @@ def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
 
     color.print("Launching FiftyOne web interface...", colors['info'])
     
-    port = get_free_port()
+    port = syst.get_free_port()
     session = None
     try:
         session = fo.launch_app(dataset, port=port, remote=False)
@@ -484,11 +460,55 @@ def get_file_name_color(prompt: str, color_key: str = 'input') -> str:
         text = f"Invalid file extension: {ext}. Please try again."
         display.print(text, colors['error'])
 
+def draw_bar(value, vmin, vmax, length=50):
+    """
+    Barre visuelle normalisée
+    """
+    ratio = (value - vmin) / (vmax - vmin)
+    ratio = max(0, min(1, ratio))
+
+    filled = int(ratio * length)
+    empty = length - filled
+
+    scale = "█" * filled + "░" * empty
+    
+    return scale
+
+def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> bool:
+    """
+    This function returns
+        - True for yes, y, oui, o.
+        - False for no, non n.
+        - The input does not take uppercase letters into account."
+    Displays the prompt in the specified color.
+    If the specified color key is invalid, the prompt will be displayed in Light Green.
+
+    """
+    display = dc.DisplayColor()
+
+    color = chck_color(color_key)
+    while True:
+        # Convert the input color from DISPLAY_COLORS to ANSI
+        input_color = rgb_to_ansi(color)
+        # Displays the prompt in color
+        colored_prompt = f"{input_color}[?] {message} (o/n, défaut = n) ) ? : {Style.RESET_ALL}"
+
+        reponse = input(colored_prompt).strip().lower()
+        if reponse == "":
+            return default
+        if reponse in {'oui', 'o'}:
+            return True
+        if reponse in {'non', 'n'}:
+            return False
+        
+        text = f"Réponse valide : (o/n) {ct.BELL}"
+        display.print(text, colors['error'])
 
 # ------------------------------
 # Function to display and save problematic items
 # ------------------------------
 def display_and_save_errors(
+    cfg,
     path_user: Path,
     items: list[str],
     file_name: str,
@@ -518,17 +538,21 @@ def display_and_save_errors(
         items = sorted(items, key=lambda p: str(p))
 
     # Save to file if report mode is enabled
-    if pr.REPORT_MODE:
+    if cfg["REPORT_MODE"]:
 
         new = horodatage(file_name)
         file_path: Path = path_user / new
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            for x in items:
-                f.write(str(x) if full_path else Path(x).name)
-                f.write("\n")
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                for x in items:
+                    f.write(str(x) if full_path else Path(x).name)
+                    f.write("\n")
+        except FileNotFoundError:
+             display.print(f"Impossible de sauvegarder : {file_path}", colors['error'])
 
         display.print(f" ****** '{file_name}' create *****\n", colors["warning"])
+
 
 
 def afficher_bbox_erreurs_compact(
@@ -716,19 +740,22 @@ def save_anomalies_readable(
     new = horodatage(file_name)
     output_path =  path_user / new
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        # --- Résumé ---
-        f.write("=== RÉSUMÉ DES ANOMALIES ===\n")
-        for typ, images in anomalies_by_type.items():
-            f.write(f"{typ}: {len(images)} image(s)\n")
-        f.write("\n")
-
-        # --- Détails par type ---
-        for typ, images in anomalies_by_type.items():
-            f.write(f"--- {typ} ---\n")
-            for i in range(0, len(images), ct.N_PER_LINE):
-                line_images = images[i:i+ ct.N_PER_LINE] # type: ignore
-                f.write(" | ".join(line_images) + "\n")
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            # --- Résumé ---
+            f.write("=== RÉSUMÉ DES ANOMALIES ===\n")
+            for typ, images in anomalies_by_type.items():
+                f.write(f"{typ}: {len(images)} image(s)\n")
             f.write("\n")
+
+            # --- Détails par type ---
+            for typ, images in anomalies_by_type.items():
+                f.write(f"--- {typ} ---\n")
+                for i in range(0, len(images), ct.N_PER_LINE):
+                    line_images = images[i:i+ ct.N_PER_LINE] # type: ignore
+                    f.write(" | ".join(line_images) + "\n")
+                f.write("\n")
+    except FileNotFoundError:
+             display.print(f"Impossible de sauvegarder : {output_path}", colors['error'])
 
     display.print(f" ****** '{file_name}' create *****\n", colors["warning"])        

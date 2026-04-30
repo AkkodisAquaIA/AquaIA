@@ -3,34 +3,46 @@ from matplotlib.ticker import MaxNLocator
 from collections.abc import Sequence
 from pathlib import Path
 from datetime import datetime
+import numpy as np
 
 import config.process as pr
 import tools.utility as util
+import tools.display_color as dc
+from config.constants import DISPLAY_COLORS as colors
 
 
-def save_plot(filename: str, path_user: Path | None) -> None:
+def save_plot(filename: str, cfg) -> None:
     """
     Save the current matplotlib figure if SAVE_PLOT is enabled.
 
     Args:
         filename (str): Name of the output file (e.g. 'plot.png').
-        path_user (Path | None): Destination directory.
     """
 
-    if pr.SAVE_PLOT and path_user is not None:
+    display = dc.DisplayColor()
 
+    if cfg["SAVE_PLOT"] :
+
+        path_user: Path = Path(cfg["PATH_USER"])
+        if not path_user.exists():
+            path_user = Path.cwd()
         new = util.horodatage(filename)
         file_path: Path = path_user / new
 
-        # Save the current matplotlib figure
-        plt.savefig(file_path, dpi=300)
+        try:
+            # évite les labels coupés
+            plt.tight_layout()
 
+            # Save the current matplotlib figure
+            plt.savefig(file_path, dpi=300)
+        except Exception as e:
+            display.print(f"Erreur sauvegarde : {file_path}", colors['error'])
 
 def bbox_overflow(
+    cfg,
     values: Sequence[float],
     overflow_warning: float,
     overflow_error: float,
-    path_user: Path | None = None
 ) -> None:
     """
     Plot the distribution of bounding box overflow percentages.
@@ -105,15 +117,15 @@ def bbox_overflow(
     plt.legend()
     plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     plt.tight_layout()
-    save_plot("bbox_overflow.png", path_user)
+    save_plot("bbox_overflow.png", cfg)
     plt.show()
 
-def histogram(
+def histogram_taille_bbox(
     values: Sequence[float],
     title: str,
     x_label: str,
     y_label: str,
-    path_user: Path | None = None
+    cfg,
 ) -> None:
     """
     Display a simple histogram.
@@ -138,14 +150,14 @@ def histogram(
 
     plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     plt.tight_layout()
-    save_plot("histogram.png", path_user)
+    save_plot("histogram.png",  cfg)
     plt.show()
 
-def histogram_multiple(
+def histogram_anomalies(
     values: dict[str, int],
     y_label: str,
+    cfg,
     fault: str | None = None,
-    path_user: Path | None = None
 ) -> None:
     """
     Display a bar chart for anomaly counts by type.
@@ -180,5 +192,93 @@ def histogram_multiple(
 
     plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     plt.tight_layout()
-    save_plot("histogram_multiple", path_user)
+    save_plot("histogram_multiple",  cfg)
     plt.show()
+
+def histogram_classe(items, class_names, cfg, total):
+
+    items_sorted = sorted(items, key=lambda x: x[1], reverse=True)
+    
+    n = len(items_sorted)
+
+    def build_data(sub_items):
+        labels = []
+        counts = []
+        colors = []
+
+        for cls, count in sub_items:
+            pct = (count / total) * 100
+            name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
+
+            labels.append(name)
+            counts.append(count)
+
+            if pct < cfg["RARE"]:
+                colors.append("red")
+            elif pct < cfg["DOMINANT"]:
+                colors.append("orange")
+            else:
+                colors.append("green")
+
+        return labels, counts, colors
+
+    # --- seuils globaux ---
+    rare_val = (cfg["RARE"] / 100) * total
+    dom_val = (cfg["DOMINANT"] / 100) * total
+
+    # --- CAS 1 ---
+    if n <= 40:
+        labels, counts, colors = build_data(items_sorted)
+        y_pos = np.arange(len(labels))
+
+        plt.figure(figsize=(16, max(6, 0.4 * len(labels))))
+        plt.barh(y_pos, counts, color=colors)
+        plt.yticks(y_pos, labels)
+        plt.gca().invert_yaxis()
+
+        plt.axvline(rare_val, color='red', linestyle='--', label=f'Rare ({cfg["RARE"]}%)')
+        plt.axvline(dom_val, color='green', linestyle='--', label=f'Dominant ({cfg["DOMINANT"]}%)')
+
+        plt.axvspan(0, rare_val, color='red', alpha=0.08)
+        plt.axvspan(rare_val, dom_val, color='orange', alpha=0.08)
+        plt.axvspan(dom_val, max(counts), color='green', alpha=0.08)
+
+    # --- CAS 2 : 2 graphes ---
+    else:
+        mid = n // 2
+        left_items = items_sorted[:mid]
+        right_items = items_sorted[mid:]
+
+        #fig, axes = plt.subplots(1, 2, figsize=(22, max(6, 0.3 * mid)))
+        fig, axes = plt.subplots(1, 2, figsize=(24, 10))
+
+        for ax, sub_items, title in zip(
+            axes,
+            [left_items, right_items],
+            ["Classes dominantes", "Classes rares"]
+        ):
+            labels, counts, colors = build_data(sub_items)
+            y_pos = np.arange(len(labels))
+
+            ax.barh(y_pos, counts, color=colors)
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(labels, fontsize=8)
+            ax.invert_yaxis()
+            ax.set_title(title)
+
+            # seuils
+            ax.axvline(rare_val, color='red', linestyle='--', label=f'Rare ({cfg["RARE"]}%)')
+            ax.axvline(dom_val, color='green', linestyle='--', label=f'Dominant ({cfg["DOMINANT"]}%)')
+
+            ax.axvspan(0, rare_val, color='red', alpha=0.08)
+            ax.axvspan(rare_val, dom_val, color='orange', alpha=0.08)
+            ax.axvspan(dom_val, max(counts), color='green', alpha=0.08)
+
+        axes[0].set_xlabel("Nombre d'éléments")
+        axes[1].set_xlabel("Nombre d'éléments")
+
+    plt.legend()
+
+    plt.tight_layout()
+    save_plot("histogram_X_classe", cfg)
+    plt.show()    

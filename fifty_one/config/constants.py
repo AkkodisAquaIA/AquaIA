@@ -1,4 +1,3 @@
-
 #==========================================================================================
 # Logo
 INFO_PROD = r"""
@@ -46,6 +45,13 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 #-----------------------------------------------------------------------------------
 # Display & UI Settings
 #-----------------------------------------------------------------------------------
+
+# Nombre maximal de classe
+NB_CLASSES = 100
+
+# Max number of worst images displayed in report
+MAX_WORST_IMAGES = 5
+
 
 # Width of tqdm progress bars
 TQDM_NCOLS = 150

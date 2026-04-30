@@ -6,12 +6,14 @@ import yaml
 from colorama import Fore, Style, init
 from collections import defaultdict
 
+from statistics_yolo import imbalance as im
+
 import tools.display_color as dc
 from tools import utility as util
 from config import constants as ct
 from config import process as pr
 from config.constants import DISPLAY_COLORS as colors
-from graphe import graphe as gr
+from tools import graphe as gr
 
 init(autoreset=True)
 
@@ -40,181 +42,8 @@ def compute_stats(values):
         "max": float(np.max(arr))
     }
 
-def imbalance_metrics(class_distribution):
-    counts = np.array(list(class_distribution.values()))
-    total = np.sum(counts)
 
-    # probabilités
-    p = counts / total
-
-    # ratio
-    ratio = np.max(counts) / np.min(counts)
-
-    # entropie
-    entropy = -np.sum(p * np.log(p + 1e-9))
-    max_entropy = np.log(len(counts))
-    entropy_norm = entropy / max_entropy
-
-    return {
-        "ratio": ratio,
-        "entropy": entropy,
-        "entropy_norm": entropy_norm
-    }
-
-
-def compute_global_score(ratio, entropy_norm):
-    """
-    Score global 0 → 100
-    """
-    # ratio pénalisé (log pour éviter explosion)
-    ratio_score = max(0, 1 - (np.log10(ratio) / 3))  # ratio ~1000 → 0
-
-    # entropie directe
-    entropy_score = entropy_norm
-
-    # pondération
-    score = (0.6 * entropy_score + 0.4 * ratio_score) * 100
-
-    return max(0, min(100, score))
-
-def draw_bar(value, vmin, vmax, length=50):
-    """
-    Barre visuelle normalisée
-    """
-    ratio = (value - vmin) / (vmax - vmin)
-    ratio = max(0, min(1, ratio))
-
-    filled = int(ratio * length)
-    empty = length - filled
-
-    scale = "█" * filled + "░" * empty
-    
-    return scale
-    
-
-def evaluate_metric(
-    label,
-    value,
-    thresholds,
-    statuses,
-    colors_map,
-    bar_min,
-    bar_max,
-    display,
-    higher_is_better=True,
-    value_format="8.2f",
-    suffix=""
-):
-    warning_th, ok_th = thresholds
-    error_status, warning_status, ok_status = statuses
-
-    if higher_is_better:
-        if value >= ok_th:
-            status = ok_status
-            color = colors_map["ok"]
-        elif value >= warning_th:
-            status = warning_status
-            color = colors_map["warning"]
-        else:
-            status = error_status
-            color = colors_map["error"]
-    else:
-        # ✅ Cas inverse (ex: ratio)
-        if value <= ok_th:
-            status = ok_status
-            color = colors_map["ok"]
-        elif value <= warning_th:
-            status = warning_status
-            color = colors_map["warning"]
-        else:
-            status = error_status
-            color = colors_map["error"]
-
-    print(f"{label:25}: {value:{value_format}}{suffix}   ", end="")
-    display.print(status, color)
-    bare = draw_bar(value, bar_min, bar_max)   
-    print(f"{'':25}  {bare}\n")
-
-def afficher_imbalance_avance(metrics, display, colors):
-
-    ratio = float(metrics["ratio"])
-    entropy_norm = float(metrics["entropy_norm"])
-
-    print("\n---------------- DATASET IMBALANCE ----------------\n")
-    print('Ration max/min (plus petit = mieux) : indique le déséquilibre entre la classe la plus fréquente et la moins fréquente.')
-    print('Entropie normalisée (plus grand = mieux) : mesure la diversité globale des classes, en tenant compte de leur distribution.')
-    print('Score global : combinaison pondérée des deux métriques précédentes pour une évaluation synthétique du déséquilibre du dataset.\n')
-    
-    # --- RATIO (plus petit = mieux) ---
-    evaluate_metric(
-    label="Ratio max/min",
-    value=min(ratio, 300),
-    thresholds=(pr.RATIO_WARNING, pr.RATIO_OK),
-    statuses=("Très déséquilibré", "Déséquilibré", "Équilibré"),
-    colors_map=colors,
-    bar_min=1,
-    bar_max=300,
-    display=display,
-    higher_is_better=False
-)
-
-    # --- ENTROPIE (plus grand = mieux) ---
-    evaluate_metric(
-    label="Entropie normalisée",
-    value=entropy_norm,
-    thresholds=(pr.ENTROPY_WARNING, pr.ENTROPY_OK),
-    statuses=("Déséquilibré", "Moyennement équilibré", "Équilibré"),
-    colors_map=colors,
-    bar_min=0,
-    bar_max=1,
-    display=display,
-    higher_is_better=True
-)
-
-    # --- SCORE GLOBAL ---
-    score = compute_global_score(ratio, entropy_norm)
-
-    evaluate_metric(
-        label="Score global",
-        value=score,
-        thresholds=(pr.SCORE_WARNING, pr.SCORE_OK),
-        statuses=("Faible", "Moyen", "Bon"),
-        colors_map=colors,
-        bar_min=0,
-        bar_max=100,
-        value_format="6.1f",
-        suffix=" / 100",
-        display=display,
-        higher_is_better=True
-    )
-
-    # --- DIAGNOSTIC ---
-    print("Diagnostic :")
-
-    if ratio > 100:
-        print("- Dataset très déséquilibré (ratio élevé)")
-
-    if entropy_norm < 0.75:
-        print("- Distribution globale déséquilibrée")
-
-    if entropy_norm > 0.75 and ratio > 100:
-        print("- Beaucoup de classes rares malgré une diversité correcte")
-
-    # --- RECOMMANDATIONS ---
-    print("\nRecommandations :")
-
-    if ratio > 100:
-        print("- Augmenter les classes très rares (< 1%)")
-
-    if entropy_norm < 0.7:
-        print("- Rééquilibrer globalement le dataset")
-
-    print("- Utiliser data augmentation ciblée")
-    print("- Envisager un sampling équilibré")
-
-    print("--------------------------------------------------\n")
-
-def dataset_statistics_yolo(DATASET_DIR):
+def dataset_statistics_yolo(DATASET_DIR, cfg):
 
     images_dir, labels_dir = util.get_dataset_paths(DATASET_DIR)
 
@@ -301,7 +130,7 @@ def dataset_statistics_yolo(DATASET_DIR):
 
         area = w * h
 
-        if w < pr.MIN_BBOX or h < pr.MIN_BBOX:
+        if w < cfg["MIN_BBOX"] or h < cfg["MIN_BBOX"]:
             anomalies.append({
                 "type": "bbox_trop_petite",
                 "width": w,
@@ -311,7 +140,7 @@ def dataset_statistics_yolo(DATASET_DIR):
             })
 
 
-        if w > pr.MAX_BBOX or h > pr.MAX_BBOX:
+        if w > cfg["MAX_BBOX"] or h > cfg["MAX_BBOX"]:
             anomalies.append({
                 "type": "bbox_trop_grande",
                 "width": w,
@@ -321,7 +150,7 @@ def dataset_statistics_yolo(DATASET_DIR):
             })
 
 
-        if area < pr.MIN_BBOX_AREA:
+        if area < cfg["MIN_BBOX_AREA"]:
             anomalies.append({
                 "type": "bbox_surface_trop_petite",
                 "width": w,
@@ -331,7 +160,7 @@ def dataset_statistics_yolo(DATASET_DIR):
             })
 
 
-        if area > pr.MAX_BBOX_AREA:
+        if area > cfg["MAX_BBOX_AREA"]:
             anomalies.append({
                 "type": "bbox_surface_trop_grande",
                 "width": w,
@@ -370,7 +199,7 @@ def dataset_statistics_yolo(DATASET_DIR):
 
         # --- Détection anomalies ---
         # ERROR
-        if outside_ratio_pct > pr.MIN_BBOX_OVERFLOW_ERROR:
+        if outside_ratio_pct > cfg["MIN_BBOX_OVERFLOW_ERROR"]:
             anomalies.append({
                 "type": "bbox_hors_limite_error",
                 "width": w,
@@ -382,7 +211,7 @@ def dataset_statistics_yolo(DATASET_DIR):
             })
 
         # WARNING
-        elif outside_ratio_pct >= pr.MIN_BBOX_OVERFLOW_WARNING:
+        elif outside_ratio_pct >= cfg["MIN_BBOX_OVERFLOW_WARNING"]:
             anomalies.append({
                 "type": "bbox_hors_limite_warning",
                 "width": w,
@@ -407,7 +236,7 @@ def dataset_statistics_yolo(DATASET_DIR):
 
 #==========================================================================================
 
-def afficher_stats_bbox(stats):
+def afficher_stats_bbox(stats, cfg):
 
     def format_value(v):
         if v == 0:
@@ -445,9 +274,9 @@ def afficher_stats_bbox(stats):
             (format_const(cmin, cmax), True),
         ])
 
-    add_row("Width",  stats["bbox_width"],  pr.MIN_BBOX,      pr.MAX_BBOX)
-    add_row("Height", stats["bbox_height"], pr.MIN_BBOX,      pr.MAX_BBOX)
-    add_row("Area",   stats["bbox_area"],   pr.MIN_BBOX_AREA, pr.MAX_BBOX_AREA)
+    add_row("Width",  stats["bbox_width"],  cfg["MIN_BBOX"],      cfg["MAX_BBOX"])
+    add_row("Height", stats["bbox_height"], cfg["MIN_BBOX"],      cfg["MAX_BBOX"])
+    add_row("Area",   stats["bbox_area"],   cfg["MIN_BBOX_AREA"], cfg["MAX_BBOX_AREA"])
 
     table.footer()
 
@@ -462,7 +291,7 @@ def verifier_classes_dataset(class_distribution, class_names):
     valides = classes_presentes & classes_yaml
     return {"inutilisees": inutilisees, "manquantes": manquantes, "valides": valides}
 
-def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_par_ligne=4, afficher_hist=False):
+def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, classes_par_ligne=4, afficher_hist=False):
 
     display = dc.DisplayColor()
 
@@ -485,7 +314,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
 
     # --- statistiques BBOX ---
     print("\n--------------- BBOX STATISTICS -----------------")
-    afficher_stats_bbox(stats)
+    afficher_stats_bbox(stats, cfg)
 
     # --- Vérification YAML ---
     missing_label  = False
@@ -525,10 +354,10 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
 
         # Couleur automatique selon importance
-        if pct < pr.RARE:
+        if pct < cfg["RARE"] :
             color = Fore.RED
             rary +=1
-        elif pct < pr.DOMINANT:
+        elif pct < cfg["DOMINANT"] :
             color = Fore.YELLOW
             moy +=1
         else:
@@ -536,7 +365,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
             dom +=1
 
         BAR_WIDTH = 20 # largeur maximale de la barre pour 100% (ajustable)
-        bbare = draw_bar(pct, 0, 100, BAR_WIDTH)
+        bbare = util.draw_bar(pct, 0, 100, BAR_WIDTH)
   
         bloc = (
             f"{color}"
@@ -553,9 +382,9 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     print()
     display.print(f"----------- CLASS DISTRIBUTION ({rary + moy + dom}) -----------", colors['info'])
     legend_colored = (
-        f"    {Fore.GREEN}■ ({dom}) ≥ {pr.DOMINANT}% Dominant{Style.RESET_ALL}   "
-        f"│ {Fore.YELLOW}■ ({moy}) {pr.RARE}–{pr.DOMINANT}% Moyen{Style.RESET_ALL}   "
-        f"│ {Fore.RED}■ ({rary}) < {pr.RARE}% Rare{Style.RESET_ALL}"
+        f'    {Fore.GREEN}■ ({dom}) ≥ {cfg["DOMINANT"]}% Dominant{Style.RESET_ALL}   '
+        f'│ {Fore.YELLOW}■ ({moy}) {cfg["RARE"]}–{cfg["DOMINANT"]}% Moyen{Style.RESET_ALL}   '
+        f'│ {Fore.RED}■ ({rary}) < {cfg["RARE"]}% Rare{Style.RESET_ALL}'
     )
     print(f"{legend_colored}\n")
 
@@ -566,23 +395,24 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
 
     for i in range(0, len(blocs), classes_par_ligne):
         ligne = blocs[i:i + classes_par_ligne]
-        print(" │ ".join(f"{b:<{bloc_width}}" for b in ligne))
+        print("│ ".join(f"{b:<{bloc_width}}" for b in ligne))
 
+    gr.histogram_classe(items, class_names, cfg, total )
 
     # --- classes Rares ---------------------------------------
-    if pr.RARE is not None:
+    if cfg["RARE"] is not None:
         classes_faibles = []
         print()
         for cls, count in items:
             pct = (count / total) * 100
-            if pct < pr.RARE:
+            if pct < cfg["RARE"]:
                 name = class_names[cls] if class_names and cls < len(class_names) else f"UNKNOWN_{cls}"
                 classes_faibles.append((cls, name, count, pct))
 
         if not classes_faibles:
-            display.print(f"Aucune classe sous {pr.RARE}% ", colors['ok'])
+            display.print(f'Aucune classe sous {cfg["RARE"]}% ', colors['ok'])
         else:
-            message = f"------- CLASSES RARES ({rary}) < {pr.RARE}% -------"
+            message = f'------- CLASSES RARES ({rary}) < {cfg["RARE"]}% -------'
             display.print(message, colors['error'])
             # tri optionnel (du pire au moins pire)
             classes_faibles.sort(key=lambda x: x[3])  # tri par %
@@ -605,6 +435,8 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
                 for i in range(0, len(texts), ct.N_PER_LINE):
                     print(" │ ".join(f"{t:<{max_width}}" for t in texts[i:i+ ct.N_PER_LINE]))
                 print("")
+
+
 
 # --- IMAGES PAR CLASSE --------------------------------------------------------
     display.print("------------- IMAGES PAR CLASSE -------------", colors['info'])
@@ -661,15 +493,15 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     for cls in available_classes:
         name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
         count = len(class_to_images[cls])
-        formatted = f"{cls:>3} - {name:<{max_name_length}} : {count:>{max_count_length}} imgs"
+        formatted = f"{cls:>3} - {name:<{max_name_length}} : {count:>{max_count_length}}"
         rows.append(formatted)
 
     COLUMNS = 5
-    col_width = max(len(r) for r in rows) + 3
+    col_width = max(len(r) for r in rows) + 0
 
     for i in range(0, len(rows), COLUMNS):
         line = rows[i:i + COLUMNS]
-        print(" │ ".join(f"{item:<{col_width}}" for item in line))
+        print("│ ".join(f"{item:<{col_width}}" for item in line))
 
     print()
 
@@ -677,11 +509,11 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
     tag = f"Affichage des noms des images par classe"
     display.print(tag, colors['info'])
     while True:
-        tag = f"Entrez jusqu'à {MAX_CLASSES_SELECT} classes (ex: 1 3-5 8) ou 'q' pour quitter : "
+        tag = f"Entrez jusqu'à {MAX_CLASSES_SELECT} classes (ex: 1 3-5 8) ou 'Return' pour quitter : "
         display.print(tag, colors['input']) 
         user_input = input("  > ").strip()
 
-        if user_input.lower() == 'q':
+        if user_input.lower() == '':
             break
 
         selected_classes = parse_selection(user_input, available_classes)            
@@ -717,12 +549,15 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
 
     # --- histogramme bbox ---
     if afficher_hist and bbox_areas:
-        gr.histogram(bbox_areas,
+        gr.histogram_taille_bbox(bbox_areas,
                       "Distribution des tailles de BBox",
                       "Aire bbox",
                       "Nombre",
-                      path_user
+                      cfg,
                       )
+
+
+
 
 
     # --- anomalies ---------------------------------------------------------------
@@ -840,7 +675,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
 
             total_line.append(cell)
 
-        print(" │ ".join(total_line))
+        print("│ ".join(total_line))
     
         # --- pire images ----------------------------------------------
         # pondération des erreurs
@@ -898,11 +733,21 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
                 if d["score"] != 0
             ]
 
-            nb =  f'{pr.MAX_WORST_IMAGES} premieres' if len(valid_images) > pr.MAX_WORST_IMAGES else len(valid_images)     
-            print(f"\n-------------------------- Les {nb} pires images ----------------------")
+            n = len(valid_images)
+            max_n = ct.MAX_WORST_IMAGES
 
+            if n == 1:
+                texte = "La pire image"
+            else:
+                if n > max_n:
+                    texte = f"Les {max_n} images les plus mauvaises"
+                else:
+                    texte = f"Les {n} pires images"
+
+            print(f"\n-------------------------- {texte} ----------------------")
+            
             # Then limit to 10
-            for img, d in valid_images[:pr.MAX_WORST_IMAGES]:
+            for img, d in valid_images[:ct.MAX_WORST_IMAGES]:
                 ratio = (d['count'] / d['bbox_total']) * 100
 
                 print(
@@ -918,7 +763,7 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         pct_images = (images_problematiques / stats["images"]) * 100 if stats["images"] else 0
         dataset_score = (sum(d["score"] for d in score_images.values()) / len(score_images)) if score_images else 0
         
-        text = f"Nombre d'images avec au moins une bbox problématique : {images_problematiques} ({pct_images:.2f}%)" 
+        text = f"Nombre d'images avec au moins une bbox problématique : {images_problematiques} ({pct_images:.3f}%)" 
         display.print(text, colors['warning'])
         
         text = f"Total de bboxes problématiques : {total_bboxes_problematiques}"
@@ -931,20 +776,21 @@ def afficher_dataset_statistics(resultats, path_user, class_names=None, classes_
         if afficher_hist : 
             type_counts = Counter(a["type"] for a in anomalies)
             if type_counts:
-                gr.histogram_multiple(type_counts,
+                gr.histogram_anomalies(type_counts,
                                 "Nombre",
+                                cfg,
                                 anomalies,
-                                path_user) 
+                    ) 
 
-        anomalies = resultats['anomalies']   # après dataset_statistics_yolo
+        anomalies = resultats['anomalies'] 
 
-        if pr.REPORT_MODE :
+        if cfg["REPORT_MODE"] :
             util.save_anomalies_readable(anomalies, "erreurs_dataset.txt", path_user)
 
 
     # --- AFFICHAGE DES METRIQUES D'IMBALANCE ---
-    metrics = imbalance_metrics(class_distribution)
-    afficher_imbalance_avance(metrics, display, colors)
+    metrics = im.imbalance_metrics(class_distribution, cfg)
+    im.afficher_imbalance_avance(metrics, display, colors, cfg)
   
     print()
     display.print('-' * 120, colors['info'])

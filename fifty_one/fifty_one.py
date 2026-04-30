@@ -1,8 +1,11 @@
 import os
-# os.environ.setdefault("FIFTYONE_DATABASE_URI", "mongodb://127.0.0.1:27017")
+import sys
+from tools import system as syst
+
+if syst.est_linux():
+    os.environ.setdefault("FIFTYONE_DATABASE_URI", "mongodb://127.0.0.1:27017")
 
 # TOUT le reste des imports AVANT fiftyone
-import platform
 from pathlib import Path
 import torch
 from torchvision import transforms
@@ -10,140 +13,34 @@ from PIL import Image
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
-import faiss
 from tqdm import tqdm
 import timm
 import random
-import tkinter as tk
+
 
 # ONLY HERE
 import fiftyone as fo
 import fiftyone.core.labels as fol
 from fiftyone import ViewField as F
-from PIL import Image, ImageTk, ImageDraw, ImageFont
+from PIL import Image
 
 from bboxes import bboxes as bb
 from statistics_yolo import dataset_statistics_yolo as ds
-
-from tools import utility as util
-from config import process as pr
+from config import valid_conf as vc
+from config.process import load_config
 from config import constants as ct
+from tools import utility as util
+
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
-from graphe import graphe as gr
+from tools import graphe as gr
 
+from tools import logo_win as lw
 
 #==========================================================================================
 # ================= FONCTIONS =================
- 
-def est_windows():
-    return platform.system().lower() == "windows"
-    
-def splash_screen_circle(image_path, duration=3000):
-    """
-    Splash screen circulaire avec un cercle extérieur clair
-    et texte centré foncé.
-    """
-    splash = tk.Tk()
-    splash.overrideredirect(True)
-    splash.attributes("-topmost", True)
 
-    splash.attributes("-alpha", 0.0)
 
-    transparent_color = "magenta"
-    splash.configure(bg=transparent_color)
-
-    # --- Charger l'image ---
-    image_path = "Image1.png" 
-    img = Image.open(image_path).convert("RGBA")
-    size = min(img.width, img.height)
-    img = img.resize((size, size))
-
-    # --- Créer image finale ---
-    img_circle = Image.new("RGBA", (size, size), (0,0,0,0))
-    draw = ImageDraw.Draw(img_circle)
-
-    # Couleurs
-    circle_color = (64, 224, 208, 255)  # Turquoise clair
-    text_color = (0, 102, 102, 255)     # Bleu-vert foncé
-
-    # Dessiner le cercle extérieur
-    border_width = size // 20
-    draw.ellipse((0, 0, size, size), fill=circle_color)
-
-    # Masque circulaire pour l'image
-    inner_size = size - 2*border_width
-    img_resized = img.resize((inner_size, inner_size))
-    mask_inner = Image.new("L", (inner_size, inner_size), 0)
-    draw_mask_inner = ImageDraw.Draw(mask_inner)
-    draw_mask_inner.ellipse((0,0,inner_size, inner_size), fill=255)
-
-    # Coller l'image centrée
-    img_circle.paste(img_resized, (border_width, border_width), mask_inner)
-
-    # Ajouter le texte centré
-    draw_text = ImageDraw.Draw(img_circle)
-    font_size = size // 8
-    try:
-        font = ImageFont.truetype("arial.ttf", font_size)
-    except:
-        font = ImageFont.load_default()
-    text = "Aqua-IA"
-    bbox = draw_text.textbbox((0,0), text, font=font)
-    w = bbox[2] - bbox[0]
-    h = bbox[3] - bbox[1]
-    draw_text.text(((size-w)/2, (size-h)/2), text, font=font, fill=text_color)
-
-    # Conversion en image Tkinter
-    photo = ImageTk.PhotoImage(img_circle)
-
-    # Affichage
-    label = tk.Label(splash, image=photo, bg=transparent_color, bd=0)
-    label.pack()
-    splash.wm_attributes("-transparentcolor", transparent_color)
-
-    # Centrer la fenêtre
-    screen_width = splash.winfo_screenwidth()
-    screen_height = splash.winfo_screenheight()
-    x = (screen_width - size) // 2
-    y = (screen_height - size) // 2
-    splash.geometry(f"{size}x{size}+{x}+{y}")
-
-    splash.after(10, lambda: fade_in(splash, steps=60, delay=30))
-    
-    # Afficher le splash screen pour la durée
-    splash.after(duration, lambda: fade_out(splash, steps=40))
-    splash.mainloop()
-
-def fade_in(window, steps=60, delay=30):
-    alpha = 0.0
-    window.attributes("-alpha", alpha)
-
-    increment = 1.0 / steps
-
-    def _fade():
-        nonlocal alpha
-        alpha += increment
-        if alpha >= 1.0:
-            window.attributes("-alpha", 1.0)
-        else:
-            window.attributes("-alpha", alpha)
-            window.after(delay, _fade)
-
-    _fade()
-
-def fade_out(window, steps):
-    alpha = window.attributes("-alpha") or 1.0
-    decrement = alpha / steps
-    def fade():
-        nonlocal alpha
-        alpha -= decrement
-        if alpha <= 0:
-            window.destroy()
-        else:
-            window.attributes("-alpha", alpha)
-            window.after(50, fade)
-    fade()
 
 def def_status(etat, path_user):
        
@@ -156,18 +53,22 @@ def def_status(etat, path_user):
     )
     return status
 
-def statistique(DATASET_DIR, path_user):
+def statistique(DATASET_DIR, cfg, class_names, path_user):
      # ================= STATISTICS =================
     dataset_yaml = os.path.join(DATASET_DIR, "dataset.yaml")
-    class_names = ds.load_class_names(dataset_yaml)
+    # class_names = ds.load_class_names(dataset_yaml)
 
-    results = ds.dataset_statistics_yolo(DATASET_DIR)
+
+
+    results = ds.dataset_statistics_yolo(DATASET_DIR, cfg)
+
+
     seuils = util.calibrer_seuils_overflow(
         results,
-        warning_percentile= pr.PERCENTILE_WARNING,
-        error_percentile= pr.PERCENTILE_ERROR,
-        min_warning= pr.MIN_BBOX_OVERFLOW_WARNING,
-        min_error= pr.MIN_BBOX_OVERFLOW_ERROR
+        warning_percentile= cfg["PERCENTILE_WARNING"],
+        error_percentile= cfg["PERCENTILE_ERROR"],
+        min_warning= cfg["MIN_BBOX_OVERFLOW_WARNING"],
+        min_error= cfg["MIN_BBOX_OVERFLOW_ERROR"]
     )
     
     BBOX_OVERFLOW_WARNING = seuils['BBOX_OVERFLOW_WARNING']
@@ -177,9 +78,9 @@ def statistique(DATASET_DIR, path_user):
                                             []) if 'outside_ratio_pct' in a]
 
     if outside_ratios :
-        gr.bbox_overflow(outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR, path_user) 
+        gr.bbox_overflow(cfg, outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR) 
 
-    resultat = ds.afficher_dataset_statistics(results, path_user, class_names, classes_par_ligne=4, afficher_hist=True)
+    resultat = ds.afficher_dataset_statistics(results, cfg, path_user, class_names, classes_par_ligne=4, afficher_hist=True)
 
     return resultat
 
@@ -199,7 +100,13 @@ def create_anomaly_dataset(anomalies, DATASET_DIR):
     if dataset_name in fo.list_datasets():
         fo.delete_dataset(dataset_name)
 
+    # ✅ mini barre
+    progress = util.MiniProgressBar("Chargement dataset", width=20)
+    progress.start()
+
     dataset = fo.Dataset(dataset_name)
+
+    progress.stop()
 
     grouped = group_anomalies(anomalies)
 
@@ -221,9 +128,14 @@ def create_anomaly_dataset(anomalies, DATASET_DIR):
             lines = f.readlines()
 
         for i, line in enumerate(lines):
-            parts = line.strip().split()
+            line = line.strip()
 
-            class_id = int(parts[0])
+            # ✅ ignorer ligne vide
+            if not line:
+                continue
+
+            parts = line.split()
+
             x_center, y_center, width, height = map(float, parts[1:5])
 
             # Associer bbox aux anomalies via width/height
@@ -253,10 +165,6 @@ def create_anomaly_dataset(anomalies, DATASET_DIR):
     display.print(f"Dataset anomalies créé : {len(dataset)} images", colors['ok']) # type: ignore
     
     return dataset
-
-
-
-
 
 def create_dataset(DATASET_DIR):
     display = dc.DisplayColor()
@@ -413,35 +321,40 @@ def encoding(dataset, VEC_FIELD, total_images, DEVICE, model):
 #------------------------------------------------------------------------------------------------
 def main():
     # ================= CONFIG =================
-
-    dataset_name = "coco128_local"
-    VEC_FIELD = "emb_dinov3"
-    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
     fo.config.show_progress_bars = False 
-
-    DUP_THRESHOLD = 0.98
-    NEIGHBORS = 20
 
     display = dc.DisplayColor()
 
-    # ================= REPRO =================
-    torch.manual_seed(ct.SEED)
-    torch.cuda.manual_seed_all(ct.SEED)
-    np.random.seed(ct.SEED)
-    random.seed(ct.SEED)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
     # Efface l'écran avant de commencer
-    util.clear_screen()
-    
+    syst.clear_screen()
+
     # Display du logo et infos système
-    print()
-    if est_windows():
-        splash_screen_circle("Image.png", duration=3000)
+
+    lw.splash_screen_circle("Image1.png") 
+
+    # lg.affiche_logo("Image1.png")   
+
     display.print(ct.INFO_PROD, colors['aqua'])
-    
+
+
+    # Chargement & Vérification du fichier de Paramètrage
+    cfg = load_config()
+    print()
+    vc.controle(cfg)
+    print()
+
+
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+    # ================= REPRO =================
+    if ct.SEED != 0 :
+        torch.manual_seed(ct.SEED)
+        torch.cuda.manual_seed_all(ct.SEED)
+        np.random.seed(ct.SEED)
+        random.seed(ct.SEED)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
     if torch.cuda.is_available: 
         prompt = ("CUDA available - Running on 'GPU'")
@@ -455,10 +368,11 @@ def main():
     # Affichge du mode de débugage
     display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
  
+    
     print()
     # Contrôle répertoire de sauvegarde
     try:
-        path_user: Path = Path(pr.PATH_USER)
+        path_user: Path = Path(cfg["PATH_USER"])
         if not path_user.exists():
             path_user = Path.cwd()
             display.print("Path not defied : Using current working directory", colors["error"])
@@ -467,24 +381,25 @@ def main():
         display.print("Path not defied : Using current working directory", colors["error"])
  
     # Report mode handling
-    status = def_status(pr.REPORT_MODE, path_user)
+    status = def_status(cfg["REPORT_MODE"], path_user)
     display.print(f"Report mode {status}.\n", colors['warning'])
  
     # Graphe mode handling
-    status = def_status(pr.SAVE_PLOT, path_user)
+    status = def_status(cfg["SAVE_PLOT"], path_user)
     display.print(f"Save Plot mode {status}.\n", colors['warning'])
 
 
     if ct.TEST_MODE :
         # Pour les simulation
-        if est_windows(): 
+        if syst.est_windows(): 
             # DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
             DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco_small"
             MODEL_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3"
             MODEL_NAME = r"dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
         else :
-            DATASET_DIR = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/2026/Aqua-/AQUA/datasets/coco128"
-            MODEL_NAME = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/2026/Aqua-/Fitty_One/Model/DINOv3/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+            DATASET_DIR = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/Data/coco_small_Work"
+            MODEL_DIR = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/2026/Aqua-/Fitty_One/Model/DINOv3"
+            MODEL_NAME = r"dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
     else :
         DATASET_DIR = util.get_path_color("Entrée le chemin du dataset")
         MODEL_DIR = util.get_path_color("Entrée le chemin du modèle")
@@ -492,6 +407,7 @@ def main():
 
     print()
     display.print("Démarrage du traitement ...", colors['info'])
+
 
     # Chargement des noms de classes pour les stats
     DATASET_DIR  = Path(DATASET_DIR )
@@ -503,8 +419,9 @@ def main():
         exit(1)
 
     # validation des labels avant création du dataset FiftyOne
-    erreur, all_bboxes, rapport, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_user)
+    erreur,  ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg)
  
+    
     if not ctrl_ok:
         display.print(f"Erreurs détectées dans les images/labels. Arrêt du programme {ct.BELL}", colors['error'])
         total_errors = sum(len(v) for v in erreur.values())
@@ -526,21 +443,27 @@ def main():
     else:    
         display.print("Aucune erreur détectée. Analyse du Dataset...\n", colors['ok'])
 
-        def_image = statistique(DATASET_DIR, path_user)
+        def_image = statistique(DATASET_DIR, cfg, class_names, path_user)
 
         if not def_image:
             display.print("Dataset Ok ", colors['ok'])
             
-            dataset = create_dataset(DATASET_DIR)
+            #TODO
+            # dataset = create_dataset(DATASET_DIR)
 
-            total_images = len(dataset) # type: ignore
-            MODEL_DIR = Path(MODEL_DIR) # type: ignore
-            model_ = MODEL_DIR / MODEL_NAME
-            # model_ =  os.path.join(MODEL_DIR, MODEL_NAME)
-            model = load_model(model_, total_images, DEVICE)
+            if util.answer_yes_or_no("Voulez-vous lancer Fifty_one"):
+                # launch interface FiftyOne
+                util.launch_fiftyone_interface(dataset) # type: ignore
 
-            # ================= ENCODING =================
-            encoding(dataset, VEC_FIELD, total_images, DEVICE, model )
+            # #TODO
+            # # ================= ENCODING =================
+            # total_images = len(dataset) # type: ignore
+            # MODEL_DIR = Path(MODEL_DIR) # type: ignore
+            # model_ = MODEL_DIR / MODEL_NAME
+            # model = load_model(model_, total_images, DEVICE)
+
+            # encoding(dataset, cfg["VEC_FIELD"], total_images, DEVICE, model )
+                
 
         else:
             display.print("Dataset Not Ok ", colors['warning'])
@@ -550,7 +473,6 @@ def main():
             # launch interface FiftyOne
             util.launch_fiftyone_interface(dataset)
 
-        
 
     print()
 

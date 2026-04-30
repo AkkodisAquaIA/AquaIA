@@ -9,7 +9,7 @@ from tools import utility as util
 import tools.display_color as dc
 from config import process as pr
 from config import constants as ct
-from config.constants import DISPLAY_COLORS as colors
+
 
 #==================================================================================
 
@@ -56,7 +56,7 @@ def round_coords(x, y, w, h, decimals=4):
 #-----------------------------------------------------------------------------------
 display = dc.DisplayColor()
 
-def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
+def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
 
     images_dir, labels_dir = util.get_dataset_paths(DATASET_DIR)
     
@@ -69,6 +69,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
     all_bboxes = []
 
 
+    # Analyse des fichiers 'labels'
     for entry in os.scandir(labels_dir):
         if not entry.name.lower().endswith(".txt"):
             continue
@@ -81,12 +82,17 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
             seen_boxes = set()
             seen_coords_classes = {}            
             seen_boxes_list = []
-            seen_boxes_by_class = defaultdict(list)  # <--- INITIALISÉ ICI, UNE FOIS PAR FICHIER
+            seen_boxes_by_class = defaultdict(list)
 
             for i, line in enumerate(f, start=1):
                 line = line.strip()
                 if not line:
+                    # --- ligne vide ---
+                    erreurs_syntaxe["lignes_vides"].append(f"{entry.name} (ligne {i})")
+                    rapport_detail[entry.name][i].append("lignes_vides")
+                    ctrl_ok = False
                     continue
+
                 has_content = True
                 parts = split_pattern.split(line)
                 erreurs_ligne = []
@@ -103,11 +109,13 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
                 # --- Classe ---
                 try:
                     cls = int(parts[0])
-                    if pr.NB_CLASSES is not None and cls >= pr.NB_CLASSES:
+                    if ct.NB_CLASSES is not None and cls >= ct.NB_CLASSES :
+                        # --- Classe hors plage ---
                         erreurs_syntaxe["classe_hors_plage"].append(f"{entry.name} (ligne {i})")
                         erreurs_ligne.append("classe_hors_plage")
                         ctrl_ok = False
                 except ValueError:
+                    # --- Classe invalides ---
                     erreurs_syntaxe["classe_invalide"].append(f"{entry.name} (ligne {i})")
                     erreurs_ligne.append("classe_invalide")
                     ctrl_ok = False
@@ -119,6 +127,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
                 try:
                     x, y, w, h = map(float, parts[1:])
                 except ValueError:
+                    # --- Valeurs non numériques ---
                     erreurs_syntaxe["valeurs_non_numeriques"].append(f"{entry.name} (ligne {i})")
                     erreurs_ligne.append("valeurs_non_numeriques")
                     float_ok = False
@@ -161,7 +170,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
                     ctrl_ok = False
                 seen_boxes.add(bbox_tuple_rounded)
 
-                # --- Classes différentes sur mêmes coordonnées ---
+                # --- Classes différentes avec mêmes coordonnées ---
                 coords_tuple = round_coords(x, y, w, h)
                 if coords_tuple not in seen_coords_classes:
                     seen_coords_classes[coords_tuple] = set()
@@ -175,7 +184,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
                 current_box = (x, y, w, h)
                 for prev_box, prev_line in seen_boxes_by_class[cls]:
                     iou = bbox_iou(current_box, prev_box)
-                    if iou > pr.IOU_THRESHOLD:
+                    if iou > cfg["IOU_THRESHOLD"] :
                         erreurs_syntaxe["bbox_IoU_suspect"].append(
                             f"{entry.name} (classe {cls}, lignes {prev_line}-{i}) IoU={iou:.3f}"
                         )
@@ -203,15 +212,17 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
     # labels orphelins
     orphan_labels = sorted(label_stems - image_stems)
     if orphan_labels:
+        ctrl_ok = False
         erreurs_syntaxe["labels_orphelins"] = orphan_labels
         for lbl in orphan_labels:
             rapport_detail[lbl][0].append("labels_orphelins")
 
 
-     # Vérification images invalides / corrompues
+    # Vérification images invalides / corrompues
     images_invalides = []
 
     for p in image_paths:
+        # --- image corrompue ---
         if not is_valid_image(p):
             images_invalides.append(p.name)
 
@@ -236,10 +247,14 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user):
         for key, values in erreurs_syntaxe.items():
             if values:
                 util.display_and_save_errors(
+                    cfg,
                     path_user,
                     sorted(values),
                     f"{key}.txt",
                     key.replace("_", " ").capitalize()
                 )
-
-    return erreurs_syntaxe, all_bboxes, rapport_detail, ctrl_ok
+    #
+    # all_bboxes : liste avec toutes les Bboxes
+    # repport    : collections.defaultdict
+    #
+    return erreurs_syntaxe, ctrl_ok
