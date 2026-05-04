@@ -23,11 +23,7 @@ def test_main_help_returns_zero_and_lists_subcommands() -> None:
 		text=True,
 		timeout=60,
 	)
-	assert result.returncode == 0, (
-		f"`python main.py --help` exited with {result.returncode}\n"
-		f"stdout:\n{result.stdout}\n"
-		f"stderr:\n{result.stderr}"
-	)
+	assert result.returncode == 0, f"`python main.py --help` exited with {result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 	# Both subcommands must appear in --help output.
 	assert "train" in result.stdout, f"'train' subcommand missing from --help output:\n{result.stdout}"
 	assert "infer" in result.stdout, f"'infer' subcommand missing from --help output:\n{result.stdout}"
