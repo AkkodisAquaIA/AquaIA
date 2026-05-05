@@ -1,0 +1,117 @@
+# deploy/docker-compose.yml
+#
+# AquaIA Compose stack — copied verbatim by the CI/CD pipeline to the
+# staging and prod stack directories on the Azure VM. The exact paths are
+# stored in the GitHub Repository Variables STACK_DIR_STAGING and
+# STACK_DIR_PROD; this file is path-agnostic.
+#
+# A single file is used for both stacks. Stacks are isolated by:
+#   - working directory   (one per stack, set by the deploy job)
+#   - Compose project name `aquaia-${STACK_NAME}` (passed by the deploy job)
+#   - the `.env` next to this file, which sets IMAGE_TAG, STACK_NAME and
+#     DOCKERHUB_NAMESPACE
+#
+# Service profiles (https://docs.docker.com/compose/profiles/):
+#   - idle  (default) : long-running container that just stays up; entry point
+#                       for `docker exec` workloads and for the API later on
+#   - train           : one-shot training run, no restart, exits on completion
+#   - infer           : one-shot inference run, same shape as train
+#   - api             : (placeholder, NOT yet enabled) FastAPI server, see
+#                       AQUA-IA scientific dossier — Tâche 2.4
+#
+# Usage on the VM (run from the stack directory holding the rendered .env):
+#   docker compose -p aquaia-${STACK_NAME} pull
+#   docker compose -p aquaia-${STACK_NAME} --profile idle  up -d
+#   docker compose -p aquaia-${STACK_NAME} --profile train up
+#   docker compose -p aquaia-${STACK_NAME} --profile infer up
+#
+# Volumes (./datasets, ./models, ./results, ./cache) are bind mounts living
+# on the VM filesystem and are NEVER baked into the image.
+
+x-aquaia-common: &aquaia-common
+  image: ${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required, set it in .env}/aquaia:${IMAGE_TAG:?IMAGE_TAG is required, set it in .env}
+  pull_policy: always
+  environment:
+    PYTHONUNBUFFERED: "1"
+    HF_HOME: /app/cache/huggingface
+    TORCH_HOME: /app/cache/torch
+    AQUAIA_STACK: ${STACK_NAME:?STACK_NAME is required, set it in .env (staging|prod)}
+  volumes:
+    - ./datasets:/app/datasets:ro
+    - ./models:/app/models:ro
+    - ./results:/app/results
+    - ./cache:/app/cache
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  # -------------------------------------------------------------------------
+  # idle (default profile) — kept up by `sleep infinity`, used as an exec host
+  # for ad-hoc workloads. Always restarts on failure / VM reboot.
+  # -------------------------------------------------------------------------
+  aquaia:
+    <<: *aquaia-common
+    container_name: aquaia-${STACK_NAME}
+    profiles: ["idle"]
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import torch; assert torch.cuda.is_available()"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+  # -------------------------------------------------------------------------
+  # train — one-shot, exits on completion. Trigger with:
+  #   docker compose -p aquaia-${STACK_NAME} --profile train up
+  # -------------------------------------------------------------------------
+  aquaia-train:
+    <<: *aquaia-common
+    container_name: aquaia-${STACK_NAME}-train
+    profiles: ["train"]
+    command: ["python", "main.py", "train"]
+    restart: "no"
+
+  # -------------------------------------------------------------------------
+  # infer — one-shot, exits on completion. Trigger with:
+  #   docker compose -p aquaia-${STACK_NAME} --profile infer up
+  # -------------------------------------------------------------------------
+  aquaia-infer:
+    <<: *aquaia-common
+    container_name: aquaia-${STACK_NAME}-infer
+    profiles: ["infer"]
+    command: ["python", "main.py", "infer"]
+    restart: "no"
+
+  # -------------------------------------------------------------------------
+  # api — PLACEHOLDER, intentionally disabled for now.
+  #
+  # TODO (AQUA-IA dossier scientifique, Axe 2 — Tâche 2.4
+  # « Évaluation et Déploiement Opérationnel de la Méthode IA »):
+  #   1. Add a FastAPI entry point (e.g. src/api/server.py exposing the
+  #      detection / classification / SAM inference pipelines).
+  #   2. Replace the placeholder command below with the real uvicorn invocation.
+  #   3. Re-enable the `profiles: ["api"]` line and confirm the port mapping
+  #      is correctly opened on the VM (NSG / firewall / reverse proxy).
+  #   4. Add an HTTP healthcheck (GET /health) and remove the GPU-only one.
+  #
+  # The skeleton is kept here so adding the API is a one-line change, not a
+  # refactor.
+  aquaia-api:
+    <<: *aquaia-common
+    container_name: aquaia-${STACK_NAME}-api
+    # profiles: ["api"]   # ← re-enable when the API is implemented
+    profiles: ["__disabled__"]
+    command:
+      - python
+      - -c
+      - "import sys; print('API not implemented yet — see Tâche 2.4'); sys.exit(64)"
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
