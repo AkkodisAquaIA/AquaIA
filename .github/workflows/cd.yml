@@ -125,6 +125,7 @@ jobs:
           # for commit ${GITHUB_SHA}.
           IMAGE_TAG=${IMAGE_TAG}
           DOCKERHUB_NAMESPACE=${DOCKERHUB_NAMESPACE}
+          STACK_NAME=staging
           EOF
           echo "Rendered .env:"
           sed 's/^/  /' /tmp/aquaia.env
