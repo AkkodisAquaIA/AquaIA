@@ -161,7 +161,7 @@ if __name__ == "__main__":
 
     # Print information once
     info_device = True
-    if cfg["NMS_CLS"] != False or cfg["NMS_GLB"] != False or cfg["UNIC"] == True:
+    if cfg["NMS_CLS"] is not False or cfg["NMS_GLB"] is not False or cfg["UNIC"] is True:
         print("\n" + "=" * 100)
         print("The terminal logs during inference are still the results before custom post-processing (NMS_CLS, NMS_GLB, or UNIC).")
         print("=" * 100 + "\n")
@@ -196,15 +196,15 @@ if __name__ == "__main__":
             results = predictor(text=text_prompts)
 
             # Apply per-class NMS only when enabled and keep updated result in-place
-            if cfg["NMS_CLS"] != False:
+            if cfg["NMS_CLS"] is not False:
                 results[0] = post_nms_cls(results[0], cfg["NMS_CLS"])
 
             # Apply global NMS only when enabled and keep updated result in-place
-            if cfg["NMS_GLB"] != False:
+            if cfg["NMS_GLB"] is not False:
                 results[0] = post_nms_glb(results[0], cfg["NMS_GLB"])
 
             # Keep only the highest-confidence bbox when UNIC is enabled
-            if cfg["UNIC"] == True:
+            if cfg["UNIC"] is True:
                 results[0] = post_unic(results[0])
 
             # Save labels in xywh format
@@ -253,15 +253,15 @@ if __name__ == "__main__":
             info_device = print_device_info(model, info_device)
 
             # Apply per-class NMS only when enabled and keep updated result in-place
-            if cfg["NMS_CLS"] != False:
+            if cfg["NMS_CLS"] is not False:
                 result = post_nms_cls(result, cfg["NMS_CLS"])
 
             # Apply global NMS only when enabled and keep updated result in-place
-            if cfg["NMS_GLB"] != False:
+            if cfg["NMS_GLB"] is not False:
                 result = post_nms_glb(result, cfg["NMS_GLB"])
 
             # Keep only the highest-confidence bbox when UNIC is enabled
-            if cfg["UNIC"] == True:
+            if cfg["UNIC"] is True:
                 result = post_unic(result)
 
             # Save labels in xywh format

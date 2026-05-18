@@ -93,5 +93,5 @@ if __name__ == "__main__":
             cv2.imwrite(to_long_path(crop_filepath), crop_img)
             crop_count += 1
 
-    print(f"\nCropping completed successfully!")
+    print("\nCropping completed successfully!")
     print(f"\nTotal {crop_count} bounding boxes cropped and saved in: {det_dir / 'crop_result'}")
