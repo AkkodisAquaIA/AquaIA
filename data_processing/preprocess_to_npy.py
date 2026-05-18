@@ -43,7 +43,7 @@ def convert_to_npy(root_dir, batch_size=128, num_threads=4, device_id=0, compute
 
 	np_images = np.concatenate(batches, axis=0)[:n].astype(np.float32) / 255.0
 
-	image_dir = os.path.join(root_dir, "npy_images")
+	image_dir = os.path.join(root_dir, "npy_images.npy")
 	np.save(image_dir, np_images)
 
 	if compute_stats:
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 
 	root_dir = os.path.join(BASE_DIR, args.data_dir, args.dataset)
-	image_dir = os.path.join(root_dir, "npy_images")
+	image_dir = os.path.join(root_dir, "npy_images.npy")
 
 	if not os.path.exists(image_dir):
 		convert_to_npy(root_dir=root_dir, batch_size=args.batch_size, num_threads=args.num_threads, compute_stats=True)

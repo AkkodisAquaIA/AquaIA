@@ -188,7 +188,6 @@ def train_dino(config):
 	scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 	best_metric = 0.0
 	best_metric_dict = None
-	best_model = None
 	metrics_history = []
 
 	model.train()
@@ -232,10 +231,14 @@ def train_dino(config):
 		print_metrics(epoch_metrics)
 		metrics_history.append(epoch_metrics)
 
-		if best_metric < epoch_metrics["map_50_95"] or best_model is None:
+		if best_metric < epoch_metrics["map_50_95"] or best_metric_dict is None:
 			best_metric = epoch_metrics["map_50_95"]
-			best_model = model
-			best_metric_dict = epoch_metrics
+			best_metric_dict = epoch_metrics.copy()
+			# save best model
+			save_model_checkpoint(
+				path=os.path.join(weights_dir, "best.pt"),
+				model=model,
+			)
 			print(f"New best model found at epoch {epoch + 1} with mAP50-95: {best_metric:.4f}")
 
 		if scheduler is not None:
@@ -245,11 +248,6 @@ def train_dino(config):
 	save_model_checkpoint(
 		path=os.path.join(weights_dir, "last.pt"), 
 		model=model
-	)
-	# save best model
-	save_model_checkpoint(
-		path=os.path.join(weights_dir, "best.pt"),
-		model=best_model if best_model is not None else model,
 	)
 	# Save training state (optimizer, scaler and scheduler states) for potential resuming
 	save_training_state_checkpoint(
@@ -276,10 +274,13 @@ def train_dino(config):
 	)
 
 	# === Save some sampled predictions with the best model ===
+	best_checkpoint = torch.load(os.path.join(weights_dir, "best.pt"), map_location=device)
+	target_model = model._orig_mod if hasattr(model, "_orig_mod") else model
+	target_model.load_state_dict(best_checkpoint["model_state_dict"])
 
 	# Eval dataset
 	save_sample_predictions(
-		model=best_model if best_model is not None else model,
+		model=model,
 		subset=test_set,
 		output_dir=Path(run_dir) / "eval_predictions",
 		conf=0.3,
@@ -289,7 +290,7 @@ def train_dino(config):
 	)
 	# Train dataset
 	save_sample_predictions(
-		model=best_model if best_model is not None else model,
+		model=model,
 		subset=train_set,
 		output_dir=Path(run_dir) / "train_predictions",
 		conf=0.3,

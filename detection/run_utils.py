@@ -5,7 +5,7 @@ import csv
 import torch
 import yaml
 
-from test.config_utils import find_latest_run_dir, load_run_config
+from detection.utils.config_utils import find_latest_run_dir, load_run_config
 
 
 def get_run_context(config):
