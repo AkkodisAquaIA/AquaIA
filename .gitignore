@@ -1,19 +1,47 @@
-data_processing/datasets/
+# OS / editor
+.DS_Store
+
+# Python
 __pycache__/
+*.pyc
+.venv/
+venv/
+
+# Lint / test caches
+.ruff_cache/
+.pytest_cache/
+
+# ML weights & serialized tensors (never commit)
 *.npy
 *.npz
 *.pth
 *.pt
+*.ts
+
+# Project data — must stay out of the repo and out of Docker images
 data/
+data_processing/datasets/
+/datasets
+/results
 dataloading/*.png
 coco128
+detection/sam/*_result_det_*/
+detection/sam/*_result_det/
 
 #Linter
 .ruff_cache/
 
 /.cache
+# Local caches (HF, torch hub, etc.)
+/.cache
+.cache/
+
+# Secrets / environment files (use *.env.example to share templates)
 .env
 docker/.env
+deploy/.env
+
+# Archives & build leftovers
 *.tar
 docker/build/
 /results
@@ -23,3 +51,4 @@ docker/build/
 data_cropping/sam/*_result_det_*/
 data_cropping/sam/*_result_det/
 *.ts
+*.zip

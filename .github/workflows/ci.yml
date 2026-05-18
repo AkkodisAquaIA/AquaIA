@@ -1,0 +1,158 @@
+# .github/workflows/ci.yml
+#
+# AquaIA continuous integration — runs on every pull request targeting the
+# `development` branch (the current default branch). It is the gate every PR
+# must pass before being mergeable.
+#
+# Three independent jobs run in parallel for fast feedback:
+#   - lint   : static checks via ruff (lint + format)
+#   - test   : pytest suite, GPU-free (torch CPU is installed for the runner)
+#   - build  : multi-stage Docker image build, NOT pushed, then a smoke test
+#              `docker run … python main.py --help` to confirm the image is
+#              actually executable end-to-end
+#
+# All three are required by the branch-protection rule on `development` (see
+# deploy/README.md §2.3). When the default branch is later renamed to `main`,
+# only the trigger below needs to change — see docs/cicd_architecture.md
+# section "État transitoire main / development".
+
+name: ci
+
+on:
+  pull_request:
+    branches: [development]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Per-PR concurrency: a new push to the same PR cancels the previous run.
+# Outside of PRs (re-runs), this group still isolates by ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege: this workflow only reads the repo. It never writes back.
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # lint — fast, no heavy deps. Should fail in <1 min when ruff catches stuff.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      # Full history is needed so we can diff against the PR base ref. The
+      # repo is small enough that fetch-depth: 0 is cheap.
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dev tooling
+        run: pip install -r requirements-dev.txt
+
+      # The lint job is intentionally scoped to files modified by the PR. The
+      # repository carries pre-existing ruff debt (introduced before any CI
+      # was in place); we don't want every new PR to be blocked by that debt.
+      # A tracking issue / TODO captures the cleanup work; meanwhile new code
+      # is held to the bar.
+      - name: Compute changed Python files (vs PR base)
+        id: changed
+        run: |
+          set -euo pipefail
+          BASE_REF="origin/${{ github.base_ref }}"
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          CHANGED=$(git diff --name-only --diff-filter=ACMR \
+                    "${BASE_REF}...HEAD" -- '*.py' \
+                    | tr '\n' ' ')
+          # Trim trailing whitespace.
+          CHANGED="${CHANGED%% }"
+          echo "files=${CHANGED}" >> "$GITHUB_OUTPUT"
+          if [[ -z "${CHANGED}" ]]; then
+            echo "No Python files changed in this PR — lint will be skipped."
+          else
+            echo "Changed Python files:"
+            printf '  %s\n' ${CHANGED}
+          fi
+
+      - name: ruff check (PR diff only)
+        if: steps.changed.outputs.files != ''
+        run: ruff check ${{ steps.changed.outputs.files }}
+
+      - name: ruff format --check (PR diff only)
+        if: steps.changed.outputs.files != ''
+        run: ruff format --check ${{ steps.changed.outputs.files }}
+
+  # ---------------------------------------------------------------------------
+  # test — pytest. The runner has no GPU, so we install torch CPU first from
+  # the dedicated PyTorch index, then the project deps (which see torch as
+  # already satisfied and do not re-install it).
+  # ---------------------------------------------------------------------------
+  test:
+    name: test (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements-vm.txt
+            requirements-dev.txt
+
+      # CPU wheels — keeps the runner GPU-free and the install fast (~200 MB
+      # vs ~2 GB for CUDA wheels). The runtime image on the VM uses the GPU
+      # torch from the base image; this CI install only powers `pytest`.
+      - name: Install torch (CPU) for the runner
+        run: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install project deps
+        run: pip install -r requirements-vm.txt -r requirements-dev.txt
+
+      - name: pytest
+        run: pytest -q
+
+  # ---------------------------------------------------------------------------
+  # build — produce the runtime image WITHOUT pushing it. Then run the default
+  # CMD as a smoke test. Caches are scoped per workflow via the `gha` exporter.
+  # ---------------------------------------------------------------------------
+  build:
+    name: build & smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push, load locally)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/build/Dockerfile
+          push: false
+          load: true
+          tags: aquaia:ci-${{ github.sha }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.pull_request.updated_at }}
+          cache-from: type=gha,scope=ci
+          cache-to: type=gha,mode=max,scope=ci
+
+      - name: Smoke test — CLI is reachable
+        run: docker run --rm aquaia:ci-${{ github.sha }} python main.py --help
