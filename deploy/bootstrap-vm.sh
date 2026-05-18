@@ -10,7 +10,7 @@
 #
 # What it does:
 #   1. Refuses to run as a non-root user.
-#   2. Creates the dedicated `deploy` user (UID 1000) and adds it to `docker`.
+#   2. Creates the dedicated `deploy` user (UID 1001) and adds it to `docker`.
 #   3. Creates <stack-root>/{staging,prod}/{datasets,models,results,cache}
 #      owned by deploy:deploy. Default <stack-root> is /srv/aquaia and can be
 #      overridden via --stack-root.
@@ -39,8 +39,8 @@ set -euo pipefail
 # Constants
 # ---------------------------------------------------------------------------
 readonly DEPLOY_USER="deploy"
-readonly DEPLOY_UID="1000"
-readonly DEPLOY_GID="1000"
+readonly DEPLOY_UID="1001"
+readonly DEPLOY_GID="1001"
 readonly DEFAULT_STACK_ROOT="/srv/aquaia"
 readonly STACKS=("staging" "prod")
 readonly STACK_SUBDIRS=("datasets" "models" "results" "cache")
@@ -123,9 +123,8 @@ ensure_deploy_user() {
 	if id -u "${DEPLOY_USER}" >/dev/null 2>&1; then
 		info "  user '${DEPLOY_USER}' already exists, skipping creation"
 	else
-		# Create matching group first so UID/GID stay aligned with the
-		# 'aquaia' user inside the container (UID 1000) — keeps bind-mount
-		# permissions sane.
+		# Create matching group first. UID/GID 1001 is used because Ubuntu 24.04
+		# reserves UID/GID 1000 for the default 'ubuntu' user.
 		if ! getent group "${DEPLOY_USER}" >/dev/null 2>&1; then
 			groupadd --gid "${DEPLOY_GID}" "${DEPLOY_USER}"
 			info "  created group ${DEPLOY_USER} (gid=${DEPLOY_GID})"
