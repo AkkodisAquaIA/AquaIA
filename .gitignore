@@ -11,17 +11,15 @@ coco128
 #Linter
 .ruff_cache/
 
-<<<<<<< HEAD
 /.cache
-=======
 .env
 docker/.env
 *.tar
 docker/build/
->>>>>>> development
 /results
 /datasets
-# sam
-detection/sam/*_result_det_*/
-detection/sam/*_result_det/
+
+# data_cropping/sam
+data_cropping/sam/*_result_det_*/
+data_cropping/sam/*_result_det/
 *.ts
