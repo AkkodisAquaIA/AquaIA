@@ -1,57 +1,50 @@
-# .github/workflows/cd-prod.yml
+# .github/workflows/cd.yml
 #
-# AquaIA continuous deployment — production.
+# AquaIA continuous deployment.
 #
-# Trigger:   git tag matching `v*.*.*` (semver) pushed on any branch.
-# Builds:    one Docker image, tagged `${TAG}` (e.g. `v0.1.0`) plus the
-#            mobile `latest`, pushed to Docker Hub.
-# Deploys:   image is pulled and started on the Azure VM under the prod
-#            stack directory (cf. Repository Variable STACK_DIR_PROD),
-#            Compose project name `aquaia-prod`.
+# Trigger:   every push (including merged PR) to the `development` branch.
+# Builds:    one Docker image, tagged `dev-<short-sha>` plus the floating
+#            `dev-latest`, pushed to Docker Hub.
+# Deploys:   image pulled and started on the Azure VM under the stack
+#            directory (cf. Repository Variable STACK_DIR_STAGING),
+#            Compose project name `aquaia-staging`.
 #
-# Sensitive infra values (Docker Hub namespace, on-VM filesystem layout) are
-# kept out of the public repo. They are read at runtime from GitHub
-# Repository Variables: DOCKERHUB_NAMESPACE, STACK_DIR_PROD. The VM hostname
-# comes from the secret VM_HOST. See deploy/README.md §2 for the full list.
+# This single workflow replaces the former cd-staging + cd-prod split.
+# For a research project (batch train/infer, no 24/7 user-facing service),
+# a staging/prod distinction adds complexity without benefit. To pin a stable
+# version on the VM, edit .env manually (IMAGE_TAG=dev-<sha>) and restart.
+# See docs/cicd_architecture.md for the full rationale and the kept-aside
+# cd-prod.yml design (to be restored if the project exposes a public API).
 #
-# Production deploys are gated on a manual approval via the GitHub
-# Environment `production` (see deploy/README.md §2.2). The `build-push`
-# job runs immediately when the tag is pushed; the `deploy-prod` job pauses
-# at the environment gate until a reviewer clicks "Approve and deploy".
-#
-# This workflow does NOT change when `development` → `main` re-target
-# happens: it is tag-driven, not branch-driven.
+# When `main` becomes the up-to-date branch, change ONLY the trigger below
+# (`branches: [development]` → `[main]`). See docs/cicd_architecture.md.
 
-name: cd-prod
+name: cd
 
 on:
   push:
-    tags: ["v*.*.*"]
+    branches: [development]
 
-# One prod deploy at a time. Same rationale as cd-staging: never cancel an
-# in-flight deploy.
+# One deploy at a time. Do NOT cancel an in-flight deploy — interrupting
+# `docker compose up -d` mid-flight leaves the VM in a half-pulled state.
 concurrency:
-  group: cd-prod
+  group: cd
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 env:
-  # Sensitive infra values come from GitHub Repository Variables.
   DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
-  STACK_DIR: ${{ vars.STACK_DIR_PROD }}
-  # Project conventions — kept in-tree.
+  STACK_DIR: ${{ vars.STACK_DIR_STAGING }}
   IMAGE_NAME: aquaia
-  STACK_NAME: prod
-  COMPOSE_PROJECT: aquaia-prod
-  CONTAINER_NAME: aquaia-prod
+  COMPOSE_PROJECT: aquaia-staging
+  CONTAINER_NAME: aquaia-staging
   VM_USER: deploy
 
 jobs:
   # ---------------------------------------------------------------------------
-  # build-push — produce the image with the exact semver tag the operator
-  # pushed. Also moves the `latest` floating tag.
+  # build-push — produce the runtime image and publish it to Docker Hub.
   # ---------------------------------------------------------------------------
   build-push:
     name: build & push (Docker Hub)
@@ -66,20 +59,14 @@ jobs:
       - name: Compute image tags
         id: tags
         run: |
-          # github.ref_name is the tag name on a tag push (e.g. "v0.1.0").
-          IMAGE_TAG="${GITHUB_REF_NAME}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          IMAGE_TAG="dev-${SHORT_SHA}"
           IMAGE_REF="${DOCKERHUB_NAMESPACE}/${IMAGE_NAME}"
-          # Defensive sanity check — the trigger filters on v*.*.* but we
-          # double-check at runtime: never push junk to the `latest` tag.
-          if [[ ! "${IMAGE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::tag '${IMAGE_TAG}' is not a vX.Y.Z semver — refusing to publish"
-            exit 1
-          fi
           {
             echo "image_tag=${IMAGE_TAG}"
             echo "image_ref=${IMAGE_REF}"
           } >> "$GITHUB_OUTPUT"
-          echo "Will push ${IMAGE_REF}:${IMAGE_TAG} and ${IMAGE_REF}:latest"
+          echo "Will push ${IMAGE_REF}:${IMAGE_TAG} and ${IMAGE_REF}:dev-latest"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -98,27 +85,20 @@ jobs:
           push: true
           tags: |
             ${{ steps.tags.outputs.image_ref }}:${{ steps.tags.outputs.image_tag }}
-            ${{ steps.tags.outputs.image_ref }}:latest
+            ${{ steps.tags.outputs.image_ref }}:dev-latest
           build-args: |
             GIT_SHA=${{ github.sha }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
-          cache-from: type=gha,scope=cd-prod
-          cache-to: type=gha,mode=max,scope=cd-prod
+          cache-from: type=gha,scope=cd
+          cache-to: type=gha,mode=max,scope=cd
 
   # ---------------------------------------------------------------------------
-  # deploy-prod — gated on the GitHub Environment `production`. A reviewer
-  # must approve in the UI before this job runs. Once approved, the steps
-  # mirror cd-staging.yml but target the prod stack directory.
+  # deploy — render .env, copy compose + env, pull, restart, smoke.
   # ---------------------------------------------------------------------------
-  deploy-prod:
-    name: deploy → Azure VM (prod)
+  deploy:
+    name: deploy → Azure VM
     runs-on: ubuntu-latest
     needs: build-push
-    # Required reviewer + optional wait timer are configured on the
-    # `production` environment in repository settings — see deploy/README.md.
-    environment:
-      name: production
-      url: https://hub.docker.com/r/${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}/tags
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -135,20 +115,19 @@ jobs:
           chmod 600 ~/.ssh/aquaia_ci
           ssh-keyscan -H "${VM_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Render .env for the prod stack
+      - name: Render .env
         env:
           IMAGE_TAG: ${{ needs.build-push.outputs.image_tag }}
         run: |
           set -euo pipefail
-          cat > /tmp/aquaia-prod.env <<EOF
-          # Rendered by cd-prod.yml at $(date -u '+%Y-%m-%dT%H:%M:%SZ')
-          # for tag ${GITHUB_REF_NAME} (commit ${GITHUB_SHA}).
+          cat > /tmp/aquaia.env <<EOF
+          # Rendered by cd.yml at $(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          # for commit ${GITHUB_SHA}.
           IMAGE_TAG=${IMAGE_TAG}
-          STACK_NAME=${STACK_NAME}
           DOCKERHUB_NAMESPACE=${DOCKERHUB_NAMESPACE}
           EOF
           echo "Rendered .env:"
-          sed 's/^/  /' /tmp/aquaia-prod.env
+          sed 's/^/  /' /tmp/aquaia.env
 
       - name: Copy compose & .env to the VM
         env:
@@ -161,7 +140,7 @@ jobs:
               "${VM_USER}@${VM_HOST}:${STACK_DIR}/docker-compose.yml"
           scp -i ~/.ssh/aquaia_ci \
               -o StrictHostKeyChecking=accept-new \
-              /tmp/aquaia-prod.env \
+              /tmp/aquaia.env \
               "${VM_USER}@${VM_HOST}:${STACK_DIR}/.env"
 
       - name: Pull, restart, prune & smoke
