@@ -1,7 +1,7 @@
 # AquaIA — Computer vision for aquatic macro-invertebrate identification
 
 [![ci](https://github.com/AkkodisAquaIA/AquaIA/actions/workflows/ci.yml/badge.svg?branch=development)](https://github.com/AkkodisAquaIA/AquaIA/actions/workflows/ci.yml)
-[![cd-staging](https://github.com/AkkodisAquaIA/AquaIA/actions/workflows/cd-staging.yml/badge.svg?branch=development)](https://github.com/AkkodisAquaIA/AquaIA/actions/workflows/cd-staging.yml)
+[![cd](https://github.com/AkkodisAquaIA/AquaIA/actions/workflows/cd.yml/badge.svg?branch=development)](https://github.com/AkkodisAquaIA/AquaIA/actions/workflows/cd.yml)
 
 AquaIA is a research project of the **LPL · Akkodis · Scimabio-Interface** consortium (2025-2028). Its goal is to replace the destructive, time-consuming morphological identification of benthic macro-invertebrates — used today to score French rivers under the EU Water Framework Directive — with non-lethal AI-based identification from images and environmental DNA.
 
@@ -53,7 +53,7 @@ Status: research / pre-operational. Operational deployment (Task 2.4 of the scie
 ├── deploy/                 # docker-compose, bootstrap script, ops runbook
 ├── docs/                   # Architecture documentation
 ├── tests/                  # Pytest suite (smoke-level)
-├── .github/workflows/      # GitHub Actions — ci, cd-staging, cd-prod
+├── .github/workflows/      # GitHub Actions — ci, cd
 ├── main.py                 # CLI entry point — `train` and `infer` subcommands
 ├── pyproject.toml          # ruff + pytest configuration
 ├── requirements.txt        # General-purpose dependencies
@@ -171,28 +171,21 @@ Every commit on `development` is automatically built, tested, and deployed to th
                  └──────────────┘     │                 │     │                    │
                                       │                 │     │                    │
 ┌──────────┐     ┌──────────────┐     │   Docker Hub    │     │   Azure VM         │
-│ Push to  │────▶│ cd-staging   │────▶│ <DOCKERHUB_NS>/ │────▶│ <STACK_PATH_       │
+│ Push to  │────▶│     cd       │────▶│ <DOCKERHUB_NS>/ │────▶│ <STACK_PATH_       │
 │   dev    │     │ build · push │     │ aquaia:dev-sha  │     │     STAGING>       │
-└──────────┘     └──────────────┘     │                 │     │                    │
-                                      │                 │     │                    │
-┌──────────┐     ┌──────────────┐     │                 │     │                    │
-│ Tag      │────▶│  cd-prod     │────▶│ <DOCKERHUB_NS>/ │────▶│ <STACK_PATH_PROD>  │
-│ v*.*.*   │     │ build · push │     │ aquaia:vX.Y.Z   │     │ (after approval)   │
-└──────────┘     │ approval gate│     │                 │     │                    │
-                 └──────────────┘     └─────────────────┘     └────────────────────┘
+└──────────┘     └──────────────┘     │ aquaia:dev-     │     │                    │
+                                      │       latest    │     │                    │
+                                      └─────────────────┘     └────────────────────┘
 ```
 
 ### Workflows
 
-| Workflow                                                              | Trigger                | Action                                            | Image tags pushed             | Secrets used                                                            |
-| --------------------------------------------------------------------- | ---------------------- | ------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------- |
-| [`ci.yml`](.github/workflows/ci.yml)                                  | PR to `development`    | Lint, test, Docker build (no push) + smoke test   | none (local to runner)        | none                                                                    |
-| [`cd-staging.yml`](.github/workflows/cd-staging.yml)                  | Push to `development`  | Build, push to Docker Hub, deploy to VM staging   | `dev-<sha>` + `dev-latest`    | `DOCKERHUB_USER`, `DOCKERHUB_TOKEN`, `VM_HOST`, `VM_SSH_PRIVATE_KEY`    |
-| [`cd-prod.yml`](.github/workflows/cd-prod.yml)                        | Tag `v*.*.*`           | Build, push, deploy to VM prod (manual approval)  | `vX.Y.Z` + `latest`           | Same set + GitHub Environment `production` with required reviewer       |
+| Workflow                                          | Trigger               | Action                                          | Image tags pushed          | Secrets used                                                         |
+| ------------------------------------------------- | --------------------- | ----------------------------------------------- | -------------------------- | -------------------------------------------------------------------- |
+| [`ci.yml`](.github/workflows/ci.yml)              | PR to `development`   | Lint, test, Docker build (no push) + smoke test | none (local to runner)     | none                                                                 |
+| [`cd.yml`](.github/workflows/cd.yml)              | Push to `development` | Build, push to Docker Hub, deploy to VM         | `dev-<sha>` + `dev-latest` | `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `VM_HOST`, `VM_SSH_PRIVATE_KEY` |
 
-The floating `latest` tag only moves on prod tag pushes — `dev-latest` is its staging counterpart, so a developer pulling `latest` always gets the most recent reviewed release.
-
-For the full secret-rotation procedure, the `production` environment setup, and the branch protection rules, see [`deploy/README.md`](deploy/README.md) §1 and §2.
+For the full secret-rotation procedure and the branch protection rules, see [`deploy/README.md`](deploy/README.md) §1 and §2.
 
 ### Container runtime model
 
@@ -231,17 +224,18 @@ Semver convention:
 - **Minor** (`v0.2.0`) — new features, backwards-compatible.
 - **Major** (`v1.0.0`) — breaking changes (CLI flags, model interface, data format).
 
-Cutting a release:
+To pin a stable version on the VM (equivalent of a release):
 
 ```bash
-git checkout development
-git pull --ff-only
-git tag -a v0.1.0 -m "AquaIA 0.1.0 — initial production release"
-git push origin v0.1.0
-# cd-prod.yml triggers; manual approval is required in the GitHub UI
+ssh <DEPLOY_USER>@<VM_HOST>
+cd <STACK_PATH_STAGING>
+# Edit IMAGE_TAG to the desired dev-<sha> tag
+nano .env
+docker compose -p aquaia-staging pull
+docker compose -p aquaia-staging --profile idle up -d
 ```
 
-The semver tag becomes a stable reference for scientific reporting (Task 2.4 deliverables, consortium publications). 0 git tags posted to date — the first one will trigger the first prod deployment.
+Git tags (`v*.*.*`) can still be used for scientific reporting milestones, but they no longer trigger an automated deployment. The `dev-<sha>` tags on Docker Hub provide full traceability per commit.
 
 ### Rollback
 
@@ -268,7 +262,7 @@ Pipeline architecture, image tagging strategy, branch transition plan, and futur
 Current state (April 2026):
 
 - **`development`** is the default branch and the source of truth. All PRs target it. CI/CD workflows trigger on it.
-- **`main`** is currently obsolete. When the codebase is stable enough, `development` will be merged into `main` and the workflows will flip targets — a one-line change in `ci.yml` and `cd-staging.yml`. See [`docs/cicd_architecture.md`](docs/cicd_architecture.md) §6 for the migration plan.
+- **`main`** is currently obsolete. When the codebase is stable enough, `development` will be merged into `main` and the workflows will flip targets — a one-line change in `ci.yml` and `cd.yml`. See [`docs/cicd_architecture.md`](docs/cicd_architecture.md) §6 for the migration plan.
 - Feature branches: `feat/<short-name>`. Fixes: `fix/<short-name>`. Chores: `chore/<short-name>`.
 - 0 git tags posted to date.
 
