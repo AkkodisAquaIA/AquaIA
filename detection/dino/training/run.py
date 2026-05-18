@@ -18,7 +18,6 @@ from detection.utils.config_utils import save_resolved_config
 from detection.utils.plot_utils import plot_metrics, annotate_images_with_predictions
 
 
-
 @torch.no_grad()
 def save_sample_predictions(model, subset, output_dir, num_samples=20, conf=0.3, seed=0, device="cuda", use_amp=True):
 	images, image_files = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed)
@@ -38,18 +37,17 @@ def save_sample_predictions(model, subset, output_dir, num_samples=20, conf=0.3,
 		image_files=image_files,
 	)
 
+
 def normalize_imgsz(config):
 	model_family = str(config.get("model", {}).get("family", "")).lower()
 	patch_size = 14 if model_family == "dinov2" else 16
 	imgsz = int(config["training"]["imgsz"])
 	rounded_imgsz = max(patch_size, round(imgsz / patch_size) * patch_size)
 	if rounded_imgsz != imgsz:
-		print(
-			f"Warning: imgsz={imgsz} is not divisible by patch size {patch_size}. "
-			f"Using imgsz={rounded_imgsz} instead."
-		)
+		print(f"Warning: imgsz={imgsz} is not divisible by patch size {patch_size}. Using imgsz={rounded_imgsz} instead.")
 		config["training"]["imgsz"] = rounded_imgsz
 	return int(config["training"]["imgsz"])
+
 
 def get_datasets(data_yaml_path, device, train_fraction=0.9):
 	# Compute random split for train and eval set
@@ -61,11 +59,7 @@ def get_datasets(data_yaml_path, device, train_fraction=0.9):
 	test_size = len(dataset) - train_size
 	generator = torch.Generator().manual_seed(42)
 
-	train_dataset, test_dataset = random_split(
-		dataset,
-		[train_size, test_size],
-		generator=generator
-	)
+	train_dataset, test_dataset = random_split(dataset, [train_size, test_size], generator=generator)
 	num_classes = dataset.num_classes
 	return train_dataset, test_dataset, num_classes
 
@@ -85,6 +79,7 @@ def build_scheduler(training_config, optimizer):
 		scheduler_specific_kwargs={"min_lr_rate": training_config.get("lrf", 0.01)},
 	)
 	return scheduler
+
 
 def compute_metrics(model, train_dataloader, eval_dataloader, metrics_dict, device, num_classes, conf_thresh):
 	train_metrics = evaluate_map(
@@ -120,7 +115,7 @@ def train_dino(config):
 	use_amp = device == "cuda"
 
 	train_set, test_set, num_classes = get_datasets(config["data"]["dataset_yaml"], device)
-	
+
 	# === Setup dataloaders ===
 	dataloader = DataLoader(
 		train_set,
@@ -145,7 +140,6 @@ def train_dino(config):
 	weights_dir = os.path.join(run_dir, "weights")
 	os.makedirs(weights_dir, exist_ok=True)
 
-	
 	# === DINO related stuff ===
 	backbone_config = config.get("model", {})
 	backbone_family = str(backbone_config.get("family", "")).lower()
@@ -153,7 +147,7 @@ def train_dino(config):
 	imgsz = normalize_imgsz(config)
 
 	model = DINODetector(
-		backbone_id = backbone_family + "_" + backbone_size,
+		backbone_id=backbone_family + "_" + backbone_size,
 		img_size=imgsz,
 		device=device,
 		num_classes=num_classes,
@@ -183,7 +177,6 @@ def train_dino(config):
 	)
 
 	scheduler = build_scheduler(training_config, optimizer)
-	
 
 	scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 	best_metric = 0.0
@@ -245,10 +238,7 @@ def train_dino(config):
 			scheduler.step()
 
 	# save last model
-	save_model_checkpoint(
-		path=os.path.join(weights_dir, "last.pt"), 
-		model=model
-	)
+	save_model_checkpoint(path=os.path.join(weights_dir, "last.pt"), model=model)
 	# Save training state (optimizer, scaler and scheduler states) for potential resuming
 	save_training_state_checkpoint(
 		path=os.path.join(run_dir, "last_training_state.pt"),
