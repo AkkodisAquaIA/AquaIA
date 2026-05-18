@@ -1,0 +1,69 @@
+# .dockerignore — keeps the build context lean.
+# Anything matched here is NOT sent to the Docker daemon and cannot be COPYed.
+# When in doubt, exclude. Re-include explicit paths with `!` if the Dockerfile needs them.
+
+# VCS / CI metadata
+.git
+.gitignore
+.gitattributes
+.github
+.pre-commit-config.yaml
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Python build / test caches
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+venv
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# Project data & artifacts (mounted as volumes at runtime, never baked in)
+.cache
+cache
+data
+datasets/
+results/
+models/
+runs/
+checkpoints/
+**/*.npy
+**/*.npz
+**/*.pth
+**/*.pt
+
+# Notebooks & docs are not needed at runtime
+docs/
+notebooks/
+*.ipynb
+
+# Archives & local artifacts
+*.tar
+*.tar.gz
+*.zip
+*.7z
+
+# Secrets / local env (defense in depth — never copy a stray .env into an image)
+.env
+.env.*
+!.env.example
+deploy/.env
+docker/.env
+
+# Dockerfiles other than the one used for the build
+Dockerfile*
+!docker/build/Dockerfile
+
+# README is intentionally excluded from the image context
+README.md

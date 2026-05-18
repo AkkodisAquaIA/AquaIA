@@ -10,3 +10,13 @@ exclude= ["*.ipynb"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "tab"
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+filterwarnings = [
+    # Silence deprecation warnings escaping from third-party deps (numpy,
+    # torchvision, ultralytics) so the CI log stays focused on our own code.
+    "ignore::DeprecationWarning",
+]
