@@ -2,10 +2,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from collections.abc import Sequence
 from pathlib import Path
-from datetime import datetime
 import numpy as np
 
-import config.process as pr
 import tools.utility as util
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
@@ -198,7 +196,9 @@ def histogram_anomalies(
 def histogram_classe(items, class_names, cfg, total):
 
     items_sorted = sorted(items, key=lambda x: x[1], reverse=True)
-    
+
+    #items_sorted = items_sorted[:40]
+
     n = len(items_sorted)
 
     def build_data(sub_items):
@@ -277,7 +277,7 @@ def histogram_classe(items, class_names, cfg, total):
         axes[0].set_xlabel("Nombre d'éléments")
         axes[1].set_xlabel("Nombre d'éléments")
 
-    plt.legend()
+    plt.legend(loc='lower right')
 
     plt.tight_layout()
     save_plot("histogram_X_classe", cfg)

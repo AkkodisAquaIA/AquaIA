@@ -36,6 +36,7 @@ from config.constants import DISPLAY_COLORS as colors
 from tools import graphe as gr
 
 from tools import logo_win as lw
+from tools import logo_linux as ll
 
 #==========================================================================================
 # ================= FONCTIONS =================
@@ -329,10 +330,10 @@ def main():
     syst.clear_screen()
 
     # Display du logo et infos système
-
-    lw.splash_screen_circle("Image1.png") 
-
-    # lg.affiche_logo("Image1.png")   
+    if syst.est_windows():
+        lw.splash_screen_circle("Image1.png") 
+    else:
+        ll.splash_screen_circle("Image1.png")
 
     display.print(ct.INFO_PROD, colors['aqua'])
 
@@ -344,9 +345,6 @@ def main():
     print()
 
 
-    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-
     # ================= REPRO =================
     if ct.SEED != 0 :
         torch.manual_seed(ct.SEED)
@@ -356,7 +354,8 @@ def main():
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-    if torch.cuda.is_available: 
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    if DEVICE == "cuda": 
         prompt = ("CUDA available - Running on 'GPU'")
         display.print(prompt, colors['ok'])
     else:
@@ -419,7 +418,7 @@ def main():
         exit(1)
 
     # validation des labels avant création du dataset FiftyOne
-    erreur,  ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg)
+    erreur, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg)
  
     
     if not ctrl_ok:
@@ -448,21 +447,19 @@ def main():
         if not def_image:
             display.print("Dataset Ok ", colors['ok'])
             
-            #TODO
-            # dataset = create_dataset(DATASET_DIR)
+            dataset = create_dataset(DATASET_DIR)
 
             if util.answer_yes_or_no("Voulez-vous lancer Fifty_one"):
                 # launch interface FiftyOne
                 util.launch_fiftyone_interface(dataset) # type: ignore
 
-            # #TODO
-            # # ================= ENCODING =================
-            # total_images = len(dataset) # type: ignore
-            # MODEL_DIR = Path(MODEL_DIR) # type: ignore
-            # model_ = MODEL_DIR / MODEL_NAME
-            # model = load_model(model_, total_images, DEVICE)
+            # ================= ENCODING =================
+            total_images = len(dataset) # type: ignore
+            MODEL_DIR = Path(MODEL_DIR) # type: ignore
+            model_ = MODEL_DIR / MODEL_NAME
+            model = load_model(model_, total_images, DEVICE)
 
-            # encoding(dataset, cfg["VEC_FIELD"], total_images, DEVICE, model )
+            encoding(dataset, cfg["VEC_FIELD"], total_images, DEVICE, model )
                 
 
         else:
@@ -475,9 +472,7 @@ def main():
 
 
     print()
-
-    prompt = f"Script terminé.{ct.BELL}"
-    display.print(prompt, colors['goodbye'])
+    util.sortie_de_programme()
 
 #==========================================================================================
 if __name__ == "__main__":

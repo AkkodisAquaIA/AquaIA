@@ -2,6 +2,7 @@ import sys
 from config.config_loader import Config
 from pathlib import Path
 
+from tools import utility as util
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 from config import constants as ct
@@ -16,6 +17,7 @@ def load_config():
     fichier = Path("aqua_ia_conf.ini")
     if not fichier.is_file():
         display.print(f"Le fichier de paramètre 'aqua_ia_conf.ini' est introuvable !!! {ct.BELL}", colors['error'])
+        util.sortie_de_programme()
         exit(1)
 
     cfg = Config("aqua_ia_conf.ini")
@@ -57,8 +59,8 @@ def load_config():
             "ENTROPY_OK": cfg.get_float("scoring","ENTROPY_OK"),
             "ENTROPY_WARNING": cfg.get_float("scoring","ENTROPY_WARNING"),
 
-            "SCORE_OK": cfg.get_float("scoring","ENTROPY_OK"),
-            "SCORE_WARNING": cfg.get_float("scoring","ENTROPY_WARNING"),
+            "SCORE_OK": cfg.get_float("scoring","SCORE_OK"),
+            "SCORE_WARNING": cfg.get_float("scoring","SCORE_WARNING"),
 
         }
 
@@ -71,4 +73,5 @@ def load_config():
         display.print(e, colors["error"]) # type: ignore
         display.print("----------------------------------", colors["error"])
         print()
+        util.sortie_de_programme()
         sys.exit(1)

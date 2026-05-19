@@ -13,7 +13,6 @@ import fiftyone as fo
 from collections import defaultdict
 from datetime import datetime
 
-# from typing import Tuple, List, Dict, Optional, Any
 from typing import TypedDict
 
 from tools import system as syst
@@ -208,7 +207,6 @@ def horodatage(file_name: str) -> str:
 
     return filename_with_timestamp
 
-
 def calibrer_seuils_overflow(results : dict,
                              warning_percentile : float,
                              error_percentile : float,
@@ -335,52 +333,6 @@ def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
             color.print("FiftyOne session closed, continuing program.", colors['info'])
 
 
-# ------------------------------
-# Function to parse command-line arguments
-# ------------------------------
-def read_param() -> tuple[Path, Path]:
-    """
-    Parses command-line arguments for base path and data folder.
-
-    Returns:
-        tuple[Path, Path]: base path and data folder path
-
-    Raises:
-        FileNotFoundError: If paths do not exist
-        NotADirectoryError: If the data path is not a directory
-    """
-    parser = argparse.ArgumentParser(description="Program using a base path and a data folder")
-
-    parser.add_argument(
-        "-p", "--work_dir",
-        required=True,
-        help="Base path (e.g., C:/my_data)"
-    )
-
-    parser.add_argument(
-        "-f", "--folder",
-        required=True,
-        help="Folder containing the data (inside the base path)"
-    )
-
-    args = parser.parse_args()
-
-    base_path = Path(args.work_dir)
-    data_path = base_path / args.folder
-
-    # Validate paths
-    if not base_path.exists():
-        raise FileNotFoundError(f"Base path does not exist: {base_path}")
-
-    if not data_path.exists():
-        raise FileNotFoundError(f"Data directory does not exist: {data_path}")
-
-    if not data_path.is_dir():
-        raise NotADirectoryError(f"Data path is not a directory: {data_path}")
-
-    return base_path, data_path
-
-
 def rgb_to_ansi(rgb: tuple[int, int, int]) -> str:
     """Convert RGB color to ANSI escape code."""
     return f"\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
@@ -491,7 +443,7 @@ def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> b
         # Convert the input color from DISPLAY_COLORS to ANSI
         input_color = rgb_to_ansi(color)
         # Displays the prompt in color
-        colored_prompt = f"{input_color}[?] {message} (o/n, défaut = n) ) ? : {Style.RESET_ALL}"
+        colored_prompt = f"{input_color}[?] {message} (o/N, défaut = n) ) ? : {Style.RESET_ALL}"
 
         reponse = input(colored_prompt).strip().lower()
         if reponse == "":
@@ -501,7 +453,7 @@ def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> b
         if reponse in {'non', 'n'}:
             return False
         
-        text = f"Réponse valide : (o/n) {ct.BELL}"
+        text = f"Réponse valide : (o/N) {ct.BELL}"
         display.print(text, colors['error'])
 
 # ------------------------------
@@ -759,3 +711,8 @@ def save_anomalies_readable(
              display.print(f"Impossible de sauvegarder : {output_path}", colors['error'])
 
     display.print(f" ****** '{file_name}' create *****\n", colors["warning"])        
+
+def sortie_de_programme():
+    display = dc.DisplayColor()
+    display.print(f"Programme terminé. Au revoir !{ct.BELL}", colors['goodbye'])
+    sys.exit(0)

@@ -389,7 +389,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
     print(f"{legend_colored}\n")
 
     # Largeur terminal
-    term_width = 220 #shutil.get_terminal_size().columns (317)
+    term_width = 220 # shutil.get_terminal_size().columns (317)
     bloc_width = max(len(b) for b in blocs) + 1
     classes_par_ligne = max(1, term_width // bloc_width)
 
@@ -397,6 +397,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
         ligne = blocs[i:i + classes_par_ligne]
         print("│ ".join(f"{b:<{bloc_width}}" for b in ligne))
 
+    # Affichage de l'histogramme de distribution des classes
     gr.histogram_classe(items, class_names, cfg, total )
 
     # --- classes Rares ---------------------------------------
@@ -505,7 +506,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
 
     print()
 
-    # TODO
+    # Affichage des noms des images par classe
     tag = f"Affichage des noms des images par classe"
     display.print(tag, colors['info'])
     while True:
@@ -675,8 +676,9 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
 
             total_line.append(cell)
 
-        print("│ ".join(total_line))
+        print(" │ ".join(total_line))
     
+
         # --- pire images ----------------------------------------------
         # pondération des erreurs
         weights = {

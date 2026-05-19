@@ -50,7 +50,7 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 NB_CLASSES = 100
 
 # Max number of worst images displayed in report
-MAX_WORST_IMAGES = 5
+MAX_WORST_IMAGES = 10
 
 
 # Width of tqdm progress bars
@@ -69,9 +69,9 @@ DISPLAY_COLORS = {
     'warning': (204, 204,   0, "[!] "),    # Yellow/Orange → warning
     'input':   (153, 204,  51, "[?] "),    # Light green   → user input
     'ok':      ( 51, 153,   0, "[√] "),    # Green         → success
-    'goodbye': (255,  16, 240, "[<3] "),   # Purple        → exit message
     'info':    ( 51, 102, 255, "[I] "),    # Blue          → informational message
     'wait':    (255, 153,  51, "[...] "),  # Orange        → processing/wait
+    'goodbye': (255,  16, 240, "[<3] "),   # Purple        → exit message
 
     # Aqua-IA themed colors (blue-green palette)
     'aqua_light': (102, 255, 204, "[~] "), # Light turquoise
