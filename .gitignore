@@ -28,6 +28,10 @@ coco128
 detection/sam/*_result_det_*/
 detection/sam/*_result_det/
 
+#Linter
+.ruff_cache/
+
+/.cache
 # Local caches (HF, torch hub, etc.)
 /.cache
 .cache/
@@ -39,4 +43,12 @@ deploy/.env
 
 # Archives & build leftovers
 *.tar
+docker/build/
+/results
+/datasets
+
+# data_cropping/sam
+data_cropping/sam/*_result_det_*/
+data_cropping/sam/*_result_det/
+*.ts
 *.zip

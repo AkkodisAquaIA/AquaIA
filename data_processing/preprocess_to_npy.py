@@ -13,6 +13,7 @@ def _get_sorted_jpg_files(root_dir):
 	def _numeric_sort_key(path):
 		stem = Path(path).stem
 		return (0, int(stem)) if stem.isdigit() else (1, stem)
+
 	img_dir = os.path.join(root_dir, "images")
 	jpg_files = [str(path) for path in Path(img_dir).glob("*.jpg")]
 	return sorted(jpg_files, key=_numeric_sort_key)
@@ -32,18 +33,18 @@ def convert_to_npy(root_dir, batch_size=128, num_threads=4, device_id=0, compute
 	sorted_files = _get_sorted_jpg_files(root_dir)
 	pipe = _transform_jpeg(files=sorted_files, batch_size=batch_size, num_threads=num_threads, device_id=device_id)
 	pipe.build()
-	n = pipe.epoch_size("Reader")   # should be 1024
+	n = pipe.epoch_size("Reader")  # should be 1024
 	print(n)
 	num_iters = (n + 128 - 1) // 128
 
 	batches = []
 	for _ in range(num_iters):
-		batch = pipe.run()[0]                       # TensorListGPU
-		batches.append(batch.as_cpu().as_array())   # (B, 3, 304, 304)
+		batch = pipe.run()[0]  # TensorListGPU
+		batches.append(batch.as_cpu().as_array())  # (B, 3, 304, 304)
 
 	np_images = np.concatenate(batches, axis=0)[:n].astype(np.float32) / 255.0
 
-	image_dir = os.path.join(root_dir, "npy_images")
+	image_dir = os.path.join(root_dir, "npy_images.npy")
 	np.save(image_dir, np_images)
 
 	if compute_stats:
@@ -65,7 +66,7 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 
 	root_dir = os.path.join(BASE_DIR, args.data_dir, args.dataset)
-	image_dir = os.path.join(root_dir, "npy_images")
+	image_dir = os.path.join(root_dir, "npy_images.npy")
 
 	if not os.path.exists(image_dir):
 		convert_to_npy(root_dir=root_dir, batch_size=args.batch_size, num_threads=args.num_threads, compute_stats=True)
