@@ -69,7 +69,7 @@ Project-internal conventions with no exploit value (`aquaia-staging`, image name
 
 | Origin | SHA-pinned tag | Floating tag | Lifetime |
 |---|---|---|---|
-| CD push | `dev-<7-char-sha>` | `dev-latest` | Retained on Docker Hub (used for rollback) |
+| CD push | `dev-<7-char-sha>` | `dev-latest` | Retained on Docker Hub (used for rollback); pruned from VM after each deploy |
 | CI on PR | `aquaia:ci-<full-sha>` (local only) | — | Discarded with the runner |
 
 To pin a stable version on the VM, edit `.env` and set `IMAGE_TAG=dev-<sha>` — see [`deploy/README.md §4.2`](../deploy/README.md).
