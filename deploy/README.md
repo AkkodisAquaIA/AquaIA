@@ -108,6 +108,7 @@ Credentials are stored in `~deploy/.docker/config.json` (mode `600`).
 Every push (or merged PR) to `development` triggers `cd.yml` automatically:
 - Builds and pushes `<NAMESPACE>/aquaia:dev-<sha>` + `dev-latest` to Docker Hub
 - SSHes into the VM, writes `.env`, runs `docker compose pull && up -d`
+- Prunes all unused images on the VM (`docker image prune -af`) to keep disk usage flat
 
 No manual action needed.
 

@@ -162,8 +162,8 @@ jobs:
           docker compose -p "${COMPOSE_PROJECT}" pull
           echo "[remote] (re)starting idle profile"
           docker compose -p "${COMPOSE_PROJECT}" --profile idle up -d --remove-orphans
-          echo "[remote] cleaning dangling images"
-          docker image prune -f
+          echo "[remote] cleaning unused images"
+          docker image prune -af
           echo "[remote] smoke test"
           docker exec "${CONTAINER_NAME}" python main.py --help
           echo "[remote] OK"
