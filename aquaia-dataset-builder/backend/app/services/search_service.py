@@ -1,9 +1,8 @@
 import json
 import logging
-from datetime import datetime
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.connectors.base import ImageResult

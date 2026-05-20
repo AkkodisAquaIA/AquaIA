@@ -2,7 +2,6 @@ import hashlib
 from datetime import datetime
 from pathlib import Path
 
-import imagehash
 from pydantic import BaseModel
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
