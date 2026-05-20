@@ -45,7 +45,7 @@ async def run_search(
     db.add(sq)
 
     # Upsert taxon
-    taxon = await _get_or_create_taxon(db, query)
+    taxon = await get_or_create_taxon(db, query)
 
     # Persist image records (skip exact URL duplicates)
     saved: list[ImageRecord] = []
@@ -72,7 +72,7 @@ async def run_search(
     return saved
 
 
-async def _get_or_create_taxon(db: AsyncSession, scientific_name: str) -> Taxon | None:
+async def get_or_create_taxon(db: AsyncSession, scientific_name: str) -> Taxon | None:
     taxon = await db.scalar(
         select(Taxon).where(Taxon.scientific_name == scientific_name)
     )

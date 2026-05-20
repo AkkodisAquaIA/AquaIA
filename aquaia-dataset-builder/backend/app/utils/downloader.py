@@ -1,14 +1,12 @@
-import hashlib
-import io
 import logging
 
 import httpx
 import imagehash
-from PIL import Image
 
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.models.models import ImageRecord
+from app.utils.processor import process_image_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -16,37 +14,19 @@ HEADERS = {"User-Agent": "ADIAB/1.0 (AquaIA Dataset Builder)"}
 
 
 async def download_and_process(image_id: int, url: str) -> None:
-    fields: dict = {}
+    """Download a remote image and process it (hash, thumbnail, dedup)."""
     try:
         async with httpx.AsyncClient(timeout=settings.request_timeout, follow_redirects=True) as client:
             resp = await client.get(url, headers=HEADERS)
             resp.raise_for_status()
             content = resp.content
-
-        sha256 = hashlib.sha256(content).hexdigest()
-        fields["sha256_hash"] = sha256
-        fields["file_size"] = len(content)
-
         ext = _ext(url, resp.headers.get("content-type", ""))
-        settings.storage_raw.mkdir(parents=True, exist_ok=True)
-        raw_path = settings.storage_raw / f"{image_id}.{ext}"
-        raw_path.write_bytes(content)
-        fields["local_path"] = str(raw_path)
-
-        img = Image.open(io.BytesIO(content)).convert("RGB")
-        fields["width"] = img.width
-        fields["height"] = img.height
-        fields["perceptual_hash"] = str(imagehash.dhash(img))
-
-        settings.storage_thumbnails.mkdir(parents=True, exist_ok=True)
-        thumb = img.copy()
-        thumb.thumbnail(settings.thumbnail_size, Image.LANCZOS)
-        thumb_path = settings.storage_thumbnails / f"{image_id}.jpg"
-        thumb.save(thumb_path, "JPEG", quality=80, optimize=True)
-        fields["thumbnail_path"] = str(thumb_path)
-
     except Exception as exc:
         logger.warning(f"[downloader] image {image_id}: {exc}")
+        return
+
+    fields = await process_image_bytes(image_id, content, ext)
+    if not fields:
         return
 
     async with AsyncSessionLocal() as db:
@@ -56,7 +36,7 @@ async def download_and_process(image_id: int, url: str) -> None:
                 for k, v in fields.items():
                     setattr(record, k, v)
                 if fields.get("perceptual_hash"):
-                    await _flag_near_duplicate(db, image_id, fields["perceptual_hash"], sha256)
+                    await _flag_near_duplicate(db, image_id, fields["perceptual_hash"], fields.get("sha256_hash", ""))
             await db.commit()
         except Exception as exc:
             logger.warning(f"[downloader] DB update failed for image {image_id}: {exc}")
@@ -65,20 +45,19 @@ async def download_and_process(image_id: int, url: str) -> None:
 
 async def _flag_near_duplicate(db, image_id: int, phash: str, sha256: str) -> None:
     from sqlalchemy import select
-    # Exact duplicate by SHA256
-    existing = await db.scalar(
-        select(ImageRecord).where(
-            ImageRecord.sha256_hash == sha256,
-            ImageRecord.id != image_id,
+    if sha256:
+        existing = await db.scalar(
+            select(ImageRecord).where(
+                ImageRecord.sha256_hash == sha256,
+                ImageRecord.id != image_id,
+            )
         )
-    )
-    if existing:
-        record = await db.get(ImageRecord, image_id)
-        if record and record.status == "pending":
-            record.status = "duplicate"
-        return
+        if existing:
+            record = await db.get(ImageRecord, image_id)
+            if record and record.status == "pending":
+                record.status = "duplicate"
+            return
 
-    # Near-duplicate by perceptual hash (hamming distance ≤ 8)
     result = await db.execute(
         select(ImageRecord).where(
             ImageRecord.perceptual_hash.isnot(None),

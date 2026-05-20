@@ -58,3 +58,20 @@ export const createExport = (exportType: string, parameters?: object) =>
   api
     .post<ExportJob>("/exports", { export_type: exportType, parameters })
     .then((r) => r.data);
+
+// Image import
+export const importFromUrl = (url: string, scientific_name?: string) =>
+  api
+    .post<ImageRecord>("/images/import-url", { url, scientific_name })
+    .then((r) => r.data);
+
+export const uploadFiles = (files: File[], scientific_name?: string) => {
+  const form = new FormData();
+  files.forEach((f) => form.append("files", f));
+  if (scientific_name) form.append("scientific_name", scientific_name);
+  return api
+    .post<ImageRecord[]>("/images/upload", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    .then((r) => r.data);
+};

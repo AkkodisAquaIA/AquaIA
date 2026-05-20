@@ -60,6 +60,13 @@ class ImageRecordRead(ImageRecordBase):
     taxon: Optional[TaxonRead] = None
 
 
+# ── Import ─────────────────────────────────────────────────────────────────
+
+class ImportUrlRequest(BaseModel):
+    url: str
+    scientific_name: Optional[str] = None
+
+
 # ── Search ─────────────────────────────────────────────────────────────────
 
 class SearchRequest(BaseModel):
