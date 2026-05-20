@@ -42,33 +42,65 @@ The 50 images returned by a search land directly in **Validation Queue → Pendi
 
 ### 1. Search — retrieve images
 
-- Click **Search** in the sidebar
+Three ways to add images:
+
+**By scientific name** (Search tab)
 - Type a scientific name: `Ephemeroptera`, `Baetis rhodani`, `Plecoptera`…
-- Select sources: **Wikimedia Commons**, **iNaturalist**, **GBIF**
-- Or add a single image by URL, or upload files from your computer
-- Click **Search** → images are fetched and saved to the database with status `pending`
+- Select one or more sources: **Wikimedia Commons**, **iNaturalist**, **GBIF**
+- Click **Search** → up to 50 images are fetched per source and saved as `pending`
+
+**By URL** (Add by URL tab)
+- Paste a direct image URL
+- Optionally set the scientific name for automatic taxon assignment
+- The image is downloaded and processed in the background
+
+**From your computer** (Upload tab)
+- Drag and drop image files (jpg, png, webp…) or click to browse
+- Optionally set a scientific name
+- SHA256 exact-duplicate check runs automatically on upload
 
 ### 2. Validation Queue — review images
 
-- Click **Validation Queue** — all `pending` images are waiting here
-- Click an image to select it, then use buttons or keyboard shortcuts:
-  - `V` — Validate ✅ (image moves to your dataset)
-  - `R` — Reject ❌ (excluded from exports)
-  - `D` — Mark as duplicate
-  - `Space` — Deselect
-- Use the filter tabs to browse Pending / Validated / Rejected / Duplicates
+Every image retrieved by Search lands here with status `pending`. Nothing enters your dataset until you explicitly validate it.
+
+**How to review:**
+- Click an image to select it — the detail panel opens on the right
+- Click the preview image (or hover for the zoom icon) to open a **fullscreen lightbox** for closer inspection
+- Then assign a status using the buttons or keyboard shortcuts:
+
+| Action | Button | Key | Effect |
+|--------|--------|-----|--------|
+| Validate | Validate | `V` | Image is included in exports and Dataset Explorer |
+| Reject | Reject | `R` | Image is excluded — bad quality, wrong species, off-topic |
+| Duplicate | Duplicate | `D` | Image is a near-copy of another one already in the database |
+| Review later | Later | — | Image stays pending for a second pass |
+| Deselect | — | `Space` | Closes the detail panel |
+
+**Filter tabs** let you browse each category: Pending / Validated / Rejected / Duplicates / Later
+
+**Automatic duplicate detection:** when an image is downloaded, the backend computes a perceptual hash (dhash). If two images have a Hamming distance ≤ 8 (visually near-identical), the newer one is automatically marked `duplicate` — you don't need to do it manually. The `Duplicate` button is for cases the algorithm misses (e.g. same insect, slightly different crop or angle).
 
 ### 3. Dataset Explorer — organise validated images
 
-- **Datasets tab**: create named collections and group your validated images
+Only images with status `validated` appear here.
+
+- **Datasets tab**: create named collections (e.g. "Ephemeroptera training v1"), see image count and creation date per dataset
 - **Validated tab**: browse all validated images as a grid
-- **Taxons tab**: view the taxonomy built automatically from your searches
+- **Taxons tab**: view the taxonomy built automatically from searches (scientific name, common name, rank)
 
 ### 4. Export Center — export for AI training
 
-- Choose a format: **Classification** (folder-per-class) · **YOLO** · **COCO JSON** · **CSV**
+- Choose a format:
+
+| Format | Description |
+|--------|-------------|
+| **Classification** | One folder per taxon — standard for `torchvision.ImageFolder`, Keras `flow_from_directory` |
+| **YOLO** | `images/` + `labels/` folders with `.txt` annotation files |
+| **COCO JSON** | Single `annotations.json` in COCO format |
+| **CSV** | Flat table with image path, taxon, license, author… |
+
 - Click **Create export job** → a zip is generated in the background
-- Click **Download** once the job status shows `done`
+- Click **Download** once the job status shows `done` (page auto-refreshes while running)
 
 ## Storage
 
