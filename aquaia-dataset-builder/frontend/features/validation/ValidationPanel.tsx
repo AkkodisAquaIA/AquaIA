@@ -191,15 +191,19 @@ export default function ValidationPanel() {
                       const el = imgRef.current;
                       const scaleX = el.naturalWidth / el.width;
                       const scaleY = el.naturalHeight / el.height;
-                      await cropImage(
+                      const updated = await cropImage(
                         selected.id,
                         crop.x * scaleX,
                         crop.y * scaleY,
                         crop.width * scaleX,
                         crop.height * scaleY,
                       );
-                      setCropMode(false); setCrop(undefined); setLightbox(false);
-                      load();
+                      // Update in-place — keep detail panel open with fresh data
+                      setSelected(updated);
+                      setImages((prev) => prev.map((img) => img.id === updated.id ? updated : img));
+                      setCropMode(false);
+                      setCrop(undefined);
+                      setLightbox(false);
                     } finally {
                       setSaving(false);
                     }
