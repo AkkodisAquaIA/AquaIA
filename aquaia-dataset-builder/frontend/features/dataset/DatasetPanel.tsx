@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getImages, getTaxons, getDatasets, createDataset, deleteDataset } from "@/lib/api";
+import { getImages, getTaxons, getDatasets, createDataset, deleteDataset, addImageToDataset } from "@/lib/api";
 import type { ImageRecord, Taxon, Dataset } from "@/types";
 import { formatDate } from "@/lib/utils";
-import { Database, FolderOpen, Plus, Trash2, Images, Loader2 } from "lucide-react";
+import { Database, FolderOpen, Plus, Trash2, Images, Loader2, CheckSquare, Square, FolderPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Tab = "datasets" | "images" | "taxons";
@@ -70,7 +70,7 @@ export default function DatasetPanel() {
       ) : activeTab === "datasets" ? (
         <DatasetsTab datasets={datasets} onRefresh={reload} />
       ) : activeTab === "images" ? (
-        <ImagesTab images={images} />
+        <ImagesTab images={images} datasets={datasets} onRefresh={reload} />
       ) : (
         <TaxonsTab taxons={taxons} />
       )}
@@ -203,7 +203,32 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
 
 // ── Images tab ───────────────────────────────────────────────────────────────
 
-function ImagesTab({ images }: { images: ImageRecord[] }) {
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
+function ImagesTab({ images, datasets, onRefresh }: { images: ImageRecord[]; datasets: Dataset[]; onRefresh: () => void }) {
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [targetDataset, setTargetDataset] = useState<number | "">("");
+  const [adding, setAdding] = useState(false);
+
+  const toggle = (id: number) =>
+    setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+  const selectAll = () => setSelected(new Set(images.map((i) => i.id)));
+  const clearAll  = () => setSelected(new Set());
+
+  const handleAddToDataset = async () => {
+    if (!targetDataset || selected.size === 0) return;
+    setAdding(true);
+    try {
+      await Promise.all([...selected].map((imgId) => addImageToDataset(Number(targetDataset), imgId)));
+      setSelected(new Set());
+      setTargetDataset("");
+      onRefresh();
+    } finally {
+      setAdding(false);
+    }
+  };
+
   if (images.length === 0) return (
     <div className="flex flex-col items-center justify-center h-48 text-center">
       <Database className="w-12 h-12 text-[var(--text-ghost)] mb-3" />
@@ -211,14 +236,77 @@ function ImagesTab({ images }: { images: ImageRecord[] }) {
       <p className="text-xs text-[var(--text-muted)] mt-1">Validate images in the Validation Queue first</p>
     </div>
   );
+
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-2">
-      {images.map((img) => (
-        <div key={img.id} className="aspect-square rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--bg-input)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img.source_image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+    <div className="space-y-3">
+      {/* Action bar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button onClick={selected.size === images.length ? clearAll : selectAll}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors">
+            {selected.size === images.length
+              ? <CheckSquare className="w-3.5 h-3.5 text-green-400" />
+              : <Square className="w-3.5 h-3.5" />}
+            {selected.size === images.length ? "Deselect all" : "Select all"}
+          </button>
+          {selected.size > 0 && (
+            <span className="text-xs text-green-400 font-medium">{selected.size} selected</span>
+          )}
         </div>
-      ))}
+
+        {selected.size > 0 && (
+          <div className="flex items-center gap-2 ml-auto">
+            <FolderPlus className="w-4 h-4 text-[var(--text-muted)]" />
+            <select
+              value={targetDataset}
+              onChange={(e) => setTargetDataset(e.target.value ? Number(e.target.value) : "")}
+              className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-base)] focus:outline-none focus:border-green-500/50"
+            >
+              <option value="">Choose a dataset…</option>
+              {datasets.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleAddToDataset}
+              disabled={!targetDataset || adding}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors"
+            >
+              {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              Add to dataset
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-2">
+        {images.map((img) => {
+          const src = img.local_path
+            ? `${API_BASE}/images/${img.id}/thumbnail`
+            : img.source_image_url;
+          const isSelected = selected.has(img.id);
+          return (
+            <button key={img.id} onClick={() => toggle(img.id)}
+              className={cn(
+                "relative aspect-square rounded-lg overflow-hidden border transition-all",
+                isSelected
+                  ? "border-green-500 ring-2 ring-green-500/30"
+                  : "border-[var(--border)] hover:border-[var(--border-hi)]"
+              )}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt="" className="w-full h-full object-cover bg-[var(--bg-input)]" loading="lazy" />
+              {isSelected && (
+                <div className="absolute inset-0 bg-green-500/20 flex items-start justify-end p-1">
+                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                    <CheckSquare className="w-2.5 h-2.5 text-white" />
+                  </div>
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
