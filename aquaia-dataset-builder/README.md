@@ -97,9 +97,21 @@ Every image retrieved by Search lands here with status `pending`. Nothing enters
 
 Only images with status `validated` appear here.
 
-- **Datasets tab**: create named collections (e.g. "Ephemeroptera training v1"), see image count and creation date per dataset
-- **Validated tab**: browse all validated images as a grid
-- **Taxons tab**: view the taxonomy built automatically from searches (scientific name, common name, rank)
+**How to create a dataset and add images:**
+
+1. Click the **Datasets tab** → **+ New dataset** → type a name (e.g. `Ephemeroptera v1`) → **Create**
+2. Click the **Validated tab** → images are shown as a grid
+3. Click individual images to select them (green border + checkmark), or click **Select all**
+4. A dropdown appears on the right — choose your dataset
+5. Click **Add to dataset** → the image count on the dataset card updates immediately
+
+> The Name field is required — the Create button stays disabled until you fill it in.
+
+| Tab | Content |
+|-----|---------|
+| **Datasets** | Named collections with image count and creation date. Create, browse and delete datasets here. |
+| **Validated** | All validated images. Multi-select here to assign images to a dataset. |
+| **Taxons** | Taxonomy built automatically from searches (scientific name, common name, rank). |
 
 ### 4. Export Center — export for AI training
 
