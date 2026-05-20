@@ -39,7 +39,26 @@ export default function ValidationPanel() {
   const [saving, setSaving] = useState(false);
   const [imgBust, setImgBust] = useState(0);
   const [settingRef, setSettingRef] = useState(false);
+  const [refPanelHeight, setRefPanelHeight] = useState(160);
+  const dragState = useRef<{ startY: number; startH: number } | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+
+  const handleDividerMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragState.current = { startY: e.clientY, startH: refPanelHeight };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragState.current) return;
+      const delta = dragState.current.startY - ev.clientY;
+      setRefPanelHeight(Math.max(80, Math.min(420, dragState.current.startH + delta)));
+    };
+    const onUp = () => {
+      dragState.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -254,62 +273,79 @@ export default function ValidationPanel() {
 
       {/* Right: detail panel */}
       {selected && (
-        <div className="w-72 shrink-0 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-4 overflow-y-auto">
-          <div className="relative group aspect-video rounded-lg overflow-hidden bg-[var(--bg-input)] cursor-zoom-in"
-               onClick={() => setLightbox(true)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={selected.source_image_url} alt="" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-              <Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+        <div className="w-72 shrink-0 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl flex flex-col overflow-hidden">
+
+          {/* Top: scrollable — selected image + metadata + actions */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
+            <div className="relative group aspect-video rounded-lg overflow-hidden bg-[var(--bg-input)] cursor-zoom-in"
+                 onClick={() => setLightbox(true)}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imgSrc(selected, imgBust)} alt="" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                <Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Source</p>
+              <p className="text-sm text-[var(--text-base)]">{selected.source_name}</p>
+              {selected.taxon && (
+                <p className="text-sm text-green-400 italic">{selected.taxon.scientific_name}</p>
+              )}
+              {selected.author && <p className="text-xs text-[var(--text-dim)]">© {selected.author}</p>}
+              {selected.license && (
+                <span className="inline-block px-2 py-0.5 text-[10px] bg-[var(--border)] text-[var(--text-dim)] rounded">
+                  {selected.license}
+                </span>
+              )}
+              {selected.source_page_url && (
+                <a href={selected.source_page_url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-1">
+                  <ExternalLink className="w-3 h-3" /> View source
+                </a>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Actions · V/R/D</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => handleStatus(selected.id, "validated")}
+                  className="flex items-center justify-center gap-1.5 py-2 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-400 text-xs rounded-lg transition-colors">
+                  <Check className="w-3.5 h-3.5" /> Validate
+                </button>
+                <button onClick={() => handleStatus(selected.id, "rejected")}
+                  className="flex items-center justify-center gap-1.5 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 text-xs rounded-lg transition-colors">
+                  <X className="w-3.5 h-3.5" /> Reject
+                </button>
+                <button onClick={() => handleStatus(selected.id, "duplicate")}
+                  className="flex items-center justify-center gap-1.5 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-400 text-xs rounded-lg transition-colors">
+                  <Copy className="w-3.5 h-3.5" /> Duplicate
+                </button>
+                <button onClick={() => handleStatus(selected.id, "review_later")}
+                  className="flex items-center justify-center gap-1.5 py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-400 text-xs rounded-lg transition-colors">
+                  <Clock className="w-3.5 h-3.5" /> Later
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Source</p>
-            <p className="text-sm text-[var(--text-base)]">{selected.source_name}</p>
-            {selected.taxon && (
-              <p className="text-sm text-green-400 italic">{selected.taxon.scientific_name}</p>
-            )}
-            {selected.author && <p className="text-xs text-[var(--text-dim)]">© {selected.author}</p>}
-            {selected.license && (
-              <span className="inline-block px-2 py-0.5 text-[10px] bg-[var(--border)] text-[var(--text-dim)] rounded">
-                {selected.license}
-              </span>
-            )}
-            {selected.source_page_url && (
-              <a href={selected.source_page_url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-1">
-                <ExternalLink className="w-3 h-3" /> View source
-              </a>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="space-y-2">
-            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Actions · V/R/D</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => handleStatus(selected.id, "validated")}
-                className="flex items-center justify-center gap-1.5 py-2 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-400 text-xs rounded-lg transition-colors">
-                <Check className="w-3.5 h-3.5" /> Validate
-              </button>
-              <button onClick={() => handleStatus(selected.id, "rejected")}
-                className="flex items-center justify-center gap-1.5 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 text-xs rounded-lg transition-colors">
-                <X className="w-3.5 h-3.5" /> Reject
-              </button>
-              <button onClick={() => handleStatus(selected.id, "duplicate")}
-                className="flex items-center justify-center gap-1.5 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-400 text-xs rounded-lg transition-colors">
-                <Copy className="w-3.5 h-3.5" /> Duplicate
-              </button>
-              <button onClick={() => handleStatus(selected.id, "review_later")}
-                className="flex items-center justify-center gap-1.5 py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-400 text-xs rounded-lg transition-colors">
-                <Clock className="w-3.5 h-3.5" /> Later
-              </button>
-            </div>
-          </div>
-
-          {/* Reference image */}
+          {/* Draggable separator — only shown when there's a taxon */}
           {selected.taxon && (
-            <div className="space-y-2 border-t border-[var(--border)] pt-3">
+            <div
+              onMouseDown={handleDividerMouseDown}
+              className="group h-2.5 flex items-center justify-center cursor-row-resize shrink-0 bg-[var(--bg-input)] hover:bg-amber-500/20 transition-colors border-y border-[var(--border)]"
+              title="Drag to resize"
+            >
+              <div className="w-8 h-0.5 rounded-full bg-[var(--border)] group-hover:bg-amber-400 transition-colors" />
+            </div>
+          )}
+
+          {/* Bottom: reference image panel (resizable) */}
+          {selected.taxon && (
+            <div
+              style={{ height: refPanelHeight }}
+              className="shrink-0 overflow-hidden p-3 flex flex-col gap-2"
+            >
               <div className="flex items-center justify-between">
                 <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
                   <BookImage className="w-3 h-3" /> Reference — {selected.taxon.scientific_name}
@@ -320,8 +356,9 @@ export default function ValidationPanel() {
                   </span>
                 )}
               </div>
+
               {selected.taxon.reference_image_id ? (
-                <div className="relative rounded-lg overflow-hidden border border-amber-500/30 aspect-square bg-[var(--bg-input)]">
+                <div className="relative flex-1 min-h-0 rounded-lg overflow-hidden border border-amber-500/30 bg-[var(--bg-input)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`${API_BASE}/images/${selected.taxon.reference_image_id}/thumbnail`}
@@ -368,7 +405,7 @@ export default function ValidationPanel() {
                       setSettingRef(false);
                     }
                   }}
-                  className="w-full flex items-center justify-center gap-1.5 py-2.5 border border-dashed border-amber-500/40 hover:border-amber-500/70 hover:bg-amber-500/5 text-amber-400 text-xs rounded-lg transition-colors">
+                  className="flex-1 flex items-center justify-center gap-1.5 border border-dashed border-amber-500/40 hover:border-amber-500/70 hover:bg-amber-500/5 text-amber-400 text-xs rounded-lg transition-colors">
                   {settingRef
                     ? <div className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />
                     : <><Star className="w-3.5 h-3.5" /> Définir comme référence</>
