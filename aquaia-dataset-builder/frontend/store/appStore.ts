@@ -19,6 +19,10 @@ interface AppState {
 
   validationFilter: string;
   setValidationFilter: (f: string) => void;
+
+  cropWidth: number;
+  cropHeight: number;
+  setCropDimensions: (w: number, h: number) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -52,4 +56,14 @@ export const useAppStore = create<AppState>((set) => ({
 
   validationFilter: "pending",
   setValidationFilter: (f) => set({ validationFilter: f }),
+
+  cropWidth: parseInt(typeof window !== "undefined" ? localStorage.getItem("adiab-crop-w") || "640" : "640"),
+  cropHeight: parseInt(typeof window !== "undefined" ? localStorage.getItem("adiab-crop-h") || "640" : "640"),
+  setCropDimensions: (w, h) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("adiab-crop-w", String(w));
+      localStorage.setItem("adiab-crop-h", String(h));
+    }
+    set({ cropWidth: w, cropHeight: h });
+  },
 }));

@@ -18,7 +18,7 @@ const FILTERS = [
 ];
 
 export default function ValidationPanel() {
-  const { validationFilter, setValidationFilter } = useAppStore();
+  const { validationFilter, setValidationFilter, cropWidth, cropHeight } = useAppStore();
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -161,7 +161,18 @@ export default function ValidationPanel() {
           {/* Toolbar */}
           <div className="flex items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
             {!cropMode ? (
-              <button onClick={() => setCropMode(true)}
+              <button onClick={() => {
+                setCropMode(true);
+                // Pre-initialize crop centered on the displayed image
+                if (imgRef.current) {
+                  const { width: dw, height: dh } = imgRef.current.getBoundingClientRect();
+                  const scaleX = imgRef.current.naturalWidth / dw;
+                  const scaleY = imgRef.current.naturalHeight / dh;
+                  const pw = Math.min(cropWidth / scaleX, dw);
+                  const ph = Math.min(cropHeight / scaleY, dh);
+                  setCrop({ unit: "px", x: (dw - pw) / 2, y: (dh - ph) / 2, width: pw, height: ph });
+                }
+              }}
                 className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-lg transition-colors">
                 <Crop className="w-3.5 h-3.5" /> Crop
               </button>
@@ -217,7 +228,7 @@ export default function ValidationPanel() {
               </ReactCrop>
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={selected.source_image_url} alt=""
+              <img ref={imgRef} src={selected.source_image_url} alt=""
                 className="max-w-[92vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" />
             )}
           </div>
