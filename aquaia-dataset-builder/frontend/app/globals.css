@@ -3,21 +3,6 @@
 @tailwind utilities;
 
 :root {
-  --bg-base:    #0a0a0f;
-  --bg-card:    #111118;
-  --bg-input:   #1a1a24;
-  --bg-hover:   #222230;
-  --bg-alt:     #0f0f16;
-  --border:     #2a2a3a;
-  --border-hi:  #3a3a50;
-  --text-base:  #f0f0f5;
-  --text-sub:   #ccccdd;
-  --text-dim:   #888899;
-  --text-muted: #555566;
-  --text-ghost: #333344;
-}
-
-html.light {
   --bg-base:    #f4f4f8;
   --bg-card:    #ffffff;
   --bg-input:   #eeeef5;
@@ -30,6 +15,21 @@ html.light {
   --text-dim:   #555577;
   --text-muted: #888899;
   --text-ghost: #aaaabc;
+}
+
+html.dark {
+  --bg-base:    #0a0a0f;
+  --bg-card:    #111118;
+  --bg-input:   #1a1a24;
+  --bg-hover:   #222230;
+  --bg-alt:     #0f0f16;
+  --border:     #2a2a3a;
+  --border-hi:  #3a3a50;
+  --text-base:  #f0f0f5;
+  --text-sub:   #ccccdd;
+  --text-dim:   #888899;
+  --text-muted: #555566;
+  --text-ghost: #333344;
 }
 
 * {

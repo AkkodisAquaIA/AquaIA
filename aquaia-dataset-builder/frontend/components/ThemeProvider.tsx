@@ -8,9 +8,9 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     const saved = localStorage.getItem("adiab-theme") as "dark" | "light" | null;
-    if (saved === "light") {
-      document.documentElement.classList.add("light");
-      useAppStore.setState({ theme: "light" });
+    if (saved === "dark") {
+      document.documentElement.classList.add("dark");
+      useAppStore.setState({ theme: "dark" });
     }
   }, []);
 
