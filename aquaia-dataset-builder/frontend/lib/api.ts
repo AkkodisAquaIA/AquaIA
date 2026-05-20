@@ -51,6 +51,9 @@ export const getTaxons = (q?: string) =>
     .get<Taxon[]>("/taxonomy", { params: q ? { q } : {} })
     .then((r) => r.data);
 
+export const setTaxonReference = (taxonId: number, imageId: number | null) =>
+  api.patch<Taxon>(`/taxonomy/${taxonId}/reference`, { image_id: imageId }).then((r) => r.data);
+
 // Exports
 export const getExports = () =>
   api.get<ExportJob[]>("/exports").then((r) => r.data);

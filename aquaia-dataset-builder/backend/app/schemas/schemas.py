@@ -19,6 +19,7 @@ class TaxonCreate(TaxonBase):
 class TaxonRead(TaxonBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    reference_image_id: Optional[int] = None
     created_at: datetime
 
 

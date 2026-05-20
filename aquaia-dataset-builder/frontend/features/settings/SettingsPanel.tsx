@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppStore } from "@/store/appStore";
 import { cn } from "@/lib/utils";
+import { Star, X } from "lucide-react";
+import { getTaxons, setTaxonReference } from "@/lib/api";
+import type { Taxon } from "@/types";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 const CROP_PRESETS = [
   { label: "224 × 224", w: 224, h: 224 },
@@ -17,6 +22,16 @@ export default function SettingsPanel() {
   const { cropWidth, cropHeight, setCropDimensions } = useAppStore();
   const [customW, setCustomW] = useState(String(cropWidth));
   const [customH, setCustomH] = useState(String(cropHeight));
+  const [taxons, setTaxons] = useState<Taxon[]>([]);
+
+  useEffect(() => {
+    getTaxons().then(setTaxons).catch(() => {});
+  }, []);
+
+  const handleClearReference = async (taxon: Taxon) => {
+    const updated = await setTaxonReference(taxon.id, null);
+    setTaxons((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  };
 
   const applyCustom = () => {
     const w = parseInt(customW);
@@ -101,6 +116,51 @@ export default function SettingsPanel() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* Reference images */}
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+        <div>
+          <p className="text-sm font-medium text-[var(--text-base)]">Reference images</p>
+          <p className="text-xs text-[var(--text-dim)] mt-0.5">
+            One representative image per species, shown in the Validation Queue for comparison. Set from the detail panel while reviewing.
+          </p>
+        </div>
+        {taxons.filter((t) => t.reference_image_id).length === 0 ? (
+          <p className="text-xs text-[var(--text-muted)] italic">
+            No reference images defined yet. Select an image in the Validation Queue and click "Définir comme référence".
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+            {taxons.filter((t) => t.reference_image_id).map((t) => (
+              <div key={t.id} className="group relative rounded-lg overflow-hidden border border-amber-500/30 bg-[var(--bg-input)]">
+                <div className="aspect-square">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`${API_BASE}/images/${t.reference_image_id}/thumbnail`}
+                    alt={t.scientific_name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="px-2 py-1.5 space-y-0.5">
+                  <p className="text-[10px] text-[var(--text-base)] italic truncate font-medium">{t.scientific_name}</p>
+                  {t.common_name && (
+                    <p className="text-[9px] text-[var(--text-muted)] truncate">{t.common_name}</p>
+                  )}
+                </div>
+                <div className="absolute top-1 left-1 flex items-center gap-0.5 px-1 py-0.5 bg-amber-500/80 rounded text-[9px] text-white">
+                  <Star className="w-2.5 h-2.5 fill-white" />
+                </div>
+                <button
+                  onClick={() => handleClearReference(t)}
+                  className="absolute top-1 right-1 p-1 bg-black/60 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
+                  title="Remove reference">
+                  <X className="w-3 h-3 text-white" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Connectors */}

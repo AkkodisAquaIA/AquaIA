@@ -16,6 +16,15 @@ async def lifespan(app: FastAPI):
     logger.info("Starting ADIAB backend — creating tables")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # SQLite doesn't add new columns to existing tables via create_all — migrate manually
+        for stmt in [
+            "ALTER TABLE taxons ADD COLUMN reference_image_id INTEGER REFERENCES image_records(id)",
+        ]:
+            try:
+                from sqlalchemy import text
+                await conn.execute(text(stmt))
+            except Exception:
+                pass  # Column already exists
     for path in [
         settings.storage_raw, settings.storage_validated, settings.storage_rejected,
         settings.storage_duplicates, settings.storage_exports, settings.storage_thumbnails,

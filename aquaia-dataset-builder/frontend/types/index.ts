@@ -12,6 +12,7 @@ export interface Taxon {
   common_name: string | null;
   rank: string | null;
   parent_taxon_id: number | null;
+  reference_image_id: number | null;
   created_at: string;
 }
 

@@ -36,9 +36,10 @@ class Taxon(Base):
     common_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     rank: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     parent_taxon_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("taxons.id"), nullable=True)
+    reference_image_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("image_records.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    images: Mapped[list["ImageRecord"]] = relationship("ImageRecord", back_populates="taxon")
+    images: Mapped[list["ImageRecord"]] = relationship("ImageRecord", back_populates="taxon", foreign_keys="ImageRecord.taxon_id")
 
 
 class ImageRecord(Base):

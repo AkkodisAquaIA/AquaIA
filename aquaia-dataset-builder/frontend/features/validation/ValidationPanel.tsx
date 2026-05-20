@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight, Maximize2, Crop, RotateCcw } from "lucide-react";
-import { getImages, updateImageStatus, cropImage } from "@/lib/api";
+import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight, Maximize2, Crop, RotateCcw, BookImage, Star } from "lucide-react";
+import { getImages, updateImageStatus, cropImage, setTaxonReference } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
 import type { ImageRecord } from "@/types";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,7 @@ export default function ValidationPanel() {
   const [crop, setCrop] = useState<CropType>();
   const [saving, setSaving] = useState(false);
   const [imgBust, setImgBust] = useState(0);
+  const [settingRef, setSettingRef] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
 
   const load = useCallback(async () => {
@@ -305,6 +306,77 @@ export default function ValidationPanel() {
               </button>
             </div>
           </div>
+
+          {/* Reference image */}
+          {selected.taxon && (
+            <div className="space-y-2 border-t border-[var(--border)] pt-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
+                  <BookImage className="w-3 h-3" /> Reference — {selected.taxon.scientific_name}
+                </p>
+                {selected.taxon.reference_image_id === selected.id && (
+                  <span className="flex items-center gap-0.5 text-[9px] text-amber-400">
+                    <Star className="w-2.5 h-2.5 fill-amber-400" /> Current
+                  </span>
+                )}
+              </div>
+              {selected.taxon.reference_image_id ? (
+                <div className="relative rounded-lg overflow-hidden border border-amber-500/30 aspect-square bg-[var(--bg-input)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`${API_BASE}/images/${selected.taxon.reference_image_id}/thumbnail`}
+                    alt="reference"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-1 left-1 flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/80 rounded text-[9px] text-white font-medium">
+                    <Star className="w-2.5 h-2.5 fill-white" /> Référence
+                  </div>
+                  {selected.taxon.reference_image_id !== selected.id && (
+                    <button
+                      disabled={settingRef}
+                      onClick={async () => {
+                        if (!selected.taxon) return;
+                        setSettingRef(true);
+                        try {
+                          const updated = await setTaxonReference(selected.taxon.id, selected.id);
+                          setSelected((prev) => prev ? { ...prev, taxon: updated } : prev);
+                          setImages((prev) => prev.map((img) =>
+                            img.taxon?.id === updated.id ? { ...img, taxon: updated } : img
+                          ));
+                        } finally {
+                          setSettingRef(false);
+                        }
+                      }}
+                      className="absolute bottom-1 right-1 px-2 py-0.5 bg-black/70 hover:bg-amber-600/80 text-[9px] text-white rounded transition-colors">
+                      Changer
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  disabled={settingRef}
+                  onClick={async () => {
+                    if (!selected.taxon) return;
+                    setSettingRef(true);
+                    try {
+                      const updated = await setTaxonReference(selected.taxon.id, selected.id);
+                      setSelected((prev) => prev ? { ...prev, taxon: updated } : prev);
+                      setImages((prev) => prev.map((img) =>
+                        img.taxon?.id === updated.id ? { ...img, taxon: updated } : img
+                      ));
+                    } finally {
+                      setSettingRef(false);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 border border-dashed border-amber-500/40 hover:border-amber-500/70 hover:bg-amber-500/5 text-amber-400 text-xs rounded-lg transition-colors">
+                  {settingRef
+                    ? <div className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />
+                    : <><Star className="w-3.5 h-3.5" /> Définir comme référence</>
+                  }
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
