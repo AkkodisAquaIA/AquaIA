@@ -90,18 +90,18 @@ export default function Autocomplete({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={cn(
-            "w-full bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-white",
-            "placeholder-[#555566] focus:outline-none focus:border-green-500/50 transition-colors pr-8",
+            "w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)]",
+            "placeholder-[var(--text-muted)] focus:outline-none focus:border-green-500/50 transition-colors pr-8",
             className
           )}
         />
         {loading && (
-          <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#555566] animate-spin" />
+          <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)] animate-spin" />
         )}
       </div>
 
       {open && suggestions.length > 0 && (
-        <ul className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-[#2a2a3a] rounded-lg shadow-xl overflow-hidden">
+        <ul className="absolute z-50 w-full mt-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden">
           {suggestions.map((s, i) => (
             <li key={s}>
               <button
@@ -110,7 +110,7 @@ export default function Autocomplete({
                   "w-full text-left px-3 py-2 text-sm italic transition-colors",
                   i === activeIdx
                     ? "bg-green-500/10 text-green-400"
-                    : "text-[#ccccdd] hover:bg-[#2a2a3a] hover:text-white"
+                    : "text-[var(--text-sub)] hover:bg-[var(--border)] hover:text-[var(--text-base)]"
                 )}
               >
                 {s}

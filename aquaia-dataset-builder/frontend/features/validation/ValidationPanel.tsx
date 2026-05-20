@@ -5,7 +5,7 @@ import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight } from "
 import { getImages, updateImageStatus } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
 import type { ImageRecord } from "@/types";
-import { cn, statusColor } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const FILTERS = [
   { id: "pending", label: "Pending" },
@@ -65,8 +65,8 @@ export default function ValidationPanel() {
       <div className="flex-1 min-w-0 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-white">Validation Queue</h1>
-            <p className="text-sm text-[#888899] mt-0.5">{total} images</p>
+            <h1 className="text-xl font-semibold text-[var(--text-base)]">Validation Queue</h1>
+            <p className="text-sm text-[var(--text-dim)] mt-0.5">{total} images</p>
           </div>
           <div className="flex gap-1.5">
             {FILTERS.map((f) => (
@@ -77,7 +77,7 @@ export default function ValidationPanel() {
                   "px-3 py-1.5 text-xs rounded-lg border transition-colors",
                   validationFilter === f.id
                     ? "bg-green-500/10 border-green-500/30 text-green-400"
-                    : "bg-[#1a1a24] border-[#2a2a3a] text-[#888899] hover:border-[#3a3a50]"
+                    : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
                 )}
               >
                 {f.label}
@@ -92,8 +92,8 @@ export default function ValidationPanel() {
           </div>
         ) : images.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-center">
-            <Check className="w-12 h-12 text-[#333344] mb-3" />
-            <p className="text-sm text-[#888899]">No images in this category</p>
+            <Check className="w-12 h-12 text-[var(--text-ghost)] mb-3" />
+            <p className="text-sm text-[var(--text-dim)]">No images in this category</p>
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-2 overflow-y-auto">
@@ -105,14 +105,14 @@ export default function ValidationPanel() {
                   "group relative aspect-square rounded-lg overflow-hidden border transition-all",
                   selected?.id === img.id
                     ? "border-green-500 ring-1 ring-green-500/30"
-                    : "border-[#2a2a3a] hover:border-[#3a3a50]"
+                    : "border-[var(--border)] hover:border-[var(--border-hi)]"
                 )}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={img.source_image_url}
                   alt=""
-                  className="w-full h-full object-cover bg-[#1a1a24]"
+                  className="w-full h-full object-cover bg-[var(--bg-input)]"
                   loading="lazy"
                 />
               </button>
@@ -124,12 +124,12 @@ export default function ValidationPanel() {
         {pages > 1 && (
           <div className="flex items-center gap-2 justify-end pt-2">
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-              className="p-1.5 rounded-lg border border-[#2a2a3a] text-[#888899] disabled:opacity-30 hover:bg-[#1a1a24]">
+              className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-dim)] disabled:opacity-30 hover:bg-[var(--bg-input)]">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs text-[#888899]">{page} / {pages}</span>
+            <span className="text-xs text-[var(--text-dim)]">{page} / {pages}</span>
             <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page === pages}
-              className="p-1.5 rounded-lg border border-[#2a2a3a] text-[#888899] disabled:opacity-30 hover:bg-[#1a1a24]">
+              className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-dim)] disabled:opacity-30 hover:bg-[var(--bg-input)]">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -138,21 +138,21 @@ export default function ValidationPanel() {
 
       {/* Right: detail panel */}
       {selected && (
-        <div className="w-72 shrink-0 bg-[#111118] border border-[#2a2a3a] rounded-xl p-4 flex flex-col gap-4 overflow-y-auto">
-          <div className="aspect-video rounded-lg overflow-hidden bg-[#1a1a24]">
+        <div className="w-72 shrink-0 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-4 overflow-y-auto">
+          <div className="aspect-video rounded-lg overflow-hidden bg-[var(--bg-input)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={selected.source_image_url} alt="" className="w-full h-full object-cover" />
           </div>
 
           <div className="space-y-1.5">
-            <p className="text-xs text-[#555566] uppercase tracking-wider">Source</p>
-            <p className="text-sm text-white">{selected.source_name}</p>
+            <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Source</p>
+            <p className="text-sm text-[var(--text-base)]">{selected.source_name}</p>
             {selected.taxon && (
               <p className="text-sm text-green-400 italic">{selected.taxon.scientific_name}</p>
             )}
-            {selected.author && <p className="text-xs text-[#888899]">© {selected.author}</p>}
+            {selected.author && <p className="text-xs text-[var(--text-dim)]">© {selected.author}</p>}
             {selected.license && (
-              <span className="inline-block px-2 py-0.5 text-[10px] bg-[#2a2a3a] text-[#888899] rounded">
+              <span className="inline-block px-2 py-0.5 text-[10px] bg-[var(--border)] text-[var(--text-dim)] rounded">
                 {selected.license}
               </span>
             )}
@@ -166,7 +166,7 @@ export default function ValidationPanel() {
 
           {/* Actions */}
           <div className="space-y-2">
-            <p className="text-[10px] text-[#555566] uppercase tracking-wider">Actions · V/R/D</p>
+            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Actions · V/R/D</p>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => handleStatus(selected.id, "validated")}
                 className="flex items-center justify-center gap-1.5 py-2 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-400 text-xs rounded-lg transition-colors">

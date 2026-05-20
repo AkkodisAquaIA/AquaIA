@@ -23,7 +23,7 @@ function ActivePanel() {
 
 export default function Home() {
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0a0a0f]">
+    <div className="flex h-screen overflow-hidden bg-[var(--bg-base)]">
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-6">
         <ActivePanel />

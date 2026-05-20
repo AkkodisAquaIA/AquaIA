@@ -38,12 +38,12 @@ export default function SearchPanel() {
   return (
     <div className="panel-enter space-y-5">
       <div>
-        <h1 className="text-xl font-semibold text-white">Image Search</h1>
-        <p className="text-sm text-[#888899] mt-1">Search macro-invertebrate images from biodiversity platforms</p>
+        <h1 className="text-xl font-semibold text-[var(--text-base)]">Image Search</h1>
+        <p className="text-sm text-[var(--text-dim)] mt-1">Search macro-invertebrate images from biodiversity platforms</p>
       </div>
 
       {/* Search bar */}
-      <div className="bg-[#111118] border border-[#2a2a3a] rounded-xl p-4 space-y-3">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
         <div className="flex gap-2">
           <Autocomplete
             value={searchQuery}
@@ -64,7 +64,7 @@ export default function SearchPanel() {
 
         {/* Source toggles */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[#555566]">Sources:</span>
+          <span className="text-xs text-[var(--text-muted)]">Sources:</span>
           {SOURCES.map((s) => (
             <button
               key={s.id}
@@ -73,7 +73,7 @@ export default function SearchPanel() {
                 "px-2.5 py-1 text-xs rounded-md border transition-colors",
                 selectedSources.includes(s.id)
                   ? "bg-green-500/10 border-green-500/30 text-green-400"
-                  : "bg-[#1a1a24] border-[#2a2a3a] text-[#888899] hover:border-[#3a3a50]"
+                  : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
               )}
             >
               {s.label}
@@ -92,7 +92,7 @@ export default function SearchPanel() {
       {searched && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm text-[#888899]">
+            <p className="text-sm text-[var(--text-dim)]">
               {results.length > 0
                 ? `${results.length} new images retrieved`
                 : "No new images found (already in database or no results)"}
@@ -111,9 +111,9 @@ export default function SearchPanel() {
 
       {!searched && (
         <div className="flex flex-col items-center justify-center h-48 text-center">
-          <Search className="w-12 h-12 text-[#333344] mb-3" />
-          <p className="text-sm text-[#888899]">Enter a scientific name to start searching</p>
-          <p className="text-xs text-[#555566] mt-1">e.g. Ephemeroptera, Plecoptera, Trichoptera</p>
+          <Search className="w-12 h-12 text-[var(--text-ghost)] mb-3" />
+          <p className="text-sm text-[var(--text-dim)]">Enter a scientific name to start searching</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">e.g. Ephemeroptera, Plecoptera, Trichoptera</p>
         </div>
       )}
     </div>
@@ -122,8 +122,8 @@ export default function SearchPanel() {
 
 function ImageCard({ image }: { image: ImageRecord }) {
   return (
-    <div className="group relative bg-[#111118] border border-[#2a2a3a] rounded-lg overflow-hidden hover:border-green-500/30 transition-colors">
-      <div className="aspect-square bg-[#1a1a24] relative overflow-hidden">
+    <div className="group relative bg-[var(--bg-card)] border border-[var(--border)] rounded-lg overflow-hidden hover:border-green-500/30 transition-colors">
+      <div className="aspect-square bg-[var(--bg-input)] relative overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image.source_image_url}
@@ -147,7 +147,7 @@ function ImageCard({ image }: { image: ImageRecord }) {
         </div>
       </div>
       <div className="px-2 py-1.5">
-        <p className="text-[10px] text-[#888899] truncate">{image.source_name}</p>
+        <p className="text-[10px] text-[var(--text-dim)] truncate">{image.source_name}</p>
         <div className="flex items-center gap-1 mt-0.5">
           <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />
           <span className="text-[10px] text-green-400">saved</span>
