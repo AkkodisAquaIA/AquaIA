@@ -68,13 +68,14 @@ Every image retrieved by Search lands here with status `pending`. Nothing enters
 - Click the preview image (or hover for the zoom icon) to open a **fullscreen lightbox** for closer inspection
 - Then assign a status using the buttons or keyboard shortcuts:
 
-| Action | Button | Key | Effect |
+| Status | Button | Key | Effect |
 |--------|--------|-----|--------|
-| Validate | Validate | `V` | Image is included in exports and Dataset Explorer |
-| Reject | Reject | `R` | Image is excluded — bad quality, wrong species, off-topic |
-| Duplicate | Duplicate | `D` | Image is a near-copy of another one already in the database |
-| Review later | Later | — | Image stays pending for a second pass |
-| Deselect | — | `Space` | Closes the detail panel |
+| **Pending** | — | — | Initial state of every newly fetched image — waiting for your review |
+| **Validated** | Validate | `V` | Image is included in exports and Dataset Explorer |
+| **Rejected** | Reject | `R` | Image is excluded — bad quality, wrong species, off-topic |
+| **Duplicate** | Duplicate | `D` | Image is a near-copy of another one already in the database |
+| **Later** | Later | — | Deferred for a second pass — stays visible in the Later tab |
+| Deselect | — | `Space` | Closes the detail panel without changing the status |
 
 **Filter tabs** let you browse each category: Pending / Validated / Rejected / Duplicates / Later
 
