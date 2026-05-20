@@ -181,6 +181,29 @@ async def update_status(
 
 # ── File serving ────────────────────────────────────────────────────────────
 
+@router.post("/{image_id}/crop", response_model=ImageRecordRead)
+async def crop_image(
+    image_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    img = await db.get(ImageRecord, image_id, options=[selectinload(ImageRecord.taxon)])
+    if not img:
+        raise HTTPException(404, "Image not found")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Empty file")
+    ext = (img.local_path or "x.jpg").rsplit(".", 1)[-1].lower()
+    if ext not in IMAGE_EXTS:
+        ext = "jpg"
+    fields = await process_image_bytes(image_id, content, ext)
+    fields["sha256_hash"] = __import__("hashlib").sha256(content).hexdigest()
+    for k, v in fields.items():
+        setattr(img, k, v)
+    await db.flush()
+    return ImageRecordRead.model_validate(img)
+
+
 @router.get("/{image_id}/file")
 async def serve_image_file(image_id: int, db: AsyncSession = Depends(get_db)):
     img = await db.get(ImageRecord, image_id)

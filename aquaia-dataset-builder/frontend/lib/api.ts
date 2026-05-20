@@ -82,6 +82,16 @@ export const importFromUrl = (url: string, scientific_name?: string) =>
     .post<ImageRecord>("/images/import-url", { url, scientific_name })
     .then((r) => r.data);
 
+export const cropImage = (imageId: number, blob: Blob) => {
+  const form = new FormData();
+  form.append("file", blob, "crop.jpg");
+  return api
+    .post<ImageRecord>(`/images/${imageId}/crop`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    .then((r) => r.data);
+};
+
 export const uploadFiles = (files: File[], scientific_name?: string) => {
   const form = new FormData();
   files.forEach((f) => form.append("files", f));

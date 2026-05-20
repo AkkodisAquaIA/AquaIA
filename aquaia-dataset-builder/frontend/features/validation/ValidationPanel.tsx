@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
-import { getImages, updateImageStatus } from "@/lib/api";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight, Maximize2, Crop, RotateCcw } from "lucide-react";
+import { getImages, updateImageStatus, cropImage } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
 import type { ImageRecord } from "@/types";
 import { cn } from "@/lib/utils";
+import ReactCrop, { type Crop as CropType, centerCrop, makeAspectCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 
 const FILTERS = [
   { id: "pending",      label: "Pending" },
@@ -24,6 +26,10 @@ export default function ValidationPanel() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ImageRecord | null>(null);
   const [lightbox, setLightbox] = useState(false);
+  const [cropMode, setCropMode] = useState(false);
+  const [crop, setCrop] = useState<CropType>();
+  const [saving, setSaving] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,7 +64,7 @@ export default function ValidationPanel() {
   useEffect(() => {
     if (!selected) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setLightbox(false); return; }
+      if (e.key === "Escape") { setCropMode(false); setLightbox(false); return; }
       if (lightbox) return;
       if (e.key === "v" || e.key === "V") handleStatus(selected.id, "validated");
       if (e.key === "r" || e.key === "R") handleStatus(selected.id, "rejected");
@@ -149,25 +155,75 @@ export default function ValidationPanel() {
 
       {/* Lightbox overlay */}
       {lightbox && selected && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
-          onClick={() => setLightbox(false)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={selected.source_image_url}
-            alt=""
-            className="max-w-[92vw] max-h-[92vh] object-contain rounded-lg shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            onClick={() => setLightbox(false)}
-            className="absolute top-4 right-4 p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          {selected.taxon && (
-            <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/80 text-sm italic bg-black/50 px-3 py-1 rounded-full">
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center gap-4"
+          onClick={() => { if (!cropMode) { setLightbox(false); setCropMode(false); setCrop(undefined); } }}>
+
+          {/* Toolbar */}
+          <div className="flex items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
+            {!cropMode ? (
+              <button onClick={() => setCropMode(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-lg transition-colors">
+                <Crop className="w-3.5 h-3.5" /> Crop
+              </button>
+            ) : (
+              <>
+                <button onClick={() => { setCropMode(false); setCrop(undefined); }}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-lg transition-colors">
+                  <RotateCcw className="w-3.5 h-3.5" /> Cancel
+                </button>
+                <button
+                  disabled={!crop?.width || saving}
+                  onClick={async () => {
+                    if (!crop?.width || !imgRef.current || !selected) return;
+                    setSaving(true);
+                    try {
+                      const img = imgRef.current;
+                      const scaleX = img.naturalWidth / img.width;
+                      const scaleY = img.naturalHeight / img.height;
+                      const canvas = document.createElement("canvas");
+                      canvas.width = crop.width * scaleX;
+                      canvas.height = crop.height * scaleY;
+                      const ctx = canvas.getContext("2d")!;
+                      ctx.drawImage(img,
+                        crop.x * scaleX, crop.y * scaleY,
+                        crop.width * scaleX, crop.height * scaleY,
+                        0, 0, canvas.width, canvas.height);
+                      const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.92));
+                      await cropImage(selected.id, blob);
+                      setCropMode(false); setCrop(undefined); setLightbox(false);
+                      load();
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-xs rounded-lg transition-colors">
+                  {saving ? "Saving…" : <><Check className="w-3.5 h-3.5" /> Apply crop</>}
+                </button>
+              </>
+            )}
+            <button onClick={() => { setLightbox(false); setCropMode(false); setCrop(undefined); }}
+              className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors ml-2">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Image / crop area */}
+          <div onClick={(e) => e.stopPropagation()}>
+            {cropMode ? (
+              <ReactCrop crop={crop} onChange={(c) => setCrop(c)} className="max-h-[80vh]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img ref={imgRef} src={selected.source_image_url} alt=""
+                  className="max-w-[90vw] max-h-[80vh] object-contain" />
+              </ReactCrop>
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={selected.source_image_url} alt=""
+                className="max-w-[92vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+            )}
+          </div>
+
+          {selected.taxon && !cropMode && (
+            <p className="text-white/70 text-sm italic bg-black/50 px-3 py-1 rounded-full">
               {selected.taxon.scientific_name}
             </p>
           )}
