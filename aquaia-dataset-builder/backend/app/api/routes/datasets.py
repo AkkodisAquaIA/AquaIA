@@ -54,6 +54,20 @@ async def create_dataset(body: DatasetCreate, db: AsyncSession = Depends(get_db)
                        created_at=ds.created_at, image_count=0)
 
 
+@router.get("/assigned", response_model=dict)
+async def get_assigned_images(db: AsyncSession = Depends(get_db)):
+    """Return {image_id: {dataset_id, dataset_name}} for all assigned images."""
+    from app.models.models import dataset_images
+    rows = await db.execute(
+        select(dataset_images.c.image_id, Dataset.id, Dataset.name)
+        .join(Dataset, Dataset.id == dataset_images.c.dataset_id)
+    )
+    return {
+        row.image_id: {"dataset_id": row.id, "dataset_name": row.name}
+        for row in rows
+    }
+
+
 @router.get("/{dataset_id}", response_model=DatasetRead)
 async def get_dataset(dataset_id: int, db: AsyncSession = Depends(get_db)):
     ds = await db.get(Dataset, dataset_id)
@@ -76,20 +90,6 @@ async def get_dataset_images(dataset_id: int, db: AsyncSession = Depends(get_db)
     if not ds:
         raise HTTPException(404, "Dataset not found")
     return [ImageRecordRead.model_validate(img) for img in ds.images]
-
-
-@router.get("/assigned", response_model=dict)
-async def get_assigned_images(db: AsyncSession = Depends(get_db)):
-    """Return {image_id: {dataset_id, dataset_name}} for all assigned images."""
-    from app.models.models import dataset_images
-    rows = await db.execute(
-        select(dataset_images.c.image_id, Dataset.id, Dataset.name)
-        .join(Dataset, Dataset.id == dataset_images.c.dataset_id)
-    )
-    return {
-        row.image_id: {"dataset_id": row.id, "dataset_name": row.name}
-        for row in rows
-    }
 
 
 @router.post("/{dataset_id}/images/{image_id}", status_code=204)
