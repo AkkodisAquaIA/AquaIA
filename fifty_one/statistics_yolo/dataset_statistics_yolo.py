@@ -42,7 +42,6 @@ def compute_stats(values):
         "max": float(np.max(arr))
     }
 
-
 def dataset_statistics_yolo(DATASET_DIR, cfg):
 
     images_dir, labels_dir = util.get_dataset_paths(DATASET_DIR)
@@ -234,8 +233,6 @@ def dataset_statistics_yolo(DATASET_DIR, cfg):
         "class_to_images": class_to_images,
     }
 
-#==========================================================================================
-
 def afficher_stats_bbox(stats, cfg):
 
     def format_value(v):
@@ -280,8 +277,6 @@ def afficher_stats_bbox(stats, cfg):
 
     table.footer()
 
-
-#==========================================================================================================
 def verifier_classes_dataset(class_distribution, class_names):
     n_classes = len(class_names)
     classes_presentes = set(class_distribution.keys())
@@ -290,6 +285,8 @@ def verifier_classes_dataset(class_distribution, class_names):
     manquantes = classes_presentes - classes_yaml
     valides = classes_presentes & classes_yaml
     return {"inutilisees": inutilisees, "manquantes": manquantes, "valides": valides}
+
+#==========================================================================================================
 
 def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, classes_par_ligne=4, afficher_hist=False):
 
@@ -305,15 +302,16 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
     total = sum(class_distribution.values())
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
-    print("\n================ DATASET SUMMARY ================")
+    display.print("================ DATASET SUMMARY ================", colors["info"])
     print(f"{'Images':18}: {stats['images']}")
     print(f"{'Labels':18}: {stats['labels']}")
     print(f"{'Bounding boxes':18}: {total_boxes}")
     print(f"{'BBox / image':18}: {total_boxes / stats['images']:.2f}")
     print(f"{'Classes':18}: {total_classes}")
+    print()
 
     # --- statistiques BBOX ---
-    print("\n--------------- BBOX STATISTICS -----------------")
+    display.print("--------------- BBOX STATISTICS -----------------", colors["info"])
     afficher_stats_bbox(stats, cfg)
 
     # --- Vérification YAML ---
@@ -380,7 +378,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
         blocs.append(bloc)
 
     print()
-    display.print(f"----------- CLASS DISTRIBUTION ({rary + moy + dom}) -----------", colors['info'])
+    display.print(f"----------- REPARTITION DES CLASSES ({rary + moy + dom}) -----------", colors['info'])
     legend_colored = (
         f'    {Fore.GREEN}■ ({dom}) ≥ {cfg["DOMINANT"]}% Dominant{Style.RESET_ALL}   '
         f'│ {Fore.YELLOW}■ ({moy}) {cfg["RARE"]}–{cfg["DOMINANT"]}% Moyen{Style.RESET_ALL}   '
@@ -548,7 +546,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
         
         print()
 
-    # --- histogramme bbox ---
+    # --- histogramme des tailles de bbox ---
     if afficher_hist and bbox_areas:
         gr.histogram_taille_bbox(bbox_areas,
                       "Distribution des tailles de BBox",
@@ -556,9 +554,6 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
                       "Nombre",
                       cfg,
                       )
-
-
-
 
 
     # --- anomalies ---------------------------------------------------------------
@@ -576,8 +571,8 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
         display.print('Attention : des classes sont présentes dans les labels mais absentes du YAML !!', colors['warning'])
 
     if not anomaly_images :
-        print()
         display.print('Aucune anomalie trouvé !!', colors['ok'])
+        print()
     else :
         # --- Types d'anomalies à afficher dans le tableau croisé
         types_anomalies = [
@@ -589,7 +584,6 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
             "bbox_hors_limite_error"
         ]
 
-        print()
         display.print("---------------- ANOMALIES ----------------------", colors['warning'])
         print("------ LEGENDES ------")
         print("1 : bbox_trop_petite        │ 2 : bbox_trop_grande")
@@ -746,7 +740,8 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
                 else:
                     texte = f"Les {n} pires images"
 
-            print(f"\n-------------------------- {texte} ----------------------")
+            tag = f"-------------------------- {texte} ----------------------"
+            print(tag)
             
             # Then limit to 10
             for img, d in valid_images[:ct.MAX_WORST_IMAGES]:
@@ -759,7 +754,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
                     f"{img:<25}"
                 )
 
-            print("---------------------------------------------------------------------")
+            print("-" * len(tag))
         images_problematiques = sum(1 for d in score_images.values() if d["count"] > 0)
         total_bboxes_problematiques = len(anomalies)
         pct_images = (images_problematiques / stats["images"]) * 100 if stats["images"] else 0

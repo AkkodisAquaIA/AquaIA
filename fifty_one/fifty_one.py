@@ -1,5 +1,4 @@
 import os
-import sys
 from tools import system as syst
 
 if syst.est_linux():
@@ -344,7 +343,6 @@ def main():
     vc.controle(cfg)
     print()
 
-
     # ================= REPRO =================
     if ct.SEED != 0 :
         torch.manual_seed(ct.SEED)
@@ -363,21 +361,16 @@ def main():
         display.print(prompt, colors['warning'])
     print()
 
-
-    # Affichge du mode de débugage
-    display.print(f"Debug mode {'ON' if ct.DEBUG_MODE else 'OFF'}.", colors['warning'])
- 
-    
     print()
     # Contrôle répertoire de sauvegarde
     try:
         path_user: Path = Path(cfg["PATH_USER"])
         if not path_user.exists():
             path_user = Path.cwd()
-            display.print("Path not defied : Using current working directory", colors["error"])
+            display.print("Chemin non défini : Utilisation du répertoire de travail actuel", colors["error"])
     except Exception as e : 
         path_user = Path.cwd()
-        display.print("Path not defied : Using current working directory", colors["error"])
+        display.print("Chemin non défini : Utilisation du répertoire de travail actuel", colors["error"])
  
     # Report mode handling
     status = def_status(cfg["REPORT_MODE"], path_user)
@@ -394,11 +387,12 @@ def main():
             # DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
             DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco_small"
             MODEL_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3"
-            MODEL_NAME = r"dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
         else :
             DATASET_DIR = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/Data/coco_small_Work"
             MODEL_DIR = r"/media/DataLinux/Travail/_AKKA/___Akka_Reacher/2026/Aqua-/Fitty_One/Model/DINOv3"
-            MODEL_NAME = r"dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+        
+        MODEL_NAME = r"dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+
     else :
         DATASET_DIR = util.get_path_color("Entrée le chemin du dataset")
         MODEL_DIR = util.get_path_color("Entrée le chemin du modèle")
@@ -414,8 +408,8 @@ def main():
     try:
         class_names = ds.load_class_names(dataset_yaml)
     except Exception as e:
-        display.print(f"dataset.yaml introuvable dans {DATASET_DIR}", colors['error'])
-        exit(1)
+        display.print(f"dataset.yaml introuvable dans {DATASET_DIR}\n", colors['error'])
+        util.sortie_de_programme()
 
     # validation des labels avant création du dataset FiftyOne
     erreur, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg)
@@ -442,13 +436,14 @@ def main():
     else:    
         display.print("Aucune erreur détectée. Analyse du Dataset...\n", colors['ok'])
 
-        def_image = statistique(DATASET_DIR, cfg, class_names, path_user)
+        def_image = statistique(DATASET_DIR, cfg, class_names, path_user) # type: ignore
 
         if not def_image:
             display.print("Dataset Ok ", colors['ok'])
             
+            
             dataset = create_dataset(DATASET_DIR)
-
+                
             if util.answer_yes_or_no("Voulez-vous lancer Fifty_one"):
                 # launch interface FiftyOne
                 util.launch_fiftyone_interface(dataset) # type: ignore

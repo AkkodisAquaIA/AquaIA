@@ -176,7 +176,7 @@ class TablePrinter:
 
 # TODO A suprimer
 def quoi(valeur):
-    print(f"\n*-------------------\n {valeur} \n-------------------*\n")
+    print(f"*-------------------\n {valeur} \n-------------------*")
 
 
 def get_dataset_paths(dataset_dir, split="train2017"):
@@ -264,7 +264,7 @@ def calibrer_seuils_overflow(results : dict,
     ]
 
     if not outside_ratios:
-        print(" No overflow detected, using minimum thresholds.")
+        print(" No overflow detected, using minimum thresholds.\n")
         return {
             "BBOX_OVERFLOW_WARNING": min_warning,
             "BBOX_OVERFLOW_ERROR": min_error

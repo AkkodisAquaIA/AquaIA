@@ -89,7 +89,7 @@ def afficher_imbalance_avance(metrics, display, colors, cfg):
     ratio = float(metrics["ratio"])
     entropy_norm = float(metrics["entropy_norm"])
 
-    print("\n---------------- DATASET IMBALANCE ----------------\n")
+    display.print("---------------- DATASET IMBALANCE ----------------", colors["info"])
     print('Ration max/min (plus petit = mieux) : indique le déséquilibre entre la classe la plus fréquente et la moins fréquente.')
     print('Entropie normalisée (plus grand = mieux) : mesure la diversité globale des classes, en tenant compte de leur distribution.')
     print('Score global : combinaison pondérée des deux métriques précédentes pour une évaluation synthétique du déséquilibre du dataset.\n')
@@ -148,17 +148,4 @@ def afficher_imbalance_avance(metrics, display, colors, cfg):
 
     if entropy_norm > 0.75 and ratio > 100:
         print("- Beaucoup de classes rares malgré une diversité correcte")
-
-    # --- RECOMMANDATIONS ---
-    print("\nRecommandations :")
-
-    if ratio > 100:
-        print("- Augmenter les classes très rares (< 1%)")
-
-    if entropy_norm < 0.7:
-        print("- Rééquilibrer globalement le dataset")
-
-    print("- Utiliser data augmentation ciblée")
-    print("- Envisager un sampling équilibré")
-
-    print("--------------------------------------------------\n")
+        print()

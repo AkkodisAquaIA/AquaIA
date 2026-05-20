@@ -1,5 +1,5 @@
 
-
+from tools import utility as util
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 
@@ -29,11 +29,11 @@ def normalize_min_max(warnings, val, name="bbox", min_allowed=0.0, max_allowed=1
     # 1. Clamp individuel
     if val < min_allowed:
         warnings.append(f"{name}: min < {min_allowed} → forcé à {min_allowed}")
-        min_val = min_allowed
+        val = min_allowed
 
     if val > max_allowed:
         warnings.append(f"{name}: max > {max_allowed} → forcé à {max_allowed}")
-        max_val = max_allowed
+        val = max_allowed
 
     return val
 
@@ -48,13 +48,6 @@ def swap(warnings, val1, val2, name="bbox", inv=False):
 
     return val1, val2
 
-def est_negatif(warnings, val, name="bbox"):
-    if val < 0 :
-        warnings.append(f"{name} doit être positif : utilisation de la valeur absolue")
-        return abs(val)
-    return val
-
-
 
 def controle(cfg):
 
@@ -67,31 +60,24 @@ def controle(cfg):
     cfg["MIN_BBOX"], cfg["MAX_BBOX"] = bbox_min_max(warnings, cfg["MIN_BBOX"], cfg["MAX_BBOX"], "Bbox")
     cfg["MIN_BBOX_AREA"], cfg["MAX_BBOX_AREA"] = bbox_min_max(warnings, cfg["MIN_BBOX_AREA"], cfg["MAX_BBOX_AREA"], "Bbox_Area")
 
-
-    cfg["PERCENTILE_WARNING"] = est_negatif(warnings, cfg["PERCENTILE_WARNING"], 'PERCENTILE_WARNING')
-    cfg["PERCENTILE_ERROR"] = est_negatif(warnings, cfg["PERCENTILE_ERROR"], 'PERCENTILE_ERROR')
-
     cfg["PERCENTILE_WARNING"] = normalize_min_max(warnings, cfg["PERCENTILE_WARNING"], "PERCENTILE_WARNING", 70.0, 90.0)
     cfg["PERCENTILE_ERROR"] = normalize_min_max(warnings, cfg["PERCENTILE_ERROR"], "PERCENTILE_ERROR", 90.0, 99.0)
 
-    cfg["MIN_BBOX_OVERFLOW_WARNING"] = normalize_min_max(warnings, cfg["MIN_BBOX_OVERFLOW_WARNING"], "MIN_BBOX_OVERFLOW_WARNING", 05.0, 20.0)
+    cfg["MIN_BBOX_OVERFLOW_WARNING"] = normalize_min_max(warnings, cfg["MIN_BBOX_OVERFLOW_WARNING"], "MIN_BBOX_OVERFLOW_WARNING",  5.0, 20.0)
     cfg["MIN_BBOX_OVERFLOW_WARNING"] = normalize_min_max(warnings, cfg["MIN_BBOX_OVERFLOW_WARNING"], "MIN_BBOX_OVERFLOW_WARNING", 15.0, 40.0)
 
+    cfg["RARE"] = normalize_min_max(warnings, cfg["RARE"], "RARE", 0.0, 100.0)
+    cfg["DOMINANT"] = normalize_min_max(warnings, cfg["DOMINANT"], "DOMINANT", 0.0, 100.0)
     cfg["DOMINANT"], cfg["RARE"]  = swap(warnings, cfg["DOMINANT"], cfg["RARE"], "Class imbalance thresholds")
 
+    cfg["RATIO_OK"] = normalize_min_max(warnings, cfg["RATIO_OK"], "RATIO OK", 1, 10) 
+    cfg["RATIO_WARNING"] = normalize_min_max(warnings, cfg["RATIO_WARNING"], "RATIO WARNING", 50, 999)
 
-    cfg["RATIO_OK"] = est_negatif(warnings, cfg["RATIO_OK"], 'RATIO_OK')
-    cfg["RATIO_WARNING"] = est_negatif(warnings, cfg["RATIO_WARNING"], 'RATIO_WARNING')
-
-    cfg["ENTROPY_OK"] = est_negatif(warnings, cfg["ENTROPY_OK"], 'ENTROPY_OK')
-    cfg["ENTROPY_WARNING"] = est_negatif(warnings, cfg["ENTROPY_WARNING"], 'ENTROPY_WARNING')
-
-    cfg["SCORE_OK"] = est_negatif(warnings, cfg["SCORE_OK"], 'SCORE_OK')
-    cfg["SCORE_WARNING"] = est_negatif(warnings, cfg["SCORE_WARNING"], 'SCORE_WARNING')
-
-    cfg["RATIO_OK"], cfg["RATIO_WARNING"] = swap(warnings, cfg["RATIO_OK"], cfg["RATIO_WARNING"],  "RATIO", inv=True)
-    cfg["ENTROPY_OK"], cfg["ENTROPY_WARNING"] = swap(warnings, cfg["ENTROPY_OK"], cfg["ENTROPY_WARNING"], "ENTROPY")
-    cfg["SCORE_OK"], cfg["SCORE_WARNING"] = swap(warnings, cfg["SCORE_OK"], cfg["SCORE_WARNING"], "SCORE")
+    cfg["ENTROPY_OK"] = normalize_min_max(warnings, cfg["ENTROPY_OK"], "ENTROPY OK", 0.76, 1.0) 
+    cfg["ENTROPY_WARNING"] = normalize_min_max(warnings, cfg["ENTROPY_WARNING"], "ENTROPY WARNING", 0.0, 0.75)
+    
+    cfg["SCORE_OK"] = normalize_min_max(warnings, cfg["SCORE_OK"], "SCORE OK", 80, 100) 
+    cfg["SCORE_WARNING"] = normalize_min_max(warnings, cfg["SCORE_WARNING"], "SCORE WARNING", 0, 60)
 
 
     if len(warnings) != 0 :

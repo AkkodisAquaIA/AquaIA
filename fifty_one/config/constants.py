@@ -50,7 +50,7 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 NB_CLASSES = 100
 
 # Max number of worst images displayed in report
-MAX_WORST_IMAGES = 10
+MAX_WORST_IMAGES = 6
 
 
 # Width of tqdm progress bars
