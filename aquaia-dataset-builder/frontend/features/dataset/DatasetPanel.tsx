@@ -27,6 +27,8 @@ export default function DatasetPanel() {
       setImages(imgs.items);
       setTaxons(txs);
       setDatasets(dss);
+    } catch {
+      // Backend may not be fully up yet — fail silently
     } finally {
       setLoading(false);
     }
