@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from app.connectors.base import ImageResult
 from app.connectors.wikimedia import WikimediaConnector
@@ -71,6 +72,17 @@ async def run_search(
 
     await db.flush()
     logger.info(f"Saved {len(saved)} new image records for '{query}'")
+
+    # Reload with eager taxon to avoid lazy-load in async serialization
+    if saved:
+        ids = [r.id for r in saved]
+        result = await db.execute(
+            select(ImageRecord)
+            .where(ImageRecord.id.in_(ids))
+            .options(selectinload(ImageRecord.taxon))
+        )
+        saved = list(result.scalars().all())
+
     return saved
 
 

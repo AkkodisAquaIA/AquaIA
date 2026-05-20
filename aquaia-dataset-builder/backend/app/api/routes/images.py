@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from app.db.database import get_db
 from app.models.models import ImageRecord
@@ -84,6 +85,8 @@ async def import_from_url(
     db.add(img)
     await db.flush()
     background_tasks.add_task(download_and_process, img.id, img.source_image_url)
+    # Reload with taxon to avoid lazy-load error during serialization
+    await db.refresh(img, ["taxon"])
     return ImageRecordRead.model_validate(img)
 
 
@@ -137,6 +140,16 @@ async def upload_files(
             await _flag_near_duplicate(db, img.id, fields["perceptual_hash"], sha256)
 
         records.append(img)
+
+    # Reload all with taxon eager-loaded
+    if records:
+        ids = [r.id for r in records]
+        result = await db.execute(
+            select(ImageRecord)
+            .where(ImageRecord.id.in_(ids))
+            .options(selectinload(ImageRecord.taxon))
+        )
+        records = list(result.scalars().all())
 
     return [ImageRecordRead.model_validate(r) for r in records]
 
