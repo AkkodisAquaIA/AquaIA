@@ -70,6 +70,9 @@ export const createDataset = (name: string, description?: string) =>
 export const deleteDataset = (id: number) =>
   api.delete(`/datasets/${id}`);
 
+export const getDatasetImages = (datasetId: number) =>
+  api.get<ImageRecord[]>(`/datasets/${datasetId}/images`).then((r) => r.data);
+
 export const addImageToDataset = (datasetId: number, imageId: number) =>
   api.post(`/datasets/${datasetId}/images/${imageId}`);
 

@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getImages, getTaxons, getDatasets, createDataset, deleteDataset, addImageToDataset } from "@/lib/api";
+import { getImages, getTaxons, getDatasets, createDataset, deleteDataset, addImageToDataset, getDatasetImages, removeImageFromDataset } from "@/lib/api";
 import type { ImageRecord, Taxon, Dataset } from "@/types";
 import { formatDate } from "@/lib/utils";
-import { Database, FolderOpen, Plus, Trash2, Images, Loader2, CheckSquare, Square, FolderPlus } from "lucide-react";
+import { Database, FolderOpen, Plus, Trash2, Images, Loader2, CheckSquare, Square, FolderPlus, ArrowLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const API_BASE_DS = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 type Tab = "datasets" | "images" | "taxons";
 
@@ -87,6 +89,27 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openDataset, setOpenDataset] = useState<Dataset | null>(null);
+  const [dsImages, setDsImages] = useState<ImageRecord[]>([]);
+  const [dsLoading, setDsLoading] = useState(false);
+
+  const openDetail = async (ds: Dataset) => {
+    setOpenDataset(ds);
+    setDsLoading(true);
+    try {
+      const imgs = await getDatasetImages(ds.id);
+      setDsImages(imgs);
+    } finally {
+      setDsLoading(false);
+    }
+  };
+
+  const handleRemoveImage = async (imageId: number) => {
+    if (!openDataset) return;
+    await removeImageFromDataset(openDataset.id, imageId);
+    setDsImages((prev) => prev.filter((i) => i.id !== imageId));
+    onRefresh();
+  };
 
   const handleCreate = async () => {
     if (!name.trim()) return;
@@ -111,6 +134,56 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
     onRefresh();
   };
 
+  // ── Dataset detail view ──────────────────────────────────────────────────
+  if (openDataset) return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <button onClick={() => { setOpenDataset(null); setDsImages([]); }}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors">
+          <ArrowLeft className="w-3.5 h-3.5" /> Back
+        </button>
+        <div className="flex items-center gap-2">
+          <FolderOpen className="w-4 h-4 text-indigo-400" />
+          <span className="text-sm font-semibold text-[var(--text-base)]">{openDataset.name}</span>
+          <span className="text-xs text-[var(--text-muted)]">— {dsImages.length} image{dsImages.length !== 1 ? "s" : ""}</span>
+        </div>
+      </div>
+
+      {dsLoading ? (
+        <div className="flex items-center justify-center h-48">
+          <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : dsImages.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-48 text-center">
+          <Images className="w-10 h-10 text-[var(--text-ghost)] mb-3" />
+          <p className="text-sm text-[var(--text-dim)]">No images in this dataset</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">Go to the Validated tab to add images</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-2">
+          {dsImages.map((img) => {
+            const src = img.local_path
+              ? `${API_BASE_DS}/images/${img.id}/thumbnail`
+              : img.source_image_url;
+            return (
+              <div key={img.id} className="group relative aspect-square rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--bg-input)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                <button
+                  onClick={() => handleRemoveImage(img.id)}
+                  className="absolute top-1 right-1 p-1 bg-black/60 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
+                  title="Remove from dataset">
+                  <X className="w-3 h-3 text-white" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Dataset list ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -171,7 +244,8 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {datasets.map((ds) => (
-            <div key={ds.id} className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3 hover:border-[var(--border-hi)] transition-colors">
+            <div key={ds.id} onClick={() => openDetail(ds)}
+              className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3 hover:border-indigo-400/50 cursor-pointer transition-colors">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="p-1.5 rounded-lg bg-indigo-500/10 shrink-0">
@@ -179,7 +253,7 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
                   </div>
                   <p className="text-sm font-medium text-[var(--text-base)] truncate">{ds.name}</p>
                 </div>
-                <button onClick={() => handleDelete(ds.id)}
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(ds.id); }}
                   className="p-1 text-[var(--text-muted)] hover:text-red-400 transition-colors shrink-0">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

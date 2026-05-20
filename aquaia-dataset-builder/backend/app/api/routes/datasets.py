@@ -67,6 +67,17 @@ async def get_dataset(dataset_id: int, db: AsyncSession = Depends(get_db)):
                        created_at=ds.created_at, image_count=count)
 
 
+@router.get("/{dataset_id}/images")
+async def get_dataset_images(dataset_id: int, db: AsyncSession = Depends(get_db)):
+    from app.schemas.schemas import ImageRecordRead
+    ds = await db.get(Dataset, dataset_id, options=[
+        selectinload(Dataset.images).selectinload(ImageRecord.taxon)
+    ])
+    if not ds:
+        raise HTTPException(404, "Dataset not found")
+    return [ImageRecordRead.model_validate(img) for img in ds.images]
+
+
 @router.post("/{dataset_id}/images/{image_id}", status_code=204)
 async def add_image_to_dataset(dataset_id: int, image_id: int, db: AsyncSession = Depends(get_db)):
     ds = await db.get(Dataset, dataset_id, options=[selectinload(Dataset.images)])
