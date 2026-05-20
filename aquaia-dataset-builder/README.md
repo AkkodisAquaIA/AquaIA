@@ -47,7 +47,10 @@ Three ways to add images:
 **By scientific name** (Search tab)
 - Type a scientific name: `Ephemeroptera`, `Baetis rhodani`, `Plecoptera`…
 - Select one or more sources: **Wikimedia Commons**, **iNaturalist**, **GBIF**
-- Click **Search** → up to 50 images are fetched per source and saved as `pending`
+- Set **Max results** to control how many images are fetched per source: 10 / 25 / **50** (default) / 100 / 200
+- Click **Search** → images are fetched from each selected source and saved as `pending`
+
+> Tip: start with 50 (default) to get a representative sample without flooding your validation queue. Use 100–200 for rare species where results are sparse.
 
 **By URL** (Add by URL tab)
 - Paste a direct image URL

@@ -61,19 +61,22 @@ export default function SearchPanel() {
 
 // ─── Mode 1: Search by scientific name ──────────────────────────────────────
 
+const LIMIT_OPTIONS = [10, 25, 50, 100, 200];
+
 function SearchByNameMode() {
   const { searchQuery, setSearchQuery, selectedSources, toggleSource } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ImageRecord[]>([]);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [limit, setLimit] = useState(50);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await runSearch(searchQuery.trim(), selectedSources, 50);
+      const data = await runSearch(searchQuery.trim(), selectedSources, limit);
       setResults(data);
       setSearched(true);
     } catch {
@@ -104,22 +107,44 @@ function SearchByNameMode() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[var(--text-muted)]">Sources:</span>
-          {SOURCES.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => toggleSource(s.id)}
-              className={cn(
-                "px-2.5 py-1 text-xs rounded-md border transition-colors",
-                selectedSources.includes(s.id)
-                  ? "bg-green-500/10 border-green-500/30 text-green-400"
-                  : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
-              )}
-            >
-              {s.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--text-muted)]">Sources:</span>
+            {SOURCES.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => toggleSource(s.id)}
+                className={cn(
+                  "px-2.5 py-1 text-xs rounded-md border transition-colors",
+                  selectedSources.includes(s.id)
+                    ? "bg-green-500/10 border-green-500/30 text-green-400"
+                    : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
+                )}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-xs text-[var(--text-muted)]">Max results:</span>
+            <div className="flex gap-1">
+              {LIMIT_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setLimit(n)}
+                  className={cn(
+                    "px-2 py-1 text-xs rounded-md border transition-colors",
+                    limit === n
+                      ? "bg-green-500/10 border-green-500/30 text-green-400"
+                      : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
+                  )}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
