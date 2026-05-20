@@ -188,19 +188,16 @@ export default function ValidationPanel() {
                     if (!crop?.width || !imgRef.current || !selected) return;
                     setSaving(true);
                     try {
-                      const img = imgRef.current;
-                      const scaleX = img.naturalWidth / img.width;
-                      const scaleY = img.naturalHeight / img.height;
-                      const canvas = document.createElement("canvas");
-                      canvas.width = crop.width * scaleX;
-                      canvas.height = crop.height * scaleY;
-                      const ctx = canvas.getContext("2d")!;
-                      ctx.drawImage(img,
-                        crop.x * scaleX, crop.y * scaleY,
-                        crop.width * scaleX, crop.height * scaleY,
-                        0, 0, canvas.width, canvas.height);
-                      const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.92));
-                      await cropImage(selected.id, blob);
+                      const el = imgRef.current;
+                      const scaleX = el.naturalWidth / el.width;
+                      const scaleY = el.naturalHeight / el.height;
+                      await cropImage(
+                        selected.id,
+                        crop.x * scaleX,
+                        crop.y * scaleY,
+                        crop.width * scaleX,
+                        crop.height * scaleY,
+                      );
                       setCropMode(false); setCrop(undefined); setLightbox(false);
                       load();
                     } finally {

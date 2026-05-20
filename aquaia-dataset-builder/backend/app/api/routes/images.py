@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 import imagehash
+from pydantic import BaseModel
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -181,23 +182,45 @@ async def update_status(
 
 # ── File serving ────────────────────────────────────────────────────────────
 
+class CropRequest(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+
+
 @router.post("/{image_id}/crop", response_model=ImageRecordRead)
 async def crop_image(
     image_id: int,
-    file: UploadFile = File(...),
+    body: CropRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    from PIL import Image as PILImage
+    import io as _io
+
     img = await db.get(ImageRecord, image_id, options=[selectinload(ImageRecord.taxon)])
     if not img:
         raise HTTPException(404, "Image not found")
-    content = await file.read()
-    if not content:
-        raise HTTPException(400, "Empty file")
-    ext = (img.local_path or "x.jpg").rsplit(".", 1)[-1].lower()
-    if ext not in IMAGE_EXTS:
-        ext = "jpg"
+    if not img.local_path:
+        raise HTTPException(422, "Image not yet downloaded — try again in a moment")
+
+    path = Path(img.local_path)
+    if not path.exists():
+        raise HTTPException(404, "Local file not found")
+
+    pil = PILImage.open(path).convert("RGB")
+    left = max(0, int(body.x))
+    top  = max(0, int(body.y))
+    right  = min(pil.width,  int(body.x + body.width))
+    bottom = min(pil.height, int(body.y + body.height))
+    cropped = pil.crop((left, top, right, bottom))
+
+    buf = _io.BytesIO()
+    cropped.save(buf, "JPEG", quality=92, optimize=True)
+    content = buf.getvalue()
+
+    ext = path.suffix.lstrip(".") or "jpg"
     fields = await process_image_bytes(image_id, content, ext)
-    fields["sha256_hash"] = __import__("hashlib").sha256(content).hexdigest()
     for k, v in fields.items():
         setattr(img, k, v)
     await db.flush()
