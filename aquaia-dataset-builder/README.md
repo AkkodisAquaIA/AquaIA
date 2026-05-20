@@ -24,35 +24,63 @@ docker compose up --build
 | View logs | `docker compose logs -f` |
 | View running containers | `docker compose ps` |
 
+## Workflow
+
+```
+1. Search          → images fetched from sources, saved as "pending"
+                          ↓
+2. Validation Queue → manually review: validate ✅ / reject ❌ / duplicate
+                          ↓
+3. Dataset Explorer → only "validated" images appear here, organised in datasets
+                          ↓
+4. Export Center   → export validated images as YOLO / COCO / CSV / Classification
+```
+
+The 50 images returned by a search land directly in **Validation Queue → Pending tab**. Nothing is included in a dataset until you explicitly validate it.
+
 ## Usage
 
 ### 1. Search — retrieve images
 
 - Click **Search** in the sidebar
 - Type a scientific name: `Ephemeroptera`, `Baetis rhodani`, `Plecoptera`…
-- Select sources (Wikimedia Commons, iNaturalist)
-- Click **Search** → images are fetched and saved to the database automatically
+- Select sources: **Wikimedia Commons**, **iNaturalist**, **GBIF**
+- Or add a single image by URL, or upload files from your computer
+- Click **Search** → images are fetched and saved to the database with status `pending`
 
 ### 2. Validation Queue — review images
 
-- Click **Validation Queue**
-- Click an image to select it
-- Use buttons or keyboard shortcuts:
-  - `V` — Validate ✅
-  - `R` — Reject ❌
+- Click **Validation Queue** — all `pending` images are waiting here
+- Click an image to select it, then use buttons or keyboard shortcuts:
+  - `V` — Validate ✅ (image moves to your dataset)
+  - `R` — Reject ❌ (excluded from exports)
   - `D` — Mark as duplicate
   - `Space` — Deselect
 - Use the filter tabs to browse Pending / Validated / Rejected / Duplicates
 
-### 3. Dataset Explorer — browse your dataset
+### 3. Dataset Explorer — organise validated images
 
-- See all validated images in a grid
-- Browse the taxonomy created automatically from your searches
+- **Datasets tab**: create named collections and group your validated images
+- **Validated tab**: browse all validated images as a grid
+- **Taxons tab**: view the taxonomy built automatically from your searches
 
 ### 4. Export Center — export for AI training
 
-- Choose a format: **Classification** (folders) · **YOLO** · **COCO JSON** · **CSV**
-- Click **Create export job**
+- Choose a format: **Classification** (folder-per-class) · **YOLO** · **COCO JSON** · **CSV**
+- Click **Create export job** → a zip is generated in the background
+- Click **Download** once the job status shows `done`
+
+## Storage
+
+Images are stored locally under `aquaia-dataset-builder/storage/` (never committed to git):
+
+```
+storage/
+├── raw/          ← downloaded images (named by DB id, e.g. 42.jpg)
+├── thumbnails/   ← auto-generated 256×256 previews
+├── exports/      ← generated zip files
+└── adiab.db      ← SQLite database
+```
 
 ## Architecture
 
