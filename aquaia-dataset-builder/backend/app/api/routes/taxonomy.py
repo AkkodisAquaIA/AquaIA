@@ -1,3 +1,5 @@
+import httpx
+import logging
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -6,7 +8,52 @@ from app.db.database import get_db
 from app.models.models import Taxon
 from app.schemas.schemas import TaxonCreate, TaxonRead
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/taxonomy", tags=["taxonomy"])
+
+INATURALIST_TAXA = "https://api.inaturalist.org/v1/taxa"
+
+
+@router.get("/suggest", response_model=list[str])
+async def suggest_taxons(
+    q: str = Query(..., min_length=2, max_length=100),
+    db: AsyncSession = Depends(get_db),
+):
+    # Local DB — already searched taxa
+    local_result = await db.execute(
+        select(Taxon.scientific_name)
+        .where(Taxon.scientific_name.ilike(f"{q}%"))
+        .order_by(Taxon.scientific_name)
+        .limit(5)
+    )
+    local = [r[0] for r in local_result.all()]
+
+    # iNaturalist taxon search
+    remote: list[str] = []
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(INATURALIST_TAXA, params={
+                "q": q,
+                "rank": "order,family,genus,species,subspecies",
+                "is_active": "true",
+                "per_page": 10,
+            })
+            if resp.status_code == 200:
+                for t in resp.json().get("results", []):
+                    name = t.get("name", "")
+                    if name and name not in local:
+                        remote.append(name)
+    except Exception as e:
+        logger.warning(f"iNaturalist suggest failed: {e}")
+
+    seen: set[str] = set(local)
+    merged = list(local)
+    for name in remote:
+        if name not in seen:
+            seen.add(name)
+            merged.append(name)
+
+    return merged[:10]
 
 
 @router.get("", response_model=list[TaxonRead])

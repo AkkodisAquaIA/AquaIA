@@ -5,7 +5,8 @@ import { Search, Loader2, ExternalLink, CheckCircle } from "lucide-react";
 import { runSearch } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
 import type { ImageRecord } from "@/types";
-import { cn, statusColor } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import Autocomplete from "@/components/ui/Autocomplete";
 
 const SOURCES = [
   { id: "wikimedia", label: "Wikimedia" },
@@ -44,13 +45,12 @@ export default function SearchPanel() {
       {/* Search bar */}
       <div className="bg-[#111118] border border-[#2a2a3a] rounded-xl p-4 space-y-3">
         <div className="flex gap-2">
-          <input
-            type="text"
+          <Autocomplete
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            onChange={setSearchQuery}
+            onSelect={(v) => { setSearchQuery(v); }}
+            onEnter={handleSearch}
             placeholder="e.g. Ephemeroptera, Baetis rhodani..."
-            className="flex-1 bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#555566] focus:outline-none focus:border-green-500/50 transition-colors"
           />
           <button
             onClick={handleSearch}
