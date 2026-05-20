@@ -44,11 +44,14 @@ export default function ValidationPanel() {
 
   const handleStatus = async (id: number, status: string) => {
     await updateImageStatus(id, status);
-    if (status !== validationFilter) {
-      setImages((prev) => prev.filter((img) => img.id !== id));
-      setTotal((t) => t - 1);
-    }
-    setSelected(null);
+    const leavesFilter = status !== validationFilter;
+    setImages((prev) => {
+      const idx = prev.findIndex((img) => img.id === id);
+      const next = prev[idx + 1] ?? prev[idx - 1] ?? null;
+      setSelected(next);
+      return leavesFilter ? prev.filter((img) => img.id !== id) : prev;
+    });
+    if (leavesFilter) setTotal((t) => t - 1);
   };
 
   // Keyboard shortcuts
