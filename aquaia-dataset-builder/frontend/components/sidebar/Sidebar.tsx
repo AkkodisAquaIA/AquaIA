@@ -31,7 +31,7 @@ export default function Sidebar() {
           <Microscope className="w-4 h-4 text-green-400" />
         </div>
         <div>
-          <p className="text-sm font-semibold" style={{ color: "var(--text-base)" }}>ADIAB</p>
+          <p className="text-sm font-semibold" style={{ color: "var(--text-base)" }}>AquaIA</p>
           <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Dataset Builder</p>
         </div>
       </div>
