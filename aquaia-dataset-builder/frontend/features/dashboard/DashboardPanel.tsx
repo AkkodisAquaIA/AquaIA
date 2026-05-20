@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Images, CheckCircle, XCircle, Copy, Layers, Clock } from "lucide-react";
+import { Images, CheckCircle, XCircle, Copy, Layers, Clock, HardDrive } from "lucide-react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { getStats } from "@/lib/api";
 import type { DashboardStats } from "@/types";
 import { formatNumber, formatDate } from "@/lib/utils";
@@ -26,6 +27,13 @@ function StatCard({ label, value, icon: Icon, color }: StatCardProps) {
     </div>
   );
 }
+
+const STATUS_COLORS: Record<string, string> = {
+  Validated: "#22c55e",
+  Pending: "#f59e0b",
+  Rejected: "#ef4444",
+  Duplicates: "#a855f7",
+};
 
 export default function DashboardPanel() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -56,6 +64,13 @@ export default function DashboardPanel() {
   const total = stats.total_images;
   const validatedPct = total > 0 ? Math.round((stats.validated / total) * 100) : 0;
 
+  const pieData = [
+    { name: "Validated", value: stats.validated },
+    { name: "Pending", value: stats.pending },
+    { name: "Rejected", value: stats.rejected },
+    { name: "Duplicates", value: stats.duplicates },
+  ].filter((d) => d.value > 0);
+
   return (
     <div className="panel-enter space-y-6">
       <div>
@@ -71,27 +86,89 @@ export default function DashboardPanel() {
         <StatCard label="Duplicates" value={stats.duplicates} icon={Copy} color="bg-purple-500/10 text-purple-400" />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         <StatCard label="Taxons" value={stats.total_taxons} icon={Layers} color="bg-yellow-500/10 text-yellow-400" />
         <StatCard label="Exports" value={stats.total_exports} icon={Clock} color="bg-orange-500/10 text-orange-400" />
+        <StatCard label="Downloaded" value={stats.downloaded ?? 0} icon={HardDrive} color="bg-cyan-500/10 text-cyan-400" />
       </div>
 
-      {/* Progress bar */}
+      {/* Chart + Progress */}
       {total > 0 && (
-        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-[var(--text-dim)]">Validation progress</span>
-            <span className="text-[var(--text-base)] font-medium">{validatedPct}%</span>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {/* Pie chart */}
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+            <p className="text-sm font-semibold text-[var(--text-base)] mb-3">Status distribution</p>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={75}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {pieData.map((entry) => (
+                    <Cell key={entry.name} fill={STATUS_COLORS[entry.name]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--bg-card)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "8px",
+                    color: "var(--text-base)",
+                    fontSize: "12px",
+                  }}
+                />
+                <Legend
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: "11px", color: "var(--text-dim)" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
-          <div className="w-full bg-[var(--border)] rounded-full h-2">
-            <div
-              className="bg-green-500 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${validatedPct}%` }}
-            />
+
+          {/* Validation progress */}
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-center gap-4">
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-[var(--text-dim)]">Validation progress</span>
+                <span className="text-[var(--text-base)] font-medium">{validatedPct}%</span>
+              </div>
+              <div className="w-full bg-[var(--border)] rounded-full h-2">
+                <div
+                  className="bg-green-500 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${validatedPct}%` }}
+                />
+              </div>
+              <p className="text-xs text-[var(--text-dim)] mt-2">
+                {formatNumber(stats.validated)} validated · {formatNumber(stats.pending)} pending
+              </p>
+            </div>
+
+            {stats.downloaded !== undefined && total > 0 && (
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-[var(--text-dim)]">Downloaded locally</span>
+                  <span className="text-[var(--text-base)] font-medium">
+                    {Math.round(((stats.downloaded ?? 0) / total) * 100)}%
+                  </span>
+                </div>
+                <div className="w-full bg-[var(--border)] rounded-full h-2">
+                  <div
+                    className="bg-cyan-500 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.round(((stats.downloaded ?? 0) / total) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-[var(--text-dim)] mt-2">
+                  {formatNumber(stats.downloaded ?? 0)} / {formatNumber(total)} images cached on disk
+                </p>
+              </div>
+            )}
           </div>
-          <p className="text-xs text-[var(--text-dim)] mt-2">
-            {formatNumber(stats.validated)} validated · {formatNumber(stats.pending)} pending
-          </p>
         </div>
       )}
 

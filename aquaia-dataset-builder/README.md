@@ -73,7 +73,7 @@ npm run dev
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 1 | ✅ | Monorepo, Docker, FastAPI, Next.js, SQLite, base UI |
-| 2 | ⏳ | Wikimedia + iNaturalist connectors, search grid |
-| 3 | ⏳ | Image persistence, local storage, download |
-| 4 | ⏳ | Export system, duplicate detection, dashboard charts |
-| 5 | ⏳ | UI polish, animations, tests, optimizations |
+| 2 | ✅ | Wikimedia + iNaturalist connectors, search grid, autocomplete |
+| 3 | ✅ | Background image download, SHA256 + perceptual hash, thumbnails |
+| 4 | ✅ | Export system (classification/YOLO/COCO/CSV), dedup detection, dashboard chart |
+| 5 | ⏳ | Tests, optimizations, GBIF connector |

@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Plus, Loader2 } from "lucide-react";
+import { Download, Plus, Loader2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { getExports, createExport } from "@/lib/api";
 import type { ExportJob } from "@/types";
 import { formatDate } from "@/lib/utils";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
 const EXPORT_TYPES = [
   { id: "classification", label: "Classification folders", desc: "class/image.jpg structure" },
-  { id: "yolo", label: "YOLO", desc: "labels + images + data.yaml" },
-  { id: "coco", label: "COCO JSON", desc: "instances_*.json format" },
+  { id: "yolo", label: "YOLO", desc: "images/ + data.yaml" },
+  { id: "coco", label: "COCO JSON", desc: "instances_validated.json" },
   { id: "csv", label: "CSV", desc: "metadata spreadsheet" },
 ];
 
@@ -19,9 +21,17 @@ export default function ExportPanel() {
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState("classification");
 
+  const reload = () => getExports().then(setJobs).finally(() => setLoading(false));
+
+  useEffect(() => { reload(); }, []);
+
+  // Poll running jobs every 3s
   useEffect(() => {
-    getExports().then(setJobs).finally(() => setLoading(false));
-  }, []);
+    const running = jobs.some((j) => j.status === "running");
+    if (!running) return;
+    const id = setInterval(() => getExports().then(setJobs), 3000);
+    return () => clearInterval(id);
+  }, [jobs]);
 
   const handleCreate = async () => {
     setCreating(true);
@@ -67,7 +77,14 @@ export default function ExportPanel() {
 
       {/* Jobs list */}
       <div>
-        <h2 className="text-sm font-semibold text-[var(--text-base)] mb-3">Export history</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-[var(--text-base)]">Export history</h2>
+          <button onClick={reload}
+            className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:bg-[var(--bg-input)] transition-colors">
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center h-24">
             <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
@@ -85,6 +102,7 @@ export default function ExportPanel() {
                   <th className="px-4 py-3 text-left">Type</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Created</th>
+                  <th className="px-4 py-3 text-left">Download</th>
                 </tr>
               </thead>
               <tbody>
@@ -92,15 +110,25 @@ export default function ExportPanel() {
                   <tr key={job.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--bg-input)]">
                     <td className="px-4 py-2.5 text-[var(--text-base)] font-mono text-xs">{job.export_type}</td>
                     <td className="px-4 py-2.5">
-                      <span className={`px-2 py-0.5 text-[10px] rounded border ${
-                        job.status === "done"
-                          ? "bg-green-500/10 text-green-400 border-green-500/20"
-                          : "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
-                      }`}>
-                        {job.status}
-                      </span>
+                      <StatusBadge status={job.status} />
                     </td>
                     <td className="px-4 py-2.5 text-[var(--text-muted)] text-xs">{formatDate(job.created_at)}</td>
+                    <td className="px-4 py-2.5">
+                      {job.status === "done" ? (
+                        <a
+                          href={`${API_BASE}/exports/${job.id}/download`}
+                          download
+                          className="flex items-center gap-1 text-xs text-green-500 hover:text-green-400 transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Download
+                        </a>
+                      ) : job.status === "running" ? (
+                        <Loader2 className="w-3.5 h-3.5 text-[var(--text-muted)] animate-spin" />
+                      ) : (
+                        <span className="text-xs text-[var(--text-muted)]">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -109,5 +137,23 @@ export default function ExportPanel() {
         )}
       </div>
     </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === "done") return (
+    <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border bg-green-500/10 text-green-400 border-green-500/20 w-fit">
+      <CheckCircle className="w-3 h-3" /> done
+    </span>
+  );
+  if (status === "running") return (
+    <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border bg-yellow-500/10 text-yellow-400 border-yellow-500/20 w-fit">
+      <Loader2 className="w-3 h-3 animate-spin" /> running
+    </span>
+  );
+  return (
+    <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border bg-red-500/10 text-red-400 border-red-500/20 w-fit">
+      <AlertCircle className="w-3 h-3" /> {status}
+    </span>
   );
 }

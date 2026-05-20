@@ -59,6 +59,7 @@ export interface DashboardStats {
   validated: number;
   rejected: number;
   duplicates: number;
+  downloaded: number;
   total_taxons: number;
   total_exports: number;
   recent_searches: SearchQuery[];

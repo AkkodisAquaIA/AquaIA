@@ -16,6 +16,9 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     validated = await db.scalar(select(func.count(ImageRecord.id)).where(ImageRecord.status == "validated")) or 0
     rejected = await db.scalar(select(func.count(ImageRecord.id)).where(ImageRecord.status == "rejected")) or 0
     duplicates = await db.scalar(select(func.count(ImageRecord.id)).where(ImageRecord.status == "duplicate")) or 0
+    downloaded = await db.scalar(
+        select(func.count(ImageRecord.id)).where(ImageRecord.local_path.isnot(None))
+    ) or 0
     total_taxons = await db.scalar(select(func.count(Taxon.id))) or 0
     total_exports = await db.scalar(select(func.count(ExportJob.id))) or 0
 
@@ -30,6 +33,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         validated=validated,
         rejected=rejected,
         duplicates=duplicates,
+        downloaded=downloaded,
         total_taxons=total_taxons,
         total_exports=total_exports,
         recent_searches=[SearchQueryRead.model_validate(s) for s in recent_searches],

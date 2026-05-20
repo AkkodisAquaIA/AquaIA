@@ -102,6 +102,7 @@ class DashboardStats(BaseModel):
     validated: int
     rejected: int
     duplicates: int
+    downloaded: int = 0
     total_taxons: int
     total_exports: int
     recent_searches: list[SearchQueryRead]

@@ -1,5 +1,8 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, Query, HTTPException
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -69,6 +72,28 @@ async def update_status(
 
     await db.flush()
     return ImageRecordRead.model_validate(img)
+
+
+@router.get("/{image_id}/file")
+async def serve_image_file(image_id: int, db: AsyncSession = Depends(get_db)):
+    img = await db.get(ImageRecord, image_id)
+    if not img or not img.local_path:
+        raise HTTPException(404, "Local file not available — download may be in progress")
+    path = Path(img.local_path)
+    if not path.exists():
+        raise HTTPException(404, "File not found on disk")
+    return FileResponse(path)
+
+
+@router.get("/{image_id}/thumbnail")
+async def serve_thumbnail(image_id: int, db: AsyncSession = Depends(get_db)):
+    img = await db.get(ImageRecord, image_id)
+    if not img or not img.thumbnail_path:
+        raise HTTPException(404, "Thumbnail not available")
+    path = Path(img.thumbnail_path)
+    if not path.exists():
+        raise HTTPException(404, "Thumbnail not found on disk")
+    return FileResponse(path, media_type="image/jpeg")
 
 
 @router.get("/{image_id}", response_model=ImageRecordRead)
