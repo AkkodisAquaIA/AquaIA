@@ -88,3 +88,27 @@ async def get_taxon(taxon_id: int, db: AsyncSession = Depends(get_db)):
     if not taxon:
         raise HTTPException(404, "Taxon not found")
     return taxon
+
+
+@router.post("/enrich", response_model=list[TaxonRead])
+async def enrich_taxons(db: AsyncSession = Depends(get_db)):
+    """Fetch missing common_name / rank for all taxons that lack them."""
+    from app.services.search_service import _fetch_taxon_meta
+    result = await db.execute(
+        select(Taxon).where(
+            (Taxon.common_name.is_(None)) | (Taxon.rank.is_(None))
+        )
+    )
+    taxons = list(result.scalars().all())
+    updated = []
+    for t in taxons:
+        common, rank = await _fetch_taxon_meta(t.scientific_name)
+        if common or rank:
+            if common and not t.common_name:
+                t.common_name = common
+            if rank and not t.rank:
+                t.rank = rank
+            updated.append(t)
+    await db.flush()
+    logger.info(f"[enrich] updated {len(updated)} taxons")
+    return updated

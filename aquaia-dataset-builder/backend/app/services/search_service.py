@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -91,7 +92,30 @@ async def get_or_create_taxon(db: AsyncSession, scientific_name: str) -> Taxon |
         select(Taxon).where(Taxon.scientific_name == scientific_name)
     )
     if not taxon:
-        taxon = Taxon(scientific_name=scientific_name)
+        common_name, rank = await _fetch_taxon_meta(scientific_name)
+        taxon = Taxon(scientific_name=scientific_name, common_name=common_name, rank=rank)
         db.add(taxon)
         await db.flush()
     return taxon
+
+
+async def _fetch_taxon_meta(scientific_name: str) -> tuple[str | None, str | None]:
+    """Fetch common name and rank from iNaturalist taxa API."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                "https://api.inaturalist.org/v1/taxa/autocomplete",
+                params={"q": scientific_name, "per_page": 1},
+            )
+            resp.raise_for_status()
+            results = resp.json().get("results", [])
+            if results:
+                hit = results[0]
+                # Only use result if name matches closely
+                if hit.get("name", "").lower() == scientific_name.lower():
+                    common = hit.get("preferred_common_name") or None
+                    rank = hit.get("rank") or None
+                    return common, rank
+    except Exception as exc:
+        logger.debug(f"[taxon_meta] {scientific_name}: {exc}")
+    return None, None
