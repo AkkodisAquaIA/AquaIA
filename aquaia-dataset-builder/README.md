@@ -13,6 +13,17 @@ docker compose up --build
 - Backend API: http://localhost:8000
 - API docs: http://localhost:8000/docs
 
+## Docker commands
+
+| Action | Command |
+|--------|---------|
+| Start (with rebuild) | `docker compose up --build` |
+| Start (background) | `docker compose up --build -d` |
+| Stop & remove containers | `docker compose down` |
+| Stop & remove containers + images | `docker compose down --rmi local` |
+| View logs | `docker compose logs -f` |
+| View running containers | `docker compose ps` |
+
 ## Usage
 
 ### 1. Search — retrieve images
