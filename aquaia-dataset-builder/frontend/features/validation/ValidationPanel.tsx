@@ -30,6 +30,8 @@ export default function ValidationPanel() {
       setImages(data.items);
       setTotal(data.total);
       setPages(data.pages);
+    } catch {
+      // Backend may not be up yet — fail silently
     } finally {
       setLoading(false);
     }

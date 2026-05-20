@@ -46,7 +46,9 @@ async def list_images(
         count_q = count_q.where(ImageRecord.taxon_id == taxon_id)
 
     total = await db.scalar(count_q) or 0
-    result = await db.execute(q.offset((page - 1) * size).limit(size))
+    result = await db.execute(
+        q.offset((page - 1) * size).limit(size).options(selectinload(ImageRecord.taxon))
+    )
     items = result.scalars().all()
     return {
         "items": [ImageRecordRead.model_validate(i) for i in items],
@@ -164,7 +166,7 @@ async def update_status(
 ):
     if body.status not in VALID_STATUSES:
         raise HTTPException(400, f"Invalid status. Must be one of: {VALID_STATUSES}")
-    img = await db.get(ImageRecord, image_id)
+    img = await db.get(ImageRecord, image_id, options=[selectinload(ImageRecord.taxon)])
     if not img:
         raise HTTPException(404, "Image not found")
     img.status = body.status
@@ -203,7 +205,7 @@ async def serve_thumbnail(image_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/{image_id}", response_model=ImageRecordRead)
 async def get_image(image_id: int, db: AsyncSession = Depends(get_db)):
-    img = await db.get(ImageRecord, image_id)
+    img = await db.get(ImageRecord, image_id, options=[selectinload(ImageRecord.taxon)])
     if not img:
         raise HTTPException(404, "Image not found")
     return ImageRecordRead.model_validate(img)
