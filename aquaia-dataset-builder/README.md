@@ -13,12 +13,35 @@ docker compose up --build
 - Backend API: http://localhost:8000
 - API docs: http://localhost:8000/docs
 
-## Workflow
+## Usage
 
-1. **Search** — enter a scientific name (e.g. `Ephemeroptera`) → images retrieved from Wikimedia & iNaturalist
-2. **Validation Queue** — review images, press `V` (validate), `R` (reject), `D` (duplicate)
-3. **Dataset Explorer** — browse validated images and taxonomy
-4. **Export Center** — export as Classification / YOLO / COCO / CSV
+### 1. Search — retrieve images
+
+- Click **Search** in the sidebar
+- Type a scientific name: `Ephemeroptera`, `Baetis rhodani`, `Plecoptera`…
+- Select sources (Wikimedia Commons, iNaturalist)
+- Click **Search** → images are fetched and saved to the database automatically
+
+### 2. Validation Queue — review images
+
+- Click **Validation Queue**
+- Click an image to select it
+- Use buttons or keyboard shortcuts:
+  - `V` — Validate ✅
+  - `R` — Reject ❌
+  - `D` — Mark as duplicate
+  - `Space` — Deselect
+- Use the filter tabs to browse Pending / Validated / Rejected / Duplicates
+
+### 3. Dataset Explorer — browse your dataset
+
+- See all validated images in a grid
+- Browse the taxonomy created automatically from your searches
+
+### 4. Export Center — export for AI training
+
+- Choose a format: **Classification** (folders) · **YOLO** · **COCO JSON** · **CSV**
+- Click **Create export job**
 
 ## Architecture
 

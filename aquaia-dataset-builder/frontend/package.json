@@ -26,7 +26,6 @@
     "@radix-ui/react-toast": "^1.2.3",
     "@radix-ui/react-tooltip": "^1.1.5",
     "@radix-ui/react-progress": "^1.1.1",
-    "@radix-ui/react-badge": "*",
     "recharts": "^2.13.3"
   },
   "devDependencies": {
