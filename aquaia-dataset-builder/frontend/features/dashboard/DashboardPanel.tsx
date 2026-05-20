@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Images, CheckCircle, XCircle, Copy, Layers, Clock, HardDrive } from "lucide-react";
+import { Images, CheckCircle, XCircle, Copy, Layers, Clock, HardDrive, FolderOpen } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { getStats } from "@/lib/api";
 import type { DashboardStats } from "@/types";
@@ -87,9 +87,10 @@ export default function DashboardPanel() {
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <StatCard label="Taxons" value={stats.total_taxons} icon={Layers} color="bg-yellow-500/10 text-yellow-400" />
-        <StatCard label="Exports" value={stats.total_exports} icon={Clock} color="bg-orange-500/10 text-orange-400" />
-        <StatCard label="Downloaded" value={stats.downloaded ?? 0} icon={HardDrive} color="bg-cyan-500/10 text-cyan-400" />
+        <StatCard label="Taxons"    value={stats.total_taxons}    icon={Layers}      color="bg-yellow-500/10 text-yellow-400" />
+        <StatCard label="Datasets"  value={stats.total_datasets}  icon={FolderOpen}  color="bg-indigo-500/10 text-indigo-400" />
+        <StatCard label="Exports"   value={stats.total_exports}   icon={Clock}       color="bg-orange-500/10 text-orange-400" />
+        <StatCard label="Downloaded" value={stats.downloaded ?? 0} icon={HardDrive}  color="bg-cyan-500/10 text-cyan-400" />
       </div>
 
       {/* Chart + Progress */}

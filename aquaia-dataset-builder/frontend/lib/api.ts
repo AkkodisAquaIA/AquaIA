@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   DashboardStats,
+  Dataset,
   ImageRecord,
   PaginatedResponse,
   SearchQuery,
@@ -58,6 +59,22 @@ export const createExport = (exportType: string, parameters?: object) =>
   api
     .post<ExportJob>("/exports", { export_type: exportType, parameters })
     .then((r) => r.data);
+
+// Datasets
+export const getDatasets = () =>
+  api.get<Dataset[]>("/datasets").then((r) => r.data);
+
+export const createDataset = (name: string, description?: string) =>
+  api.post<Dataset>("/datasets", { name, description }).then((r) => r.data);
+
+export const deleteDataset = (id: number) =>
+  api.delete(`/datasets/${id}`);
+
+export const addImageToDataset = (datasetId: number, imageId: number) =>
+  api.post(`/datasets/${datasetId}/images/${imageId}`);
+
+export const removeImageFromDataset = (datasetId: number, imageId: number) =>
+  api.delete(`/datasets/${datasetId}/images/${imageId}`);
 
 // Image import
 export const importFromUrl = (url: string, scientific_name?: string) =>

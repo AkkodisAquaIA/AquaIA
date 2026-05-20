@@ -60,6 +60,22 @@ class ImageRecordRead(ImageRecordBase):
     taxon: Optional[TaxonRead] = None
 
 
+# ── Dataset ────────────────────────────────────────────────────────────────
+
+class DatasetCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+
+class DatasetRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    description: Optional[str] = None
+    created_at: datetime
+    image_count: int = 0
+
+
 # ── Import ─────────────────────────────────────────────────────────────────
 
 class ImportUrlRequest(BaseModel):
@@ -111,6 +127,7 @@ class DashboardStats(BaseModel):
     duplicates: int
     downloaded: int = 0
     total_taxons: int
+    total_datasets: int = 0
     total_exports: int
     recent_searches: list[SearchQueryRead]
 

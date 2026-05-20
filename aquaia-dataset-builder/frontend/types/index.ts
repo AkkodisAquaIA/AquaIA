@@ -53,6 +53,14 @@ export interface ExportJob {
   created_at: string;
 }
 
+export interface Dataset {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+  image_count: number;
+}
+
 export interface DashboardStats {
   total_images: number;
   pending: number;
@@ -61,6 +69,7 @@ export interface DashboardStats {
   duplicates: number;
   downloaded: number;
   total_taxons: number;
+  total_datasets: number;
   total_exports: number;
   recent_searches: SearchQuery[];
 }

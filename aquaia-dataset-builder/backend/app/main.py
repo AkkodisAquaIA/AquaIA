@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.database import engine, Base
-from app.api.routes import search, images, taxonomy, exports, stats
+from app.api.routes import search, images, taxonomy, exports, stats, datasets
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ app.include_router(search.router, prefix="/api")
 app.include_router(images.router, prefix="/api")
 app.include_router(taxonomy.router, prefix="/api")
 app.include_router(exports.router, prefix="/api")
+app.include_router(datasets.router, prefix="/api")
 
 
 @app.get("/health")

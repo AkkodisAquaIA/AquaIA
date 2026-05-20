@@ -1,8 +1,31 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Integer, String, Text, DateTime, ForeignKey, BigInteger
+from sqlalchemy import Integer, String, Text, DateTime, ForeignKey, BigInteger, Table, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.database import Base
+
+
+# ── Many-to-many: Dataset ↔ ImageRecord ────────────────────────────────────
+
+dataset_images = Table(
+    "dataset_images",
+    Base.metadata,
+    Column("dataset_id", Integer, ForeignKey("datasets.id", ondelete="CASCADE"), primary_key=True),
+    Column("image_id",   Integer, ForeignKey("image_records.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class Dataset(Base):
+    __tablename__ = "datasets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    images: Mapped[list["ImageRecord"]] = relationship(
+        "ImageRecord", secondary=dataset_images, back_populates="datasets"
+    )
 
 
 class Taxon(Base):
@@ -42,6 +65,9 @@ class ImageRecord(Base):
     validated_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     taxon: Mapped[Optional["Taxon"]] = relationship("Taxon", back_populates="images")
+    datasets: Mapped[list["Dataset"]] = relationship(
+        "Dataset", secondary=dataset_images, back_populates="images"
+    )
 
 
 class SearchQuery(Base):

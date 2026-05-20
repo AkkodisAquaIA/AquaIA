@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.db.database import get_db
-from app.models.models import ImageRecord, Taxon, SearchQuery, ExportJob
+from app.models.models import ImageRecord, Taxon, SearchQuery, ExportJob, Dataset
 from app.schemas.schemas import DashboardStats, SearchQueryRead
 
 router = APIRouter(prefix="/stats", tags=["stats"])
@@ -20,6 +20,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         select(func.count(ImageRecord.id)).where(ImageRecord.local_path.isnot(None))
     ) or 0
     total_taxons = await db.scalar(select(func.count(Taxon.id))) or 0
+    total_datasets = await db.scalar(select(func.count(Dataset.id))) or 0
     total_exports = await db.scalar(select(func.count(ExportJob.id))) or 0
 
     recent_result = await db.execute(
@@ -35,6 +36,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         duplicates=duplicates,
         downloaded=downloaded,
         total_taxons=total_taxons,
+        total_datasets=total_datasets,
         total_exports=total_exports,
         recent_searches=[SearchQueryRead.model_validate(s) for s in recent_searches],
     )
