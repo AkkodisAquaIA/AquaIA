@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { getImages, updateImageStatus } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
 import type { ImageRecord } from "@/types";
 import { cn } from "@/lib/utils";
 
 const FILTERS = [
-  { id: "pending", label: "Pending" },
-  { id: "validated", label: "Validated" },
-  { id: "rejected", label: "Rejected" },
-  { id: "duplicate", label: "Duplicates" },
+  { id: "pending",      label: "Pending" },
+  { id: "validated",    label: "Validated" },
+  { id: "rejected",     label: "Rejected" },
+  { id: "duplicate",    label: "Duplicates" },
+  { id: "review_later", label: "Later" },
 ];
 
 export default function ValidationPanel() {
@@ -22,6 +23,7 @@ export default function ValidationPanel() {
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ImageRecord | null>(null);
+  const [lightbox, setLightbox] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,8 +44,10 @@ export default function ValidationPanel() {
 
   const handleStatus = async (id: number, status: string) => {
     await updateImageStatus(id, status);
-    setImages((prev) => prev.filter((img) => img.id !== id));
-    setTotal((t) => t - 1);
+    if (status !== validationFilter) {
+      setImages((prev) => prev.filter((img) => img.id !== id));
+      setTotal((t) => t - 1);
+    }
     setSelected(null);
   };
 
@@ -51,6 +55,8 @@ export default function ValidationPanel() {
   useEffect(() => {
     if (!selected) return;
     const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setLightbox(false); return; }
+      if (lightbox) return;
       if (e.key === "v" || e.key === "V") handleStatus(selected.id, "validated");
       if (e.key === "r" || e.key === "R") handleStatus(selected.id, "rejected");
       if (e.key === "d" || e.key === "D") handleStatus(selected.id, "duplicate");
@@ -59,7 +65,7 @@ export default function ValidationPanel() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
+  }, [selected, lightbox]);
 
   return (
     <div className="panel-enter flex gap-4 h-full">
@@ -138,12 +144,43 @@ export default function ValidationPanel() {
         )}
       </div>
 
+      {/* Lightbox overlay */}
+      {lightbox && selected && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          onClick={() => setLightbox(false)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={selected.source_image_url}
+            alt=""
+            className="max-w-[92vw] max-h-[92vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setLightbox(false)}
+            className="absolute top-4 right-4 p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          {selected.taxon && (
+            <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/80 text-sm italic bg-black/50 px-3 py-1 rounded-full">
+              {selected.taxon.scientific_name}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Right: detail panel */}
       {selected && (
         <div className="w-72 shrink-0 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-4 overflow-y-auto">
-          <div className="aspect-video rounded-lg overflow-hidden bg-[var(--bg-input)]">
+          <div className="relative group aspect-video rounded-lg overflow-hidden bg-[var(--bg-input)] cursor-zoom-in"
+               onClick={() => setLightbox(true)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={selected.source_image_url} alt="" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+              <Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+            </div>
           </div>
 
           <div className="space-y-1.5">
