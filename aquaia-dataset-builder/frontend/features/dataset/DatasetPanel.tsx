@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getImages, getTaxons, getDatasets, createDataset, deleteDataset, addImageToDataset, getDatasetImages, removeImageFromDataset } from "@/lib/api";
+import { getImages, getTaxons, getDatasets, createDataset, deleteDataset, addImageToDataset, getDatasetImages, removeImageFromDataset, getAssignedImages } from "@/lib/api";
 import type { ImageRecord, Taxon, Dataset } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { Database, FolderOpen, Plus, Trash2, Images, Loader2, CheckSquare, Square, FolderPlus, ArrowLeft, X } from "lucide-react";
@@ -11,24 +11,29 @@ const API_BASE_DS = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/ap
 
 type Tab = "datasets" | "images" | "taxons";
 
+type AssignmentMap = Record<number, { dataset_id: number; dataset_name: string }>;
+
 export default function DatasetPanel() {
   const [activeTab, setActiveTab] = useState<Tab>("datasets");
   const [images, setImages]   = useState<ImageRecord[]>([]);
   const [taxons, setTaxons]   = useState<Taxon[]>([]);
   const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [assignments, setAssignments] = useState<AssignmentMap>({});
   const [loading, setLoading] = useState(true);
 
   const reload = async () => {
     setLoading(true);
     try {
-      const [imgs, txs, dss] = await Promise.all([
+      const [imgs, txs, dss, asgn] = await Promise.all([
         getImages({ status: "validated", size: 100 }),
         getTaxons(),
         getDatasets(),
+        getAssignedImages(),
       ]);
       setImages(imgs.items);
       setTaxons(txs);
       setDatasets(dss);
+      setAssignments(asgn);
     } catch {
       // Backend may not be fully up yet — fail silently
     } finally {
@@ -72,7 +77,7 @@ export default function DatasetPanel() {
       ) : activeTab === "datasets" ? (
         <DatasetsTab datasets={datasets} onRefresh={reload} />
       ) : activeTab === "images" ? (
-        <ImagesTab images={images} datasets={datasets} onRefresh={reload} />
+        <ImagesTab images={images} datasets={datasets} assignments={assignments} onRefresh={reload} />
       ) : (
         <TaxonsTab taxons={taxons} />
       )}
@@ -281,10 +286,18 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
-function ImagesTab({ images, datasets, onRefresh }: { images: ImageRecord[]; datasets: Dataset[]; onRefresh: () => void }) {
+function ImagesTab({
+  images, datasets, assignments, onRefresh,
+}: {
+  images: ImageRecord[];
+  datasets: Dataset[];
+  assignments: AssignmentMap;
+  onRefresh: () => void;
+}) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [targetDataset, setTargetDataset] = useState<number | "">("");
   const [adding, setAdding] = useState(false);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const toggle = (id: number) =>
     setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -294,9 +307,42 @@ function ImagesTab({ images, datasets, onRefresh }: { images: ImageRecord[]; dat
 
   const handleAddToDataset = async () => {
     if (!targetDataset || selected.size === 0) return;
+    const targetId = Number(targetDataset);
+    setWarning(null);
+
+    const alreadyHere: number[]  = [];
+    const alreadyElsewhere: { id: number; dsName: string }[] = [];
+    const toAdd: number[] = [];
+
+    for (const imgId of selected) {
+      const a = assignments[imgId];
+      if (!a) {
+        toAdd.push(imgId);
+      } else if (a.dataset_id === targetId) {
+        alreadyHere.push(imgId);
+      } else {
+        alreadyElsewhere.push({ id: imgId, dsName: a.dataset_name });
+      }
+    }
+
+    if (alreadyElsewhere.length > 0) {
+      const names = [...new Set(alreadyElsewhere.map((e) => e.dsName))].join(", ");
+      const count = alreadyElsewhere.length;
+      setWarning(
+        `${count} image${count > 1 ? "s" : ""} already assigned to: ${names}. Only unassigned images were added.`
+      );
+    }
+
+    if (toAdd.length === 0) {
+      if (alreadyHere.length > 0 && alreadyElsewhere.length === 0) {
+        setWarning("All selected images are already in this dataset.");
+      }
+      return;
+    }
+
     setAdding(true);
     try {
-      await Promise.all([...selected].map((imgId) => addImageToDataset(Number(targetDataset), imgId)));
+      await Promise.all(toAdd.map((imgId) => addImageToDataset(targetId, imgId)));
       setSelected(new Set());
       setTargetDataset("");
       onRefresh();
@@ -315,6 +361,17 @@ function ImagesTab({ images, datasets, onRefresh }: { images: ImageRecord[]; dat
 
   return (
     <div className="space-y-3">
+      {/* Warning banner */}
+      {warning && (
+        <div className="flex items-start gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+          <span className="shrink-0 mt-0.5">⚠</span>
+          <span>{warning}</span>
+          <button onClick={() => setWarning(null)} className="ml-auto shrink-0 opacity-60 hover:opacity-100">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Action bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
@@ -335,7 +392,7 @@ function ImagesTab({ images, datasets, onRefresh }: { images: ImageRecord[]; dat
             <FolderPlus className="w-4 h-4 text-[var(--text-muted)]" />
             <select
               value={targetDataset}
-              onChange={(e) => setTargetDataset(e.target.value ? Number(e.target.value) : "")}
+              onChange={(e) => { setTargetDataset(e.target.value ? Number(e.target.value) : ""); setWarning(null); }}
               className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-base)] focus:outline-none focus:border-green-500/50"
             >
               <option value="">Choose a dataset…</option>
@@ -362,12 +419,15 @@ function ImagesTab({ images, datasets, onRefresh }: { images: ImageRecord[]; dat
             ? `${API_BASE}/images/${img.id}/thumbnail`
             : img.source_image_url;
           const isSelected = selected.has(img.id);
+          const assignment = assignments[img.id];
           return (
             <button key={img.id} onClick={() => toggle(img.id)}
               className={cn(
                 "relative aspect-square rounded-lg overflow-hidden border transition-all",
                 isSelected
                   ? "border-green-500 ring-2 ring-green-500/30"
+                  : assignment
+                  ? "border-indigo-400/50"
                   : "border-[var(--border)] hover:border-[var(--border-hi)]"
               )}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -377,6 +437,12 @@ function ImagesTab({ images, datasets, onRefresh }: { images: ImageRecord[]; dat
                   <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
                     <CheckSquare className="w-2.5 h-2.5 text-white" />
                   </div>
+                </div>
+              )}
+              {assignment && !isSelected && (
+                <div className="absolute bottom-0 inset-x-0 bg-indigo-900/80 px-1 py-0.5 flex items-center gap-1">
+                  <FolderOpen className="w-2.5 h-2.5 text-indigo-300 shrink-0" />
+                  <span className="text-[9px] text-indigo-200 truncate leading-tight">{assignment.dataset_name}</span>
                 </div>
               )}
             </button>
