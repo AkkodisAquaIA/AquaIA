@@ -133,6 +133,7 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               placeholder="e.g. Ephemeroptera training set v1"
+              autoFocus
               className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-green-500/50 transition-colors"
             />
           </div>
@@ -148,7 +149,8 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
           {error && <p className="text-xs text-red-400">{error}</p>}
           <div className="flex gap-2">
             <button onClick={handleCreate} disabled={creating || !name.trim()}
-              className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors">
+              title={!name.trim() ? "Enter a name first" : undefined}
+              className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium rounded-lg transition-colors">
               {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
               Create
             </button>
