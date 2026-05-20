@@ -17,6 +17,14 @@ const FILTERS = [
   { id: "review_later", label: "Later" },
 ];
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
+function imgSrc(image: ImageRecord, bust?: number): string {
+  if (image.local_path)
+    return `${API_BASE}/images/${image.id}/file${bust ? `?t=${bust}` : ""}`;
+  return image.source_image_url;
+}
+
 export default function ValidationPanel() {
   const { validationFilter, setValidationFilter, cropWidth, cropHeight } = useAppStore();
   const [images, setImages] = useState<ImageRecord[]>([]);
@@ -29,6 +37,7 @@ export default function ValidationPanel() {
   const [cropMode, setCropMode] = useState(false);
   const [crop, setCrop] = useState<CropType>();
   const [saving, setSaving] = useState(false);
+  const [imgBust, setImgBust] = useState(0);
   const imgRef = useRef<HTMLImageElement>(null);
 
   const load = useCallback(async () => {
@@ -198,12 +207,12 @@ export default function ValidationPanel() {
                         crop.width * scaleX,
                         crop.height * scaleY,
                       );
-                      // Update in-place — keep detail panel open with fresh data
+                      // Stay in lightbox — show cropped result immediately
                       setSelected(updated);
                       setImages((prev) => prev.map((img) => img.id === updated.id ? updated : img));
+                      setImgBust(Date.now());
                       setCropMode(false);
                       setCrop(undefined);
-                      setLightbox(false);
                     } finally {
                       setSaving(false);
                     }
@@ -224,12 +233,12 @@ export default function ValidationPanel() {
             {cropMode ? (
               <ReactCrop crop={crop} onChange={(c) => setCrop(c)} className="max-h-[80vh]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img ref={imgRef} src={selected.source_image_url} alt=""
+                <img ref={imgRef} src={imgSrc(selected, imgBust)} alt=""
                   className="max-w-[90vw] max-h-[80vh] object-contain" />
               </ReactCrop>
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img ref={imgRef} src={selected.source_image_url} alt=""
+              <img ref={imgRef} src={imgSrc(selected, imgBust)} alt=""
                 className="max-w-[92vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" />
             )}
           </div>
