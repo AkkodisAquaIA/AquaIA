@@ -68,8 +68,17 @@ Every image retrieved by Search lands here with status `pending`. Nothing enters
 
 **How to review:**
 - Click an image to select it — the detail panel opens on the right
+- After each action the panel **automatically moves to the next image** — no need to re-click
 - Click the preview image (or hover for the zoom icon) to open a **fullscreen lightbox** for closer inspection
-- Then assign a status using the buttons or keyboard shortcuts:
+
+**Lightbox crop tool:**
+- In the lightbox, click **Crop** to enter crop mode
+- A selection rectangle is pre-positioned and sized to your default crop dimensions (see Settings)
+- Drag to reposition, handles to resize — then click **Apply crop**
+- The cropped image replaces the original: dimensions, hash and thumbnail are all updated
+- Press `Escape` or click **Cancel** to exit without saving
+
+- Assign a status using the buttons or keyboard shortcuts:
 
 | Status | Button | Key | Effect |
 |--------|--------|-----|--------|
@@ -105,6 +114,14 @@ Only images with status `validated` appear here.
 
 - Click **Create export job** → a zip is generated in the background
 - Click **Download** once the job status shows `done` (page auto-refreshes while running)
+
+### 5. Settings — platform configuration
+
+| Setting | Description |
+|---------|-------------|
+| **Default crop dimensions** | Size of the pre-initialized crop rectangle when opening the crop tool. Presets: 224 / 256 / 320 / 416 / 512 / **640** (default) × same height. Custom W × H also supported. Persisted in browser localStorage. |
+
+> Tip: set crop dimensions to match your model's input size (e.g. 640×640 for YOLOv8, 224×224 for ResNet/EfficientNet) so every crop is already the right size without post-processing.
 
 ## Storage
 
