@@ -39,7 +39,7 @@ export const useAppStore = create<AppState>((set) => ({
   searchQuery: "",
   setSearchQuery: (q) => set({ searchQuery: q }),
 
-  selectedSources: ["wikimedia", "inaturalist"],
+  selectedSources: ["wikimedia", "inaturalist", "gbif"],
   toggleSource: (source) =>
     set((s) => ({
       selectedSources: s.selectedSources.includes(source)

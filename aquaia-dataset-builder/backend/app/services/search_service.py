@@ -7,12 +7,14 @@ from sqlalchemy import select, func
 from app.connectors.base import ImageResult
 from app.connectors.wikimedia import WikimediaConnector
 from app.connectors.inaturalist import INaturalistConnector
+from app.connectors.gbif import GBIFConnector
 from app.models.models import ImageRecord, SearchQuery, Taxon
 
 logger = logging.getLogger(__name__)
 
 CONNECTORS = {
     "wikimedia": WikimediaConnector,
+    "gbif": GBIFConnector,
     "inaturalist": INaturalistConnector,
 }
 

@@ -11,8 +11,9 @@ import Autocomplete from "@/components/ui/Autocomplete";
 type Mode = "search" | "url" | "upload";
 
 const SOURCES = [
-  { id: "wikimedia", label: "Wikimedia" },
+  { id: "wikimedia",   label: "Wikimedia" },
   { id: "inaturalist", label: "iNaturalist" },
+  { id: "gbif",        label: "GBIF" },
 ];
 
 const MODES: { id: Mode; label: string; icon: React.ElementType }[] = [
