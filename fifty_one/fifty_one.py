@@ -40,11 +40,7 @@ from tools import logo_linux as ll
 #==========================================================================================
 # ================= FONCTIONS =================
 
-
-
 def def_status(etat, path_user):
-       
-    display = dc.DisplayColor()
  
     status: str = (
         f"ON : Saving to:\n    {path_user}"
@@ -330,7 +326,7 @@ def main():
 
     # Display du logo et infos système
     if syst.est_windows():
-        lw.splash_screen_circle("Image1.png") 
+        ll.splash_screen_circle("Image1.png") 
     else:
         ll.splash_screen_circle("Image1.png")
 
@@ -354,23 +350,22 @@ def main():
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     if DEVICE == "cuda": 
-        prompt = ("CUDA available - Running on 'GPU'")
+        prompt = ("CUDA available - Running on 'GPU'\n")
         display.print(prompt, colors['ok'])
     else:
-        prompt = ("CUDA not available - Running on 'CPU'")
+        prompt = ("CUDA not available - Running on 'CPU'\n")
         display.print(prompt, colors['warning'])
-    print()
 
-    print()
+
     # Contrôle répertoire de sauvegarde
     try:
         path_user: Path = Path(cfg["PATH_USER"])
         if not path_user.exists():
             path_user = Path.cwd()
-            display.print("Chemin non défini : Utilisation du répertoire de travail actuel", colors["error"])
+            display.print(f"Chemin non défini : Utilisation du répertoire de travail actuel\n{ct.BELL}", colors["error"])
     except Exception as e : 
         path_user = Path.cwd()
-        display.print("Chemin non défini : Utilisation du répertoire de travail actuel", colors["error"])
+        display.print(f"Chemin non défini : Utilisation du répertoire de travail actuel\n{ct.BELL}", colors["error"])
  
     # Report mode handling
     status = def_status(cfg["REPORT_MODE"], path_user)
@@ -399,7 +394,9 @@ def main():
         MODEL_NAME = util.get_file_name_color("Entrée le nom du modèle DINOv3")
 
     print()
-    display.print("Démarrage du traitement ...", colors['info'])
+
+
+    display.print("Démarrage du traitement", colors['titre'])
 
 
     # Chargement des noms de classes pour les stats
@@ -416,6 +413,7 @@ def main():
  
     
     if not ctrl_ok:
+        display.print("-" * 80, colors['error'])
         display.print(f"Erreurs détectées dans les images/labels. Arrêt du programme {ct.BELL}", colors['error'])
         total_errors = sum(len(v) for v in erreur.values())
         
@@ -432,15 +430,17 @@ def main():
         display.print(f"{label2:<{label_width}} {value2:>{value_width}}", colors['error'])    
         print()
         util.afficher_bbox_erreurs_compact(erreur)
-     
+        display.print("-" * 80, colors['error'])
+
     else:    
         display.print("Aucune erreur détectée. Analyse du Dataset...\n", colors['ok'])
 
         def_image = statistique(DATASET_DIR, cfg, class_names, path_user) # type: ignore
 
+        display.print("Action final", colors['titre'])
+
         if not def_image:
             display.print("Dataset Ok ", colors['ok'])
-            
             
             dataset = create_dataset(DATASET_DIR)
                 

@@ -21,7 +21,6 @@ def is_valid_image(path):
     except (UnidentifiedImageError, OSError):
         return False
 
-
 def bbox_iou(box1, box2):
     x1, y1, w1, h1 = box1
     x2, y2, w2, h2 = box2
@@ -101,8 +100,8 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
 
                 # --- Colonnes ---
                 if len(parts) != 5:
-                    erreurs_syntaxe["colonnes_incorrectes"].append(f"{entry.name} (ligne {i})")
-                    erreurs_ligne.append("colonnes_incorrectes")
+                    erreurs_syntaxe["lignes_incorrectes"].append(f"{entry.name} (ligne {i})")
+                    erreurs_ligne.append("lignes_incorrectes")
                     ctrl_ok = False
                     continue 
 
@@ -147,8 +146,9 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
                         ctrl_ok = False
                     # --- Coordonnées > 1 ---
                     if x > 1 or y > 1:
-                        erreurs_syntaxe["coord_>_1"].append(f"{entry.name} (ligne {i})")
-                        erreurs_ligne.append("coord_>_1")
+                        # util.quoi(" *" * 10)
+                        erreurs_syntaxe["coord_sup_1"].append(f"{entry.name} (ligne {i})")
+                        erreurs_ligne.append("coord_sup_1")
                         ctrl_ok = False
 
                     # --- Taille négative ---
@@ -158,8 +158,8 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
                         ctrl_ok = False
                     # --- Taille > 1 ---    
                     if w > 1 or h > 1:
-                        erreurs_syntaxe["taille_>_1"].append(f"{entry.name} (ligne {i})")
-                        erreurs_ligne.append("taille_>_1")
+                        erreurs_syntaxe["taille_sup_1"].append(f"{entry.name} (ligne {i})")
+                        erreurs_ligne.append("taille_sup_1")
                         ctrl_ok = False
 
                 #--- BBox dupliquées ---
@@ -243,16 +243,16 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
         if duplicates:
             erreurs_syntaxe["images_dupliquees"] = duplicates
 
-        # --- Affichage erreurs ---
-        for key, values in erreurs_syntaxe.items():
-            if values:
-                util.display_and_save_errors(
-                    cfg,
-                    path_user,
-                    sorted(values),
-                    f"{key}.txt",
-                    key.replace("_", " ").capitalize()
-                )
+    # --- Affichage erreurs ---
+    for key, values in erreurs_syntaxe.items():
+        if values:
+            util.display_and_save_errors(
+                cfg,
+                path_user,
+                sorted(values),
+                f"{key}.txt",
+                key.replace("_", " ").capitalize()
+            )
     #
     # all_bboxes : liste avec toutes les Bboxes
     # repport    : collections.defaultdict

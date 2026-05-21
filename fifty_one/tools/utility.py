@@ -456,6 +456,10 @@ def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> b
         text = f"Réponse valide : (o/N) {ct.BELL}"
         display.print(text, colors['error'])
 
+def titre_centre(texte, largeur=120, remplissage='—'):
+    return f" {texte} ".center(largeur, remplissage)
+
+
 # ------------------------------
 # Function to display and save problematic items
 # ------------------------------
@@ -503,8 +507,7 @@ def display_and_save_errors(
         except FileNotFoundError:
              display.print(f"Impossible de sauvegarder : {file_path}", colors['error'])
 
-        display.print(f" ****** '{file_name}' create *****\n", colors["warning"])
-
+        display.print(f" *** Fichier erreur : '{file_name}' create ", colors["warning"])
 
 
 def afficher_bbox_erreurs_compact(
@@ -537,7 +540,7 @@ def afficher_bbox_erreurs_compact(
     indent: str = " " * (categorie_max_len + 3)
     separateur: str = " | "
 
-    display.print("Detected errors:", colors["error"])
+    display.print(" --- Detected errors:", colors["error"])
 
     for categorie, chemins in bbox_erreurs.items():
         if not chemins:

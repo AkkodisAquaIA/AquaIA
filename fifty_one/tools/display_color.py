@@ -1,5 +1,7 @@
 from typing import Tuple
 
+from tools import utility as util
+
 # A color spec is (red, green, blue, prefix_str)
 ColorSpec = Tuple[int, int, int, str]
 
@@ -32,8 +34,12 @@ class DisplayColor:
         rgb_code  = f"\033[38;2;{r};{g};{b}m"
         bold_code = self.BOLD if bold else ""
 
+        tag = text
+        if prefix == "":
+            tag = util.titre_centre(text)
+        
         # Final output
-        print(f"{rgb_code}{bold_code}{prefix}{text}{self.RESET}")
+        print(f"{rgb_code}{bold_code}{prefix}{tag}{self.RESET}")
 
 
     def colored(self, text: str, color_spec: ColorSpec, bold: bool = False) -> str:

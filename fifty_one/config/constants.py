@@ -13,7 +13,7 @@ INFO_PROD = r"""
 
 
 # Random seed for reproducibility (ensures consistent results across runs)
-SEED = 42
+SEED = 0
 
 # Simulation & test mode
 # True  -> Enables test/simulation behavior
@@ -70,6 +70,7 @@ DISPLAY_COLORS = {
     'input':   (153, 204,  51, "[?] "),    # Light green   → user input
     'ok':      ( 51, 153,   0, "[√] "),    # Green         → success
     'info':    ( 51, 102, 255, "[I] "),    # Blue          → informational message
+    'titre':   ( 51,  51, 255, ""),        # Blue          → ———— Titre ————
     'wait':    (255, 153,  51, "[...] "),  # Orange        → processing/wait
     'goodbye': (255,  16, 240, "[<3] "),   # Purple        → exit message
 

@@ -302,7 +302,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
     total = sum(class_distribution.values())
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
-    display.print("================ DATASET SUMMARY ================", colors["info"])
+    display.print("DATASET SUMMARY", colors["titre"])
     print(f"{'Images':18}: {stats['images']}")
     print(f"{'Labels':18}: {stats['labels']}")
     print(f"{'Bounding boxes':18}: {total_boxes}")
@@ -311,7 +311,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
     print()
 
     # --- statistiques BBOX ---
-    display.print("--------------- BBOX STATISTICS -----------------", colors["info"])
+    display.print("BBOX STATISTICS", colors["titre"])
     afficher_stats_bbox(stats, cfg)
 
     # --- Vérification YAML ---
@@ -378,7 +378,8 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
         blocs.append(bloc)
 
     print()
-    display.print(f"----------- REPARTITION DES CLASSES ({rary + moy + dom}) -----------", colors['info'])
+    tag = f"REPARTITION DES CLASSES ({rary + moy + dom})"
+    display.print(tag , colors['titre'])
     legend_colored = (
         f'    {Fore.GREEN}■ ({dom}) ≥ {cfg["DOMINANT"]}% Dominant{Style.RESET_ALL}   '
         f'│ {Fore.YELLOW}■ ({moy}) {cfg["RARE"]}–{cfg["DOMINANT"]}% Moyen{Style.RESET_ALL}   '
@@ -438,7 +439,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
 
 
 # --- IMAGES PAR CLASSE --------------------------------------------------------
-    display.print("------------- IMAGES PAR CLASSE -------------", colors['info'])
+    display.print("IMAGES PAR CLASSE", colors['titre'])
 
     MAX_IMAGES_DISPLAY = 30     # nombre max d'images par classe
     MAX_CLASSES_SELECT = 6      # max classes que l'utilisateur peut demander
@@ -506,7 +507,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
 
     # Affichage des noms des images par classe
     tag = f"Affichage des noms des images par classe"
-    display.print(tag, colors['info'])
+    display.print(tag, colors['titre'])
     while True:
         tag = f"Entrez jusqu'à {MAX_CLASSES_SELECT} classes (ex: 1 3-5 8) ou 'Return' pour quitter : "
         display.print(tag, colors['input']) 
@@ -566,7 +567,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
 
     # ---- 
     print()
-    display.print('-' * 120, colors['info'])
+    display.print("Recherche d'anomalies" , colors['titre'])
     if missing_label :
         display.print('Attention : des classes sont présentes dans les labels mais absentes du YAML !!', colors['warning'])
 
@@ -788,8 +789,5 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
     # --- AFFICHAGE DES METRIQUES D'IMBALANCE ---
     metrics = im.imbalance_metrics(class_distribution, cfg)
     im.afficher_imbalance_avance(metrics, display, colors, cfg)
-  
-    print()
-    display.print('-' * 120, colors['info'])
 
     return anomalies
