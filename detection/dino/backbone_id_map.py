@@ -2,9 +2,13 @@ import os
 
 
 # TODO : temporaire, DINOv3 sera téléchargé depuis le sharepoint idéalement
-ROOT_DIR = os.path.expanduser("~/.cache/torch/hub")
-DINOV2_LOCAL_REPO = os.path.join(ROOT_DIR, "facebookresearch_dinov2_main")
-DINOV3_LOCAL_REPO = os.path.join(ROOT_DIR, "facebookresearch_dinov3_main")
+default_dir = os.path.expanduser("~/.cache")
+ROOT_DIR = os.environ.get("AQUAIA_MODEL_ROOT_DIR", default_dir)
+if not os.path.exists(ROOT_DIR):
+	raise ValueError(f"Le dossier contenant les modèles DINO n'existe pas : {ROOT_DIR}.")
+
+DINOV2_LOCAL_REPO = os.path.join(ROOT_DIR+"/torch/hub", "facebookresearch_dinov2_main")
+DINOV3_LOCAL_REPO = os.path.join(ROOT_DIR+"/torch/hub", "facebookresearch_dinov3_main")
 
 DINO_ID_MAPPING = {
 	"dinov2_small" : 

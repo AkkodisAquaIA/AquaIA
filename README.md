@@ -26,6 +26,12 @@ python main.py train --help
 python main.py infer --help
 ```
 
+The pre-trained models (YOLO, DINO and potentially other) may be located in different location depending on the system. For instance, by default HuggingFace will download models to ```~/.cache```. However, the VM does not have enough disk space inside ```~``` so large files (including pre-trained models) are located in ```aqua-ia-data``` instead. To specify where to find those models, you can set the ```AQUAIA_MODEL_ROOT_DIR```. On the linux VM:
+```bash
+export AQUAIA_MODEL_ROOT_DIR=/aqua-ia-data/models
+```
+In this case for DINO-based backbones, the software will search inside ```$AQUAIA_MODEL_ROOT_DIR/torch/hub``` instead of ```~/.cache/torch/hub```
+
 ---
 
 ## Repository structure
