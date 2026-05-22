@@ -310,7 +310,7 @@ def encoding(dataset, VEC_FIELD, total_images, DEVICE, model):
         dataset.set_values(VEC_FIELD, all_embeddings, key_field="id")
         dataset.save()
         executor.shutdown()
-        display.print("Embeddings terminés et enregistrés.\n", colors['ok'])
+        display.print("Embeddings terminés et enregistrés.", colors['ok'])
 
 
 
@@ -326,7 +326,7 @@ def main():
 
     # Display du logo et infos système
     if syst.est_windows():
-        ll.splash_screen_circle("Image1.png") 
+        lw.splash_screen_circle("Image1.png") 
     else:
         ll.splash_screen_circle("Image1.png")
 
@@ -379,7 +379,6 @@ def main():
     if ct.TEST_MODE :
         # Pour les simulation
         if syst.est_windows(): 
-            # DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco128"
             DATASET_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Data\coco_small"
             MODEL_DIR = r"C:\Users\Pierre.FANCELLI\Documents\___Dev\Aqua-IA\Fitty_One\Model\DINOv3"
         else :
@@ -393,9 +392,8 @@ def main():
         MODEL_DIR = util.get_path_color("Entrée le chemin du modèle")
         MODEL_NAME = util.get_file_name_color("Entrée le nom du modèle DINOv3")
 
+
     print()
-
-
     display.print("Démarrage du traitement", colors['titre'])
 
 
@@ -452,7 +450,12 @@ def main():
             total_images = len(dataset) # type: ignore
             MODEL_DIR = Path(MODEL_DIR) # type: ignore
             model_ = MODEL_DIR / MODEL_NAME
-            model = load_model(model_, total_images, DEVICE)
+            
+            try: 
+                model = load_model(model_, total_images, DEVICE)
+            except FileNotFoundError:
+                display.print(f"fichier : {model_} introuvable", colors['error'])
+                util.sortie_de_programme()
 
             encoding(dataset, cfg["VEC_FIELD"], total_images, DEVICE, model )
                 

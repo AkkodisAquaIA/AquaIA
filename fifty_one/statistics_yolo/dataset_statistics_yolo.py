@@ -302,7 +302,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
     total = sum(class_distribution.values())
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
-    display.print("DATASET SUMMARY", colors["titre"])
+    display.print("Dataset Summary", colors["titre"])
     print(f"{'Images':18}: {stats['images']}")
     print(f"{'Labels':18}: {stats['labels']}")
     print(f"{'Bounding boxes':18}: {total_boxes}")
@@ -311,7 +311,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
     print()
 
     # --- statistiques BBOX ---
-    display.print("BBOX STATISTICS", colors["titre"])
+    display.print("Statistiques des BBOX", colors["titre"])
     afficher_stats_bbox(stats, cfg)
 
     # --- Vérification YAML ---
@@ -326,15 +326,27 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
             max_width = max(len(t) for t in inutilisees) + 2
             for i in range(0, len(inutilisees), 5):
                 print(" │ ".join(f"{entry:<{max_width}}" for entry in inutilisees[i:i+5]))
+
         # Classes manquantes
         if verif["manquantes"]:
             print("")
-            missing_label  = True
-            display.print(f"Classes présentes dans labels mais absentes du YAML ({len(verif['manquantes'])}) : ", colors["warning"])
-            manquantes = [str(cls) for cls in sorted(verif["manquantes"])]
-            max_width = max(len(t) for t in manquantes) + 2
-            for i in range(0, len(manquantes), 5):
-                print(" │ ".join(f"{entry:<{max_width}}" for entry in manquantes[i:i+5]))
+            missing_label = True
+
+            display.print(
+                f"Classes présentes dans labels mais absentes du YAML ({len(verif['manquantes'])}) :",
+                colors["warning"]
+            )
+
+            for cls in sorted(verif["manquantes"]):
+                fichiers = class_to_images.get(cls, [])
+                print(f"Classe {cls}")
+
+                if fichiers:
+                    for f in fichiers:
+                        print(f"   └── {Path(f).name}")
+                else:
+                    print("   └── Aucun fichier trouvé")
+
 
     # --- distribution par classe ---
     items = sorted(class_distribution.items())
@@ -378,13 +390,13 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
         blocs.append(bloc)
 
     print()
-    tag = f"REPARTITION DES CLASSES ({rary + moy + dom})"
+    tag = f"Répartition des classes ({rary + moy + dom})"
     display.print(tag , colors['titre'])
     legend_colored = (
-        f'    {Fore.GREEN}■ ({dom}) ≥ {cfg["DOMINANT"]}% Dominant{Style.RESET_ALL}   '
+        f'{Fore.GREEN}■ ({dom}) ≥ {cfg["DOMINANT"]}% Dominant{Style.RESET_ALL}   '
         f'│ {Fore.YELLOW}■ ({moy}) {cfg["RARE"]}–{cfg["DOMINANT"]}% Moyen{Style.RESET_ALL}   '
         f'│ {Fore.RED}■ ({rary}) < {cfg["RARE"]}% Rare{Style.RESET_ALL}'
-    )
+    ).center(140)
     print(f"{legend_colored}\n")
 
     # Largeur terminal
@@ -412,8 +424,8 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
         if not classes_faibles:
             display.print(f'Aucune classe sous {cfg["RARE"]}% ', colors['ok'])
         else:
-            message = f'------- CLASSES RARES ({rary}) < {cfg["RARE"]}% -------'
-            display.print(message, colors['error'])
+            message = f'Classes Rares ({rary}) < {cfg["RARE"]}%'
+            display.print(message, colors['titre'])
             # tri optionnel (du pire au moins pire)
             classes_faibles.sort(key=lambda x: x[3])  # tri par %
 
@@ -437,9 +449,8 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
                 print("")
 
 
-
 # --- IMAGES PAR CLASSE --------------------------------------------------------
-    display.print("IMAGES PAR CLASSE", colors['titre'])
+    display.print("Nombres d'images par classe", colors['titre'])
 
     MAX_IMAGES_DISPLAY = 30     # nombre max d'images par classe
     MAX_CLASSES_SELECT = 6      # max classes que l'utilisateur peut demander
@@ -502,7 +513,6 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
     for i in range(0, len(rows), COLUMNS):
         line = rows[i:i + COLUMNS]
         print("│ ".join(f"{item:<{col_width}}" for item in line))
-
     print()
 
     # Affichage des noms des images par classe
@@ -544,7 +554,6 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
                     
             if len(all_images) > MAX_IMAGES_DISPLAY:
                 display.print(f"... + {len(all_images) - MAX_IMAGES_DISPLAY} autres images", colors['warning'])
-        
         print()
 
     # --- histogramme des tailles de bbox ---
@@ -570,6 +579,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
     display.print("Recherche d'anomalies" , colors['titre'])
     if missing_label :
         display.print('Attention : des classes sont présentes dans les labels mais absentes du YAML !!', colors['warning'])
+        print()
 
     if not anomaly_images :
         display.print('Aucune anomalie trouvé !!', colors['ok'])

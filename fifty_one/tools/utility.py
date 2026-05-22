@@ -456,7 +456,7 @@ def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> b
         text = f"Réponse valide : (o/N) {ct.BELL}"
         display.print(text, colors['error'])
 
-def titre_centre(texte, largeur=120, remplissage='—'):
+def titre_centre(texte, largeur=120, remplissage='—'):  # '—' 
     return f" {texte} ".center(largeur, remplissage)
 
 

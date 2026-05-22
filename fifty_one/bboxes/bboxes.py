@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 
 from tools import utility as util
 import tools.display_color as dc
+from config.constants import DISPLAY_COLORS as colors
 from config import process as pr
 from config import constants as ct
 
@@ -57,8 +58,15 @@ display = dc.DisplayColor()
 
 def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
 
-    images_dir, labels_dir = util.get_dataset_paths(DATASET_DIR)
-    
+
+    try:
+        images_dir, labels_dir = util.get_dataset_paths(DATASET_DIR)
+
+    except FileNotFoundError as e:
+        display.print(str(e), colors['error'])
+        util.sortie_de_programme()
+
+
     split_pattern = re.compile(r"[,\s]+")
     
     erreurs_syntaxe = defaultdict(list)
@@ -255,6 +263,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
             )
     #
     # all_bboxes : liste avec toutes les Bboxes
-    # repport    : collections.defaultdict
+    # rapport_detail    : collections.defaultdict
     #
+
     return erreurs_syntaxe, ctrl_ok
