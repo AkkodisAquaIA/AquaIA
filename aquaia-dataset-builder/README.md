@@ -4,7 +4,10 @@ Professional AI dataset platform for aquatic macro-invertebrate identification.
 
 ## Quick start
 
+All commands below must be run from the `aquaia-dataset-builder/` directory:
+
 ```bash
+cd aquaia-dataset-builder
 cp .env.example .env
 docker compose up --build
 ```
@@ -14,6 +17,8 @@ docker compose up --build
 - API docs: http://localhost:8000/docs
 
 ## Docker commands
+
+> Run all commands from the `aquaia-dataset-builder/` directory.
 
 | Action | Command |
 |--------|---------|
