@@ -1,7 +1,7 @@
 # torch==2.10.0 --index-url https://download.pytorch.org/whl/cu130
 # torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cu130
-torchmetrics
-transformers
+torchmetrics>=0.11,<2.0
+transformers>=4.40,<4.52
 ultralytics
 tqdm
 matplotlib
