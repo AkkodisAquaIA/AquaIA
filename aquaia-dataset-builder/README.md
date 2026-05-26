@@ -107,6 +107,10 @@ Only images with status `validated` appear here.
 
 > The Name field is required — the Create button stays disabled until you fill it in.
 
+**Deduplication protection:** each image can only belong to one dataset at a time.
+- Images already assigned to a dataset show an **indigo badge** with the dataset name — you can still select them but they won't be moved
+- If you try to add images that are already in a *different* dataset, an amber warning banner lists the conflicts and only the unassigned images are actually added
+
 | Tab | Content |
 |-----|---------|
 | **Datasets** | Named collections with image count and creation date. Create, browse and delete datasets here. |
@@ -132,8 +136,16 @@ Only images with status `validated` appear here.
 | Setting | Description |
 |---------|-------------|
 | **Default crop dimensions** | Size of the pre-initialized crop rectangle when opening the crop tool. Presets: 224 / 256 / 320 / 416 / 512 / **640** (default) × same height. Custom W × H also supported. Persisted in browser localStorage. |
+| **Reference images** | One representative image per species, used as a visual anchor in the Validation Queue. Shows all defined references with a remove button. |
 
 > Tip: set crop dimensions to match your model's input size (e.g. 640×640 for YOLOv8, 224×224 for ResNet/EfficientNet) so every crop is already the right size without post-processing.
+
+**Reference image — Validation Queue detail panel:**
+
+The bottom of the right panel shows the reference image for the selected species:
+- If a reference is already set → thumbnail is shown with a gold **★ Référence** badge; click **Changer** to replace it with the current image
+- If no reference is set → a dashed **"Définir comme référence"** button lets you set the current image in one click
+- The separator between the selected image and the reference image is **draggable** — drag it up or down to resize both sections
 
 ## Storage
 
