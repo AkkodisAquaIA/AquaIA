@@ -1,0 +1,13 @@
+# Storage — images, database and exports must never be committed
+storage/**
+!storage/**/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+.next/
+.env.local

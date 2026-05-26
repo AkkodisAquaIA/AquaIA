@@ -51,4 +51,5 @@ docker/build/
 data_cropping/sam/*_result_det_*/
 data_cropping/sam/*_result_det/
 *.ts
+!aquaia-dataset-builder/**/*.ts
 *.zip
