@@ -1,6 +1,8 @@
 # ─── AquaIA — developer shortcuts ────────────────────────────────────────────
 #
-# Prerequisites: pip install -r requirements-dev.txt
+# Prerequisites (macOS/Homebrew — use a venv):
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements-dev.txt
 #
 # Usage:
 #   make lint          lint only the files changed vs origin/development (= CI)
@@ -25,7 +27,7 @@ CHANGED_PY := $(shell git diff --name-only --diff-filter=ACMR $(BASE_BRANCH)...H
 # Guard: print a helpful message if ruff is not installed.
 _check-ruff:
 	@command -v ruff >/dev/null 2>&1 || \
-		{ echo "ruff not found — run: pip install -r requirements-dev.txt"; exit 1; }
+		{ echo "ruff not found — activate your venv then: pip install -r requirements-dev.txt"; exit 1; }
 
 lint: _check-ruff
 	@if [ -z "$(CHANGED_PY)" ]; then \

@@ -61,9 +61,11 @@ python main.py infer --help
 
 ## Local development — lint & tests
 
-Install the dev tools once:
+Install the dev tools once (virtual environment required on macOS/Homebrew):
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 ```
 
