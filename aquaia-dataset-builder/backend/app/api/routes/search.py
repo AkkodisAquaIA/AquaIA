@@ -13,22 +13,20 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 @router.get("", response_model=list[SearchQueryRead])
 async def list_searches(
-    limit: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
+	limit: int = Query(20, ge=1, le=100),
+	db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(SearchQuery).order_by(SearchQuery.created_at.desc()).limit(limit)
-    )
-    return result.scalars().all()
+	result = await db.execute(select(SearchQuery).order_by(SearchQuery.created_at.desc()).limit(limit))
+	return result.scalars().all()
 
 
 @router.post("/run", response_model=list[ImageRecordRead])
 async def run_search_endpoint(
-    body: SearchRequest,
-    background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db),
+	body: SearchRequest,
+	background_tasks: BackgroundTasks,
+	db: AsyncSession = Depends(get_db),
 ):
-    records = await run_search(db, body.query, body.sources, body.limit)
-    for record in records:
-        background_tasks.add_task(download_and_process, record.id, record.source_image_url)
-    return records
+	records = await run_search(db, body.query, body.sources, body.limit)
+	for record in records:
+		background_tasks.add_task(download_and_process, record.id, record.source_image_url)
+	return records
