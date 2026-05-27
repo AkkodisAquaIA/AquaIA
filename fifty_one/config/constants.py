@@ -5,8 +5,10 @@ INFO_PROD = r"""
    │  Indice macro-invertébrés par ADNe et IA   │  
    │       Agence de l'Eau Adour Garonne        │
    │                                            │
-   │ Version : 0.05 Beta                        │
-   │                                            │  
+   │            Analyse d'un Dataset            │
+   │                                            │   
+   │ Version : 1.00                             │
+   │                                            │ 
    │                        by AKKODIS-Research │
    └────────────────────────────────────────────┘
 """
@@ -15,28 +17,18 @@ INFO_PROD = r"""
 # Random seed for reproducibility (ensures consistent results across runs)
 SEED = 0
 
-# Simulation & test mode
-# True  -> Enables test/simulation behavior
-# False -> Runs in normal production mode
-TEST_MODE = True
+# Chargement du dataset
+# True  -> Chargement via fichier de config 
+# False -> Saisie manuelle des chemins 
+LOAD_DIR = True
 
 # System bell sound (used to alert on errors)
 BELL = "\a"
 
-# Debug mode
-# True  -> Full error messages (detailed stack traces)
-# False -> Short and user-friendly error messages
-DEBUG_MODE: bool = False
 
 #-----------------------------------------------------------------------------------
 # Data Loading Configuration
 #-----------------------------------------------------------------------------------
-
-# Batch size for data loading / processing
-BATCH_SIZE = 64
-
-# Number of parallel workers for data loading
-NUM_WORKERS = 8
 
 # Supported image file extensions
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
@@ -70,9 +62,11 @@ DISPLAY_COLORS = {
     'input':   (153, 204,  51, "[?] "),    # Light green   → user input
     'ok':      ( 51, 153,   0, "[√] "),    # Green         → success
     'info':    ( 51, 102, 255, "[I] "),    # Blue          → informational message
-    'titre':   ( 0,  204, 153, ""),        # Standard teal → ———— Titre ————
     'wait':    (255, 153,  51, "[...] "),  # Orange        → processing/wait
     'goodbye': (255,  16, 240, "[<3] "),   # Purple        → exit message
+
+    # Custom prefixes for specific message types
+    'titre':   ( 0,  204, 153, "T"),        # Standard teal → ———— Titre ————
 
     # Aqua-IA themed colors (blue-green palette)
     'aqua_light': (102, 255, 204, "[~] "), # Light turquoise

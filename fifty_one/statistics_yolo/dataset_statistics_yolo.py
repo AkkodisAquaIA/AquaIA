@@ -302,6 +302,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
     total = sum(class_distribution.values())
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
+    # --- résumé général ---
     display.print("Dataset Summary", colors["titre"])
     print(f"{'Images':18}: {stats['images']}")
     print(f"{'Labels':18}: {stats['labels']}")
@@ -389,7 +390,6 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
 
         blocs.append(bloc)
 
-    print()
     tag = f"Répartition des classes ({rary + moy + dom})"
     display.print(tag , colors['titre'])
     legend_colored = (
@@ -446,8 +446,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
                 max_width = max(len(t) for t in texts) + 2
                 for i in range(0, len(texts), ct.N_PER_LINE):
                     print(" │ ".join(f"{t:<{max_width}}" for t in texts[i:i+ ct.N_PER_LINE]))
-                print("")
-
+                print()
 
 # --- IMAGES PAR CLASSE --------------------------------------------------------
     display.print("Nombres d'images par classe", colors['titre'])
@@ -515,47 +514,6 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
         print("│ ".join(f"{item:<{col_width}}" for item in line))
     print()
 
-    # Affichage des noms des images par classe
-    tag = f"Affichage des noms des images par classe"
-    display.print(tag, colors['titre'])
-    while True:
-        tag = f"Entrez jusqu'à {MAX_CLASSES_SELECT} classes (ex: 1 3-5 8) ou 'Return' pour quitter : "
-        display.print(tag, colors['input']) 
-        user_input = input("  > ").strip()
-
-        if user_input.lower() == '':
-            break
-
-        selected_classes = parse_selection(user_input, available_classes)            
-
-        if not selected_classes:
-            print()
-            display.print("Aucune classe valide sélectionnée.\n", colors['warning'])
-            continue
-
-        if len(selected_classes) > MAX_CLASSES_SELECT:
-            print()
-            display.print(f"Maximum {MAX_CLASSES_SELECT} classes autorisées.\n", colors['warning'])
-            continue    
-
-        for cls in selected_classes:
-
-            name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
-            all_images = sorted(class_to_images[cls])
-            images = all_images[:MAX_IMAGES_DISPLAY]
-
-            print(f"\n{cls:>2} {name}  ({len(all_images)} images)")
-
-            if images:
-                max_width = max(len(img) for img in images) + 1
-                for i in range(0, len(images), 5):
-                    ligne = images[i:i+5]
-                    print(" │ ".join(f"{img:<{max_width}}" for img in ligne))
-                    
-            if len(all_images) > MAX_IMAGES_DISPLAY:
-                display.print(f"... + {len(all_images) - MAX_IMAGES_DISPLAY} autres images", colors['warning'])
-        print()
-
     # --- histogramme des tailles de bbox ---
     if afficher_hist and bbox_areas:
         gr.histogram_taille_bbox(bbox_areas,
@@ -575,12 +533,8 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None, cla
         anomaly_images[img][typ] += 1
 
     # ---- 
-    print()
     display.print("Recherche d'anomalies" , colors['titre'])
-    if missing_label :
-        display.print('Attention : des classes sont présentes dans les labels mais absentes du YAML !!', colors['warning'])
-        print()
-
+ 
     if not anomaly_images :
         display.print('Aucune anomalie trouvé !!', colors['ok'])
         print()

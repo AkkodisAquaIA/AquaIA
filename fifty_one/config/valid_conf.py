@@ -1,5 +1,6 @@
 
 from tools import utility as util
+from config import constants as ct
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 
@@ -48,7 +49,7 @@ def swap(warnings, val1, val2, name="bbox", inv=False):
 
     return val1, val2
 
-
+#--------------------------------------------------------------------------------------------------------
 def controle(cfg):
 
     display = dc.DisplayColor()
@@ -86,4 +87,24 @@ def controle(cfg):
         for w in warnings:            
             display.print(w, colors["warning"])
         display.print('----------------------------------------------------------------------*', colors["warning"])
-        
+
+
+    if ct.LOAD_DIR:
+
+        required_paths = {
+            "DATASET_DIR": "dataset",
+        }
+
+        missing_config = False
+
+        for key, label in required_paths.items():
+            if not cfg.get(key):
+                display.print(f"Répertoire du {label} non défini", colors["warning"])
+                missing_config = True
+
+        ct.LOAD_DIR = not missing_config
+
+    if ct.LOAD_DIR:
+        display.print(f"Répertoire du dataset : {cfg['DATASET_DIR']}", colors["ok"])
+    else:
+        display.print("Chargement via fichier de config désactivé\n  Chargement manuel des chemins!!", colors["warning"])

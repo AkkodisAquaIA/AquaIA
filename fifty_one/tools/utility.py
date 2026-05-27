@@ -257,6 +257,8 @@ def calibrer_seuils_overflow(results : dict,
           thresholds are returned without percentile computation.
     """
 
+    display = dc.DisplayColor()
+
     outside_ratios = [
         a['outside_ratio_pct']
         for a in results.get('anomalies', [])
@@ -264,7 +266,7 @@ def calibrer_seuils_overflow(results : dict,
     ]
 
     if not outside_ratios:
-        print(" No overflow detected, using minimum thresholds.\n")
+        display.print(" No overflow detected, using minimum thresholds.", colors['ok'])
         return {
             "BBOX_OVERFLOW_WARNING": min_warning,
             "BBOX_OVERFLOW_ERROR": min_error
@@ -282,7 +284,7 @@ def calibrer_seuils_overflow(results : dict,
     if error_final <= warning_final:
         error_final = warning_final + 5.0  # small safety margin
 
-    print("Automatic threshold calibration:")
+    display.print("Automatic threshold calibration:", colors["warning"])
     print(f"  - Warning ({warning_percentile} percentile): "
           f"{warning_calculated:.2f}% → Final: {warning_final:.2f}%")
     print(f"  - Error   ({error_percentile} percentile): "
@@ -331,7 +333,6 @@ def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
         if session is not None:
             session.close()
             color.print("FiftyOne session closed, continuing program.", colors['info'])
-
 
 def rgb_to_ansi(rgb: tuple[int, int, int]) -> str:
     """Convert RGB color to ANSI escape code."""
@@ -384,34 +385,6 @@ def get_path_color(prompt: str, color_key: str = 'input') -> Path:
         error_text: str = f"Invalid path: {path_input}. Please try again."
         display.print(error_text, colors['error'])
 
-def get_file_name_color(prompt: str, color_key: str = 'input') -> str:
-    """
-    Requests a file name from the user.
-    Ensures it has a supported extension.
-    Displays the prompt in the specified color.
-    If the specified color key is invalid, the prompt will be displayed in Light Green.
-    """
-    display = dc.DisplayColor()
-
-    color = chck_color(color_key)
-    while True:
-        # Convert the input color from DISPLAY_COLORS to ANSI
-        input_color = rgb_to_ansi(color)
-
-        # Display the prompt in color
-        colored_prompt = f"{input_color}[?] {prompt}: {Style.RESET_ALL}"
-        file_name = input(colored_prompt).strip()
-
-        # Extract extension
-        _, ext = os.path.splitext(file_name)
-
-        # Validate extension
-        if ext.lower() == ".pth":
-            return file_name
-
-        text = f"Invalid file extension: {ext}. Please try again."
-        display.print(text, colors['error'])
-
 def draw_bar(value, vmin, vmax, length=50):
     """
     Barre visuelle normalisée
@@ -443,7 +416,7 @@ def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> b
         # Convert the input color from DISPLAY_COLORS to ANSI
         input_color = rgb_to_ansi(color)
         # Displays the prompt in color
-        colored_prompt = f"{input_color}[?] {message} (o/N, défaut = n) ) ? : {Style.RESET_ALL}"
+        colored_prompt = f"{input_color}[?] {message} (o/N, défaut = N) ? : {Style.RESET_ALL}"
 
         reponse = input(colored_prompt).strip().lower()
         if reponse == "":
@@ -713,7 +686,7 @@ def save_anomalies_readable(
     except FileNotFoundError:
              display.print(f"Impossible de sauvegarder : {output_path}", colors['error'])
 
-    display.print(f" ****** '{file_name}' create *****\n", colors["warning"])        
+    display.print(f" ****** '{file_name}' create *****", colors["warning"])        
 
 def sortie_de_programme():
     display = dc.DisplayColor()

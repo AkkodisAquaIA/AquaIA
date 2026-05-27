@@ -8,7 +8,7 @@ import tools.utility as util
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 
-
+#-----------------------------------------------------------------------------------
 def save_plot(filename: str, cfg) -> None:
     """
     Save the current matplotlib figure if SAVE_PLOT is enabled.
@@ -21,9 +21,11 @@ def save_plot(filename: str, cfg) -> None:
 
     if cfg["SAVE_PLOT"] :
 
-        path_user: Path = Path(cfg["PATH_USER"])
+        path_user: Path = Path(cfg["SAVE_USER"])
         if not path_user.exists():
-            path_user = Path.cwd()
+            path_user = Path.cwd() / "Report"
+
+        path_user.mkdir(parents=True, exist_ok=True)    
         new = util.horodatage(filename)
         file_path: Path = path_user / new
 

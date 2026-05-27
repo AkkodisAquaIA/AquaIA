@@ -37,9 +37,16 @@ class Config:
 
     # --- computed values ---
     @property
-    def PATH_USER(self):
+    def SAVE_USER(self):
         if self.system == "Windows":
             return self.get_str("paths", "WINDOWS")
         else:
             return self.get_str("paths", "LINUX")
+        
+    @property    
+    def DATA_USER(self):
+        if self.system == "Windows":
+            return self.get_str("paths", "DATA_WIN")
+        else:
+            return self.get_str("paths", "DATA_LIN")
         

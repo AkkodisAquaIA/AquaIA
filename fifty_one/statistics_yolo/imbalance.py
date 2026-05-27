@@ -84,6 +84,7 @@ def evaluate_metric(
     bare = util.draw_bar(value, bar_min, bar_max)   
     print(f"{'':25}  {bare}\n")
 
+#----------------------------------------------------------------------------------------
 def afficher_imbalance_avance(metrics, display, colors, cfg):
 
     ratio = float(metrics["ratio"])
@@ -148,4 +149,4 @@ def afficher_imbalance_avance(metrics, display, colors, cfg):
 
     if entropy_norm > 0.75 and ratio > 100:
         print("- Beaucoup de classes rares malgré une diversité correcte")
-        print()
+

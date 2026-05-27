@@ -27,9 +27,9 @@ def load_config():
             # --- General ---
             "REPORT_MODE": cfg.get_bool("general", "REPORT_MODE"),
             "SAVE_PLOT": cfg.get_bool("general", "SAVE_PLOT"),
-            "VEC_FIELD": cfg.get_str("general", "VEC_FIELD"),
 
-            "PATH_USER": cfg.PATH_USER,
+            "SAVE_USER": cfg.SAVE_USER,
+            "DATASET_DIR":cfg.DATA_USER,
 
             # --- Détection ---
             "IOU_THRESHOLD": cfg.get_float("detection", "IOU_THRESHOLD"),
@@ -63,6 +63,25 @@ def load_config():
             "SCORE_WARNING": cfg.get_float("scoring","SCORE_WARNING"),
 
         }
+
+        # --- Vérification des répertoires ---
+        dirs_to_check = {
+            "DATASET_DIR": config["DATASET_DIR"],
+        }
+
+        for name, path_str in dirs_to_check.items():
+            path = Path(path_str)
+
+            if not path.exists():
+                raise FileNotFoundError(
+                    f"Le répertoire '{name}' est introuvable : {path}"
+                )
+
+            if not path.is_dir():
+                raise NotADirectoryError(
+                    f"'{name}' n'est pas un répertoire valide : {path}"
+                )
+
 
         display.print("Fichier de Paramètres valide",colors["ok"])
         return config

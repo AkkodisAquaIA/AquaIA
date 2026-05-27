@@ -35,8 +35,11 @@ class DisplayColor:
         bold_code = self.BOLD if bold else ""
 
         tag = text
-        if prefix == "":
+        # Special handling for titles (prefix "T") to center them
+        if prefix == "T":
+            prefix = ""  # No prefix for titles, just centering
             tag = util.titre_centre(text)
+            print()
         
         # Final output
         print(f"{rgb_code}{bold_code}{prefix}{tag}{self.RESET}")
