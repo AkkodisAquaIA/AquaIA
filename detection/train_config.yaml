@@ -11,7 +11,7 @@ model:
 # ----------------------------------------------------------------------
 data:
   # Dataset path consumed by the DINO trainer.
-  dataset_yaml: "datasets/coco128"
+  dataset_yaml: "datasets/coco8"
 
 # ----------------------------------------------------------------------
 # Output section: training artifact handling
@@ -34,8 +34,8 @@ training:
   device: "auto"
 
   # ---------- DATA INPUT / LOADING ----------
-  imgsz: 304
-  batch: 64
+  imgsz: 640
+  batch: 2
   workers: 0
 
   # ---------- TRAINING SCHEDULE ----------

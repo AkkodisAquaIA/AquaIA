@@ -5,10 +5,9 @@ from pathlib import Path
 import numpy as np
 import torch
 import tqdm
-from torch.utils.data import DataLoader, random_split
 from transformers import get_scheduler
 
-from dataloading.datasets import NpyDetectionDataset, detection_collate_fn, sample_dataset
+from dataloading.datasets import YOLOFormatDataset, DALIDetectionDataLoader, sample_dataset
 from detection.dino.dino_detector import DINODetector
 from detection.dino.loss import SetCriterion
 from detection.metric import evaluate_map, log_epoch, print_metrics, update_log_dict
@@ -49,19 +48,21 @@ def normalize_imgsz(config):
 	return int(config["training"]["imgsz"])
 
 
-def get_datasets(data_yaml_path, device, train_fraction=0.9):
+def get_datasets(data_yaml_path, batch_size):
+	# TODO : currently GPU only because of DALI, but should be possible to support CPU-only training)
 	# Compute random split for train and eval set
-	dataset = NpyDetectionDataset(
+	train_dataset = YOLOFormatDataset(
+        dataset_root=data_yaml_path,
+        data_split="train",
+        batch_size=batch_size,
+    )
+	val_dataset = YOLOFormatDataset(
 		dataset_root=data_yaml_path,
-		device=device,
+		data_split="val",
+		batch_size=batch_size,
 	)
-	train_size = int(train_fraction * len(dataset))
-	test_size = len(dataset) - train_size
-	generator = torch.Generator().manual_seed(42)
-
-	train_dataset, test_dataset = random_split(dataset, [train_size, test_size], generator=generator)
-	num_classes = dataset.num_classes
-	return train_dataset, test_dataset, num_classes
+	num_classes = train_dataset.num_classes
+	return train_dataset, val_dataset, num_classes
 
 
 def build_scheduler(training_config, optimizer):
@@ -101,7 +102,6 @@ def compute_metrics(model, train_dataloader, eval_dataloader, metrics_dict, devi
 	metrics_dict.update(eval_metrics)
 
 
-# TODO : the image size specified inside the trainin_conig.yaml and the npy is not the same
 def train_dino(config):
 	training_config = config["training"]
 	output_config = config["output"]
@@ -114,23 +114,12 @@ def train_dino(config):
 
 	use_amp = device == "cuda"
 
-	train_set, test_set, num_classes = get_datasets(config["data"]["dataset_yaml"], device)
+	train_set, val_set, num_classes = get_datasets(config["data"]["dataset_yaml"], training_config["batch"])
 
 	# === Setup dataloaders ===
-	dataloader = DataLoader(
-		train_set,
-		batch_size=training_config["batch"],
-		shuffle=True,
-		num_workers=training_config["workers"],
-		collate_fn=detection_collate_fn,
-	)
-	eval_dataloader = DataLoader(
-		test_set,
-		batch_size=training_config["batch"],
-		shuffle=False,
-		num_workers=training_config["workers"],
-		collate_fn=detection_collate_fn,
-	)
+	imgsz = normalize_imgsz(config)
+	dataloader = DALIDetectionDataLoader(train_set, device="gpu", img_size=imgsz)
+	val_dataloader = DALIDetectionDataLoader(val_set, device="gpu", img_size=imgsz)
 
 	# === Config, save path and fun ===
 	# root folder for training outputs (weights, logs, resolved config)
@@ -144,7 +133,6 @@ def train_dino(config):
 	backbone_config = config.get("model", {})
 	backbone_family = str(backbone_config.get("family", "")).lower()
 	backbone_size = str(backbone_config.get("size", "").lower())
-	imgsz = normalize_imgsz(config)
 
 	model = DINODetector(
 		backbone_id=backbone_family + "_" + backbone_size,
@@ -192,8 +180,14 @@ def train_dino(config):
 		epoch_loss = 0.0
 		log_dict = {"avg": 0.0}
 		progress = tqdm.tqdm(dataloader, desc=f"Epoch {epoch + 1}/{training_config['epochs']}")
-		for images, targets, _ in progress:
-			images = images.to(device, non_blocking=True)
+		for batch in progress:
+			batch = batch[0]
+			images = batch["images"]
+			targets = {
+				"labels": batch["labels"],
+				"boxes": batch["bboxes"],
+			}
+			print(targets)
 
 			optimizer.zero_grad(set_to_none=True)
 			with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
@@ -214,7 +208,7 @@ def train_dino(config):
 		compute_metrics(
 			model=model,
 			train_dataloader=dataloader,
-			eval_dataloader=eval_dataloader,
+			eval_dataloader=val_dataloader,
 			metrics_dict=epoch_metrics,
 			device=device,
 			num_classes=num_classes,
@@ -271,7 +265,7 @@ def train_dino(config):
 	# Eval dataset
 	save_sample_predictions(
 		model=model,
-		subset=test_set,
+		subset=val_set,
 		output_dir=Path(run_dir) / "eval_predictions",
 		conf=0.3,
 		seed=42,
