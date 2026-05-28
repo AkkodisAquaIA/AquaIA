@@ -138,8 +138,11 @@ def train_dino(config):
 	backbone_size = str(backbone_config.get("size", "").lower())
 	imgsz = normalize_imgsz(config)
 
-	train_set, test_set, num_classes = get_datasets(config["data"]["dataset_yaml"], device,
-		img_size=imgsz, loader=config["data"].get("loader", "jpg"),
+	train_set, test_set, num_classes = get_datasets(
+		config["data"]["dataset_yaml"],
+		device,
+		img_size=imgsz,
+		loader=config["data"].get("loader", "jpg"),
 	)
 
 	# === Setup dataloaders ===
