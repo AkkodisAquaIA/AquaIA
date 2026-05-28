@@ -5,7 +5,7 @@ import torch
 import tqdm
 from torch.utils.data import DataLoader
 
-from dataloading.datasets import NpyDetectionDataset, detection_collate_fn, sample_dataset
+from dataloading.datasets import JpgDetectionDataset, NpyDetectionDataset, detection_collate_fn, sample_dataset
 from detection.dino.dino_detector import DINODetector
 from detection.metric import evaluate_map, save_metrics
 from detection.utils.config_utils import find_latest_run_dir, load_run_config, load_class_names
@@ -101,7 +101,15 @@ def test_dino(config):
         num_classes=len(test_class_names),
         device=device,
     )
-    test_dataset = NpyDetectionDataset(dataset_root=str(Path(test_data_root)), device=device)
+    if data_cfg.get("loader", "jpg") == "npy":
+        test_dataset = NpyDetectionDataset(dataset_root=str(Path(test_data_root)), device=device)
+    else:
+        test_dataset = JpgDetectionDataset(
+            dataset_root=str(Path(test_data_root)),
+            img_size=(int(run_config["training"]["imgsz"]), int(run_config["training"]["imgsz"])),
+            device=device,
+            split=data_cfg.get("split", "test"),
+        )
 
     # print_test_header(run_dir, device, use_amp, train_data_root, test_data_root, output_dir)
 

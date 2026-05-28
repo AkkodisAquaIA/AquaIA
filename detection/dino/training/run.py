@@ -8,7 +8,7 @@ import tqdm
 from torch.utils.data import DataLoader, random_split
 from transformers import get_scheduler
 
-from dataloading.datasets import NpyDetectionDataset, detection_collate_fn, sample_dataset
+from dataloading.datasets import JpgDetectionDataset, NpyDetectionDataset, detection_collate_fn, sample_dataset
 from detection.dino.dino_detector import DINODetector
 from detection.dino.loss import SetCriterion
 from detection.metric import evaluate_map, log_epoch, print_metrics, update_log_dict
@@ -22,7 +22,9 @@ from detection.utils.plot_utils import plot_metrics, annotate_images_with_predic
 def save_sample_predictions(model, subset, output_dir, num_samples=20, conf=0.3, seed=0, device="cuda", use_amp=True):
 	images, image_files = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed)
 	print(image_files)
-	print(f"Sampled {len(image_files)} images from {subset.dataset.dataset_root}")
+	# Support both random_split Subset datasets and direct split datasets.
+	source_dataset = subset.dataset if hasattr(subset, "dataset") else subset
+	print(f"Sampled {len(image_files)} images from {source_dataset.dataset_root}")
 	images = images.to(device, non_blocking=device == "cuda")
 	with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
 		outputs = model(images)
@@ -31,7 +33,7 @@ def save_sample_predictions(model, subset, output_dir, num_samples=20, conf=0.3,
 	annotate_images_with_predictions(
 		images=images,
 		outputs=outputs,
-		class_names=subset.dataset.class_names,
+		class_names=source_dataset.class_names,
 		conf_thres=conf,
 		output_dir=output_dir,
 		image_files=image_files,
@@ -49,18 +51,34 @@ def normalize_imgsz(config):
 	return int(config["training"]["imgsz"])
 
 
-def get_datasets(data_yaml_path, device, train_fraction=0.9):
-	# Compute random split for train and eval set
-	dataset = NpyDetectionDataset(
-		dataset_root=data_yaml_path,
-		device=device,
-	)
-	train_size = int(train_fraction * len(dataset))
-	test_size = len(dataset) - train_size
-	generator = torch.Generator().manual_seed(42)
+def get_datasets(data_yaml_path, device, img_size, loader="jpg", train_fraction=0.9):
+	if loader == "npy":
+		# Compute random split for train and eval set
+		dataset = NpyDetectionDataset(
+			dataset_root=data_yaml_path,
+			device=device,
+		)
+		train_size = int(train_fraction * len(dataset))
+		test_size = len(dataset) - train_size
+		generator = torch.Generator().manual_seed(42)
 
-	train_dataset, test_dataset = random_split(dataset, [train_size, test_size], generator=generator)
-	num_classes = dataset.num_classes
+		train_dataset, test_dataset = random_split(dataset, [train_size, test_size], generator=generator)
+		num_classes = dataset.num_classes
+		return train_dataset, test_dataset, num_classes
+
+	train_dataset = JpgDetectionDataset(
+		dataset_root=data_yaml_path,
+		img_size=(img_size, img_size),
+		device=device,
+		split="train",
+	)
+	test_dataset = JpgDetectionDataset(
+		dataset_root=data_yaml_path,
+		img_size=(img_size, img_size),
+		device=device,
+		split="val",
+	)
+	num_classes = max(train_dataset.num_classes, test_dataset.num_classes)
 	return train_dataset, test_dataset, num_classes
 
 
@@ -114,7 +132,15 @@ def train_dino(config):
 
 	use_amp = device == "cuda"
 
-	train_set, test_set, num_classes = get_datasets(config["data"]["dataset_yaml"], device)
+	# === DINO related stuff ===
+	backbone_config = config.get("model", {})
+	backbone_family = str(backbone_config.get("family", "")).lower()
+	backbone_size = str(backbone_config.get("size", "").lower())
+	imgsz = normalize_imgsz(config)
+
+	train_set, test_set, num_classes = get_datasets(config["data"]["dataset_yaml"], device,
+		img_size=imgsz, loader=config["data"].get("loader", "jpg"),
+	)
 
 	# === Setup dataloaders ===
 	dataloader = DataLoader(
@@ -139,12 +165,6 @@ def train_dino(config):
 	# folder to save model weights (best and last)
 	weights_dir = os.path.join(run_dir, "weights")
 	os.makedirs(weights_dir, exist_ok=True)
-
-	# === DINO related stuff ===
-	backbone_config = config.get("model", {})
-	backbone_family = str(backbone_config.get("family", "")).lower()
-	backbone_size = str(backbone_config.get("size", "").lower())
-	imgsz = normalize_imgsz(config)
 
 	model = DINODetector(
 		backbone_id=backbone_family + "_" + backbone_size,
