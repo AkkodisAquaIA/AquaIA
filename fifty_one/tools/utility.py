@@ -182,8 +182,8 @@ def quoi(valeur):
 def get_dataset_paths(dataset_dir, split="train2017"):
     dataset_dir = Path(dataset_dir)
 
-    images_dir = dataset_dir / "images" / split
-    labels_dir = dataset_dir / "labels" / split
+    images_dir = dataset_dir / "images"   / split
+    labels_dir = dataset_dir / "labels"   / split
 
     if not images_dir.exists():
         raise FileNotFoundError(f"Images dir introuvable : {images_dir}")
@@ -384,6 +384,34 @@ def get_path_color(prompt: str, color_key: str = 'input') -> Path:
 
         error_text: str = f"Invalid path: {path_input}. Please try again."
         display.print(error_text, colors['error'])
+
+def selection(maxi) -> int:
+  
+        display = dc.DisplayColor()
+        color = colors['input']
+  
+        while True:
+            try:
+                #  # Convert the input color from DISPLAY_COLORS to ANSI
+                input_color = rgb_to_ansi(color[:3])
+                # # Displays the prompt in color
+                prompt = "Quel est votre choix "
+                colored_select = f"{input_color}[?] {prompt}: {Style.RESET_ALL}"
+
+                select = int(input(colored_select).strip())
+
+                if 1 <= select <= maxi  :
+                    return select - 1
+                text = f"Sélection invalide. Veuillez réessayer. {ct.BELL}"
+                display.print(text, colors['error'])
+
+            # Input is not a number
+            except ValueError:
+                text = (
+                        f"Ce n'est pas un nombre . "
+                        f"Réessayez! {ct.BELL}"
+                    )
+                display.print(text, colors['error'])
 
 def draw_bar(value, vmin, vmax, length=50):
     """

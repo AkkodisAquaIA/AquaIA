@@ -4,11 +4,12 @@ from PIL import Image
 from PIL import UnidentifiedImageError
 from pathlib import Path
 from collections import Counter, defaultdict
+from tqdm import tqdm
 
 from tools import utility as util
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
-from config import process as pr
+# from config import process as pr
 from config import constants as ct
 
 
@@ -66,7 +67,6 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
         display.print(str(e), colors['error'])
         util.sortie_de_programme()
 
-
     split_pattern = re.compile(r"[,\s]+")
     
     erreurs_syntaxe = defaultdict(list)
@@ -75,9 +75,13 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
     label_stems = set()
     all_bboxes = []
 
-
     # Analyse des fichiers 'labels'
-    for entry in os.scandir(labels_dir):
+    for entry in tqdm(list(os.scandir(labels_dir)), # type: ignore 
+                    desc=" Analyse des labels",
+                    unit=" fichier",
+                    ncols=100,
+                    position=0): 
+        # for entry in os.scandir(labels_dir):
         if not entry.name.lower().endswith(".txt"):
             continue
         label_stems.add(Path(entry.name).stem)
@@ -214,7 +218,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
             ctrl_ok = False
 
     # --- Analyse images ---
-    image_paths = [p for p in Path(images_dir).rglob("*") if p.suffix.lower() in ct.IMAGE_EXT]
+    image_paths = [p for p in Path(images_dir).glob("*") if p.suffix.lower() in ct.IMAGE_EXT] # type: ignore
     image_stems = {p.stem for p in image_paths}
 
     # labels orphelins
@@ -229,7 +233,13 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
     # Vérification images invalides / corrompues
     images_invalides = []
 
-    for p in image_paths:
+    for p in tqdm(
+        image_paths,
+        desc=" Vérification images",
+        unit=" image",
+        ncols=100,
+        position=0):
+    # for p in image_paths:
         # --- image corrompue ---
         if not is_valid_image(p):
             images_invalides.append(p.name)
@@ -254,6 +264,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
     # --- Affichage erreurs ---
     for key, values in erreurs_syntaxe.items():
         if values:
+            print()
             util.display_and_save_errors(
                 cfg,
                 path_user,
