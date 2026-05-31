@@ -6,6 +6,7 @@ import torch
 from ultralytics import YOLO
 from datetime import datetime
 from detection.utils.config_utils import save_resolved_config
+from pathlib import Path
 
 # -----------------------------
 # Model resolution (family/size/init)
@@ -44,7 +45,8 @@ def train_yolo(config) -> Any:
     output_config = config.get("output", {})
 
     # ---------- 2. Resolve dataset path ----------
-    dataset_config = config["data"]["dataset_yaml"]
+    dataset_root = Path(config["data"]["dataset_yaml"])
+    dataset_config = str(dataset_root / dataset_root.stem) + ".yaml"
 
     # ---------- 3. Build model and device ----------
     # Instantiate YOLO model (keep variable name: model)

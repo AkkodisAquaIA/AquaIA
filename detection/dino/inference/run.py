@@ -5,7 +5,7 @@ import torch
 import tqdm
 from torch.utils.data import DataLoader
 
-from dataloading.datasets import NpyDetectionDataset, detection_collate_fn, sample_dataset
+from dataloading.datasets import YOLOFormatDataset, detection_collate_fn, sample_dataset
 from detection.dino.dino_detector import DINODetector
 from detection.dino.predict import predict as predict_detections
 from detection.metric import evaluate_map, save_metrics
@@ -107,8 +107,9 @@ def test_dino(config):
         num_classes=len(test_class_names),
         device=device,
     )
-    test_dataset = NpyDetectionDataset(dataset_root=str(Path(test_data_root)), device=device)
-    
+    test_dataset = YOLOFormatDataset(
+        dataset_root=str(Path(test_data_root)), device=device)
+
     save_sample_predictions(
         model=model,
         dataset=test_dataset,
