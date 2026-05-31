@@ -39,7 +39,7 @@ training:
   workers: 0
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 5
+  epochs: 600
   warmup_ratio: 0.05
 
   # ---------- OPTIMIZER & LR ----------

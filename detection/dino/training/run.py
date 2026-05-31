@@ -15,23 +15,24 @@ from detection.dino.utils.matcher import HungarianMatcher
 from detection.checkpoint import save_model_checkpoint, save_training_state_checkpoint
 from detection.utils.config_utils import save_resolved_config
 from detection.utils.plot_utils import plot_metrics, annotate_images_with_predictions
-
+from detection.dino.predict import predict
 
 @torch.no_grad()
 def save_sample_predictions(model, subset, output_dir, num_samples=20, conf=0.3, seed=0, device="cuda", use_amp=True):
-	images, image_files = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed)
-	print(image_files)
-	print(f"Sampled {len(image_files)} images from {subset.dataset.dataset_root}")
-	images = images.to(device, non_blocking=device == "cuda")
-	with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
-		outputs = model(images)
-	outputs["pred_boxes"] = outputs["pred_boxes"].float()
-	outputs["pred_logits"] = outputs["pred_logits"].float()
+	inputs, images, image_files = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
+	print(f"Sampled {len(image_files)} images from {subset.dataset_root}")
+	model.eval()
+	predictions = predict(
+		model=model, 
+		images=inputs, 
+		device=device, 
+		conf_thres=conf
+	)
+
 	annotate_images_with_predictions(
 		images=images,
-		outputs=outputs,
-		class_names=subset.dataset.class_names,
-		conf_thres=conf,
+		predictions=predictions,
+		class_names=subset.class_names,
 		output_dir=output_dir,
 		image_files=image_files,
 	)
@@ -81,25 +82,44 @@ def build_scheduler(training_config, optimizer):
 	)
 	return scheduler
 
+def parse_batch(batch):
+	batch = batch[0]
+	images = batch["images"]
+	# TODO : ugly but currently required. Need to modify downstream code to avoid this conversion
+	targets = [
+		{"labels": labels, "boxes": boxes}
+	  	for labels, boxes in zip(batch["labels"], batch["bboxes"])
+	]
+	return images, targets
 
-def compute_metrics(model, train_dataloader, eval_dataloader, metrics_dict, device, num_classes, conf_thresh):
-	train_metrics = evaluate_map(
-		model=model,
-		dataloader=train_dataloader,
-		device=device,
-		num_classes=num_classes,
-		conf_thresh=conf_thresh,
-	)
-	metrics_dict["train_map_50"] = train_metrics["map_50"]
-	metrics_dict["train_map_50_95"] = train_metrics["map_50_95"]
-	eval_metrics = evaluate_map(
-		model=model,
-		dataloader=eval_dataloader,
-		device=device,
-		num_classes=num_classes,
-		conf_thresh=conf_thresh,
-	)
-	metrics_dict.update(eval_metrics)
+@torch.no_grad()
+def compute_metrics(model, train_dataloader, eval_dataloader, metrics_dict, device, conf_thresh):
+	model.eval()
+	imgsz = train_dataloader.img_size
+	for phase, loader in enumerate([train_dataloader, eval_dataloader]):
+		predictions = []
+		targets = []
+		split = "train" if phase==0 else "val"
+		for batch in loader: 
+			images, batch_targets = parse_batch(batch)
+			batch_preds = predict(
+				model=model, 
+				images=images, 
+				device=device, 
+				conf_thres=conf_thresh
+			)
+			predictions.extend(batch_preds)
+			targets.extend(batch_targets)
+
+		metrics = evaluate_map(
+			predictions=predictions,
+			targets=targets,
+			imgsz=imgsz,
+			split=split,
+			device=device,
+		)
+		metrics_dict.update(metrics)
+	model.train()
 
 
 def train_dino(config):
@@ -181,13 +201,7 @@ def train_dino(config):
 		log_dict = {"avg": 0.0}
 		progress = tqdm.tqdm(dataloader, desc=f"Epoch {epoch + 1}/{training_config['epochs']}")
 		for batch in progress:
-			batch = batch[0]
-			images = batch["images"]
-			targets = {
-				"labels": batch["labels"],
-				"boxes": batch["bboxes"],
-			}
-			print(targets)
+			images, targets = parse_batch(batch)
 
 			optimizer.zero_grad(set_to_none=True)
 			with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
@@ -211,15 +225,14 @@ def train_dino(config):
 			eval_dataloader=val_dataloader,
 			metrics_dict=epoch_metrics,
 			device=device,
-			num_classes=num_classes,
 			conf_thresh=training_config.get("conf_thresh", 0.05),
 		)
 		epoch_metrics["epoch"] = epoch + 1
 		print_metrics(epoch_metrics)
 		metrics_history.append(epoch_metrics)
 
-		if best_metric < epoch_metrics["map_50_95"] or best_metric_dict is None:
-			best_metric = epoch_metrics["map_50_95"]
+		if best_metric < epoch_metrics["val_map_50_95"] or best_metric_dict is None:
+			best_metric = epoch_metrics["val_map_50_95"]
 			best_metric_dict = epoch_metrics.copy()
 			# save best model
 			save_model_checkpoint(
@@ -258,7 +271,7 @@ def train_dino(config):
 	)
 
 	# === Save some sampled predictions with the best model ===
-	best_checkpoint = torch.load(os.path.join(weights_dir, "best.pt"), map_location=device)
+	best_checkpoint = torch.load(os.path.join(weights_dir, "last.pt"), map_location=device)
 	target_model = model._orig_mod if hasattr(model, "_orig_mod") else model
 	target_model.load_state_dict(best_checkpoint["model_state_dict"])
 

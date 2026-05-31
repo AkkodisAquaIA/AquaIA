@@ -1,17 +1,16 @@
 import os
-from PIL import Image
 from pathlib import Path
 from typing import List, Tuple
 from nvidia.dali import pipeline_def
 import nvidia.dali.fn as fn
 import nvidia.dali.types as types
 from nvidia.dali.plugin.pytorch import DALIRaggedIterator, LastBatchPolicy
+import nvidia.dali.experimental.dynamic as ndd
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 import random
-# from detection.utils.config_utils import load_class_names
+from detection.utils.config_utils import load_class_names
 
 # TODO : AutoAugment: Learning Augmentation Strategies from Data
 
@@ -22,7 +21,7 @@ def create_detection_pipeline(dataset_src, stats, img_size=640, device="gpu"):
         num_outputs=3,
         batch=False,
         parallel=True,
-        dtype=[types.UINT8, types.INT32, types.FLOAT],
+        dtype=[types.UINT8, types.INT64, types.FLOAT],
     )
     decoding_device = "mixed" if device == "gpu" else device
     # TODO : add cache/padding to the decoding part to avoid memory re-allocation
@@ -63,10 +62,9 @@ class BaseDetectionDataset:
         ):
         self.dataset_root = Path(dataset_root)
         self.stats_file = stats_file
-        self.num_classes = 0
         self.data_split = data_split
         self.load_stats()
-        # self.class_names = load_class_names(dataset_root)
+        self.class_names, self.num_classes = load_class_names(dataset_root)
         self.load_targets()
 
     def __len__(self):
@@ -126,7 +124,7 @@ class BaseDetectionDataset:
                     boxes.append(bbox)
         # TODO : clean up, dict struct is not longer necessary
         return {
-            "labels": np.array(labels, dtype=np.int32),
+            "labels": np.array(labels, dtype=np.int64),
             "boxes": np.array(boxes, dtype=np.float32).reshape(-1, 4),
         }
 
@@ -135,8 +133,12 @@ class BaseDetectionDataset:
         if not self.target_files:
             raise FileNotFoundError(f"No label files found under {self.dataset_root / 'labels'}")
         self.targets = [self.read_target(path) for path in self.target_files]
-        self.num_classes = 1 + max((int(t["labels"].max().item()) for t in self.targets if len(t["labels"]) > 0), default=0)
 
+    def normalize_img(self, img: torch.Tensor) -> torch.Tensor:
+        
+        mean = torch.from_numpy(self.stats["mean"]).to(dtype=img.dtype).view(-1, 1, 1)
+        std = torch.from_numpy(self.stats["std"]).to(dtype=img.dtype).view(-1, 1, 1)
+        return (img - mean) / std
 
 class YOLOFormatDataset(BaseDetectionDataset):
     # TODO : only JPEG, need to think about TIFF handling
@@ -170,6 +172,10 @@ class YOLOFormatDataset(BaseDetectionDataset):
             None
         )
 
+    @staticmethod
+    def _dali_tensor_to_torch(tensor):
+        return torch.from_dlpack(tensor.evaluate().data)
+
     def __call__(self, sample_info):
         # print(sample_info.iteration, sample_info.idx_in_epoch, sample_info.epoch_idx)
         sample_idx = sample_info.idx_in_epoch
@@ -193,18 +199,37 @@ class YOLOFormatDataset(BaseDetectionDataset):
     
     def __getitem__(self, key):
         # Slow but useful for sampling a few images for visualization / testing
-        # Uses PIL instead of DALI decoding
+        # Mirrors the DALI pipeline path using DALI dynamic operators.
         idx = self.indices[key]
         label = self.targets[idx]["labels"]
         bboxes = self.targets[idx]["boxes"]
         img_id = self.target_files[idx].stem
         img_path = self.img_dir / f"{img_id}.{self.img_format}"
-        # Load and decode image using PIL
-        img = Image.open(img_path).convert("RGB")
-        img = np.array(img)
-        img = self.to_tensor(img).unsqueeze(0)
-        img = F.interpolate(img, size=(640, 640), mode="bilinear").squeeze()
-        return img, label, bboxes, str(img_path)
+
+        encoded_img = np.frombuffer(img_path.read_bytes(), dtype=np.uint8).copy()
+        device = "gpu" if torch.cuda.is_available() else "cpu"
+        decoding_device = "mixed" if device == "gpu" else device
+        mean = self.stats["mean"].astype(np.float32).tolist()
+        std = self.stats["std"].astype(np.float32).tolist()
+
+        img = ndd.decoders.image(encoded_img, device=decoding_device, output_type=types.RGB)
+        img = ndd.resize(
+            img,
+            resize_x=640.0,
+            resize_y=640.0,
+            device=device,
+        )
+        norm_img = ndd.crop_mirror_normalize(
+            img,
+            device=device,
+            dtype=types.FLOAT,
+            output_layout="CHW",
+            mean=mean,
+            std=std,
+        )
+        img = self._dali_tensor_to_torch(img).cpu().permute(2,0,1)
+        norm_img = self._dali_tensor_to_torch(norm_img)
+        return norm_img, img, label, bboxes, str(img_path)
 
 class DALIDetectionDataLoader:
     def __init__(
@@ -243,6 +268,9 @@ class DALIDetectionDataLoader:
             auto_reset=True,
         )
 
+    def __len__(self):
+        return self.dataset.full_iterations
+    
     def __iter__(self):
         return iter(self.loader)
 
@@ -253,36 +281,52 @@ def sample_indices(dataset_size, num_samples, seed):
     return sorted(rng.sample(range(dataset_size), sample_size))
 
 
-def sample_dataset(dataset, num_samples, seed):
+def sample_dataset(dataset, num_samples, seed, device):
     sampled_indices = sample_indices(len(dataset), num_samples, seed)
     samples = [dataset[index] for index in sampled_indices]
-    images = torch.stack([sample[0] for sample in samples], dim=0)
+    inputs = torch.stack([sample[0] for sample in samples], dim=0).to(device)
+    imgs = torch.stack([sample[1] for sample in samples], dim=0)
     img_files = [sample[-1] for sample in samples]
-    return images, img_files
+    return inputs, imgs, img_files
 
+
+# if __name__ == "__main__":
+#     dataset = YOLOFormatDataset(
+#         dataset_root="/home/beaussant/pro/AquaIA/datasets/coco8",
+#         data_split="val",
+#         batch_size=2,
+#     )
+#     print(len(dataset), dataset.num_classes)
+
+#     img, img_f = sample_dataset(dataset, num_samples=2, seed=42)
+#     print(img.shape, img_f)
+
+#     loader = DALIDetectionDataLoader(dataset=dataset, device="gpu", img_size=640)
+
+#     for _ in range(3):  # iterate over 2 epochs
+#         for batch in loader:
+#             # batch = batch[0]
+#             print(batch)
+#             images = batch["images"]   # torch tensor, usually GPU if DALI output is GPU
+#             boxes = batch["bboxes"]     # list-like / tensor batch of variable-length boxes
+#             labels = batch["labels"]
+#             print(f"Batch images shape: {images}")
+#             print(f"Batch labels: {labels}")
+#             print(f"Batch boxes: {boxes}")
+#             print("-"*50)
+#         print("="*50)
 
 if __name__ == "__main__":
-    dataset = YOLOFormatDataset(
-        dataset_root="/home/beaussant/pro/AquaIA/datasets/coco8",
+    d = YOLOFormatDataset(
+        dataset_root="/home/beaussant/pro/AquaIA/datasets/coco8", 
         data_split="val",
-        batch_size=2,
+        batch_size=1
     )
-    print(len(dataset), dataset.num_classes)
+    l = DALIDetectionDataLoader(d)
+    for b in l:
+        im = b[0]["images"]
+        print(torch.sum(im))
 
-    img, img_f = sample_dataset(dataset, num_samples=2, seed=42)
-    print(img.shape, img_f)
-
-    loader = DALIDetectionDataLoader(dataset=dataset, device="gpu", img_size=640)
-
-    for _ in range(3):  # iterate over 2 epochs
-        for batch in loader:
-            # batch = batch[0]
-            print(batch)
-            images = batch["images"]   # torch tensor, usually GPU if DALI output is GPU
-            boxes = batch["bboxes"]     # list-like / tensor batch of variable-length boxes
-            labels = batch["labels"]
-            print(f"Batch images shape: {images}")
-            print(f"Batch labels: {labels}")
-            print(f"Batch boxes: {boxes}")
-            print("-"*50)
-        print("="*50)
+    print("-"*50)
+    for b in d:
+        print(torch.sum(b[0]))

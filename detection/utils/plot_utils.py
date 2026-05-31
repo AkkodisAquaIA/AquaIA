@@ -5,16 +5,9 @@ import numpy as np
 from PIL import Image
 from ultralytics.utils.plotting import Annotator
 
-from detection.utils.box_ops import box_cxcywh_to_xyxy
 
-
-def annotate_images_with_predictions(images, outputs, class_names, conf_thres, output_dir, image_files):
+def annotate_images_with_predictions(images, predictions, class_names, output_dir, image_files):
     images = images.detach().cpu().float()
-    pred_boxes = outputs["pred_boxes"].detach().cpu()
-    pred_logits = outputs["pred_logits"].detach().cpu()
-    class_logits = pred_logits[..., : len(class_names)]
-    scores, labels = class_logits.sigmoid().max(dim=-1)
-
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -28,14 +21,16 @@ def annotate_images_with_predictions(images, outputs, class_names, conf_thres, o
         h, w = img_uint8.shape[:2]
 
         annotator = Annotator(img_uint8.copy(), line_width=2)
-        boxes_xyxy = box_cxcywh_to_xyxy(pred_boxes[i]).clamp(0, 1)
-        boxes_xyxy[:, [0, 2]] *= w
-        boxes_xyxy[:, [1, 3]] *= h
-
-        keep = scores[i] >= conf_thres
-        kept_boxes = boxes_xyxy[keep]
-        kept_scores = scores[i][keep]
-        kept_labels = labels[i][keep]
+        image_predictions = predictions[i]
+        boxes = image_predictions["boxes"].detach().cpu().float()
+        scale = boxes.new_tensor([w, h, w, h])
+        source_size = float(max(boxes.max().item(), 0.0)) if boxes.numel() else 0.0
+        if source_size <= 1.0:
+            kept_boxes = boxes * scale
+        else:
+            kept_boxes = boxes
+        kept_scores = image_predictions["scores"].detach().cpu().float()
+        kept_labels = image_predictions["labels"].detach().cpu().long()
 
         for box, score, label in zip(kept_boxes, kept_scores, kept_labels):
             x1, y1, x2, y2 = box.tolist()

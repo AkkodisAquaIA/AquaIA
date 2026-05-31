@@ -63,14 +63,27 @@ def find_latest_run_dir(runs_root):
 
 def load_class_names(dataset_path):
     dataset_path = Path(dataset_path)
+
     if dataset_path.is_dir():
         dataset_path = dataset_path / f"{dataset_path.name}.yaml"
 
-    yaml_text = dataset_path.read_text(encoding="utf-8")
-    match = re.search(r"names:\s*(\[[\s\S]*?\])", yaml_text)
-    if match is None:
-        raise ValueError(f"Could not parse class names from {dataset_path}")
-    return ast.literal_eval(match.group(1))
+    with open(dataset_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    names = data.get("names") if isinstance(data, dict) else None
+
+    if not isinstance(names, list):
+        raise ValueError(
+            f"Expected 'names' to be a list in {dataset_path}, got {type(names).__name__}"
+        )
+    
+    num_class = data.get("nc") if isinstance(data, dict) else None
+    if num_class is not None and num_class != len(names):
+        raise ValueError(
+            f"Number of classes 'nc' ({num_class}) does not match length of 'names' ({len(names)}) in {dataset_path}"
+        )
+
+    return names, len(names)
 
 
 def load_run_config(run_dir):

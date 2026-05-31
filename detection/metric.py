@@ -47,12 +47,12 @@ def save_metrics(metrics, output_dir):
         )
 
 
-def _build_refs(targets, shapes):
+def _build_refs(targets, imgsz):
     refs = []
-    for target, (height, width) in zip(targets, shapes):
+    for target in targets:
         target_boxes_xyxy = box_cxcywh_to_xyxy(target["boxes"]).clamp(0, 1)
-        target_boxes_xyxy[:, [0, 2]] *= width
-        target_boxes_xyxy[:, [1, 3]] *= height
+        target_boxes_xyxy[:, [0, 2]] *= imgsz
+        target_boxes_xyxy[:, [1, 3]] *= imgsz
         refs.append(
             {
                 "boxes": target_boxes_xyxy,
@@ -62,67 +62,8 @@ def _build_refs(targets, shapes):
     return refs
 
 
-def _predict_dino(model, images, device, num_classes, conf_thres):
-    with torch.autocast(device_type=device, dtype=torch.float16, enabled=device == "cuda"):
-        outputs = model(images)
-
-    pred_boxes = outputs["pred_boxes"].float()
-    pred_logits = outputs["pred_logits"].float()
-    if pred_logits.shape[-1] > num_classes:
-        pred_logits = pred_logits[..., :num_classes]
-
-    _, _, height, width = images.shape
-    scores, labels = pred_logits.sigmoid().max(dim=-1)
-    preds = []
-    for i in range(images.shape[0]):
-        boxes_xyxy = box_cxcywh_to_xyxy(pred_boxes[i]).clamp(0, 1)
-        boxes_xyxy[:, [0, 2]] *= width
-        boxes_xyxy[:, [1, 3]] *= height
-        keep = scores[i] >= conf_thres
-        preds.append(
-            {
-                "boxes": boxes_xyxy[keep],
-                "scores": scores[i][keep],
-                "labels": labels[i][keep].long(),
-            }
-        )
-    return preds
-
-
-def _predict_yolo(model, image_files, device, conf_thres, imgsz):
-    results = model.predict(
-        source=image_files, 
-        conf=conf_thres, 
-        device=device, 
-        verbose=False, 
-        imgsz=imgsz
-    )
-    preds = []
-    shapes = []
-    for result in results:
-        boxes = result.boxes
-        shapes.append(result.orig_shape)
-        if boxes is None:
-            preds.append(
-                {
-                    "boxes": torch.empty((0, 4), dtype=torch.float32, device=device),
-                    "scores": torch.empty((0,), dtype=torch.float32, device=device),
-                    "labels": torch.empty((0,), dtype=torch.int64, device=device),
-                }
-            )
-            continue
-        preds.append(
-            {
-                "boxes": boxes.xyxy.to(device),
-                "scores": boxes.conf.to(device),
-                "labels": boxes.cls.to(device=device, dtype=torch.int64),
-            }
-        )
-    return preds, shapes
-
-
 @torch.no_grad()
-def evaluate_map(model, dataloader, device, num_classes, conf_thresh):
+def evaluate_map(predictions, targets, imgsz, split, device):
     metric = MeanAveragePrecision(
         box_format="xyxy",
         iou_type="bbox",
@@ -130,29 +71,10 @@ def evaluate_map(model, dataloader, device, num_classes, conf_thresh):
         class_metrics=False,
     ).to(device)
 
-    was_training = getattr(model, "training", False)
-    if hasattr(model, "eval"):
-        model.eval()
-
-    is_yolo_model = model.__class__.__name__.lower().startswith("yolo")
-
-    for batch in dataloader:
-        images, targets, image_files = batch
-        images = images.to(device, non_blocking=True)
-        _, _, height, width = images.shape
-        if is_yolo_model:
-            preds, shapes = _predict_yolo(model, image_files, device, conf_thresh, imgsz=height)
-        else:
-            preds = _predict_dino(model, images, device, num_classes, conf_thresh)
-            shapes = [(height, width)] * len(targets)
-        refs = _build_refs(targets, shapes)
-
-        metric.update(preds, refs)
-
+    refs = _build_refs(targets, imgsz)
+    metric.update(predictions, refs)
     computed_metrics = metric.compute()
-    if was_training and hasattr(model, "train"):
-        model.train()
     return {
-        "map_50": float(computed_metrics["map_50"].item()),
-        "map_50_95": float(computed_metrics["map"].item()),
+        f"{split}_map_50": float(computed_metrics["map_50"].item()),
+        f"{split}_map_50_95": float(computed_metrics["map"].item()),
     }

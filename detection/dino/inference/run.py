@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 
 from dataloading.datasets import NpyDetectionDataset, detection_collate_fn, sample_dataset
 from detection.dino.dino_detector import DINODetector
+from detection.dino.predict import predict as predict_detections
 from detection.metric import evaluate_map, save_metrics
 from detection.utils.config_utils import find_latest_run_dir, load_run_config, load_class_names
 from detection.utils.plot_utils import annotate_images_with_predictions
@@ -36,20 +37,25 @@ def predict(model, images, device, use_amp):
 
 
 def save_sample_predictions(model, dataset, class_names, inference_config, output_dir, seed, device, use_amp):
-    images, image_files = sample_dataset(dataset=dataset, num_samples=inference_config["num_samples"], seed=seed)
+    inputs, images, image_files = sample_dataset(dataset=dataset, num_samples=inference_config["num_samples"], seed=seed, device=device)
     pred_output_dir = output_dir / f"predictions"
 
     print(f"Sampled {len(image_files)} images from {dataset.dataset_root}")
     for start in tqdm.tqdm(range(0, len(image_files), inference_config["batch"]), desc=f"Testing"):
         end = min(start + inference_config["batch"], len(image_files))
+        batch_inputs = inputs[start:end]
         batch_images = images[start:end]
         batch_files = image_files[start:end]
-        outputs = predict(model, batch_images, device, use_amp)
+        predictions = predict_detections(
+            model=model,
+            images=batch_inputs,
+            device=device,
+            conf_thres=inference_config["conf"],
+        )
         annotate_images_with_predictions(
             images=batch_images,
-            outputs=outputs,
+            predictions=predictions,
             class_names=class_names,
-            conf_thres=inference_config["conf"],
             output_dir=pred_output_dir,
             image_files=batch_files,
         )
@@ -102,10 +108,7 @@ def test_dino(config):
         device=device,
     )
     test_dataset = NpyDetectionDataset(dataset_root=str(Path(test_data_root)), device=device)
-
-    # print_test_header(run_dir, device, use_amp, train_data_root, test_data_root, output_dir)
-
-
+    
     save_sample_predictions(
         model=model,
         dataset=test_dataset,

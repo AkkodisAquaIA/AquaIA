@@ -29,7 +29,7 @@ class DETR(nn.Module):
         super().__init__()
         self.num_queries = num_queries
         self.transformer = Transformer(d_model=d_model)#.to(dtype=dtype)
-        self.class_embed = nn.Linear(d_model, num_classes + 1)#.to(dtype=dtype)
+        self.class_embed = nn.Linear(d_model, num_classes)#.to(dtype=dtype)
         self.bbox_embed = MLP(d_model, d_model, 4, 3)#.to(dtype=dtype)
         self.query_embed = nn.Embedding(num_queries, d_model)#.to(dtype=dtype)
         self.input_proj = nn.Linear(num_input_channels, d_model)#.to(dtype=dtype)
@@ -42,7 +42,7 @@ class DETR(nn.Module):
 
             It returns a dict with the following elements:
                - "pred_logits": the classification logits (including no-object) for all queries.
-                                Shape= [batch_size x num_queries x (num_classes + 1)]
+                                Shape= [batch_size x num_queries x (num_classes)]
                - "pred_boxes": The normalized boxes coordinates for all queries, represented as
                                (center_x, center_y, height, width). These values are normalized in [0, 1],
                                relative to the size of each individual image (disregarding possible padding).
