@@ -20,27 +20,29 @@ def _get_sorted_jpg_files(root_dir):
 
 
 @pipeline_def
-def _transform_jpeg(files, size=640):
-    jpegs = fn.readers.file(files=files, name="Reader")[0]
-    images = fn.decoders.image(jpegs, device="mixed", output_type=types.RGB)
-    images = fn.transpose(images, device="gpu", perm=[2, 0, 1])
+def _transform_jpg(files, size=640):
+    jpgs = fn.readers.file(files=files, name="Reader")[0]
+    images = fn.decoders.image(jpgs, device="mixed", output_type=types.RGB)
     images = fn.resize(images, resize_x=size, resize_y=size, min_filter=types.DALIInterpType.INTERP_TRIANGULAR)
+    images = fn.transpose(images, device="gpu", perm=[2, 0, 1])
 
     return images
 
 
-def convert_to_npy(root_dir, batch_size=128, num_threads=4, device_id=0, compute_stats=False):
+def convert_to_npy(root_dir, batch_size=128, num_threads=4, device_id=0, compute_stats=False, image_size=640):
     sorted_files = _get_sorted_jpg_files(root_dir)
-    pipe = _transform_jpeg(files=sorted_files, batch_size=batch_size, num_threads=num_threads, device_id=device_id)
+    if not sorted_files:
+        raise FileNotFoundError(f"No jpg files found under {os.path.join(root_dir, 'images')}")
+    pipe = _transform_jpg(files=sorted_files, size=image_size, batch_size=batch_size, num_threads=num_threads, device_id=device_id)
     pipe.build()
-    n = pipe.epoch_size("Reader")  # should be 1024
-    print(n)
-    num_iters = (n + 128 - 1) // 128
+    n = pipe.epoch_size("Reader")
+    print(f"Found {n} images")
+    num_iters = (n + batch_size - 1) // batch_size
 
     batches = []
     for _ in range(num_iters):
         batch = pipe.run()[0]  # TensorListGPU
-        batches.append(batch.as_cpu().as_array())  # (B, 3, 304, 304)
+        batches.append(batch.as_cpu().as_array())  # (B, 3, image_size, image_size)
 
     np_images = np.concatenate(batches, axis=0)[:n].astype(np.float32) / 255.0
 
@@ -58,15 +60,16 @@ def convert_to_npy(root_dir, batch_size=128, num_threads=4, device_id=0, compute
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Preprocess jpeg images to .npy format using DALI")
+    parser = argparse.ArgumentParser(description="Preprocess jpg images to .npy format using DALI")
     parser.add_argument("--data-dir", type=str, default="datasets", help="Directory containing datasets")
     parser.add_argument("--dataset", type=str, default="coco_small", help="Name of the dataset")
     parser.add_argument("--batch-size", type=int, default=128, help="Batch size for DALI pipeline")
     parser.add_argument("--num-threads", type=int, default=4, help="Number of threads for DALI pipeline")
+    parser.add_argument("--image-size", type=int, default=640, help="Output image size")
     args = parser.parse_args()
 
     root_dir = os.path.join(BASE_DIR, args.data_dir, args.dataset)
     image_dir = os.path.join(root_dir, "npy_images.npy")
 
     if not os.path.exists(image_dir):
-        convert_to_npy(root_dir=root_dir, batch_size=args.batch_size, num_threads=args.num_threads, compute_stats=True)
+        convert_to_npy(root_dir=root_dir, batch_size=args.batch_size, num_threads=args.num_threads, compute_stats=True, image_size=args.image_size)
