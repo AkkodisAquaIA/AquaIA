@@ -131,7 +131,7 @@ def train_dino(config):
 		log_dict = {"avg": 0.0}
 		progress = tqdm.tqdm(dataloader, desc=f"Epoch {epoch + 1}/{training_config['epochs']}")
 		for batch in progress:
-			images, targets = parse_batch(batch)
+			images, targets, _ = parse_batch(batch)
 
 			optimizer.zero_grad(set_to_none=True)
 			with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):

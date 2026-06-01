@@ -83,15 +83,17 @@ def evaluate_map(predictions, targets, imgsz, split, device):
 def compute_metrics(model, dataloaders, predict_fn, device, conf_thresh):
 	model.eval()
 	all_metrics = {}
-	imgsz = dataloaders[0].img_size
+	imgsz = 640#dataloaders[0].img_size
 	for loader in dataloaders:
 		predictions = []
 		targets = []
 		for batch in loader: 
-			images, batch_targets = parse_batch(batch)
+			_, batch_targets, _ = parse_batch(batch)
+			if isinstance(batch, list):
+				batch = batch[0]
 			batch_preds = predict_fn(
 				model=model, 
-				images=images, 
+				samples=batch, 
 				device=device, 
 				conf_thres=conf_thresh
 			)

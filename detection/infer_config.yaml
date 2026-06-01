@@ -1,7 +1,7 @@
 # AquaIA - DETR+DINO inference config
 
 run:
-  runs_root: "results/detect/dinov3_small_pretrained"
+  runs_root: "results/detect/yolo26_s_random"
   run_dir: null
 
 data:

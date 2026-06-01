@@ -1,7 +1,12 @@
 import torch
 
+def normalize_imgsz(config, phase):
+	# TODO: check image size for YOLO too ?
+	return int(config[phase]["imgsz"])
 
-def predict_yolo(model, image_files, device, conf_thres, imgsz):
+
+def predict(model, samples, device, conf_thres, imgsz=640):
+    image_files = samples["img_paths"]
     results = model.predict(
         source=image_files, 
         conf=conf_thres, 
@@ -10,10 +15,8 @@ def predict_yolo(model, image_files, device, conf_thres, imgsz):
         imgsz=imgsz
     )
     preds = []
-    shapes = []
     for result in results:
         boxes = result.boxes
-        shapes.append(result.orig_shape)
         if boxes is None:
             preds.append(
                 {
@@ -30,4 +33,4 @@ def predict_yolo(model, image_files, device, conf_thres, imgsz):
                 "labels": boxes.cls.to(device=device, dtype=torch.int64),
             }
         )
-    return preds, shapes
+    return preds

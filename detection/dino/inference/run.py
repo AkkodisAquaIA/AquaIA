@@ -13,8 +13,6 @@ from detection.dino.predict import predict, normalize_imgsz
 
 def load_model(run_dir, backbone_id, img_size, num_classes, device):
     checkpoint = torch.load(Path(run_dir) / "weights" / "last.pt", map_location=device)
-    print(num_classes)
-    print(img_size)
     model = DINODetector(
         backbone_id=backbone_id,
         img_size=int(img_size),
@@ -44,7 +42,7 @@ def test_dino(config):
     output_dir = output_root / f"{Path(test_data_root).name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    test_class_names, num_classes = load_class_names(test_data_root)
+    _, num_classes = load_class_names(test_data_root)
     model = load_model(
         run_dir=run_dir,
         backbone_id=f"{run_config['model']['family']}_{run_config['model']['size']}",

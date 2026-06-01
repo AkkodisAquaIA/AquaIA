@@ -2,9 +2,9 @@
 # Model section: 
 # ----------------------------------------------------------------------
 model:
-  family: "dinov3"
-  size : "small"
-  init: "pretrained"
+  family: "yolo26"
+  size : "s"
+  init: "random"
 
 # ----------------------------------------------------------------------
 # Data section: train/val dataset
@@ -40,7 +40,7 @@ training:
 
   # ---------- TRAINING SCHEDULE ----------
   epochs: 500
-  warmup_ratio: 0.05
+  # warmup_ratio: 0.05
 
   # ---------- OPTIMIZER & LR ----------
   optimizer: "AdamW"
@@ -49,14 +49,20 @@ training:
   cos_lr: true
   weight_decay: 0.00005
 
-  # ---------- LOSS / MATCHER HYPERPARAMETERS ----------
-  cost_class: 2.0
-  cost_bbox: 5.0
-  cost_giou: 2.0
-  cost_bbox_type: "l1"
-  cls: 4.0
-  box: 5.0
-  giou: 2.0
+  # # ---------- LOSS / MATCHER HYPERPARAMETERS ----------
+  # cost_class: 2.0
+  # cost_bbox: 5.0
+  # cost_giou: 2.0
+  # cost_bbox_type: "l1"
+  # cls: 4.0
+  # box: 5.0
+  # giou: 2.0
+
+  # ---------- LOSS / BOX / CLS HYPERPARAMETERS ----------
+  # See Ultralytics default.yaml for the latest recommended defaults.
+  box: 7.5            # box loss gain
+  cls: 0.5            # classification loss gain
+  dfl: 1.5            # distribution focal loss gain
 
   # ---------- DATA AUGMENTATION ----------
   augment: true

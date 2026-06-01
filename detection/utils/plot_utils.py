@@ -63,22 +63,22 @@ def annotate_yolo_predictions(results, class_names, conf_thres, output_dir, imag
 
 @torch.no_grad()
 def save_sample_predictions(model, subset, output_dir, predict_fn, num_samples=20, conf=0.3, seed=0, device="cuda"):
-	inputs, images, image_files = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
-	print(f"Sampled {len(image_files)} images from {subset.dataset_root}")
+	samples = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
+	print(f"Sampled {len(samples["img_paths"])} images from {subset.dataset_root}")
 	model.eval()
 	predictions = predict_fn(
 		model=model, 
-		images=inputs, 
+		samples=samples, 
 		device=device, 
 		conf_thres=conf
 	)
 
 	annotate_images_with_predictions(
-		images=images,
+		images=samples["images"],
 		predictions=predictions,
 		class_names=subset.class_names,
 		output_dir=output_dir,
-		image_files=image_files,
+		image_files=samples["img_paths"],
 	)
 
 
