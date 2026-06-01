@@ -11,7 +11,9 @@ model:
 # ----------------------------------------------------------------------
 data:
   # Dataset path consumed by the DINO trainer.
-  dataset_yaml: "datasets/coco128"
+  dataset_yaml: "datasets/coco_custom"
+  # Image loader used by the DINO trainer. Use "npy" to keep the legacy path.
+  loader: "jpg"
 
 # ----------------------------------------------------------------------
 # Output section: training artifact handling
@@ -34,7 +36,7 @@ training:
   device: "auto"
 
   # ---------- DATA INPUT / LOADING ----------
-  imgsz: 304
+  imgsz: 640
   batch: 64
   workers: 0
 
