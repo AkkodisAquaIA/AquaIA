@@ -16,14 +16,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_main_help_returns_zero_and_lists_subcommands() -> None:
-	result = subprocess.run(
-		[sys.executable, "main.py", "--help"],
-		cwd=REPO_ROOT,
-		capture_output=True,
-		text=True,
-		timeout=60,
-	)
-	assert result.returncode == 0, f"`python main.py --help` exited with {result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-	# Both subcommands must appear in --help output.
-	assert "train" in result.stdout, f"'train' subcommand missing from --help output:\n{result.stdout}"
-	assert "infer" in result.stdout, f"'infer' subcommand missing from --help output:\n{result.stdout}"
+    result = subprocess.run(
+        [sys.executable, "main.py", "--help"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, f"`python main.py --help` exited with {result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    # Both subcommands must appear in --help output.
+    assert "train" in result.stdout, f"'train' subcommand missing from --help output:\n{result.stdout}"
+    assert "infer" in result.stdout, f"'infer' subcommand missing from --help output:\n{result.stdout}"

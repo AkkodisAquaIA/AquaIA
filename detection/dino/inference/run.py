@@ -105,7 +105,6 @@ def test_dino(config):
 
     # print_test_header(run_dir, device, use_amp, train_data_root, test_data_root, output_dir)
 
-
     save_sample_predictions(
         model=model,
         dataset=test_dataset,
@@ -124,5 +123,4 @@ def test_dino(config):
         device=device,
     )
 
-    
     return output_dir

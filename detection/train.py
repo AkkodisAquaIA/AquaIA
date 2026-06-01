@@ -17,4 +17,3 @@ def train_from_config(config_path):
     config = load_train_config(config_path)
     print_train_config(config)
     return train(config)
-

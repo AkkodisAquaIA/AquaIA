@@ -57,6 +57,7 @@ class FocalLoss(nn.Module):
         reduction (str): 'mean' | 'sum' | 'none'
         ignore_index (int): label ignoré, comme dans CrossEntropyLoss
     """
+
     def __init__(self, alpha=None, gamma=2.0, reduction="mean", ignore_index=-100):
         super().__init__()
         self.gamma = float(gamma)
@@ -89,7 +90,7 @@ class FocalLoss(nn.Module):
             ignore_index=self.ignore_index,
         )
 
-        valid_mask = (targets != self.ignore_index)
+        valid_mask = targets != self.ignore_index
 
         if valid_mask.sum() == 0:
             return logits.new_zeros(())
@@ -106,9 +107,7 @@ class FocalLoss(nn.Module):
                 alpha_t = self.alpha.to(logits.device)
             elif self.alpha.ndim == 1:
                 if self.alpha.numel() != logits.size(1):
-                    raise ValueError(
-                        f"alpha a {self.alpha.numel()} classes, mais logits a {logits.size(1)} classes"
-                    )
+                    raise ValueError(f"alpha a {self.alpha.numel()} classes, mais logits a {logits.size(1)} classes")
                 alpha_t = self.alpha.to(logits.device)[targets_valid]
             else:
                 raise ValueError("alpha doit être scalaire ou 1D")
@@ -138,9 +137,7 @@ def compute_class_weights_from_class_to_idx_and_samples(
 
     if torch.any(counts == 0):
         missing = (counts == 0).nonzero(as_tuple=True)[0].tolist()
-        raise RuntimeError(
-            f"Impossible de calculer alpha auto: certaines classes sont absentes du dataset évalué: {missing}"
-        )
+        raise RuntimeError(f"Impossible de calculer alpha auto: certaines classes sont absentes du dataset évalué: {missing}")
 
     weights = counts.sum() / counts
     weights = weights / weights.mean()
@@ -173,10 +170,7 @@ def build_eval_criterion(
         ignore_index=ignore_index,
     ).to(device)
 
-    print(
-        f"[INFO] Eval criterion = FocalLoss(gamma={gamma}, "
-        f"alpha={'None' if alpha is None else alpha}, ignore_index={ignore_index})"
-    )
+    print(f"[INFO] Eval criterion = FocalLoss(gamma={gamma}, alpha={'None' if alpha is None else alpha}, ignore_index={ignore_index})")
     return criterion
 
 
@@ -190,6 +184,7 @@ class LabeledFolderDataset(Dataset):
       classB/*.jpg
     On calcule des métriques. Les classes vides OK (ignorées).
     """
+
     def __init__(self, root: Path, class_to_idx: Dict[str, int], processor):
         self.samples: List[Tuple[Path, int]] = []
         self.processor = processor
@@ -220,6 +215,7 @@ class UnlabeledRecursiveDataset(Dataset):
     """
     Parcourt INPUT_DIR récursivement, sans labels.
     """
+
     def __init__(self, root: Path, processor):
         self.paths: List[Path] = []
         self.processor = processor
@@ -320,6 +316,7 @@ def plot_confusion_matrix(cm: np.ndarray, class_names: List[str], title: str) ->
 
 def write_csv(path: Path, rows: List[List[str]], header: List[str]) -> None:
     import csv
+
     with path.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(header)
@@ -371,13 +368,11 @@ def main():
         )
 
         criterion = build_eval_criterion(
-        ckpt=ckpt,
-        device=device,
+            ckpt=ckpt,
+            device=device,
         )
 
-        loss, acc, y_true, y_pred, y_conf, paths = predict_labeled(
-            model, loader, criterion, device, USE_AMP
-        )
+        loss, acc, y_true, y_pred, y_conf, paths = predict_labeled(model, loader, criterion, device, USE_AMP)
 
         macro_f1 = float(f1_score(y_true, y_pred, average="macro"))
         bal_acc = float(balanced_accuracy_score(y_true, y_pred))
@@ -420,12 +415,14 @@ def main():
 
         rows = []
         for p, yt, yp, conf in zip(paths, y_true.tolist(), y_pred.tolist(), y_conf.tolist()):
-            rows.append([
-                p,
-                idx_to_class[int(yt)],
-                idx_to_class[int(yp)],
-                f"{float(conf):.6f}",
-            ])
+            rows.append(
+                [
+                    p,
+                    idx_to_class[int(yt)],
+                    idx_to_class[int(yp)],
+                    f"{float(conf):.6f}",
+                ]
+            )
         write_csv(
             out_root / "predictions.csv",
             rows,

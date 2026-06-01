@@ -18,13 +18,10 @@ from torchvision.datasets import ImageFolder
 from torchvision.transforms import Compose, Lambda
 from transformers import AutoImageProcessor
 
-from common_dinov3 import (
-    ensure_dir, write_json, set_seed, get_env_info,
-    DinoV3Classifier, freeze_all, unfreeze_last_n_blocks,
-    save_checkpoint
-)
+from common_dinov3 import ensure_dir, write_json, set_seed, get_env_info, DinoV3Classifier, freeze_all, unfreeze_last_n_blocks, save_checkpoint
 
 from losses import FocalLoss
+
 
 def compute_class_weights_from_imagefolder(train_ds, num_classes: int) -> torch.Tensor:
     """
@@ -44,6 +41,7 @@ def compute_class_weights_from_imagefolder(train_ds, num_classes: int) -> torch.
     weights = weights / weights.mean()
 
     return weights
+
 
 # =========================
 # CONFIG
@@ -80,14 +78,15 @@ class Config:
     save_last: bool = True
 
     # --- loss config
-    loss_name: str = "focal"   # "ce" | "focal"
+    loss_name: str = "focal"  # "ce" | "focal"
     focal_gamma: float = 2.0
-    focal_alpha_mode: str = "auto"   # "none" | "scalar" | "auto"
+    focal_alpha_mode: str = "auto"  # "none" | "scalar" | "auto"
     focal_alpha_scalar: Optional[float] = None
     focal_ignore_index: int = -100
 
 
 CFG = Config()
+
 
 # =========================
 # UTILS
@@ -151,7 +150,7 @@ def build_criterion(cfg: Config, device: torch.device, train_ds=None, num_classe
 
     else:
         raise ValueError(f"loss_name inconnu: {cfg.loss_name}")
-    
+
 
 # =========================
 # TRAIN / EVAL
@@ -270,9 +269,7 @@ def main():
 
     model.to(device)
 
-    criterion, focal_alpha_resolved = build_criterion(
-    CFG, device, train_ds=train_ds, num_classes=num_classes
-    )
+    criterion, focal_alpha_resolved = build_criterion(CFG, device, train_ds=train_ds, num_classes=num_classes)
     print(f"[INFO] Loss={CFG.loss_name}")
 
     head_params = [p for p in model.head.parameters() if p.requires_grad]

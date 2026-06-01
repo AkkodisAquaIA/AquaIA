@@ -32,6 +32,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUSERBASE=/install
+# Limit glibc malloc arenas to reduce peak memory during pip install on CI runners.
+ENV MALLOC_ARENA_MAX=2
 
 # Build-time toolchain only. Some wheels (pycocotools on older Python tags,
 # scipy under exotic platforms) may need gcc/g++ to compile; we keep them in

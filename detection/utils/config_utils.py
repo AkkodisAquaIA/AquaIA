@@ -5,8 +5,6 @@ import ast
 import re
 
 
-
-
 def infer_output_project(config):
     task = str(config["training"]["task"]).strip().lower()
     model_config = config["model"]
@@ -42,6 +40,7 @@ def save_resolved_config(path, config, device, use_amp, run_dir):
     with open(path, "w", encoding="utf-8") as f:
         yaml.safe_dump(resolved_config, f, sort_keys=False)
 
+
 def load_infer_config(config_path):
     config_path = Path(config_path).resolve()
     with config_path.open("r", encoding="utf-8") as f:
@@ -52,10 +51,7 @@ def find_latest_run_dir(runs_root):
     run_dirs = [path for path in Path(runs_root).iterdir() if path.is_dir()]
     if not run_dirs:
         raise FileNotFoundError(f"No run directories found under {runs_root}")
-    valid_run_dirs = [
-        path for path in run_dirs
-        if (path / "best_model.pt").exists() or (path / "weights" / "best.pt").exists()
-    ]
+    valid_run_dirs = [path for path in run_dirs if (path / "best_model.pt").exists() or (path / "weights" / "best.pt").exists()]
     if not valid_run_dirs:
         raise FileNotFoundError(f"No completed run directories with a supported best checkpoint found under {runs_root}")
     return max(valid_run_dirs, key=lambda path: path.name)

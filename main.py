@@ -10,7 +10,7 @@ def build_parser():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     train_parser = subparsers.add_parser("train", help="Train a model")
-    train_parser.add_argument("--config", type=str, default=os.path.join("detection","train_config.yaml"))
+    train_parser.add_argument("--config", type=str, default=os.path.join("detection", "train_config.yaml"))
     train_parser.set_defaults(command_handler=handle_train)
 
     test_parser = subparsers.add_parser("infer", help="Run inference on train and test samples")

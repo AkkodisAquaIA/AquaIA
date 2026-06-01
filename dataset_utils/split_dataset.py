@@ -9,18 +9,18 @@ from typing import Dict, List, Tuple
 # =========================================================
 # ⚙️ CONFIG — À MODIFIER
 # =========================================================
-DATA_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026")   # ton dossier actuel: DATA_DIR/classe_x/*.jpg
-OUT_DIR  = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited")    # dossier de sortie
+DATA_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026")  # ton dossier actuel: DATA_DIR/classe_x/*.jpg
+OUT_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited")  # dossier de sortie
 
 GROUP_BY_FILENAME = False
 
 TRAIN_RATIO = 0.70
-VAL_RATIO   = 0.20
-TEST_RATIO  = 0.10
+VAL_RATIO = 0.20
+TEST_RATIO = 0.10
 
 SEED = 42
-MODE = "copy"     # "copy" ou "move"
-DRY_RUN = False   # True = ne copie/déplace rien (affiche juste)
+MODE = "copy"  # "copy" ou "move"
+DRY_RUN = False  # True = ne copie/déplace rien (affiche juste)
 
 EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 
@@ -33,6 +33,7 @@ EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 #  - puis une suite de lettres/chiffres/_ (nom de classe)
 #  - puis un suffixe numérique (Num) (ex: 25)
 GROUP_RE = re.compile(r"^(\d+-[A-Za-z0-9_]+?\d+)", re.ASCII)
+
 
 def group_key_from_filename(path: Path) -> str:
     """
@@ -59,6 +60,7 @@ def ensure_dir(p: Path) -> None:
     if not DRY_RUN:
         p.mkdir(parents=True, exist_ok=True)
 
+
 def transfer(src: Path, dst: Path) -> None:
     if DRY_RUN:
         return
@@ -67,16 +69,12 @@ def transfer(src: Path, dst: Path) -> None:
     else:
         shutil.copy2(str(src), str(dst))
 
+
 def list_class_files(class_dir: Path) -> List[Path]:
     return sorted([p for p in class_dir.iterdir() if p.is_file() and p.suffix.lower() in EXTS])
 
-def split_groups(
-    groups: List[str],
-    train_r: float,
-    val_r: float,
-    test_r: float,
-    rng: random.Random
-) -> Tuple[List[str], List[str], List[str]]:
+
+def split_groups(groups: List[str], train_r: float, val_r: float, test_r: float, rng: random.Random) -> Tuple[List[str], List[str], List[str]]:
     """
     Split des GROUPES (pas des images) pour empêcher la fuite.
     Les ratios sont approximatifs; on vise au mieux.
@@ -96,8 +94,8 @@ def split_groups(
     rng.shuffle(groups)
 
     n_train = int(round(n * train_r))
-    n_val   = int(round(n * val_r))
-    n_test  = n - n_train - n_val
+    n_val = int(round(n * val_r))
+    n_test = n - n_train - n_val
 
     # Ajustements pour éviter des splits vides si possible
     if n_test <= 0:
@@ -117,12 +115,13 @@ def split_groups(
     # Re-garantir somme
     s = n_train + n_val + n_test
     if s != n:
-        n_test += (n - s)
+        n_test += n - s
 
     train_g = groups[:n_train]
-    val_g   = groups[n_train:n_train + n_val]
-    test_g  = groups[n_train + n_val:n_train + n_val + n_test]
+    val_g = groups[n_train : n_train + n_val]
+    test_g = groups[n_train + n_val : n_train + n_val + n_test]
     return train_g, val_g, test_g
+
 
 def split_files(files: List[Path], train_ratio: float, val_ratio: float, test_ratio: float, rng):
     files = files[:]
@@ -136,11 +135,10 @@ def split_files(files: List[Path], train_ratio: float, val_ratio: float, test_ra
     n_val = min(n_val, n_total - n_train)
 
     train_files = files[:n_train]
-    val_files = files[n_train:n_train + n_val]
-    test_files = files[n_train + n_val:]
+    val_files = files[n_train : n_train + n_val]
+    test_files = files[n_train + n_val :]
 
     return train_files, val_files, test_files
-
 
 
 def main():
@@ -163,8 +161,8 @@ def main():
 
         # Prépare dossiers de sortie
         out_train = OUT_DIR / "train" / class_dir.name
-        out_val   = OUT_DIR / "val"   / class_dir.name
-        out_test  = OUT_DIR / "test"  / class_dir.name
+        out_val = OUT_DIR / "val" / class_dir.name
+        out_test = OUT_DIR / "test" / class_dir.name
         ensure_dir(out_train)
         ensure_dir(out_val)
         ensure_dir(out_test)
@@ -178,19 +176,19 @@ def main():
                 grouped[group_key_from_filename(f)].append(f)
 
             group_ids = list(grouped.keys())
-            train_g, val_g, test_g = split_groups(
-                group_ids, TRAIN_RATIO, VAL_RATIO, TEST_RATIO, rng
-            )
+            train_g, val_g, test_g = split_groups(group_ids, TRAIN_RATIO, VAL_RATIO, TEST_RATIO, rng)
 
-            split_checks.append({
-                "class": class_dir.name,
-                "mode": "grouped",
-                "n_files": len(files),
-                "n_groups": len(group_ids),
-                "train_units": len(train_g),
-                "val_units": len(val_g),
-                "test_units": len(test_g),
-            })
+            split_checks.append(
+                {
+                    "class": class_dir.name,
+                    "mode": "grouped",
+                    "n_files": len(files),
+                    "n_groups": len(group_ids),
+                    "train_units": len(train_g),
+                    "val_units": len(val_g),
+                    "test_units": len(test_g),
+                }
+            )
 
             def emit_grouped(split_name: str, g_list: List[str], out_base: Path):
                 nonlocal totals
@@ -204,33 +202,28 @@ def main():
                 return count
 
             n_train_imgs = emit_grouped("train", train_g, out_train)
-            n_val_imgs   = emit_grouped("val",   val_g,   out_val)
-            n_test_imgs  = emit_grouped("test",  test_g,  out_test)
+            n_val_imgs = emit_grouped("val", val_g, out_val)
+            n_test_imgs = emit_grouped("test", test_g, out_test)
 
-            print(
-                f"[{class_dir.name}] mode=grouped "
-                f"images={len(files):4d} groups={len(group_ids):4d} -> "
-                f"train={n_train_imgs:4d} val={n_val_imgs:4d} test={n_test_imgs:4d}"
-            )
+            print(f"[{class_dir.name}] mode=grouped images={len(files):4d} groups={len(group_ids):4d} -> train={n_train_imgs:4d} val={n_val_imgs:4d} test={n_test_imgs:4d}")
 
         # -------------------------------------------------
         # CAS 2 : split direct fichier par fichier
         # -------------------------------------------------
         else:
-            
-            train_files, val_files, test_files = split_files(
-            files, TRAIN_RATIO, VAL_RATIO, TEST_RATIO, rng
-            )
+            train_files, val_files, test_files = split_files(files, TRAIN_RATIO, VAL_RATIO, TEST_RATIO, rng)
 
-            split_checks.append({
-                "class": class_dir.name,
-                "mode": "filewise",
-                "n_files": len(files),
-                "n_groups": None,
-                "train_units": len(train_files),
-                "val_units": len(val_files),
-                "test_units": len(test_files),
-            })
+            split_checks.append(
+                {
+                    "class": class_dir.name,
+                    "mode": "filewise",
+                    "n_files": len(files),
+                    "n_groups": None,
+                    "train_units": len(train_files),
+                    "val_units": len(val_files),
+                    "test_units": len(test_files),
+                }
+            )
 
             def emit_files(split_name: str, file_list: List[Path], out_base: Path):
                 nonlocal totals
@@ -243,14 +236,10 @@ def main():
                 return count
 
             n_train_imgs = emit_files("train", train_files, out_train)
-            n_val_imgs   = emit_files("val",   val_files,   out_val)
-            n_test_imgs  = emit_files("test",  test_files,  out_test)
+            n_val_imgs = emit_files("val", val_files, out_val)
+            n_test_imgs = emit_files("test", test_files, out_test)
 
-            print(
-                f"[{class_dir.name}] mode=filewise "
-                f"images={len(files):4d} -> "
-                f"train={n_train_imgs:4d} val={n_val_imgs:4d} test={n_test_imgs:4d}"
-            )
+            print(f"[{class_dir.name}] mode=filewise images={len(files):4d} -> train={n_train_imgs:4d} val={n_val_imgs:4d} test={n_test_imgs:4d}")
 
     print("\n=== RÉSUMÉ GLOBAL ===")
     print(f"Total train: {totals['train']}")
@@ -268,13 +257,7 @@ def main():
                 f"test_groups={item['test_units']}"
             )
         else:
-            print(
-                f"  {item['class']}: mode=filewise "
-                f"files={item['n_files']} -> "
-                f"train_files={item['train_units']}, "
-                f"val_files={item['val_units']}, "
-                f"test_files={item['test_units']}"
-            )
+            print(f"  {item['class']}: mode=filewise files={item['n_files']} -> train_files={item['train_units']}, val_files={item['val_units']}, test_files={item['test_units']}")
 
     if DRY_RUN:
         print("\n[DRY_RUN] Aucun fichier n'a été copié/déplacé.")

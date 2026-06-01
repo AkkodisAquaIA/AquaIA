@@ -35,12 +35,12 @@ BATCH_SIZE = 16
 # Outliers
 OUTLIER_TAG = "outlier"
 LABEL_IN = "ground_truth"
-LABEL_OUT = "clean_label"   # nouveau champ recommandé (ne pas écraser ground_truth au début)
+LABEL_OUT = "clean_label"  # nouveau champ recommandé (ne pas écraser ground_truth au début)
 
-K = 10                      # kNN local
-KNN_PCTL = 95               # top 5% isolés (par classe)
+K = 10  # kNN local
+KNN_PCTL = 95  # top 5% isolés (par classe)
 MIN_CLUSTER_SIZE = 20
-PCA_DIMS = 64               # PCA avant HDBSCAN (stabilité)
+PCA_DIMS = 64  # PCA avant HDBSCAN (stabilité)
 
 
 @torch.inference_mode()
@@ -50,10 +50,11 @@ def compute_embeddings(model, processor, filepaths, device):
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
     outputs = model(**inputs)
-    feats = outputs.last_hidden_state          # (B, T, D)
-    emb = feats.mean(dim=1)                    # (B, D)
+    feats = outputs.last_hidden_state  # (B, T, D)
+    emb = feats.mean(dim=1)  # (B, D)
     emb = torch.nn.functional.normalize(emb, p=2, dim=1)
     return emb.detach().cpu().numpy().astype(np.float32)
+
 
 def detect_outliers_knn_per_class(
     dataset,
@@ -159,6 +160,7 @@ def detect_outliers_knn_per_class(
     dataset.save()
     print(f"Total outliers (toutes classes): {len(all_outlier_ids)}")
     return all_outlier_ids
+
 
 def detect_outliers_knn_hdbscan_per_class(dataset, emb_field):
     """
@@ -271,7 +273,7 @@ def main():
 
         all_embs = []
         for i in range(0, n, BATCH_SIZE):
-            batch_paths = filepaths[i:i + BATCH_SIZE]
+            batch_paths = filepaths[i : i + BATCH_SIZE]
             emb = compute_embeddings(model, processor, batch_paths, device)
             all_embs.extend([e.tolist() for e in emb])
 
@@ -283,7 +285,7 @@ def main():
         print("Embeddings sauvegardés dans:", EMB_FIELD)
 
     # 4) Détection outliers + relabelisation (-1) par classe
-    #detect_outliers_knn_hdbscan_per_class(dataset, EMB_FIELD)
+    # detect_outliers_knn_hdbscan_per_class(dataset, EMB_FIELD)
     detect_outliers_knn_per_class(dataset, EMB_FIELD)
 
     # Vue "propres" (facultatif) : exclure outliers

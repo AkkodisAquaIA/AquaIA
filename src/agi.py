@@ -17,10 +17,12 @@ ckpt_folder = "./checkpoints"
 out_folder = "./results"
 
 # ==== 2. Data ====
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.1307,), (0.3081,))  # MNIST normalization
-])
+transform = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),  # MNIST normalization
+    ]
+)
 
 train_dataset = datasets.MNIST(root="./data", train=True, download=True, transform=transform)
 test_dataset = datasets.MNIST(root="./data", train=False, download=True, transform=transform)
@@ -28,25 +30,20 @@ test_dataset = datasets.MNIST(root="./data", train=False, download=True, transfo
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=3)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=3)
 
+
 # ==== 3. Model ====
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3,
-                               stride=stride, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3,
-                               stride=1, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
         # Projection for channel or stride mismatch
         self.shortcut = nn.Sequential()
         if stride != 1 or in_channels != out_channels:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(out_channels)
-            )
+            self.shortcut = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False), nn.BatchNorm2d(out_channels))
 
     def forward(self, x):
         identity = self.shortcut(x)
@@ -64,20 +61,14 @@ class CNN(nn.Module):
             nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
-
             ResidualBlock(64, 128, stride=2),
             ResidualBlock(128, 128),
-
             ResidualBlock(128, 256, stride=2),
             ResidualBlock(256, 256),
-
-            nn.AdaptiveAvgPool2d((1, 1))
+            nn.AdaptiveAvgPool2d((1, 1)),
         )
 
-        self.classifier = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(256, num_classes)
-        )
+        self.classifier = nn.Sequential(nn.Flatten(), nn.Linear(256, num_classes))
 
     def forward(self, x):
         x = self.features(x)

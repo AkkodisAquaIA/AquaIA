@@ -19,9 +19,9 @@ DEST_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/AQUA-IA_data
 MODEL_ID = "facebook/dinov3-vitb16-pretrain-lvd1689m"
 BATCH_SIZE = 64
 
-K = 30                 # kNN
+K = 30  # kNN
 MIN_CLASS_SIZE = 30
-MIN_THRESHOLD = 0.80   # garde-fous (évite seuil trop bas)
+MIN_THRESHOLD = 0.80  # garde-fous (évite seuil trop bas)
 MAX_THRESHOLD = 0.995  # garde-fous (évite seuil trop haut)
 
 IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
@@ -56,8 +56,8 @@ def embed_batch(model, processor, paths, device):
     inputs = {k: v.to(device) for k, v in inputs.items()}
     outputs = model(**inputs)
 
-    feats = outputs.last_hidden_state          # (B, T, D)
-    emb = feats.mean(dim=1)                    # (B, D)
+    feats = outputs.last_hidden_state  # (B, T, D)
+    emb = feats.mean(dim=1)  # (B, D)
     emb = torch.nn.functional.normalize(emb, p=2, dim=1)
     return emb.detach().cpu().numpy().astype(np.float32)
 
@@ -65,7 +65,7 @@ def embed_batch(model, processor, paths, device):
 def compute_embeddings(model, processor, filepaths, device, batch_size=BATCH_SIZE):
     X = []
     for i in range(0, len(filepaths), batch_size):
-        X.append(embed_batch(model, processor, filepaths[i:i + batch_size], device))
+        X.append(embed_batch(model, processor, filepaths[i : i + batch_size], device))
     return np.vstack(X) if X else np.zeros((0, 1), dtype=np.float32)
 
 
@@ -89,9 +89,9 @@ def compute_adaptive_threshold(X, k=K):
     best_sims = sims[:, 1:].max(axis=1)
 
     perc = knn_percentile_for_class(n)
-    print('perc', perc)
+    print("perc", perc)
     thr = float(np.percentile(best_sims, perc))
-    print('thr', thr)
+    print("thr", thr)
 
     # garde-fous
     thr = max(MIN_THRESHOLD, min(MAX_THRESHOLD, thr))
@@ -100,7 +100,7 @@ def compute_adaptive_threshold(X, k=K):
 
 def greedy_dedup_knn(X, sim_threshold, k=K):
 
-    print('sim_threshold', sim_threshold)
+    print("sim_threshold", sim_threshold)
 
     n = X.shape[0]
     if n == 0:
@@ -165,7 +165,7 @@ def process_one_class(folder: Path, model, processor, device):
     images = list_images(folder)
 
     path = DEST_DIR / class_name
-    print('class_name', class_name)
+    print("class_name", class_name)
 
     if not path.is_dir():
         print("Le dossier n'existe pas")
@@ -188,7 +188,7 @@ def process_one_class(folder: Path, model, processor, device):
         if thr is None:
             print(f"[{class_name}] kept={len(kept_idx)} redundant={len(red_idx)}")
         else:
-            print(f"[{class_name}] thr={thr:.4f} | kept={len(kept_idx)} redundant={len(red_idx)} ({100*len(red_idx)/len(images):.1f}%)")
+            print(f"[{class_name}] thr={thr:.4f} | kept={len(kept_idx)} redundant={len(red_idx)} ({100 * len(red_idx) / len(images):.1f}%)")
 
         copy_kept(images, kept_idx, DEST_DIR / class_name)
 

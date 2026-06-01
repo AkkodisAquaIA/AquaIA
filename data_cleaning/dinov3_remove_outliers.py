@@ -22,13 +22,13 @@ BLURRY_OUT_DIRNAME = "blurry_outliers"
 MAD_OUT_DIRNAME = "mad_outliers"
 SIMILAR_OUT_DIRNAME = "similar_samples"
 
-BLUR_THRESHOLD = 5         # 5 pour FIN-Benthic et 50 pour FIN-Benthic2
-K = 10                      # kNN pour MAD
-ALPHA = 3.5                 # seuil MAD (plus grand = moins d'outliers)
+BLUR_THRESHOLD = 5  # 5 pour FIN-Benthic et 50 pour FIN-Benthic2
+K = 10  # kNN pour MAD
+ALPHA = 3.5  # seuil MAD (plus grand = moins d'outliers)
 
 # Redondance / similarité
-SIM_THRESHOLD = 0.985       # plus haut = plus strict (détecte uniquement quasi-doublons)
-SIM_K = 30                  # voisins explorés pour trouver des doublons
+SIM_THRESHOLD = 0.985  # plus haut = plus strict (détecte uniquement quasi-doublons)
+SIM_K = 30  # voisins explorés pour trouver des doublons
 MIN_CLASS_SIZE = 30
 
 BATCH_SIZE = 64
@@ -77,7 +77,7 @@ def list_images(folder: Path):
 def move_blurry_images(data_dir: str, blur_threshold: float, out_dirname: str = "blurry_outliers"):
     root = Path(data_dir)
     out_root = root / out_dirname
-    print('out_root', out_root)
+    print("out_root", out_root)
     out_root.mkdir(exist_ok=True)
 
     excluded = {out_dirname, MAD_OUT_DIRNAME, SIMILAR_OUT_DIRNAME}
@@ -111,8 +111,8 @@ def compute_embeddings_batch(model, processor, filepaths, device):
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
     outputs = model(**inputs)
-    feats = outputs.last_hidden_state          # (B, T, D)
-    emb = feats.mean(dim=1)                    # (B, D)
+    feats = outputs.last_hidden_state  # (B, T, D)
+    emb = feats.mean(dim=1)  # (B, D)
     emb = torch.nn.functional.normalize(emb, p=2, dim=1)
     return emb.detach().cpu().numpy().astype(np.float32)
 
@@ -120,7 +120,7 @@ def compute_embeddings_batch(model, processor, filepaths, device):
 def compute_embeddings_all(model, processor, filepaths, device, batch_size=64):
     vecs = []
     for i in range(0, len(filepaths), batch_size):
-        batch = filepaths[i:i + batch_size]
+        batch = filepaths[i : i + batch_size]
         vecs.append(compute_embeddings_batch(model, processor, batch, device))
     return np.vstack(vecs) if vecs else np.zeros((0, 1), dtype=np.float32)
 
@@ -144,9 +144,7 @@ def mad_threshold(scores: np.ndarray, alpha: float = 3.5):
     return float(med + alpha * mad)
 
 
-def move_mad_outliers(data_dir: str, out_dirname: str = "mad_outliers",
-                      k: int = 10, alpha: float = 3.5,
-                      model=None, processor=None, device=None):
+def move_mad_outliers(data_dir: str, out_dirname: str = "mad_outliers", k: int = 10, alpha: float = 3.5, model=None, processor=None, device=None):
     root = Path(data_dir)
     out_root = root / out_dirname
     out_root.mkdir(exist_ok=True)
@@ -264,10 +262,9 @@ def sim_params_for_class(n: int) -> tuple[float, int]:
     else:
         # classes géantes → nettoyage très agressif
         return 0.94, 400
-    
 
-def move_similar_samples(data_dir: str, out_dirname: str = "similar_samples",
-                         model=None, processor=None, device=None):
+
+def move_similar_samples(data_dir: str, out_dirname: str = "similar_samples", model=None, processor=None, device=None):
     root = Path(data_dir)
     out_root = root / out_dirname
     out_root.mkdir(exist_ok=True)
@@ -276,8 +273,7 @@ def move_similar_samples(data_dir: str, out_dirname: str = "similar_samples",
     class_folders = [p for p in root.iterdir() if p.is_dir() and p.name not in excluded]
 
     for class_folder in class_folders:
-        filepaths = [p for p in class_folder.iterdir()
-                     if p.is_file() and p.suffix.lower() in IMAGE_EXTS]
+        filepaths = [p for p in class_folder.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXTS]
         n = len(filepaths)
         print(f"[SIM] {class_folder.name}: n={n}")
 
@@ -317,24 +313,10 @@ def main():
     model = AutoModel.from_pretrained(MODEL_ID).to(device).eval()
 
     #  3) Outliers MAD
-    move_mad_outliers(
-        DATA_DIR,
-        out_dirname=MAD_OUT_DIRNAME,
-        k=K,
-        alpha=ALPHA,
-        model=model,
-        processor=processor,
-        device=device
-    )
+    move_mad_outliers(DATA_DIR, out_dirname=MAD_OUT_DIRNAME, k=K, alpha=ALPHA, model=model, processor=processor, device=device)
 
     # 4) Similar / redondants
-    move_similar_samples(
-        DATA_DIR,
-        out_dirname=SIMILAR_OUT_DIRNAME,
-        model=model,
-        processor=processor,
-        device=device
-    )
+    move_similar_samples(DATA_DIR, out_dirname=SIMILAR_OUT_DIRNAME, model=model, processor=processor, device=device)
 
     print("\n✅ Pipeline terminé.")
     root = Path(DATA_DIR)
