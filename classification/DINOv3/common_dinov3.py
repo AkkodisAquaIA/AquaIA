@@ -19,8 +19,10 @@ from transformers import AutoModel
 def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
+
 def write_json(path: Path, obj) -> None:
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
+
 
 def set_seed(seed: int) -> None:
     # Fixe les seeds des générateurs aléatoires (Python, NumPy, PyTorch CPU/GPU) pour assurer la reproductibilité des résultats
@@ -29,6 +31,7 @@ def set_seed(seed: int) -> None:
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
 
 def get_env_info() -> Dict:
     return {
@@ -57,9 +60,11 @@ def infer_block_index(name: str) -> Optional[int]:
             return int(m.group(1))
     return None
 
+
 def freeze_all(model: nn.Module) -> None:
     for p in model.parameters():
         p.requires_grad = False
+
 
 def unfreeze_last_n_blocks(backbone: nn.Module, n: int) -> int:
     """
@@ -95,6 +100,7 @@ class DinoV3Classifier(nn.Module):
     """
     Backbone DINOv3 (Transformers AutoModel) + head linéaire.
     """
+
     def __init__(self, model_id: str, num_classes: int, dropout: float = 0.0):
         super().__init__()
         self.model_id = model_id
@@ -116,6 +122,7 @@ class DinoV3Classifier(nn.Module):
 def save_checkpoint(path: Path, payload: Dict) -> None:
     ensure_dir(path.parent)
     torch.save(payload, path)
+
 
 def load_checkpoint(path: Path, device: torch.device) -> Dict:
     return torch.load(path, map_location=device)

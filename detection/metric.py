@@ -30,6 +30,7 @@ def print_metrics(metrics):
     summary = " | ".join(f"{key}={metrics[key]:.4f}" for key in sorted(metrics) if isinstance(metrics[key], (int, float)))
     print(summary)
 
+
 def save_metrics(metrics, output_dir):
     print_metrics(metrics)
     with (Path(output_dir) / "inference_metrics.yaml").open("w", encoding="utf-8") as f:
@@ -90,13 +91,7 @@ def _predict_dino(model, images, device, num_classes, conf_thres):
 
 
 def _predict_yolo(model, image_files, device, conf_thres, imgsz):
-    results = model.predict(
-        source=image_files, 
-        conf=conf_thres, 
-        device=device, 
-        verbose=False, 
-        imgsz=imgsz
-    )
+    results = model.predict(source=image_files, conf=conf_thres, device=device, verbose=False, imgsz=imgsz)
     preds = []
     shapes = []
     for result in results:

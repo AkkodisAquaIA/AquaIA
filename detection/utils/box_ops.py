@@ -14,6 +14,7 @@
 """
 Utilities for bounding box manipulation and GIoU.
 """
+
 import numpy as np
 import torch
 from torchvision.ops.boxes import box_area
@@ -61,11 +62,11 @@ def generalized_box_iou(boxes1, boxes2):
     # so do an early check
     mask = (boxes1[:, 2:] >= boxes1[:, :2]).all(dim=1)
     if not mask.all():
-        print('invalid boxes(x0y0x1y1)\n', flush=True)
-        print(boxes1[~mask], '\n', flush=True)
-        print('invalid boxes(cxcywh)\n', flush=True)
-        print(box_xyxy_to_cxcywh(boxes1[~mask]), '\n', flush=True)
-        print('\n', flush=True)
+        print("invalid boxes(x0y0x1y1)\n", flush=True)
+        print(boxes1[~mask], "\n", flush=True)
+        print("invalid boxes(cxcywh)\n", flush=True)
+        print(box_xyxy_to_cxcywh(boxes1[~mask]), "\n", flush=True)
+        print("\n", flush=True)
     assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
     assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
     iou, union = box_iou(boxes1, boxes2)
@@ -105,13 +106,8 @@ def masks_to_boxes(masks):
 
     return torch.stack([x_min, y_min, x_max, y_max], 1)
 
-def delta2bbox(proposals,
-               deltas,
-               max_shape=None,
-               wh_ratio_clip=16 / 1000,
-               clip_border=True,
-               add_ctr_clamp=False,
-               ctr_clamp=32):
+
+def delta2bbox(proposals, deltas, max_shape=None, wh_ratio_clip=16 / 1000, clip_border=True, add_ctr_clamp=False, ctr_clamp=32):
 
     dxy = deltas[..., :2]
     dwh = deltas[..., 2:]
@@ -139,7 +135,8 @@ def delta2bbox(proposals,
         bboxes[..., 1::2].clamp_(min=0).clamp_(max=max_shape[0])
     return bboxes
 
-def bbox2delta(proposals, gt, means=(0., 0., 0., 0.), stds=(1., 1., 1., 1.)):
+
+def bbox2delta(proposals, gt, means=(0.0, 0.0, 0.0, 0.0), stds=(1.0, 1.0, 1.0, 1.0)):
     # hack for matcher
     if proposals.size() != gt.size():
         proposals = proposals[:, None]

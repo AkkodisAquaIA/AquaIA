@@ -24,11 +24,7 @@ EXPERIMENTS = [
         "model.family": "dinov3",
         "model.size": "plus",
     },
-    {
-        "model.family": "dinov3",
-        "model.size": "small",
-        "training.batch" : 64
-    },
+    {"model.family": "dinov3", "model.size": "small", "training.batch": 64},
 ]
 
 
@@ -133,11 +129,7 @@ def print_benchmark_summary(run_summaries: list[dict]) -> None:
 
     print("\nBenchmark summary:")
     for run_summary in run_summaries:
-        print(
-            f"  {run_summary['label']}: "
-            f"best map50={run_summary['best_map_50']:.4f}, "
-            f"best map_50_95={run_summary['best_map_50_95']:.4f}"
-        )
+        print(f"  {run_summary['label']}: best map50={run_summary['best_map_50']:.4f}, best map_50_95={run_summary['best_map_50_95']:.4f}")
 
 
 def save_metric_plot(run_summaries: list[dict], metric_key: str, output_path: Path, ylabel: str, title: str) -> None:

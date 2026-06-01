@@ -45,8 +45,8 @@ elif model_name == "dinov3":
 else:
     raise ValueError("Choisir entre 'dinov2' ou 'dinov3'")
 
-EMB_FIELD = model_name + "_embedding"   # ListField (legacy)
-VEC_FIELD = "dinov3_vec"               # VectorField (recommandé)
+EMB_FIELD = model_name + "_embedding"  # ListField (legacy)
+VEC_FIELD = "dinov3_vec"  # VectorField (recommandé)
 
 BATCH_SIZE = 64
 
@@ -61,6 +61,7 @@ MIN_CLASS_SIZE = 2
 # Si tu veux garder les datasets temporaires (pour debug) mets True
 KEEP_TEMP_DATASETS = False
 
+
 def knn_percentile_for_class(n):
     if n < 50:
         return 99
@@ -74,6 +75,7 @@ def knn_percentile_for_class(n):
         return 90
     else:
         return 85
+
 
 def safe_key(s: str) -> str:
     """brain_key safe: pas d'espaces / caractères bizarres"""
@@ -97,19 +99,15 @@ def compute_embeddings(model, processor, filepaths, device):
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
     outputs = model(**inputs)
-    feats = outputs.last_hidden_state          # (B, T, D)
-    emb = feats.mean(dim=1)                    # (B, D)
+    feats = outputs.last_hidden_state  # (B, T, D)
+    emb = feats.mean(dim=1)  # (B, D)
     emb = torch.nn.functional.normalize(emb, p=2, dim=1)
     return emb.detach().cpu().numpy().astype(np.float32)
 
 
 def ensure_vector_field(dataset):
     if VEC_FIELD not in dataset.get_field_schema():
-        dataset.add_sample_field(
-            VEC_FIELD,
-            fo.VectorField,
-            description="DINO embeddings (VectorField)"
-        )
+        dataset.add_sample_field(VEC_FIELD, fo.VectorField, description="DINO embeddings (VectorField)")
         dataset.save()
 
     # Optionnel: garder aussi EMB_FIELD (ListField)
@@ -143,7 +141,7 @@ def compute_embeddings_for_dataset(dataset, model, processor, device):
 
     vecs = []
     for i in range(0, len(filepaths), BATCH_SIZE):
-        batch_paths = filepaths[i:i + BATCH_SIZE]
+        batch_paths = filepaths[i : i + BATCH_SIZE]
         emb = compute_embeddings(model, processor, batch_paths, device)
         vecs.extend([e.tolist() for e in emb])
 
@@ -235,10 +233,8 @@ def deduplicate_dataset_single_class(dataset):
     X = np.stack(base_view.values(VEC_FIELD)).astype(np.float32)
 
     sim_threshold = knn_percentile_for_class(n)
-        
-    kept_ids, redundant_ids = greedy_dedup_from_knn(
-        X, ids, sim_threshold=sim_threshold, k=K
-    )
+
+    kept_ids, redundant_ids = greedy_dedup_from_knn(X, ids, sim_threshold=sim_threshold, k=K)
 
     if redundant_ids:
         dataset.select(redundant_ids).tag_samples(REDUNDANT_TAG)
@@ -254,7 +250,7 @@ def deduplicate_dataset_single_class(dataset):
 
     base_view.set_values(
         LABEL_OUT,
-        [fo.Classification(label=str(l)) for l in clean_labels],
+        [fo.Classification(label=str(lbl)) for lbl in clean_labels],
     )
     dataset.save()
 
@@ -325,11 +321,7 @@ def process_class_folder(
     else:
         # Import simple: toutes les images du dossier, label = class_name
         dataset = fo.Dataset.from_images_dir(class_path, name=ds_name)
-        dataset.add_sample_field(
-            LABEL_IN,
-            fo.EmbeddedDocumentField,
-            embedded_doc_type=fo.Classification
-        )
+        dataset.add_sample_field(LABEL_IN, fo.EmbeddedDocumentField, embedded_doc_type=fo.Classification)
         dataset.set_values(LABEL_IN, [fo.Classification(label=class_name)] * len(dataset))
         dataset.save()
         print(f"[{class_name}] dataset importé: {ds_name} (n={len(dataset)})")

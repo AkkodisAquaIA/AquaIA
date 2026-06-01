@@ -24,7 +24,6 @@ def rename_images_with_suffix(root_path):
 
         for img_path in folder.iterdir():
             if img_path.is_file() and img_path.suffix.lower() in IMAGE_EXTS:
-
                 # Si déjà suffixé → on skip
                 if img_path.stem.endswith(SUFFIX):
                     continue

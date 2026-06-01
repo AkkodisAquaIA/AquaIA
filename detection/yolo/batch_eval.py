@@ -89,11 +89,7 @@ def find_run_config(run_dir: Path) -> Optional[Path]:
 
 def scan_valid_runs(runs_dir: Path) -> List[Path]:
     """Return sorted list of run directories that contain a resolved config."""
-    return [
-        p
-        for p in sorted(runs_dir.iterdir())
-        if p.is_dir() and (p / _CONFIG_FILE).is_file()
-    ]
+    return [p for p in sorted(runs_dir.iterdir()) if p.is_dir() and (p / _CONFIG_FILE).is_file()]
 
 
 # ---------------------------------------------------------------------------
@@ -183,9 +179,7 @@ def parse_diagnostics_stdout(stdout: str) -> Dict[str, Any]:
         diag["low_iou_examples"] = int(m.group(1))
 
     # Confirm the final TensorBoard export line is present.
-    diag["tb_exported"] = bool(
-        re.search(r"TensorBoard export complete", stdout, re.IGNORECASE)
-    )
+    diag["tb_exported"] = bool(re.search(r"TensorBoard export complete", stdout, re.IGNORECASE))
 
     return diag
 
@@ -218,9 +212,7 @@ def build_eval_command(
     diag_script = script_dir / "yolo_run_diagnostics.py"
 
     if not diag_script.is_file():
-        raise FileNotFoundError(
-            f"yolo_run_diagnostics.py not found next to batch_eval.py: {diag_script}"
-        )
+        raise FileNotFoundError(f"yolo_run_diagnostics.py not found next to batch_eval.py: {diag_script}")
 
     cmd = [
         sys.executable,
@@ -372,9 +364,7 @@ def rank_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             sort_cols.append(col)
             ascending.append(True)
 
-    return df.sort_values(sort_cols, ascending=ascending, na_position="last").drop(
-        columns=["_ok"]
-    )
+    return df.sort_values(sort_cols, ascending=ascending, na_position="last").drop(columns=["_ok"])
 
 
 # ---------------------------------------------------------------------------
@@ -409,10 +399,7 @@ def write_markdown_report(df: pd.DataFrame, md_path: Path, batch_id: str) -> Non
             f"- `train_mAP50`    = {best.get('train_mAP50', 'N/A')}",
             f"- `train_mAP50_95` = {best.get('train_mAP50_95', 'N/A')}",
             f"- `iou_mean`       = {best.get('iou_mean', 'N/A')}",
-            (
-                f"- `good / missed / fp_only` = "
-                f"{best.get('good', '?')} / {best.get('missed', '?')} / {best.get('fp_only', '?')}"
-            ),
+            (f"- `good / missed / fp_only` = {best.get('good', '?')} / {best.get('missed', '?')} / {best.get('fp_only', '?')}"),
         ]
 
     md_path.write_text("\n".join(lines), encoding="utf-8")
@@ -429,9 +416,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parser.add_argument(
-        "--runs-dir", required=True, help="Directory containing YOLO run folders."
-    )
+    parser.add_argument("--runs-dir", required=True, help="Directory containing YOLO run folders.")
     parser.add_argument(
         "--dataset-yaml-override",
         required=True,
@@ -442,9 +427,7 @@ def parse_args() -> argparse.Namespace:
         default="runs/batch_eval",
         help="Root output folder for CSV, Markdown and TensorBoard logs.",
     )
-    parser.add_argument(
-        "--max-runs", type=int, default=20, help="Maximum number of runs to evaluate."
-    )
+    parser.add_argument("--max-runs", type=int, default=20, help="Maximum number of runs to evaluate.")
     parser.add_argument(
         "--run-filter",
         default=None,
@@ -518,9 +501,7 @@ def main() -> None:
     print(f"  dataset    : {dataset_yaml}")
     print(f"  output-dir : {output_dir}")
     print(f"  tb-dir     : {tb_dir}")
-    print(
-        f"  pred_conf={args.pred_conf}  pred_iou={args.pred_iou}  match_iou={args.match_iou}"
-    )
+    print(f"  pred_conf={args.pred_conf}  pred_iou={args.pred_iou}  match_iou={args.match_iou}")
     print(sep)
 
     valid_runs = scan_valid_runs(runs_dir)
@@ -557,10 +538,7 @@ def main() -> None:
             timeout=args.timeout,
         )
         results.append({**metadata, **eval_result})
-        print(
-            f"  → status={eval_result.get('status', '?'):8s}"
-            f"  time={eval_result.get('eval_time_s', '?'):>6}s"
-        )
+        print(f"  → status={eval_result.get('status', '?'):8s}  time={eval_result.get('eval_time_s', '?'):>6}s")
 
     df = pd.DataFrame(results)
     df = rank_dataframe(df)
@@ -581,11 +559,7 @@ def main() -> None:
     ok_df = df[df["status"] == "OK"]
     if not ok_df.empty and "train_mAP50" in ok_df.columns:
         best = ok_df.iloc[0]
-        print(
-            f"\n  WINNER : {best['run_name']}"
-            f"  (train_mAP50={best.get('train_mAP50', 'N/A')}"
-            f"  iou_mean={best.get('iou_mean', 'N/A')})"
-        )
+        print(f"\n  WINNER : {best['run_name']}  (train_mAP50={best.get('train_mAP50', 'N/A')}  iou_mean={best.get('iou_mean', 'N/A')})")
     print()
 
 

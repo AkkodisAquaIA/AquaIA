@@ -16,6 +16,7 @@ Misc functions, including distributed helpers.
 
 Mostly copy-paste from torchvision references.
 """
+
 import copy
 import os
 import subprocess
@@ -23,13 +24,11 @@ import time
 from collections import defaultdict, deque
 import datetime
 import pickle
-from typing import Optional, List
 
 import torch
 import torch.nn as nn
 import torch.distributed as dist
 import torch.nn.functional as F
-from torch import Tensor
 
 # needed due to empty tensor bug in pytorch and torchvision 0.5
 import torchvision
@@ -129,9 +128,7 @@ def all_gather(data):
     for _ in size_list:
         tensor_list.append(torch.empty((max_size,), dtype=torch.uint8, device="cuda"))
     if local_size != max_size:
-        padding = torch.empty(
-            size=(max_size - local_size,), dtype=torch.uint8, device="cuda"
-        )
+        padding = torch.empty(size=(max_size - local_size,), dtype=torch.uint8, device="cuda")
         tensor = torch.cat((tensor, padding), dim=0)
     dist.all_gather(tensor_list, tensor)
 
@@ -187,9 +184,7 @@ class MetricLogger(object):
             return self.meters[attr]
         if attr in self.__dict__:
             return self.__dict__[attr]
-        raise AttributeError(
-            "'{}' object has no attribute '{}'".format(type(self).__name__, attr)
-        )
+        raise AttributeError("'{}' object has no attribute '{}'".format(type(self).__name__, attr))
 
     def __str__(self):
         loss_str = []
@@ -271,11 +266,7 @@ class MetricLogger(object):
             end = time.time()
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-        print(
-            "{} Total time: {} ({:.4f} s / it)".format(
-                header, total_time_str, total_time / len(iterable)
-            )
-        )
+        print("{} Total time: {} ({:.4f} s / it)".format(header, total_time_str, total_time / len(iterable)))
 
 
 def get_sha():
@@ -297,7 +288,6 @@ def get_sha():
         pass
     message = f"sha: {sha}, status: {diff}, branch: {branch}"
     return message
-
 
 
 def setup_for_distributed(is_master):
@@ -369,9 +359,7 @@ def init_distributed_mode(args):
         ntasks = int(os.environ["SLURM_NTASKS"])
         node_list = os.environ["SLURM_NODELIST"]
         num_gpus = torch.cuda.device_count()
-        addr = subprocess.getoutput(
-            "scontrol show hostname {} | head -n1".format(node_list)
-        )
+        addr = subprocess.getoutput("scontrol show hostname {} | head -n1".format(node_list))
         os.environ["MASTER_PORT"] = os.environ.get("MASTER_PORT", "29500")
         os.environ["MASTER_ADDR"] = addr
         os.environ["WORLD_SIZE"] = str(ntasks)
@@ -391,9 +379,7 @@ def init_distributed_mode(args):
 
     torch.cuda.set_device(args.gpu)
     args.dist_backend = "nccl"
-    print(
-        "| distributed init (rank {}): {}".format(args.rank, args.dist_url), flush=True
-    )
+    print("| distributed init (rank {}): {}".format(args.rank, args.dist_url), flush=True)
     torch.distributed.init_process_group(
         backend=args.dist_backend,
         init_method=args.dist_url,
@@ -418,7 +404,6 @@ def accuracy(output, target, topk=(1,)):
 
     # print(pred)
     # print(target)
-    
 
     res = []
     for k in topk:
@@ -427,18 +412,14 @@ def accuracy(output, target, topk=(1,)):
     return res
 
 
-def interpolate(
-    input, size=None, scale_factor=None, mode="nearest", align_corners=None
-):
+def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corners=None):
     # type: (Tensor, Optional[List[int]], Optional[float], str, Optional[bool]) -> Tensor
     """
     Equivalent to nn.functional.interpolate, but with support for empty batch sizes.
     This will eventually be supported natively by PyTorch, and this
     class can go away.
     """
-    return torchvision.ops.misc.interpolate(
-        input, size, scale_factor, mode, align_corners
-    )
+    return torchvision.ops.misc.interpolate(input, size, scale_factor, mode, align_corners)
 
 
 def get_total_grad_norm(parameters, norm_type=2):
@@ -446,9 +427,7 @@ def get_total_grad_norm(parameters, norm_type=2):
     norm_type = float(norm_type)
     device = parameters[0].grad.device
     total_norm = torch.norm(
-        torch.stack(
-            [torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]
-        ),
+        torch.stack([torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]),
         norm_type,
     )
     return total_norm
@@ -471,7 +450,7 @@ def find_latest_checkpoint(path, ext="pth"):
         return osp.join(path, f"checkpoint.{ext}")
 
     checkpoints = glob.glob(osp.join(path, f"*.{ext}"))
-    checkpoints = [ckpt for ckpt in checkpoints if osp.basename(ckpt) != 'eval.pth']
+    checkpoints = [ckpt for ckpt in checkpoints if osp.basename(ckpt) != "eval.pth"]
     if len(checkpoints) == 0:
         return None
     latest = -1
@@ -508,19 +487,19 @@ def get_swin_layer_id(var_name, backbone_type):
     assert map_type is not None, f"Unsupported backbone type {backbone_type}"
 
     # hack for UpSampleWrapper
-    if var_name.startswith('backbone.0.net.'):
+    if var_name.startswith("backbone.0.net."):
         num_max_layer = maps[map_type]["num_max_layer"]
         layers_per_stage = maps[map_type]["layers_per_stage"]
         if var_name.startswith("backbone.0.net.body.patch_embed"):
             layer_id = 0
         elif var_name.startswith("backbone.0.net.body.layers"):
-            if var_name.split('.')[6] == "blocks":
-                stage_id = int(var_name.split('.')[5])
-                layer_id = int(var_name.split('.')[7]) + sum(layers_per_stage[:stage_id])
+            if var_name.split(".")[6] == "blocks":
+                stage_id = int(var_name.split(".")[5])
+                layer_id = int(var_name.split(".")[7]) + sum(layers_per_stage[:stage_id])
                 layer_id = layer_id + 1
-            elif var_name.split('.')[6] == "downsample":
-                stage_id = int(var_name.split('.')[5])
-                layer_id = sum(layers_per_stage[:stage_id+1])
+            elif var_name.split(".")[6] == "downsample":
+                stage_id = int(var_name.split(".")[5])
+                layer_id = sum(layers_per_stage[: stage_id + 1])
                 layer_id = layer_id
         elif var_name.startswith("backbone.0.net.body.norm"):
             layer_id = num_max_layer + 1
@@ -533,13 +512,13 @@ def get_swin_layer_id(var_name, backbone_type):
     if var_name.startswith("backbone.0.body.patch_embed"):
         layer_id = 0
     elif var_name.startswith("backbone.0.body.layers"):
-        if var_name.split('.')[5] == "blocks":
-            stage_id = int(var_name.split('.')[4])
-            layer_id = int(var_name.split('.')[6]) + sum(layers_per_stage[:stage_id])
+        if var_name.split(".")[5] == "blocks":
+            stage_id = int(var_name.split(".")[4])
+            layer_id = int(var_name.split(".")[6]) + sum(layers_per_stage[:stage_id])
             layer_id = layer_id + 1
-        elif var_name.split('.')[5] == "downsample":
-            stage_id = int(var_name.split('.')[4])
-            layer_id = sum(layers_per_stage[:stage_id+1])
+        elif var_name.split(".")[5] == "downsample":
+            stage_id = int(var_name.split(".")[4])
+            layer_id = sum(layers_per_stage[: stage_id + 1])
             layer_id = layer_id
     elif var_name.startswith("backbone.0.body.norm"):
         layer_id = num_max_layer + 1
@@ -561,14 +540,14 @@ def get_layerwise_param_dict(model, args, return_name=False):
             else:
                 group_name = "wd"
                 weight_decay = args.weight_decay
-            if 'swin' in args.backbone:
+            if "swin" in args.backbone:
                 layer_id = get_swin_layer_id(n, args.backbone)
             else:
                 raise NotImplementedError
             group_name = f"layer_{layer_id}_{group_name}"
 
             if group_name not in parameter_groups:
-                scale = args.lr_decay_rate ** layer_id
+                scale = args.lr_decay_rate**layer_id
 
                 parameter_groups[group_name] = {
                     "params": [],
@@ -644,10 +623,7 @@ def get_param_dict(model, args, return_name=False, use_layerwise_decay=False):
             "params": [
                 p if not return_name else n
                 for n, p in model.named_parameters()
-                if not match_name_keywords(n, args.lr_backbone_names)
-                and not match_name_keywords(n, args.lr_linear_proj_names)
-                and not match_name_keywords(n, args.wd_norm_names)
-                and p.requires_grad
+                if not match_name_keywords(n, args.lr_backbone_names) and not match_name_keywords(n, args.lr_linear_proj_names) and not match_name_keywords(n, args.wd_norm_names) and p.requires_grad
             ],
             "lr": args.lr,
             "weight_decay": args.weight_decay,
@@ -656,10 +632,7 @@ def get_param_dict(model, args, return_name=False, use_layerwise_decay=False):
             "params": [
                 p if not return_name else n
                 for n, p in model.named_parameters()
-                if match_name_keywords(n, args.lr_backbone_names)
-                and not match_name_keywords(n, args.lr_linear_proj_names)
-                and not match_name_keywords(n, args.wd_norm_names)
-                and p.requires_grad
+                if match_name_keywords(n, args.lr_backbone_names) and not match_name_keywords(n, args.lr_linear_proj_names) and not match_name_keywords(n, args.wd_norm_names) and p.requires_grad
             ],
             "lr": args.lr_backbone,
             "weight_decay": args.weight_decay,
@@ -668,10 +641,7 @@ def get_param_dict(model, args, return_name=False, use_layerwise_decay=False):
             "params": [
                 p if not return_name else n
                 for n, p in model.named_parameters()
-                if not match_name_keywords(n, args.lr_backbone_names)
-                and match_name_keywords(n, args.lr_linear_proj_names)
-                and not match_name_keywords(n, args.wd_norm_names)
-                and p.requires_grad
+                if not match_name_keywords(n, args.lr_backbone_names) and match_name_keywords(n, args.lr_linear_proj_names) and not match_name_keywords(n, args.wd_norm_names) and p.requires_grad
             ],
             "lr": args.lr * args.lr_linear_proj_mult,
             "weight_decay": args.weight_decay,
@@ -680,10 +650,7 @@ def get_param_dict(model, args, return_name=False, use_layerwise_decay=False):
             "params": [
                 p if not return_name else n
                 for n, p in model.named_parameters()
-                if not match_name_keywords(n, args.lr_backbone_names)
-                and not match_name_keywords(n, args.lr_linear_proj_names)
-                and match_name_keywords(n, args.wd_norm_names)
-                and p.requires_grad
+                if not match_name_keywords(n, args.lr_backbone_names) and not match_name_keywords(n, args.lr_linear_proj_names) and match_name_keywords(n, args.wd_norm_names) and p.requires_grad
             ],
             "lr": args.lr,
             "weight_decay": args.weight_decay * args.wd_norm_mult,
@@ -692,10 +659,7 @@ def get_param_dict(model, args, return_name=False, use_layerwise_decay=False):
             "params": [
                 p if not return_name else n
                 for n, p in model.named_parameters()
-                if match_name_keywords(n, args.lr_backbone_names)
-                and not match_name_keywords(n, args.lr_linear_proj_names)
-                and match_name_keywords(n, args.wd_norm_names)
-                and p.requires_grad
+                if match_name_keywords(n, args.lr_backbone_names) and not match_name_keywords(n, args.lr_linear_proj_names) and match_name_keywords(n, args.wd_norm_names) and p.requires_grad
             ],
             "lr": args.lr_backbone,
             "weight_decay": args.weight_decay * args.wd_norm_mult,
@@ -704,10 +668,7 @@ def get_param_dict(model, args, return_name=False, use_layerwise_decay=False):
             "params": [
                 p if not return_name else n
                 for n, p in model.named_parameters()
-                if not match_name_keywords(n, args.lr_backbone_names)
-                and match_name_keywords(n, args.lr_linear_proj_names)
-                and match_name_keywords(n, args.wd_norm_names)
-                and p.requires_grad
+                if not match_name_keywords(n, args.lr_backbone_names) and match_name_keywords(n, args.lr_linear_proj_names) and match_name_keywords(n, args.wd_norm_names) and p.requires_grad
             ],
             "lr": args.lr * args.lr_linear_proj_mult,
             "weight_decay": args.weight_decay * args.wd_norm_mult,
