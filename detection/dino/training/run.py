@@ -7,46 +7,15 @@ import torch
 import tqdm
 from transformers import get_scheduler
 
-from dataloading.datasets import YOLOFormatDataset, DALIDetectionDataLoader, sample_dataset
+from dataloading.datasets import YOLOFormatDataset, DALIDetectionDataLoader, parse_batch
 from detection.dino.dino_detector import DINODetector
 from detection.dino.loss import SetCriterion
-from detection.metric import evaluate_map, log_epoch, print_metrics, update_log_dict
+from detection.metric import compute_metrics, log_epoch, print_metrics, update_log_dict
 from detection.dino.utils.matcher import HungarianMatcher
 from detection.checkpoint import save_model_checkpoint, save_training_state_checkpoint
 from detection.utils.config_utils import save_resolved_config
-from detection.utils.plot_utils import plot_metrics, annotate_images_with_predictions
-from detection.dino.predict import predict
-
-@torch.no_grad()
-def save_sample_predictions(model, subset, output_dir, num_samples=20, conf=0.3, seed=0, device="cuda", use_amp=True):
-	inputs, images, image_files = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
-	print(f"Sampled {len(image_files)} images from {subset.dataset_root}")
-	model.eval()
-	predictions = predict(
-		model=model, 
-		images=inputs, 
-		device=device, 
-		conf_thres=conf
-	)
-
-	annotate_images_with_predictions(
-		images=images,
-		predictions=predictions,
-		class_names=subset.class_names,
-		output_dir=output_dir,
-		image_files=image_files,
-	)
-
-
-def normalize_imgsz(config):
-	model_family = str(config.get("model", {}).get("family", "")).lower()
-	patch_size = 14 if model_family == "dinov2" else 16
-	imgsz = int(config["training"]["imgsz"])
-	rounded_imgsz = max(patch_size, round(imgsz / patch_size) * patch_size)
-	if rounded_imgsz != imgsz:
-		print(f"Warning: imgsz={imgsz} is not divisible by patch size {patch_size}. Using imgsz={rounded_imgsz} instead.")
-		config["training"]["imgsz"] = rounded_imgsz
-	return int(config["training"]["imgsz"])
+from detection.utils.plot_utils import plot_metrics, save_sample_predictions
+from detection.dino.predict import predict, normalize_imgsz
 
 
 def get_datasets(data_yaml_path, batch_size):
@@ -82,45 +51,6 @@ def build_scheduler(training_config, optimizer):
 	)
 	return scheduler
 
-def parse_batch(batch):
-	batch = batch[0]
-	images = batch["images"]
-	# TODO : ugly but currently required. Need to modify downstream code to avoid this conversion
-	targets = [
-		{"labels": labels, "boxes": boxes}
-	  	for labels, boxes in zip(batch["labels"], batch["bboxes"])
-	]
-	return images, targets
-
-@torch.no_grad()
-def compute_metrics(model, train_dataloader, eval_dataloader, metrics_dict, device, conf_thresh):
-	model.eval()
-	imgsz = train_dataloader.img_size
-	for phase, loader in enumerate([train_dataloader, eval_dataloader]):
-		predictions = []
-		targets = []
-		split = "train" if phase==0 else "val"
-		for batch in loader: 
-			images, batch_targets = parse_batch(batch)
-			batch_preds = predict(
-				model=model, 
-				images=images, 
-				device=device, 
-				conf_thres=conf_thresh
-			)
-			predictions.extend(batch_preds)
-			targets.extend(batch_targets)
-
-		metrics = evaluate_map(
-			predictions=predictions,
-			targets=targets,
-			imgsz=imgsz,
-			split=split,
-			device=device,
-		)
-		metrics_dict.update(metrics)
-	model.train()
-
 
 def train_dino(config):
 	training_config = config["training"]
@@ -137,7 +67,7 @@ def train_dino(config):
 	train_set, val_set, num_classes = get_datasets(config["data"]["dataset_yaml"], training_config["batch"])
 
 	# === Setup dataloaders ===
-	imgsz = normalize_imgsz(config)
+	imgsz = normalize_imgsz(config, "training")
 	dataloader = DALIDetectionDataLoader(train_set, device="gpu", img_size=imgsz)
 	val_dataloader = DALIDetectionDataLoader(val_set, device="gpu", img_size=imgsz)
 
@@ -219,14 +149,14 @@ def train_dino(config):
 		epoch_metrics = log_epoch(log_dict, max(len(dataloader), 1))
 
 		# Add map50 and mAP50-95 evaluation at the end of each epoch (train and eval datasets)
-		compute_metrics(
+		metrics = compute_metrics(
 			model=model,
-			train_dataloader=dataloader,
-			eval_dataloader=val_dataloader,
-			metrics_dict=epoch_metrics,
+			dataloaders=[dataloader, val_dataloader],
+			predict_fn=predict,
 			device=device,
 			conf_thresh=training_config.get("conf_thresh", 0.05),
 		)
+		epoch_metrics.update(metrics)
 		epoch_metrics["epoch"] = epoch + 1
 		print_metrics(epoch_metrics)
 		metrics_history.append(epoch_metrics)
@@ -279,21 +209,21 @@ def train_dino(config):
 	save_sample_predictions(
 		model=model,
 		subset=val_set,
+		predict_fn=predict,
 		output_dir=Path(run_dir) / "eval_predictions",
 		conf=0.3,
 		seed=42,
 		device=device,
-		use_amp=use_amp,
 	)
 	# Train dataset
 	save_sample_predictions(
 		model=model,
 		subset=train_set,
+		predict_fn=predict,
 		output_dir=Path(run_dir) / "train_predictions",
-		conf=0.3,
+		conf=training_config.get("conf", 0.3),
 		seed=42,
 		device=device,
-		use_amp=use_amp,
 	)
 
 	return model

@@ -66,6 +66,8 @@ class BaseDetectionDataset:
         self.load_stats()
         self.class_names, self.num_classes = load_class_names(dataset_root)
         self.load_targets()
+        # if not (self.dataset_root / self.data_split).exists():
+        #     raise FileNotFoundError(f"Data split directory not found: {self.dataset_root / self.data_split}")
 
     def __len__(self):
         return len(self.target_files)
@@ -274,6 +276,15 @@ class DALIDetectionDataLoader:
     def __iter__(self):
         return iter(self.loader)
 
+def parse_batch(batch):
+	batch = batch[0]
+	images = batch["images"]
+	# TODO : ugly but currently required. Need to modify downstream code to avoid this conversion
+	targets = [
+		{"labels": labels, "boxes": boxes}
+	  	for labels, boxes in zip(batch["labels"], batch["bboxes"])
+	]
+	return images, targets
 
 def sample_indices(dataset_size, num_samples, seed):
     rng = random.Random(seed)

@@ -3,18 +3,18 @@ from pathlib import Path
 
 import torch
 import tqdm
-from torch.utils.data import DataLoader
 
-from dataloading.datasets import YOLOFormatDataset, detection_collate_fn, sample_dataset
+from dataloading.datasets import YOLOFormatDataset, DALIDetectionDataLoader
 from detection.dino.dino_detector import DINODetector
-from detection.dino.predict import predict as predict_detections
-from detection.metric import evaluate_map, save_metrics
+from detection.metric import compute_metrics, save_metrics
 from detection.utils.config_utils import find_latest_run_dir, load_run_config, load_class_names
-from detection.utils.plot_utils import annotate_images_with_predictions
-
+from detection.utils.plot_utils import save_sample_predictions
+from detection.dino.predict import predict, normalize_imgsz
 
 def load_model(run_dir, backbone_id, img_size, num_classes, device):
-    checkpoint = torch.load(Path(run_dir) / "weights" / "best.pt", map_location=device)
+    checkpoint = torch.load(Path(run_dir) / "weights" / "last.pt", map_location=device)
+    print(num_classes)
+    print(img_size)
     model = DINODetector(
         backbone_id=backbone_id,
         img_size=int(img_size),
@@ -24,61 +24,6 @@ def load_model(run_dir, backbone_id, img_size, num_classes, device):
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
     return model
-
-
-@torch.no_grad()
-def predict(model, images, device, use_amp):
-    images = images.to(device, non_blocking=device == "cuda")
-    with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
-        outputs = model(images)
-    outputs["pred_boxes"] = outputs["pred_boxes"].float()
-    outputs["pred_logits"] = outputs["pred_logits"].float()
-    return outputs
-
-
-def save_sample_predictions(model, dataset, class_names, inference_config, output_dir, seed, device, use_amp):
-    inputs, images, image_files = sample_dataset(dataset=dataset, num_samples=inference_config["num_samples"], seed=seed, device=device)
-    pred_output_dir = output_dir / f"predictions"
-
-    print(f"Sampled {len(image_files)} images from {dataset.dataset_root}")
-    for start in tqdm.tqdm(range(0, len(image_files), inference_config["batch"]), desc=f"Testing"):
-        end = min(start + inference_config["batch"], len(image_files))
-        batch_inputs = inputs[start:end]
-        batch_images = images[start:end]
-        batch_files = image_files[start:end]
-        predictions = predict_detections(
-            model=model,
-            images=batch_inputs,
-            device=device,
-            conf_thres=inference_config["conf"],
-        )
-        annotate_images_with_predictions(
-            images=batch_images,
-            predictions=predictions,
-            class_names=class_names,
-            output_dir=pred_output_dir,
-            image_files=batch_files,
-        )
-
-
-def evaluate_dataset(model, output_dir, dataset, inference_config, device):
-    dataloader = DataLoader(
-        dataset,
-        batch_size=inference_config["batch"],
-        shuffle=False,
-        collate_fn=detection_collate_fn,
-    )
-    metrics = evaluate_map(
-        model=model,
-        dataloader=dataloader,
-        device=device,
-        num_classes=int(model.num_classes),
-        conf_thresh=inference_config["conf"],
-    )
-    metrics["num_samples"] = len(dataset)
-    save_metrics(metrics, output_dir)
-    return metrics
-
 
 def test_dino(config):
     inference_config = config["inference"]
@@ -94,39 +39,42 @@ def test_dino(config):
     if run_config is None:
         raise ValueError("resolved_config.yaml is required to run inference.")
 
-    test_data_root = str(Path(data_cfg["test_data_root"]))
+    test_data_root = data_cfg["test_data_root"]
     output_root = Path(output_cfg["output_dir"]) if output_cfg.get("output_dir") else run_dir / "inference"
     output_dir = output_root / f"{Path(test_data_root).name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    test_class_names = load_class_names(test_data_root)
+    test_class_names, num_classes = load_class_names(test_data_root)
     model = load_model(
         run_dir=run_dir,
         backbone_id=f"{run_config['model']['family']}_{run_config['model']['size']}",
         img_size=run_config["training"]["imgsz"],
-        num_classes=len(test_class_names),
+        num_classes=num_classes,
         device=device,
     )
     test_dataset = YOLOFormatDataset(
-        dataset_root=str(Path(test_data_root)), device=device)
-
+        dataset_root=test_data_root,
+        data_split="test",
+        batch_size=inference_config["batch"],
+    )
+    imgsz = normalize_imgsz(config, "inference")
+    test_loader = DALIDetectionDataLoader(test_dataset, device="gpu", img_size=imgsz)
     save_sample_predictions(
         model=model,
-        dataset=test_dataset,
-        class_names=test_class_names,
-        inference_config=inference_config,
-        output_dir=output_dir,
+        subset=test_dataset,
+        predict_fn=predict,
+        output_dir=output_dir / "inference_predictions",
+        conf=inference_config.get("conf", 0.3),
         seed=inference_config["seed"],
         device=device,
-        use_amp=use_amp,
     )
-    evaluate_dataset(
+    metrics = compute_metrics(
         model=model,
-        output_dir=output_dir,
-        dataset=test_dataset,
-        inference_config=inference_config,
+        dataloaders=[test_loader],
+        predict_fn=predict,
+        conf_thresh=inference_config.get("conf", 0.3),
         device=device,
     )
-
+    save_metrics(metrics, output_dir)
     
     return output_dir
