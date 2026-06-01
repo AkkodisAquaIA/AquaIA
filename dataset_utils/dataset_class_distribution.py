@@ -86,8 +86,6 @@ CLASSES_IA = [
     "Heptageniidae_Kageronia_fuscogrisea",
     "Sphaeriidae_Sphaerium_sp",
 ]
-import os
-import matplotlib.pyplot as plt
 
 
 def plot_images_per_class(root_path, extensions=(".jpg", ".jpeg", ".png", ".tif", ".tiff")):

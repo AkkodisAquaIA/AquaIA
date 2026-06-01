@@ -104,7 +104,7 @@ def main():
     print("Embeddings sauvegardés dans:", EMB_FIELD)
 
     # Sécurité : uniquement samples avec embeddings
-    view = dataset.match(fo.ViewField(EMB_FIELD) != None)
+    view = dataset.match(fo.ViewField(EMB_FIELD) != None)  # noqa: E711
     print("Nb samples avec embeddings:", len(view))
 
     # 4a) UMAP

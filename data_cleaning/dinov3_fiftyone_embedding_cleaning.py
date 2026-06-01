@@ -151,7 +151,7 @@ def detect_outliers_knn_per_class(
     mask_global = np.array([_id in out_set for _id in base_ids], dtype=bool)
     clean_labels[mask_global] = "-1"
 
-    base_view.set_values(label_out, [fo.Classification(label=str(l)) for l in clean_labels])
+    base_view.set_values(label_out, [fo.Classification(label=str(lbl)) for lbl in clean_labels])
 
     # Tag outliers
     if all_outlier_ids:
@@ -224,7 +224,7 @@ def detect_outliers_knn_hdbscan_per_class(dataset, emb_field):
     mask_global = np.array([_id in out_set for _id in base_ids], dtype=bool)
     clean_labels[mask_global] = "-1"
 
-    base_view.set_values(LABEL_OUT, [fo.Classification(label=str(l)) for l in clean_labels])
+    base_view.set_values(LABEL_OUT, [fo.Classification(label=str(lbl)) for lbl in clean_labels])
 
     # Tag outliers
     if all_outlier_ids:

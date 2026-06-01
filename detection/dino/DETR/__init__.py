@@ -1,1 +1,1 @@
-from .detr import DETR
+from .detr import DETR as DETR

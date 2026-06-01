@@ -5,7 +5,6 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from tqdm import tqdm
 import os
-import time
 
 # ==== 1. Configuration ====
 batch_size = 1024
@@ -142,6 +141,6 @@ metrics = {
     "best_accuracy": best_accuracy,
 }
 torch.save(metrics, os.path.join(out_folder, "metrics.pth"))
-print(f"\n✅ Training finished.")
+print("\n✅ Training finished.")
 print(f"📈 Best Accuracy: {best_accuracy:.2f}%")
-print(f"💾 Saved metrics to metrics.pth and best model to best_model.pth")
+print("💾 Saved metrics to metrics.pth and best model to best_model.pth")

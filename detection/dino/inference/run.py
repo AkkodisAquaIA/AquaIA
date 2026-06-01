@@ -37,10 +37,10 @@ def predict(model, images, device, use_amp):
 
 def save_sample_predictions(model, dataset, class_names, inference_config, output_dir, seed, device, use_amp):
     images, image_files = sample_dataset(dataset=dataset, num_samples=inference_config["num_samples"], seed=seed)
-    pred_output_dir = output_dir / f"predictions"
+    pred_output_dir = output_dir / "predictions"
 
     print(f"Sampled {len(image_files)} images from {dataset.dataset_root}")
-    for start in tqdm.tqdm(range(0, len(image_files), inference_config["batch"]), desc=f"Testing"):
+    for start in tqdm.tqdm(range(0, len(image_files), inference_config["batch"]), desc="Testing"):
         end = min(start + inference_config["batch"], len(image_files))
         batch_images = images[start:end]
         batch_files = image_files[start:end]

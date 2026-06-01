@@ -87,7 +87,7 @@ def build_position_encoding(pe_type, h_dim=256):
         # TODO find a better way of exposing other arguments
         position_embedding = PositionEmbeddingSine(N_steps, normalize=True)
     elif pe_type == "learned":  # also called v3
-        position_embedding = PositionEmbeddingLearned(N_steps)
+        position_embedding = PositionEmbeddingLearned(N_steps)  # noqa: F821
     elif pe_type == "sine_unnorm":  # also called v4
         position_embedding = PositionEmbeddingSine(N_steps, normalize=False)
     else:

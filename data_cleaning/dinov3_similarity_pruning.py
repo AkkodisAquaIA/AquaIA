@@ -250,7 +250,7 @@ def deduplicate_dataset_single_class(dataset):
 
     base_view.set_values(
         LABEL_OUT,
-        [fo.Classification(label=str(l)) for l in clean_labels],
+        [fo.Classification(label=str(lbl)) for lbl in clean_labels],
     )
     dataset.save()
 

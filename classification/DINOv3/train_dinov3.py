@@ -2,7 +2,9 @@
 # train_dinov3.py
 
 from __future__ import annotations
-import json, time, re
+import json
+import time
+import re
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, Optional, Tuple

@@ -24,13 +24,11 @@ import time
 from collections import defaultdict, deque
 import datetime
 import pickle
-from typing import Optional, List
 
 import torch
 import torch.nn as nn
 import torch.distributed as dist
 import torch.nn.functional as F
-from torch import Tensor
 
 # needed due to empty tensor bug in pytorch and torchvision 0.5
 import torchvision
