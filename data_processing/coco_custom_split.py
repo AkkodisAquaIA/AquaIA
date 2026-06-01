@@ -20,6 +20,9 @@ ROOT_DIR = "C:/Users/zhijian.zhou/OneDrive - Akkodis/Travail/10_AquaIA/01_Git/Aq
 # Train/Test split ratio
 SPLIT_RATIO = 0.8
 
+# If True, only copy images that have a matching label .txt file
+MATCH = True
+
 
 def create_dir_structure(base_path):
     """Create YOLO standard dir structure"""
@@ -31,6 +34,8 @@ def create_dir_structure(base_path):
 def copy_files(file_names, src_img_dir, src_lbl_dir, dest_base, split):
     """Copy images and corresponding labels to the target dir"""
     print(f"Building {split} dataset...")
+    copied_count = 0
+    skipped_count = 0
     for fname in tqdm(file_names):
         img_name = fname + ".jpg"
         lbl_name = fname + ".txt"
@@ -41,11 +46,23 @@ def copy_files(file_names, src_img_dir, src_lbl_dir, dest_base, split):
         dest_img = os.path.join(dest_base, "images", split, img_name)
         dest_lbl = os.path.join(dest_base, "labels", split, lbl_name)
 
-        if os.path.exists(src_img):
-            shutil.copy2(src_img, dest_img)
+        if not os.path.exists(src_img):
+            skipped_count += 1
+            continue
+
+        if MATCH and not os.path.exists(src_lbl):
+            skipped_count += 1
+            continue
+
+        shutil.copy2(src_img, dest_img)
 
         if os.path.exists(src_lbl):
             shutil.copy2(src_lbl, dest_lbl)
+        copied_count += 1
+
+    if MATCH and skipped_count:
+        print(f"Skipped {skipped_count} {split} images without matching label.")
+    return copied_count
 
 
 def main():
@@ -55,7 +72,8 @@ def main():
     annotations_dir = root_path / "annotations"
 
     # Final dataset dir
-    final_output_dir = root_path.parent / "coco_custom"
+    output_name = "coco_custom_match" if MATCH else "coco_custom"
+    final_output_dir = root_path.parent / output_name
 
     print(f"Read input dataset dir: {root_path}")
     print(f"Output dataset dir: {final_output_dir}")
@@ -83,7 +101,7 @@ def main():
     # Val set
     val_lbl_dir = generated_lbl_dir / "val2017"
     val_fnames = [os.path.splitext(f)[0] for f in os.listdir(str(val_img_dir)) if f.endswith(".jpg")]
-    copy_files(val_fnames, str(val_img_dir), str(val_lbl_dir), str(final_output_dir), "val")
+    copied_val_count = copy_files(val_fnames, str(val_img_dir), str(val_lbl_dir), str(final_output_dir), "val")
 
     # Train test sets
     train_lbl_dir = generated_lbl_dir / "train2017"
@@ -96,8 +114,8 @@ def main():
     actual_train_fnames = train_fnames[:split_idx]
     actual_test_fnames = train_fnames[split_idx:]
 
-    copy_files(actual_train_fnames, str(train_img_dir), str(train_lbl_dir), str(final_output_dir), "train")
-    copy_files(actual_test_fnames, str(train_img_dir), str(train_lbl_dir), str(final_output_dir), "test")
+    copied_train_count = copy_files(actual_train_fnames, str(train_img_dir), str(train_lbl_dir), str(final_output_dir), "train")
+    copied_test_count = copy_files(actual_test_fnames, str(train_img_dir), str(train_lbl_dir), str(final_output_dir), "test")
 
     # Delete generated files when conversion .json -> .txt
     tmp_lbl_root = generated_lbl_dir.parent
@@ -106,9 +124,9 @@ def main():
         shutil.rmtree(tmp_lbl_root)
 
     print(f"\nCustom COCO dataset created at '{final_output_dir}'")
-    print(f"Train: {len(actual_train_fnames)} images")
-    print(f"Val: {len(val_fnames)} images")
-    print(f"Test: {len(actual_test_fnames)} images")
+    print(f"Train: {copied_train_count} images")
+    print(f"Val: {copied_val_count} images")
+    print(f"Test: {copied_test_count} images")
 
 
 if __name__ == "__main__":
