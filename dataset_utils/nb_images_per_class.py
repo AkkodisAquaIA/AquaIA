@@ -13,15 +13,9 @@ resultats = []
 
 for sous_dossier in dossier_racine.iterdir():
     if sous_dossier.is_dir():
-        nb_images = sum(
-            1 for f in sous_dossier.iterdir()
-            if f.is_file() and f.suffix.lower() in extensions
-        )
+        nb_images = sum(1 for f in sous_dossier.iterdir() if f.is_file() and f.suffix.lower() in extensions)
 
-        resultats.append({
-            "Classe": sous_dossier.name,
-            "Nombre d'images": nb_images
-        })
+        resultats.append({"Classe": sous_dossier.name, "Nombre d'images": nb_images})
 
 # === DATAFRAME ===
 df = pd.DataFrame(resultats)

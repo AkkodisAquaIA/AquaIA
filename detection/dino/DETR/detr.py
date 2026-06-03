@@ -2,10 +2,12 @@
 """
 DETR model and criterion classes.
 """
+
 import torch
 import torch.nn.functional as F
 from torch import nn
 from .transformer import Transformer
+
 """
 Samuel Beaussant : Taken from DETR official repo. Modified and simplified for the current project:
     * Removed support for masks and padding masks for simplicity (operate on square images)
@@ -14,10 +16,12 @@ Samuel Beaussant : Taken from DETR official repo. Modified and simplified for th
     * Added fp16 for flash attention support
 """
 
+
 class DETR(nn.Module):
-    """ This is the DETR module that performs object detection """
-    def __init__(self,  num_input_channels, num_classes, num_queries, d_model=256, aux_loss=False):
-        """ Initializes the model.
+    """This is the DETR module that performs object detection"""
+
+    def __init__(self, num_input_channels, num_classes, num_queries, d_model=256, aux_loss=False):
+        """Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
             transformer: torch module of the transformer architecture. See transformer.py
@@ -36,9 +40,9 @@ class DETR(nn.Module):
         self.aux_loss = aux_loss
 
     def forward(self, features, pos):
-        """ The forward expects a NestedTensor, which consists of:
-               - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
-               - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
+        """The forward expects a NestedTensor, which consists of:
+           - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
+           - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
 
             It returns a dict with the following elements:
                - "pred_logits": the classification logits (including no-object) for all queries.
@@ -51,17 +55,13 @@ class DETR(nn.Module):
                                 dictionnaries containing the two above keys for each decoder layer.
         """
 
-        hs = self.transformer(
-            src=self.input_proj(features), 
-            query_embed=self.query_embed.weight, 
-            pos_embed=pos
-        )#[0]
+        hs = self.transformer(src=self.input_proj(features), query_embed=self.query_embed.weight, pos_embed=pos)  # [0]
 
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
-        out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
+        out = {"pred_logits": outputs_class[-1], "pred_boxes": outputs_coord[-1]}
         if self.aux_loss:
-            out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
+            out["aux_outputs"] = self._set_aux_loss(outputs_class, outputs_coord)
         return out
 
     @torch.jit.unused
@@ -69,12 +69,11 @@ class DETR(nn.Module):
         # this is a workaround to make torchscript happy, as torchscript
         # doesn't support dictionary with non-homogeneous values, such
         # as a dict having both a Tensor and a list.
-        return [{'pred_logits': a, 'pred_boxes': b}
-                for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
+        return [{"pred_logits": a, "pred_boxes": b} for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
 
 
 class MLP(nn.Module):
-    """ Very simple multi-layer perceptron (also called FFN)"""
+    """Very simple multi-layer perceptron (also called FFN)"""
 
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
         super().__init__()

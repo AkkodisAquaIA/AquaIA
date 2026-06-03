@@ -5,10 +5,12 @@ run:
   run_dir: null
 
 data:
-  test_data_root: "datasets/coco8"
+  test_data_root: "datasets/coco_custom"
+  loader: "jpg"
+  split: "test"
 
 inference:
-  batch: 2
+  batch: 8
   imgsz : 640
   conf: 0.3
   num_samples: 20

@@ -105,10 +105,7 @@ def build_title_prefix(run_dir: Path, ctx: dict) -> str:
     epochs = training.get("epochs", "?")
     batch = training.get("batch", "?")
     imgsz = training.get("imgsz", "?")
-    return (
-        f"AquaIA – {family}{size} ({init}) – {dataset} "
-        f"[epochs={epochs}, batch={batch}, imgsz={imgsz}]"
-    )
+    return f"AquaIA – {family}{size} ({init}) – {dataset} [epochs={epochs}, batch={batch}, imgsz={imgsz}]"
 
 
 # ---------------------------------------------------------------------------
@@ -168,13 +165,9 @@ def plot_single_run(run_dir: Path, output_dir: Optional[Path] = None) -> None:
     # ---- [0,0] Train losses ----
     for train_col, _, label, color in loss_defs:
         if train_col in df.columns:
-            ax_train.plot(
-                df["epoch"], df[train_col], color=color, linewidth=1.2, label=label
-            )
+            ax_train.plot(df["epoch"], df[train_col], color=color, linewidth=1.2, label=label)
     if best:
-        ax_train.axvline(
-            best[0], color="gray", linestyle=":", linewidth=1, label=f"best ({best[0]})"
-        )
+        ax_train.axvline(best[0], color="gray", linestyle=":", linewidth=1, label=f"best ({best[0]})")
     ax_train.set_title("Train Losses")
     ax_train.set_xlabel("Epoch")
     ax_train.set_ylabel("Loss")
@@ -184,13 +177,9 @@ def plot_single_run(run_dir: Path, output_dir: Optional[Path] = None) -> None:
     # ---- [0,1] Val losses ----
     for _, val_col, label, color in loss_defs:
         if val_col in df.columns:
-            ax_val.plot(
-                df["epoch"], df[val_col], color=color, linewidth=1.2, label=label
-            )
+            ax_val.plot(df["epoch"], df[val_col], color=color, linewidth=1.2, label=label)
     if best:
-        ax_val.axvline(
-            best[0], color="gray", linestyle=":", linewidth=1, label=f"best ({best[0]})"
-        )
+        ax_val.axvline(best[0], color="gray", linestyle=":", linewidth=1, label=f"best ({best[0]})")
     ax_val.set_title("Val Losses")
     ax_val.set_xlabel("Epoch")
     ax_val.set_ylabel("Loss")
@@ -347,9 +336,7 @@ def plot_multi_run(run_dirs: List[Path], output_dir: Path) -> None:
             if col in df.columns:
                 ax.plot(df["epoch"], df[col], label=label, color=color)
                 if best:
-                    ax.axvline(
-                        best[0], color=color, linestyle=":", linewidth=0.8, alpha=0.5
-                    )
+                    ax.axvline(best[0], color=color, linestyle=":", linewidth=0.8, alpha=0.5)
 
     # Single shared legend at the bottom of the figure.
     handles, labels = axes[0, 0].get_legend_handles_labels()
@@ -417,10 +404,7 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=str,
         default=None,
-        help=(
-            "Where to save the PNG(s). "
-            "Default: run folder (single mode) or runs/plots (multi mode)."
-        ),
+        help=("Where to save the PNG(s). Default: run folder (single mode) or runs/plots (multi mode)."),
     )
     parser.add_argument(
         "--run-filter",
@@ -446,9 +430,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    output_dir = (
-        Path(args.output_dir).expanduser().resolve() if args.output_dir else None
-    )
+    output_dir = Path(args.output_dir).expanduser().resolve() if args.output_dir else None
 
     if args.run_dir:
         run_dir = Path(args.run_dir).expanduser().resolve()

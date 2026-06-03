@@ -36,16 +36,13 @@ def move_blurry_images(dataset_path, threshold):
     total_blurry = 0
 
     for class_folder in class_folders:
-
         print(f"\nClasse : {class_folder.name}")
 
-        images = [p for p in class_folder.iterdir()
-                  if p.suffix.lower() in IMAGE_EXTS]
+        images = [p for p in class_folder.iterdir() if p.suffix.lower() in IMAGE_EXTS]
 
         blurry_count = 0
 
         for img_path in images:
-
             score = blur_score(img_path)
             print(f"flou -> {img_path.name} | score={score:.2f}")
 
@@ -53,7 +50,6 @@ def move_blurry_images(dataset_path, threshold):
                 continue
 
             if score < threshold:
-
                 dst_dir = outliers_root / class_folder.name
                 dst_dir.mkdir(parents=True, exist_ok=True)
 

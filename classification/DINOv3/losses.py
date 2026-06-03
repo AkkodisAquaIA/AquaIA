@@ -6,6 +6,7 @@ import torch.nn.functional as F
 # LOSS
 # =========================
 
+
 class FocalLoss(nn.Module):
     """
     Focal Loss pour classification multi-classes.
@@ -19,6 +20,7 @@ class FocalLoss(nn.Module):
         reduction (str): 'mean' | 'sum' | 'none'
         ignore_index (int): label ignoré, comme dans CrossEntropyLoss
     """
+
     def __init__(self, alpha=None, gamma=2.0, reduction="mean", ignore_index=-100):
         super().__init__()
         self.gamma = float(gamma)
@@ -54,10 +56,10 @@ class FocalLoss(nn.Module):
             targets,
             reduction="none",
             ignore_index=self.ignore_index,
-        ) 
+        )
 
         # masque ignore_index
-        valid_mask = (targets != self.ignore_index)
+        valid_mask = targets != self.ignore_index
 
         if valid_mask.sum() == 0:
             return logits.new_zeros(())
@@ -76,9 +78,7 @@ class FocalLoss(nn.Module):
                 alpha_t = self.alpha.to(logits.device)
             elif self.alpha.ndim == 1:
                 if self.alpha.numel() != logits.size(1):
-                    raise ValueError(
-                        f"alpha a {self.alpha.numel()} classes, mais logits a {logits.size(1)} classes"
-                    )
+                    raise ValueError(f"alpha a {self.alpha.numel()} classes, mais logits a {logits.size(1)} classes")
                 alpha_t = self.alpha.to(logits.device)[targets_valid]
             else:
                 raise ValueError("alpha doit être scalaire ou 1D")

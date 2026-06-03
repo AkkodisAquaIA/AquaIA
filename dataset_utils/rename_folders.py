@@ -1,5 +1,6 @@
 import os
 
+
 def rename_folders(path):
     # Vérifie que le chemin existe
     if not os.path.isdir(path):

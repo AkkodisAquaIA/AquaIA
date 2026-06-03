@@ -325,6 +325,7 @@ def parse_batch(batch):
 	return inputs, targets, batch.get("img_paths", None)
 
 
+
 def sample_indices(dataset_size, num_samples, seed):
 	rng = random.Random(seed)
 	sample_size = min(num_samples, dataset_size)

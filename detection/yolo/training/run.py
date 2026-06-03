@@ -8,13 +8,14 @@ from datetime import datetime
 from detection.utils.config_utils import save_resolved_config
 from pathlib import Path
 
+
 # -----------------------------
 # Model resolution (family/size/init)
 # -----------------------------
 def resolve_model_identifier(model_cfg: Dict[str, Any]) -> str:
     """
     Resolve the model identifier passed to Ultralytics YOLO().
-    
+
     - model.family + model.size + model.init
       - init="pretrained" -> "{family}{size}.pt"
       - init="random"     -> "{family}{size}.yaml"
@@ -38,6 +39,7 @@ def resolve_model_identifier(model_cfg: Dict[str, Any]) -> str:
 # -----------------------------
 # Main entrypoint
 # -----------------------------
+
 
 def train_yolo(config) -> Any:
     model_config = config["model"]

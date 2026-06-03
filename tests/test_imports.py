@@ -22,18 +22,18 @@ import pytest
 # they are scratchpad scripts, not packages, and their files do not have
 # package semantics (no __init__.py / standalone scripts).
 TOP_LEVEL_PACKAGES = [
-	"detection",
-	"classification",
-	"data_cleaning",
-	"data_processing",
-	"dataloading",
-	"dataset_utils",
-	"sharepoint_dataloading",
+    "detection",
+    "classification",
+    "data_cleaning",
+    "data_processing",
+    "dataloading",
+    "dataset_utils",
+    "sharepoint_dataloading",
 ]
 
 
 @pytest.mark.parametrize("package_name", TOP_LEVEL_PACKAGES)
 def test_top_level_package_imports(package_name: str) -> None:
-	"""Each top-level package imports cleanly."""
-	module = importlib.import_module(package_name)
-	assert module is not None, f"importlib returned None for {package_name!r}"
+    """Each top-level package imports cleanly."""
+    module = importlib.import_module(package_name)
+    assert module is not None, f"importlib returned None for {package_name!r}"

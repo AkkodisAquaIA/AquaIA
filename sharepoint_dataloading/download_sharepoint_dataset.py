@@ -7,21 +7,18 @@ from pathlib import Path, PurePosixPath
 # Configuration
 # =========================
 
-#Avant de lancer le script python => rentrer les ID et secret dans le systeme avec :
-#export TENANT_ID="xxx"
-#export CLIENT_ID="xxx"
-#export CLIENT_SECRET="xxx"
+# Avant de lancer le script python => rentrer les ID et secret dans le systeme avec :
+# export TENANT_ID="xxx"
+# export CLIENT_ID="xxx"
+# export CLIENT_SECRET="xxx"
 
-TENANT_ID = os.getenv("TENANT_ID") # ID de l'organisation de l'entreprise
-CLIENT_ID = os.getenv("CLIENT_ID") # ID de l'application
-CLIENT_SECRET = os.getenv("CLIENT_SECRET") # Secret généré 
+TENANT_ID = os.getenv("TENANT_ID")  # ID de l'organisation de l'entreprise
+CLIENT_ID = os.getenv("CLIENT_ID")  # ID de l'application
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")  # Secret généré
 
 # Vérification immédiate
 if not TENANT_ID or not CLIENT_ID or not CLIENT_SECRET:
-    raise ValueError(
-        "Variables d'environnement manquantes : "
-        "TENANT_ID, CLIENT_ID, CLIENT_SECRET"
-    )
+    raise ValueError("Variables d'environnement manquantes : TENANT_ID, CLIENT_ID, CLIENT_SECRET")
 
 # URL complète du site SharePoint
 SITE_URL = "https://tobumo.sharepoint.com/teams/FRProjetDecarbonation-AQUA-IA"
@@ -35,7 +32,7 @@ DOCUMENTS_DRIVE_NAME = "Documents"
 # Timeout par défaut pour les appels HTTP
 HTTP_TIMEOUT = 30
 
-LOCAL_DOWNLOAD_DIR = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/sharepoint_dataset_test"   # dossier local de destination
+LOCAL_DOWNLOAD_DIR = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/sharepoint_dataset_test"  # dossier local de destination
 
 # True = télécharge aussi les sous-dossiers
 RECURSIVE_DOWNLOAD = True
@@ -47,11 +44,7 @@ RECURSIVE_DOWNLOAD = True
 
 authority = f"https://login.microsoftonline.com/{TENANT_ID}"
 
-app = ConfidentialClientApplication(
-    client_id=CLIENT_ID,
-    client_credential=CLIENT_SECRET,
-    authority=authority
-)
+app = ConfidentialClientApplication(client_id=CLIENT_ID, client_credential=CLIENT_SECRET, authority=authority)
 
 scope = ["https://graph.microsoft.com/.default"]
 
@@ -60,19 +53,23 @@ scope = ["https://graph.microsoft.com/.default"]
 # Exceptions personnalisées
 # =========================
 
+
 class GraphApiError(Exception):
     """Erreur générique liée à Microsoft Graph."""
+
     pass
 
 
 class SharePointResolutionError(Exception):
     """Erreur lors de la résolution du site, drive ou dossier SharePoint."""
+
     pass
 
 
 # =========================
 # Fonctions utilitaires
 # =========================
+
 
 def get_token() -> str:
     result = app.acquire_token_for_client(scopes=scope)
@@ -81,10 +78,7 @@ def get_token() -> str:
     if not access_token:
         error = result.get("error", "unknown_error")
         error_description = result.get("error_description", "No error description provided.")
-        raise GraphApiError(
-            f"Échec de récupération du token. "
-            f"Erreur: {error} | Détail: {error_description}"
-        )
+        raise GraphApiError(f"Échec de récupération du token. Erreur: {error} | Détail: {error_description}")
 
     return access_token
 
@@ -110,11 +104,7 @@ def graph_get(url: str, headers: dict) -> dict:
         except Exception:
             response_text = "<réponse non disponible>"
 
-        raise GraphApiError(
-            f"Erreur HTTP lors de l'appel Graph: {url}\n"
-            f"Statut: {e.response.status_code if e.response else 'inconnu'}\n"
-            f"Réponse: {response_text}"
-        ) from e
+        raise GraphApiError(f"Erreur HTTP lors de l'appel Graph: {url}\nStatut: {e.response.status_code if e.response else 'inconnu'}\nRéponse: {response_text}") from e
     except requests.exceptions.RequestException as e:
         raise GraphApiError(f"Erreur réseau lors de l'appel Graph: {url}\n{e}") from e
 
@@ -131,7 +121,7 @@ def build_site_graph_url(site_url: str) -> str:
     if not site_url.startswith(prefix):
         raise ValueError(f"SITE_URL invalide : {site_url}")
 
-    without_scheme = site_url[len(prefix):]
+    without_scheme = site_url[len(prefix) :]
     parts = without_scheme.split("/", 1)
 
     domain = parts[0]
@@ -148,10 +138,7 @@ def get_site_info(site_url: str, headers: dict) -> dict:
     site = graph_get(graph_site_url, headers)
 
     if "id" not in site:
-        raise SharePointResolutionError(
-            f"Impossible de résoudre l'ID du site à partir de l'URL : {site_url}\n"
-            f"Réponse reçue : {site}"
-        )
+        raise SharePointResolutionError(f"Impossible de résoudre l'ID du site à partir de l'URL : {site_url}\nRéponse reçue : {site}")
 
     return site
 
@@ -162,9 +149,7 @@ def get_site_drives(site_id: str, headers: dict) -> list:
 
     drives = data.get("value")
     if not isinstance(drives, list):
-        raise SharePointResolutionError(
-            f"Réponse invalide lors de la récupération des drives du site {site_id}: {data}"
-        )
+        raise SharePointResolutionError(f"Réponse invalide lors de la récupération des drives du site {site_id}: {data}")
 
     return drives
 
@@ -175,10 +160,7 @@ def find_drive_by_name(drives: list, drive_name: str) -> dict:
             return drive
 
     available_names = [drive.get("name", "<sans nom>") for drive in drives]
-    raise SharePointResolutionError(
-        f"Bibliothèque '{drive_name}' introuvable.\n"
-        f"Bibliothèques disponibles : {available_names}"
-    )
+    raise SharePointResolutionError(f"Bibliothèque '{drive_name}' introuvable.\nBibliothèques disponibles : {available_names}")
 
 
 def list_folder_contents(site_id: str, drive_id: str, folder_path: str, headers: dict) -> list:
@@ -187,18 +169,13 @@ def list_folder_contents(site_id: str, drive_id: str, folder_path: str, headers:
     if not normalized_path:
         raise ValueError("FOLDER_PATH ne doit pas être vide.")
 
-    url = (
-        f"https://graph.microsoft.com/v1.0/sites/{site_id}"
-        f"/drives/{drive_id}/root:/{normalized_path}:/children"
-    )
+    url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives/{drive_id}/root:/{normalized_path}:/children"
 
     data = graph_get(url, headers)
 
     items = data.get("value")
     if not isinstance(items, list):
-        raise SharePointResolutionError(
-            f"Réponse invalide lors de la lecture du dossier '{folder_path}': {data}"
-        )
+        raise SharePointResolutionError(f"Réponse invalide lors de la lecture du dossier '{folder_path}': {data}")
 
     return items
 
@@ -206,6 +183,7 @@ def list_folder_contents(site_id: str, drive_id: str, folder_path: str, headers:
 # =========================
 # Téléchargement
 # =========================
+
 
 def sanitize_relative_path(path_str: str) -> Path:
     """
@@ -228,20 +206,10 @@ def download_file_from_url(download_url: str, destination_path: Path) -> None:
                     if chunk:
                         f.write(chunk)
     except requests.exceptions.RequestException as e:
-        raise GraphApiError(
-            f"Échec du téléchargement vers '{destination_path}': {e}"
-        ) from e
+        raise GraphApiError(f"Échec du téléchargement vers '{destination_path}': {e}") from e
 
 
-
-def download_folder_contents(
-    site_id: str,
-    drive_id: str,
-    remote_folder_path: str,
-    local_base_dir: Path,
-    headers: dict,
-    recursive: bool = True
-) -> None:
+def download_folder_contents(site_id: str, drive_id: str, remote_folder_path: str, local_base_dir: Path, headers: dict, recursive: bool = True) -> None:
     """
     Télécharge tout le contenu d'un dossier SharePoint vers un dossier local,
     en conservant l'arborescence à partir du dossier FOLDER_PATH.
@@ -265,14 +233,7 @@ def download_folder_contents(
 
             if recursive:
                 sub_remote_path = f"{remote_folder_path.rstrip('/')}/{item_name}"
-                download_folder_contents(
-                    site_id=site_id,
-                    drive_id=drive_id,
-                    remote_folder_path=sub_remote_path,
-                    local_base_dir=local_base_dir,
-                    headers=headers,
-                    recursive=True
-                )
+                download_folder_contents(site_id=site_id, drive_id=drive_id, remote_folder_path=sub_remote_path, local_base_dir=local_base_dir, headers=headers, recursive=True)
         else:
             download_url = item.get("@microsoft.graph.downloadUrl")
             if not download_url:
@@ -289,6 +250,7 @@ def download_folder_contents(
 # =========================
 # Fonction principale
 # =========================
+
 
 def download_sharepoint_folder() -> None:
     """
@@ -319,14 +281,7 @@ def download_sharepoint_folder() -> None:
         local_base_dir.mkdir(parents=True, exist_ok=True)
 
         # 5) Téléchargement
-        download_folder_contents(
-            site_id=site_id,
-            drive_id=drive_id,
-            remote_folder_path=FOLDER_PATH,
-            local_base_dir=local_base_dir,
-            headers=headers,
-            recursive=RECURSIVE_DOWNLOAD
-        )
+        download_folder_contents(site_id=site_id, drive_id=drive_id, remote_folder_path=FOLDER_PATH, local_base_dir=local_base_dir, headers=headers, recursive=RECURSIVE_DOWNLOAD)
 
         print("\nTéléchargement terminé.")
 

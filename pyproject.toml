@@ -9,7 +9,7 @@ exclude= ["*.ipynb"]
 
 [tool.ruff.format]
 quote-style = "double"
-indent-style = "tab"
+indent-style = "space"
 
 
 [tool.pytest.ini_options]

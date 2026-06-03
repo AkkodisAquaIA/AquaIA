@@ -39,6 +39,7 @@ def save_resolved_config(path, config, device, use_amp, run_dir):
 		yaml.safe_dump(resolved_config, f, sort_keys=False)
 
 
+
 def load_infer_config(config_path):
 	config_path = Path(config_path).resolve()
 	with config_path.open("r", encoding="utf-8") as f:

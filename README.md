@@ -59,6 +59,31 @@ python main.py infer --help
 
 ---
 
+## Local development — lint & tests
+
+Install the dev tools once (virtual environment required on macOS/Homebrew):
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+```
+
+Then use the `Makefile` shortcuts before every PR:
+
+| Command | What it does |
+|---------|-------------|
+| `make lint` | Lint only the files changed vs `origin/development` — **identical scope to CI** |
+| `make lint-fix` | Same, but auto-fix what ruff can |
+| `make lint-all` | Lint every Python file in the repo |
+| `make format` | Auto-format every Python file |
+| `make test` | Run the pytest suite |
+| `make ci` | `lint` + `test` — full local CI simulation |
+
+> Run `make lint` before pushing to catch ruff errors locally instead of reading cryptic GitHub logs.
+
+---
+
 ## Branch rules
 
 - **`development`** is the default branch. All PRs target it.

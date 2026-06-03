@@ -43,20 +43,20 @@ def get_datasets(
 
 
 def build_scheduler(training_config, optimizer):
-	if not training_config.get("cos_lr", False):
-		return None
-	warmup_ratio = float(training_config.get("warmup_ratio", 0.0))
-	warmup_steps = int(training_config["epochs"] * warmup_ratio)
-	if warmup_ratio > 0.0:
-		warmup_steps = max(warmup_steps, 1)
-	scheduler = get_scheduler(
-		name="cosine_with_min_lr",
-		optimizer=optimizer,
-		num_warmup_steps=warmup_steps,
-		num_training_steps=training_config["epochs"],
-		scheduler_specific_kwargs={"min_lr_rate": training_config.get("lrf", 0.01)},
-	)
-	return scheduler
+    if not training_config.get("cos_lr", False):
+        return None
+    warmup_ratio = float(training_config.get("warmup_ratio", 0.0))
+    warmup_steps = int(training_config["epochs"] * warmup_ratio)
+    if warmup_ratio > 0.0:
+        warmup_steps = max(warmup_steps, 1)
+    scheduler = get_scheduler(
+        name="cosine_with_min_lr",
+        optimizer=optimizer,
+        num_warmup_steps=warmup_steps,
+        num_training_steps=training_config["epochs"],
+        scheduler_specific_kwargs={"min_lr_rate": training_config.get("lrf", 0.01)},
+    )
+    return scheduler
 
 
 def train_dino(config):

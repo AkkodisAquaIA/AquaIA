@@ -1,3 +1,4 @@
+import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -33,6 +34,7 @@ def sigmoid_focal_loss(inputs, targets, num_boxes, alpha: float = 0.25, gamma: f
 		loss = alpha_t * loss
 
 	return loss.mean(1).sum() / num_boxes
+
 
 
 class SetCriterion(nn.Module):

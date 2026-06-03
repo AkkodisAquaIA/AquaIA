@@ -31,6 +31,7 @@ def print_metrics(metrics):
 	summary = " | ".join(f"{key}={metrics[key]:.4f}" for key in sorted(metrics) if isinstance(metrics[key], (int, float)))
 	print(summary)
 
+
 def save_metrics(metrics, output_dir):
 	print_metrics(metrics)
 	with (Path(output_dir) / "inference_metrics.yaml").open("w", encoding="utf-8") as f:

@@ -85,8 +85,9 @@ CLASSES_IA = [
     "Nemouridae_Amphinemura_borealis",
     "Capniidae_Capnopsis_schilleri",
     "Heptageniidae_Kageronia_fuscogrisea",
-    "Sphaeriidae_Sphaerium_sp"
+    "Sphaeriidae_Sphaerium_sp",
 ]
+
 
 def count_images_per_class(root_path, extensions=(".jpg", ".jpeg", ".png", ".tif", ".tiff")):
     counts = []
@@ -96,10 +97,7 @@ def count_images_per_class(root_path, extensions=(".jpg", ".jpeg", ".png", ".tif
         folder_path = os.path.join(root_path, cls)
 
         if os.path.isdir(folder_path):
-            n_images = sum(
-                1 for f in os.listdir(folder_path)
-                if os.path.isfile(os.path.join(folder_path, f)) and f.lower().endswith(extensions)
-            )
+            n_images = sum(1 for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f)) and f.lower().endswith(extensions))
             existing_classes += 1
         else:
             n_images = 0
@@ -113,24 +111,10 @@ def count_images_per_class(root_path, extensions=(".jpg", ".jpeg", ".png", ".tif
 def annotate_bars(bars):
     for bar in bars:
         height = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width() / 2,
-            height,
-            f"{int(height)}",
-            ha="center",
-            va="bottom",
-            fontsize=7,
-            rotation=90
-        )
+        plt.text(bar.get_x() + bar.get_width() / 2, height, f"{int(height)}", ha="center", va="bottom", fontsize=7, rotation=90)
 
 
-def plot_images_per_class_two_paths(
-    path1,
-    path2,
-    label1="Path 1",
-    label2="Path 2",
-    extensions=(".jpg", ".jpeg", ".png", ".tif", ".tiff")
-):
+def plot_images_per_class_two_paths(path1, path2, label1="Path 1", label2="Path 2", extensions=(".jpg", ".jpeg", ".png", ".tif", ".tiff")):
     counts1 = count_images_per_class(path1, extensions)
     counts2 = count_images_per_class(path2, extensions)
 
@@ -139,8 +123,8 @@ def plot_images_per_class_two_paths(
 
     plt.figure(figsize=(22, 8))
 
-    bars1 = plt.bar(x - width/2, counts1, width=width, label=label1)
-    bars2 = plt.bar(x + width/2, counts2, width=width, label=label2)
+    bars1 = plt.bar(x - width / 2, counts1, width=width, label=label1)
+    bars2 = plt.bar(x + width / 2, counts2, width=width, label=label2)
 
     annotate_bars(bars1)
     annotate_bars(bars2)
@@ -158,5 +142,5 @@ plot_images_per_class_two_paths(
     "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited/train",
     "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited/val",
     label1="Train",
-    label2="Val"
+    label2="Val",
 )
