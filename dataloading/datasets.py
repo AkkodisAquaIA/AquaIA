@@ -108,7 +108,7 @@ class BaseDetectionDataset:
 	def get_sorted_target_files(self) -> List[str]:
 		target_dir = self.dataset_root / "labels" / self.data_split
 		target_files = [path for path in target_dir.glob("*.txt")]
-		return sorted(target_files, key=lambda path: self._numeric_sort_key(path))
+		return sorted(target_files, key=self._numeric_sort_key)
 
 	def parse_target_line(self, line: str):
 		class_id, x_center, y_center, width, height = line.split()
