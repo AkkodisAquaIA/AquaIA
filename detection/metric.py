@@ -64,6 +64,7 @@ def _build_refs(targets, imgsz):
 
 @torch.no_grad()
 def evaluate_map(predictions, targets, imgsz, split, device):
+	# TODO : can we reuse the object across epochs/batch ?
 	metric = MeanAveragePrecision(
 		box_format="xyxy",
 		iou_type="bbox",
@@ -81,9 +82,8 @@ def evaluate_map(predictions, targets, imgsz, split, device):
 
 @torch.no_grad()
 def compute_metrics(model, dataloaders, predict_fn, device, conf_thresh):
-	model.eval()
 	all_metrics = {}
-	imgsz = 640#dataloaders[0].img_size
+	imgsz = dataloaders[0].dataset.img_size
 	for loader in dataloaders:
 		predictions = []
 		targets = []
@@ -95,7 +95,8 @@ def compute_metrics(model, dataloaders, predict_fn, device, conf_thresh):
 				model=model, 
 				samples=batch, 
 				device=device, 
-				conf_thres=conf_thresh
+				conf_thres=conf_thresh,
+				imgsz=imgsz,
 			)
 			predictions.extend(batch_preds)
 			targets.extend(batch_targets)
@@ -108,5 +109,4 @@ def compute_metrics(model, dataloaders, predict_fn, device, conf_thresh):
 			device=device,
 		)
 		all_metrics.update(metrics)
-	model.train()
 	return all_metrics

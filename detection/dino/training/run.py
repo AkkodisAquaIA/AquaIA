@@ -18,17 +18,19 @@ from detection.utils.plot_utils import plot_metrics, save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
 
 
-def get_datasets(data_yaml_path, batch_size):
+def get_datasets(data_yaml_path, batch_size, img_size=640):
 	# TODO : currently GPU only because of DALI, but should be possible to support CPU-only training)
 	# Compute random split for train and eval set
 	train_dataset = YOLOFormatDataset(
         dataset_root=data_yaml_path,
         data_split="train",
+		img_size=img_size,
         batch_size=batch_size,
     )
 	val_dataset = YOLOFormatDataset(
 		dataset_root=data_yaml_path,
 		data_split="val",
+		img_size=img_size,
 		batch_size=batch_size,
 	)
 	num_classes = train_dataset.num_classes
@@ -64,12 +66,16 @@ def train_dino(config):
 
 	use_amp = device == "cuda"
 
-	train_set, val_set, num_classes = get_datasets(config["data"]["dataset_yaml"], training_config["batch"])
+	imgsz = normalize_imgsz(config, "training")
+	train_set, val_set, num_classes = get_datasets(
+		config["data"]["dataset_yaml"], 
+		training_config["batch"], 
+		img_size=imgsz
+	)
 
 	# === Setup dataloaders ===
-	imgsz = normalize_imgsz(config, "training")
-	dataloader = DALIDetectionDataLoader(train_set, device="gpu", img_size=imgsz)
-	val_dataloader = DALIDetectionDataLoader(val_set, device="gpu", img_size=imgsz)
+	dataloader = DALIDetectionDataLoader(train_set, device="gpu")
+	val_dataloader = DALIDetectionDataLoader(val_set, device="gpu")
 
 	# === Config, save path and fun ===
 	# root folder for training outputs (weights, logs, resolved config)
@@ -149,6 +155,7 @@ def train_dino(config):
 		epoch_metrics = log_epoch(log_dict, max(len(dataloader), 1))
 
 		# Add map50 and mAP50-95 evaluation at the end of each epoch (train and eval datasets)
+		model.eval()
 		metrics = compute_metrics(
 			model=model,
 			dataloaders=[dataloader, val_dataloader],
@@ -156,6 +163,7 @@ def train_dino(config):
 			device=device,
 			conf_thresh=training_config.get("conf_thresh", 0.05),
 		)
+		model.train()
 		epoch_metrics.update(metrics)
 		epoch_metrics["epoch"] = epoch + 1
 		print_metrics(epoch_metrics)

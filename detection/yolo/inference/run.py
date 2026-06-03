@@ -41,6 +41,7 @@ def test_yolo(config):
     test_dataset = YOLOFormatDataset(
         dataset_root=test_data_root,
         data_split="test",
+        img_size=normalize_imgsz(config, "inference"),
         batch_size=inference_config["batch"],
     )
     test_loader = DataLoader(

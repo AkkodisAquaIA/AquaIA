@@ -2,7 +2,6 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
 from ultralytics.utils.plotting import Annotator
 from dataloading.datasets import sample_dataset
 import torch
@@ -42,24 +41,6 @@ def annotate_images_with_predictions(images, predictions, class_names, output_di
         output_path = output_dir / f"{Path(image_files[i]).stem}.png"
         plt.imsave(output_path, annotator.result())
 
-
-def annotate_yolo_predictions(results, class_names, conf_thres, output_dir, image_files):
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    for result, image_file in zip(results, image_files):
-        annotator = Annotator(result.orig_img.copy(), line_width=2)
-        boxes = result.boxes
-        if boxes is not None:
-            for box, score, label in zip(boxes.xyxy, boxes.conf, boxes.cls):
-                if float(score) < conf_thres:
-                    continue
-                label_idx = int(label)
-                label_name = class_names[label_idx] if label_idx < len(class_names) else str(label_idx)
-                annotator.box_label(box.tolist(), label=f"{label_name} {float(score):.2f}")
-
-        output_path = output_dir / f"{Path(image_file).stem}.png"
-        Image.fromarray(annotator.result()).save(output_path)
 
 @torch.no_grad()
 def save_sample_predictions(model, subset, output_dir, predict_fn, num_samples=20, conf=0.3, seed=0, device="cuda"):

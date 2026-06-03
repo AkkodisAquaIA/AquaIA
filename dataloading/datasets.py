@@ -150,6 +150,7 @@ class YOLOFormatDataset(BaseDetectionDataset):
 			dataset_root: str, 
 			data_split : str = "train", 
 			batch_size: int = 16,
+			img_size: int = 640, 
 			img_format: str = "jpg",
 			stats_file: str = "stats.npy", 
 			):
@@ -158,6 +159,7 @@ class YOLOFormatDataset(BaseDetectionDataset):
 			data_split=data_split, 
 			stats_file=stats_file, 
 		)
+		self.img_size = img_size
 		self.batch_size = batch_size  
 		self.img_format = img_format
 		if img_format not in ["jpg", "jpeg"]:
@@ -217,8 +219,8 @@ class YOLOFormatDataset(BaseDetectionDataset):
 		img = ndd.decoders.image(encoded_img, device=decoding_device, output_type=types.RGB)
 		img = ndd.resize(
 			img,
-			resize_x=640.0,
-			resize_y=640.0,
+			resize_x=float(self.img_size),
+			resize_y=float(self.img_size),
 			device=device,
 		)
 		norm_img = ndd.crop_mirror_normalize(
@@ -231,11 +233,12 @@ class YOLOFormatDataset(BaseDetectionDataset):
 		)
 		img = self._dali_tensor_to_torch(img).cpu().permute(2,0,1)
 		norm_img = self._dali_tensor_to_torch(norm_img)
+		torch_device = "cuda" if device == "gpu" else "cpu"
 		sample = {
 			"image": img,
 			"input": norm_img,
-			"label": torch.from_numpy(label),
-			"bboxes": torch.from_numpy(bboxes),
+			"label": torch.from_numpy(label).to(torch_device),
+			"bboxes": torch.from_numpy(bboxes).to(torch_device),
 			"img_path": str(img_path),
 		}
 		return sample
@@ -245,19 +248,17 @@ class DALIDetectionDataLoader:
 			self, 
 			dataset, 
 			device="gpu", 
-			img_size=640, 
 			num_threads=3,
 			py_num_workers=3,
 			py_start_method="spawn",
 		):
 		self.dataset = dataset
 		self.device = device
-		self.img_size = img_size
 		self.pipeline = create_detection_pipeline(
 			dataset_src=self.dataset.__call__,
 			stats=self.dataset.stats,
 			device=self.device,
-			img_size=self.img_size,
+			img_size=self.dataset.img_size,
 			batch_size=self.dataset.batch_size,
 			num_threads=num_threads,
 			py_num_workers=py_num_workers,
@@ -272,7 +273,7 @@ class DALIDetectionDataLoader:
 				DALIRaggedIterator.SPARSE_LIST_TAG,
 				DALIRaggedIterator.SPARSE_LIST_TAG,
 			],
-			size=len(self.dataset.target_files),
+			size=self.dataset.full_iterations * self.dataset.batch_size,
 			last_batch_policy=LastBatchPolicy.DROP,
 			auto_reset=True,
 		)

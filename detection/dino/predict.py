@@ -11,7 +11,7 @@ def normalize_imgsz(config, phase):
 		config[phase]["imgsz"] = rounded_imgsz
 	return int(config[phase]["imgsz"])
 
-def predict(model, samples, device, conf_thres):
+def predict(model, samples, device, conf_thres, imgsz=640):
     images = samples["inputs"]
     with torch.autocast(device_type=device, dtype=torch.float16, enabled=device == "cuda"):
         outputs = model(images)

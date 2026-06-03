@@ -4,7 +4,7 @@
 model:
   family: "yolo26"
   size : "s"
-  init: "random"
+  init: "random"   # "pretrained" or "random"
 
 # ----------------------------------------------------------------------
 # Data section: train/val dataset
@@ -49,7 +49,7 @@ training:
   cos_lr: true
   weight_decay: 0.00005
 
-  # # ---------- LOSS / MATCHER HYPERPARAMETERS ----------
+  # ---------- LOSS / MATCHER HYPERPARAMETERS ----------
   # cost_class: 2.0
   # cost_bbox: 5.0
   # cost_giou: 2.0
@@ -97,4 +97,4 @@ training:
   val: true
 
   # ---------- PERFORMANCE / MISC ----------
-  compile: false
+  compile: true

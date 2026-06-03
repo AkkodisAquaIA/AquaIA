@@ -12,7 +12,7 @@ from detection.utils.plot_utils import save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
 
 def load_model(run_dir, backbone_id, img_size, num_classes, device):
-    checkpoint = torch.load(Path(run_dir) / "weights" / "last.pt", map_location=device)
+    checkpoint = torch.load(Path(run_dir) / "weights" / "best.pt", map_location=device)
     model = DINODetector(
         backbone_id=backbone_id,
         img_size=int(img_size),
@@ -50,13 +50,15 @@ def test_dino(config):
         num_classes=num_classes,
         device=device,
     )
+    imgsz = normalize_imgsz(config, "inference")
     test_dataset = YOLOFormatDataset(
         dataset_root=test_data_root,
         data_split="test",
+        img_size=imgsz,
         batch_size=inference_config["batch"],
     )
-    imgsz = normalize_imgsz(config, "inference")
-    test_loader = DALIDetectionDataLoader(test_dataset, device="gpu", img_size=imgsz)
+    
+    test_loader = DALIDetectionDataLoader(test_dataset, device="gpu")
     save_sample_predictions(
         model=model,
         subset=test_dataset,
@@ -66,6 +68,7 @@ def test_dino(config):
         seed=inference_config["seed"],
         device=device,
     )
+    model.eval()
     metrics = compute_metrics(
         model=model,
         dataloaders=[test_loader],
