@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 from nvidia.dali import pipeline_def
 import nvidia.dali.fn as fn
 import nvidia.dali.types as types
@@ -13,6 +13,7 @@ import random
 from detection.utils.config_utils import load_class_names
 
 # TODO : AutoAugment: Learning Augmentation Strategies from Data
+
 
 @pipeline_def
 def create_detection_pipeline(dataset_src, stats, img_size=640, device="gpu"):
@@ -43,7 +44,6 @@ def create_detection_pipeline(dataset_src, stats, img_size=640, device="gpu"):
 	return inputs, labels.gpu(), bboxes.gpu()
 
 
-
 class BaseDetectionDataset:
 	"""
 	Base class shared by NPY / PIL / RAM datasets.
@@ -55,11 +55,11 @@ class BaseDetectionDataset:
 	"""
 
 	def __init__(
-			self, 
-			dataset_root: str, 
-			data_split: str = "train",
-			stats_file: str = "stats.npy", 
-		):
+		self,
+		dataset_root: str,
+		data_split: str = "train",
+		stats_file: str = "stats.npy",
+	):
 		self.dataset_root = Path(dataset_root)
 		self.stats_file = stats_file
 		self.data_split = data_split
@@ -79,20 +79,22 @@ class BaseDetectionDataset:
 		if stats_path.exists():
 			stats = np.load(stats_path, allow_pickle=True).item()
 			self.stats = {
-				"mean": stats["mean"]*np.float32(255.0),
+				"mean": stats["mean"] * np.float32(255.0),
 				"std": np.clip(
 					stats["std"],
 					min=1e-6,
-				)*np.float32(255.0),
+				)
+				* np.float32(255.0),
 			}
 		else:
 			# raise FileNotFoundError(f"Stats file not found: {stats_path}")
 			self.stats = {
-				"mean": np.zeros(3, dtype=np.float32)*np.float32(255.0),
+				"mean": np.zeros(3, dtype=np.float32) * np.float32(255.0),
 				"std": np.clip(
 					np.ones(3, dtype=np.float32),
 					min=1e-6,
-				)*np.float32(255.0),
+				)
+				* np.float32(255.0),
 			}
 
 	def to_tensor(self, img: np.ndarray) -> torch.Tensor:
@@ -137,36 +139,36 @@ class BaseDetectionDataset:
 		self.targets = [self.read_target(path) for path in self.target_files]
 
 	def normalize_img(self, img: torch.Tensor) -> torch.Tensor:
-		
 		mean = torch.from_numpy(self.stats["mean"]).to(dtype=img.dtype).view(-1, 1, 1)
 		std = torch.from_numpy(self.stats["std"]).to(dtype=img.dtype).view(-1, 1, 1)
 		return (img - mean) / std
+
 
 class YOLOFormatDataset(BaseDetectionDataset):
 	# TODO : only JPEG, need to think about TIFF handling
 
 	def __init__(
-			self, 
-			dataset_root: str, 
-			data_split : str = "train", 
-			batch_size: int = 16,
-			img_size: int = 640, 
-			img_format: str = "jpg",
-			stats_file: str = "stats.npy", 
-			):
+		self,
+		dataset_root: str,
+		data_split: str = "train",
+		batch_size: int = 16,
+		img_size: int = 640,
+		img_format: str = "jpg",
+		stats_file: str = "stats.npy",
+	):
 		super().__init__(
-			dataset_root=dataset_root, 
-			data_split=data_split, 
-			stats_file=stats_file, 
+			dataset_root=dataset_root,
+			data_split=data_split,
+			stats_file=stats_file,
 		)
 		self.img_size = img_size
-		self.batch_size = batch_size  
+		self.batch_size = batch_size
 		self.img_format = img_format
 		if img_format not in ["jpg", "jpeg"]:
 			raise NotImplementedError(f"Unsupported image format: {img_format}. Only jpg is currently supported.")
 
 		self.img_dir = self.dataset_root / "images" / self.data_split
-		self.n = len(self.target_files) 
+		self.n = len(self.target_files)
 		self.indices = list(range(self.n))
 		self.full_iterations = self.n // batch_size
 		# Shuffling related stuff
@@ -200,7 +202,7 @@ class YOLOFormatDataset(BaseDetectionDataset):
 		# Encoded image bytes. DALI will decode this.
 		encoded_img = np.frombuffer(img_path.read_bytes(), dtype=np.uint8)
 		return encoded_img, label, bboxes
-	
+
 	def __getitem__(self, key):
 		# Slow but useful for sampling a few images for visualization / testing
 		# Mirrors the DALI pipeline path using DALI dynamic operators.
@@ -231,7 +233,7 @@ class YOLOFormatDataset(BaseDetectionDataset):
 			mean=mean,
 			std=std,
 		)
-		img = self._dali_tensor_to_torch(img).cpu().permute(2,0,1)
+		img = self._dali_tensor_to_torch(img).cpu().permute(2, 0, 1)
 		norm_img = self._dali_tensor_to_torch(norm_img)
 		torch_device = "cuda" if device == "gpu" else "cpu"
 		sample = {
@@ -243,15 +245,16 @@ class YOLOFormatDataset(BaseDetectionDataset):
 		}
 		return sample
 
+
 class DALIDetectionDataLoader:
 	def __init__(
-			self, 
-			dataset, 
-			device="gpu", 
-			num_threads=3,
-			py_num_workers=3,
-			py_start_method="spawn",
-		):
+		self,
+		dataset,
+		device="gpu",
+		num_threads=3,
+		py_num_workers=3,
+		py_start_method="spawn",
+	):
 		self.dataset = dataset
 		self.device = device
 		self.pipeline = create_detection_pipeline(
@@ -280,25 +283,25 @@ class DALIDetectionDataLoader:
 
 	def __len__(self):
 		return self.dataset.full_iterations
-	
+
 	def __iter__(self):
 		return iter(self.loader)
+
 
 def parse_batch(batch):
 	if isinstance(batch, list):
 		batch = batch[0]
 	inputs = batch["inputs"]
 	# TODO : ugly but currently required. Need to modify downstream code to avoid this conversion
-	targets = [
-		{"labels": labels, "boxes": boxes}
-	  	for labels, boxes in zip(batch["labels"], batch["bboxes"])
-	]
+	targets = [{"labels": labels, "boxes": boxes} for labels, boxes in zip(batch["labels"], batch["bboxes"])]
 	return inputs, targets, batch.get("img_paths", None)
+
 
 def sample_indices(dataset_size, num_samples, seed):
 	rng = random.Random(seed)
 	sample_size = min(num_samples, dataset_size)
 	return sorted(rng.sample(range(dataset_size), sample_size))
+
 
 def collate_yolo(batch):
 	collated = {
@@ -306,7 +309,7 @@ def collate_yolo(batch):
 		"inputs": torch.stack([item["input"] for item in batch], dim=0),
 		"labels": [item["label"] for item in batch],
 		"bboxes": [item["bboxes"] for item in batch],
-		"img_paths": [item["img_path"] for item in batch]
+		"img_paths": [item["img_path"] for item in batch],
 	}
 	return collated
 
@@ -317,9 +320,5 @@ def sample_dataset(dataset, num_samples, seed, device):
 	inputs = torch.stack([sample["input"] for sample in samples], dim=0).to(device)
 	imgs = torch.stack([sample["image"] for sample in samples], dim=0)
 	img_paths = [sample["img_path"] for sample in samples]
-	samples = {
-		"inputs": inputs,
-		"images": imgs,
-		"img_paths": img_paths
-	}
+	samples = {"inputs": inputs, "images": imgs, "img_paths": img_paths}
 	return samples
