@@ -1,5 +1,4 @@
 import os
-import glob
 from pathlib import Path
 from typing import List, Tuple
 
@@ -21,15 +20,17 @@ class BaseDetectionDataset(Dataset):
     - normalization
     """
 
-    def __init__(self, dataset_root: str, stats_file: str = "stats.npy", device: str = "cpu"):
+    def __init__(self, dataset_root: str, stats_file: str = "stats.npy", device: str = "cpu", split: str = None, load_targets: bool = True):
         self.dataset_root = Path(dataset_root)
         self.stats_file = stats_file
         self.device = torch.device(device)
+        self.split = split
         self.num_classes = 0
         self.load_stats()
         self.class_names = load_class_names(dataset_root)
         self.image_files = self.list_image_files()
-        self.load_targets()
+        if load_targets:
+            self.load_targets()
 
     def load_stats(self) -> None:
         stats_path = self.dataset_root / self.stats_file
@@ -57,7 +58,11 @@ class BaseDetectionDataset(Dataset):
 
     def list_image_files(self) -> List[str]:
         image_dir = self.dataset_root / "images"
-        return sorted(glob.glob(str(image_dir / "*.*")))
+        if self.split is not None:
+            image_dir = image_dir / self.split
+        image_files = [str(path) for path in image_dir.glob("*.jpg")]
+        # If not using preprocess_to_npy.py, images need to be sorted here
+        return sorted(image_files, key=lambda path: self._numeric_sort_key(Path(path)))
 
     @staticmethod
     def _numeric_sort_key(path: Path):
@@ -66,8 +71,18 @@ class BaseDetectionDataset(Dataset):
 
     def get_sorted_label_files(self) -> List[str]:
         label_dir = self.dataset_root / "labels"
+        if self.split is not None:
+            label_dir = label_dir / self.split
         label_files = [str(path) for path in label_dir.glob("*.txt")]
         return sorted(label_files, key=lambda path: self._numeric_sort_key(Path(path)))
+
+    def get_label_path(self, image_path: str) -> str:
+        """Given an image path, return the corresponding label path
+        by replacing the directory and extension."""
+        label_dir = self.dataset_root / "labels"
+        if self.split is not None:
+            label_dir = label_dir / self.split
+        return str(label_dir / f"{Path(image_path).stem}.txt")
 
     def parse_label_line(self, line: str):
         class_id, x_center, y_center, width, height = line.split()
@@ -93,11 +108,16 @@ class BaseDetectionDataset(Dataset):
     def load_targets(self) -> None:
         label_files = self.get_sorted_label_files()
         if not label_files:
-            raise FileNotFoundError(f"No label files found under {self.dataset_root / 'labels'}")
-        self.targets = [self.read_target(path) for path in label_files]
+            label_dir = self.dataset_root / "labels"
+            if self.split is not None:
+                label_dir = label_dir / self.split
+            raise FileNotFoundError(f"No label files found under {label_dir}")
+        self.targets = [self.read_target(self.get_label_path(path)) for path in self.image_files]
         if len(self.targets) != len(self.image_files):
             raise ValueError(f"Label count mismatch for {self.dataset_root}: found {len(self.targets)} label files for {len(self.image_files)} images.")
-        self.num_classes = 1 + max((int(t["labels"].max().item()) for t in self.targets if len(t["labels"]) > 0), default=0)
+        # Determine num_classes based on both class names and label files to ensure we account for all classes
+        label_num_classes = 1 + max((int(t["labels"].max().item()) for t in self.targets if len(t["labels"]) > 0), default=0)
+        self.num_classes = max(len(self.class_names), label_num_classes)
 
 
 class NpyDetectionDataset(BaseDetectionDataset):
@@ -121,6 +141,31 @@ class NpyDetectionDataset(BaseDetectionDataset):
         img = self.normalize_img(img)
         tgt = self.targets[idx]
         img_file = self.image_files[idx] if idx < len(self.image_files) else str(idx)
+        return img, tgt, img_file
+
+
+class JpgDetectionDataset(BaseDetectionDataset):
+    def __init__(
+        self,
+        dataset_root: str,
+        img_size: Tuple[int, int],
+        stats_file: str = "stats.npy",
+        device: str = "cpu",
+        split: str = None,
+    ):
+        super().__init__(dataset_root=dataset_root, stats_file=stats_file, device=device, split=split)
+        self.img_size = img_size
+
+    def __len__(self) -> int:
+        return len(self.image_files)
+
+    def __getitem__(self, idx: int):
+        img = Image.open(self.image_files[idx]).convert("RGB").resize(self.img_size)
+        img = np.array(img, dtype=np.float32) / 255.0
+        img = self.to_tensor(img)
+        img = self.normalize_img(img)
+        tgt = self.targets[idx]
+        img_file = self.image_files[idx]
         return img, tgt, img_file
 
 
