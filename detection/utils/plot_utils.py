@@ -6,6 +6,7 @@ from ultralytics.utils.plotting import Annotator
 from dataloading.datasets import sample_dataset
 import torch
 
+
 def annotate_images_with_predictions(images, predictions, class_names, output_dir, image_files):
     images = images.detach().cpu().float()
     output_dir = Path(output_dir)
@@ -44,23 +45,18 @@ def annotate_images_with_predictions(images, predictions, class_names, output_di
 
 @torch.no_grad()
 def save_sample_predictions(model, subset, output_dir, predict_fn, num_samples=20, conf=0.3, seed=0, device="cuda"):
-	samples = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
-	print(f"Sampled {len(samples["img_paths"])} images from {subset.dataset_root}")
-	model.eval()
-	predictions = predict_fn(
-		model=model, 
-		samples=samples, 
-		device=device, 
-		conf_thres=conf
-	)
+    samples = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
+    print(f"Sampled {len(samples['img_paths'])} images from {subset.dataset_root}")
+    model.eval()
+    predictions = predict_fn(model=model, samples=samples, device=device, conf_thres=conf)
 
-	annotate_images_with_predictions(
-		images=samples["images"],
-		predictions=predictions,
-		class_names=subset.class_names,
-		output_dir=output_dir,
-		image_files=samples["img_paths"],
-	)
+    annotate_images_with_predictions(
+        images=samples["images"],
+        predictions=predictions,
+        class_names=subset.class_names,
+        output_dir=output_dir,
+        image_files=samples["img_paths"],
+    )
 
 
 def plot_metrics(run_dir, output_dir=None, metrics_filename="metrics.npy"):

@@ -32,27 +32,27 @@ class DETR(nn.Module):
         """
         super().__init__()
         self.num_queries = num_queries
-        self.transformer = Transformer(d_model=d_model)#.to(dtype=dtype)
-        self.class_embed = nn.Linear(d_model, num_classes)#.to(dtype=dtype)
-        self.bbox_embed = MLP(d_model, d_model, 4, 3)#.to(dtype=dtype)
-        self.query_embed = nn.Embedding(num_queries, d_model)#.to(dtype=dtype)
-        self.input_proj = nn.Linear(num_input_channels, d_model)#.to(dtype=dtype)
+        self.transformer = Transformer(d_model=d_model)  # .to(dtype=dtype)
+        self.class_embed = nn.Linear(d_model, num_classes)  # .to(dtype=dtype)
+        self.bbox_embed = MLP(d_model, d_model, 4, 3)  # .to(dtype=dtype)
+        self.query_embed = nn.Embedding(num_queries, d_model)  # .to(dtype=dtype)
+        self.input_proj = nn.Linear(num_input_channels, d_model)  # .to(dtype=dtype)
         self.aux_loss = aux_loss
 
     def forward(self, features, pos):
         """The forward expects a NestedTensor, which consists of:
-           - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
-           - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
+        - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
+        - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
 
-            It returns a dict with the following elements:
-               - "pred_logits": the classification logits (including no-object) for all queries.
-                                Shape= [batch_size x num_queries x (num_classes)]
-               - "pred_boxes": The normalized boxes coordinates for all queries, represented as
-                               (center_x, center_y, height, width). These values are normalized in [0, 1],
-                               relative to the size of each individual image (disregarding possible padding).
-                               See PostProcess for information on how to retrieve the unnormalized bounding box.
-               - "aux_outputs": Optional, only returned when auxilary losses are activated. It is a list of
-                                dictionnaries containing the two above keys for each decoder layer.
+         It returns a dict with the following elements:
+            - "pred_logits": the classification logits (including no-object) for all queries.
+                             Shape= [batch_size x num_queries x (num_classes)]
+            - "pred_boxes": The normalized boxes coordinates for all queries, represented as
+                            (center_x, center_y, height, width). These values are normalized in [0, 1],
+                            relative to the size of each individual image (disregarding possible padding).
+                            See PostProcess for information on how to retrieve the unnormalized bounding box.
+            - "aux_outputs": Optional, only returned when auxilary losses are activated. It is a list of
+                             dictionnaries containing the two above keys for each decoder layer.
         """
 
         hs = self.transformer(src=self.input_proj(features), query_embed=self.query_embed.weight, pos_embed=pos)  # [0]

@@ -1,15 +1,17 @@
 import torch
 from detection.utils.box_ops import box_cxcywh_to_xyxy
 
+
 def normalize_imgsz(config, phase):
-	model_family = str(config.get("model", {}).get("family", "")).lower()
-	patch_size = 14 if model_family == "dinov2" else 16
-	imgsz = int(config[phase]["imgsz"])
-	rounded_imgsz = max(patch_size, round(imgsz / patch_size) * patch_size)
-	if rounded_imgsz != imgsz:
-		print(f"Warning: imgsz={imgsz} is not divisible by patch size {patch_size}. Using imgsz={rounded_imgsz} instead.")
-		config[phase]["imgsz"] = rounded_imgsz
-	return int(config[phase]["imgsz"])
+    model_family = str(config.get("model", {}).get("family", "")).lower()
+    patch_size = 14 if model_family == "dinov2" else 16
+    imgsz = int(config[phase]["imgsz"])
+    rounded_imgsz = max(patch_size, round(imgsz / patch_size) * patch_size)
+    if rounded_imgsz != imgsz:
+        print(f"Warning: imgsz={imgsz} is not divisible by patch size {patch_size}. Using imgsz={rounded_imgsz} instead.")
+        config[phase]["imgsz"] = rounded_imgsz
+    return int(config[phase]["imgsz"])
+
 
 def predict(model, samples, device, conf_thres, imgsz=640):
     images = samples["inputs"]
