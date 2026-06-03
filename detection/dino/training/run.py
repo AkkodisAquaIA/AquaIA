@@ -18,15 +18,20 @@ from detection.utils.plot_utils import plot_metrics, save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
 
 
-def get_datasets(data_yaml_path, batch_size, img_size=640):
+def get_datasets(
+	data_yaml_path,
+	batch_size,
+	img_size=640,
+	loader="jpg",
+):
 	# TODO : currently GPU only because of DALI, but should be possible to support CPU-only training)
 	# Compute random split for train and eval set
 	train_dataset = YOLOFormatDataset(
-        dataset_root=data_yaml_path,
-        data_split="train",
+		dataset_root=data_yaml_path,
+		data_split="train",
 		img_size=img_size,
-        batch_size=batch_size,
-    )
+		batch_size=batch_size,
+	)
 	val_dataset = YOLOFormatDataset(
 		dataset_root=data_yaml_path,
 		data_split="val",
@@ -68,9 +73,10 @@ def train_dino(config):
 
 	imgsz = normalize_imgsz(config, "training")
 	train_set, val_set, num_classes = get_datasets(
-		config["data"]["dataset_yaml"], 
-		training_config["batch"], 
-		img_size=imgsz
+		config["data"]["dataset_yaml"],
+		training_config["batch"],
+		img_size=imgsz,
+		loader=config["data"].get("loader", "jpg"),
 	)
 
 	# === Setup dataloaders ===

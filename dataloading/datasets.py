@@ -1,11 +1,12 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 from nvidia.dali import pipeline_def
 import nvidia.dali.fn as fn
 import nvidia.dali.types as types
 from nvidia.dali.plugin.pytorch import DALIRaggedIterator, LastBatchPolicy
 import nvidia.dali.experimental.dynamic as ndd
+from PIL import Image
 
 import numpy as np
 import torch
@@ -41,6 +42,7 @@ def create_detection_pipeline(dataset_src, stats, img_size=640, device="gpu"):
 		mean=stats["mean"],
 		std=stats["std"],
 	)
+	# TODO : push to gpu from the collate function instead of doing it here ?
 	return inputs, labels.gpu(), bboxes.gpu()
 
 
@@ -144,7 +146,7 @@ class BaseDetectionDataset:
 		return (img - mean) / std
 
 
-class YOLOFormatDataset(BaseDetectionDataset):
+class JpgDALIDataset(BaseDetectionDataset):
 	# TODO : only JPEG, need to think about TIFF handling
 
 	def __init__(
@@ -246,6 +248,32 @@ class YOLOFormatDataset(BaseDetectionDataset):
 		return sample
 
 
+class JpgDetectionDataset(BaseDetectionDataset):
+	def __init__(
+		self,
+		dataset_root: str,
+		img_size: Tuple[int, int],
+		stats_file: str = "stats.npy",
+		device: str = "cpu",
+		data_split: str = None,
+	):
+		super().__init__(dataset_root=dataset_root, stats_file=stats_file, data_split=data_split)
+		self.img_size = img_size
+		self.device = device
+
+	def __len__(self) -> int:
+		return len(self.image_files)
+
+	def __getitem__(self, idx: int):
+		img = Image.open(self.image_files[idx]).convert("RGB").resize(self.img_size)
+		img = np.array(img, dtype=np.float32) / 255.0
+		img = self.to_tensor(img)
+		img = self.normalize_img(img)
+		tgt = self.targets[idx]
+		img_file = self.image_files[idx]
+		return img, tgt, img_file
+
+
 class DALIDetectionDataLoader:
 	def __init__(
 		self,
@@ -303,15 +331,22 @@ def sample_indices(dataset_size, num_samples, seed):
 	return sorted(rng.sample(range(dataset_size), sample_size))
 
 
-def collate_yolo(batch):
-	collated = {
+def collate_dali(batch):
+	collated_batch = {
 		"images": torch.stack([item["image"] for item in batch], dim=0),
 		"inputs": torch.stack([item["input"] for item in batch], dim=0),
 		"labels": [item["label"] for item in batch],
 		"bboxes": [item["bboxes"] for item in batch],
 		"img_paths": [item["img_path"] for item in batch],
 	}
-	return collated
+	return collated_batch
+
+
+def detection_collate_fn(batch):
+	images, targets, image_files = zip(*batch)
+	images = torch.stack(images, dim=0)
+	# TODO : /!\ à faire coller au format de collate_dali
+	return images, list(targets), list(image_files)
 
 
 def sample_dataset(dataset, num_samples, seed, device):
