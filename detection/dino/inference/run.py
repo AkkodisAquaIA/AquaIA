@@ -3,7 +3,7 @@ from pathlib import Path
 
 import torch
 
-from dataloading.datasets import YOLOFormatDataset, DALIDetectionDataLoader
+from dataloading.datasets import JpgDALIDataset, DALIDetectionDataLoader
 from detection.dino.dino_detector import DINODetector
 from detection.metric import compute_metrics, save_metrics
 from detection.utils.config_utils import find_latest_run_dir, load_run_config, load_class_names
@@ -51,7 +51,7 @@ def test_dino(config):
         device=device,
     )
     imgsz = normalize_imgsz(config, "inference")
-    test_dataset = YOLOFormatDataset(
+    test_dataset = JpgDALIDataset(
         dataset_root=test_data_root,
         data_split="test",
         img_size=imgsz,

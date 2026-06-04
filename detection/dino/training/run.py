@@ -7,7 +7,7 @@ import torch
 import tqdm
 from transformers import get_scheduler
 
-from dataloading.datasets import YOLOFormatDataset, DALIDetectionDataLoader, parse_batch
+from dataloading.datasets import JpgDALIDataset, DALIDetectionDataLoader, parse_batch
 from detection.dino.dino_detector import DINODetector
 from detection.dino.loss import SetCriterion
 from detection.metric import compute_metrics, log_epoch, print_metrics, update_log_dict
@@ -26,13 +26,13 @@ def get_datasets(
 ):
     # TODO : currently GPU only because of DALI, but should be possible to support CPU-only training)
     # Compute random split for train and eval set
-    train_dataset = YOLOFormatDataset(
+    train_dataset = JpgDALIDataset(
         dataset_root=data_yaml_path,
         data_split="train",
         img_size=img_size,
         batch_size=batch_size,
     )
-    val_dataset = YOLOFormatDataset(
+    val_dataset = JpgDALIDataset(
         dataset_root=data_yaml_path,
         data_split="val",
         img_size=img_size,

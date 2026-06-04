@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from ultralytics import YOLO
 import torch
 
-from dataloading.datasets import YOLOFormatDataset, collate_yolo
+from dataloading.datasets import JpgDALIDataset, collate_dali
 from detection.utils.config_utils import find_latest_run_dir, load_run_config
 from detection.metric import compute_metrics, save_metrics
 from detection.utils.plot_utils import save_sample_predictions
@@ -35,13 +35,13 @@ def test_yolo(config):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     model = load_model(run_dir, device)
-    test_dataset = YOLOFormatDataset(
+    test_dataset = JpgDALIDataset(
         dataset_root=test_data_root,
         data_split="test",
         img_size=normalize_imgsz(config, "inference"),
         batch_size=inference_config["batch"],
     )
-    test_loader = DataLoader(test_dataset, batch_size=test_dataset.batch_size, shuffle=False, num_workers=0, collate_fn=collate_yolo)
+    test_loader = DataLoader(test_dataset, batch_size=test_dataset.batch_size, shuffle=False, num_workers=0, collate_fn=collate_dali)
 
     save_sample_predictions(
         model=model,
