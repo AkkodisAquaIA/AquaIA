@@ -15,7 +15,6 @@ def afficher_stats_bbox(stats, cfg):
         else:
             return f"{v:.4f}"
 
-
     def format_const(min_c, max_c):
         return f"{min_c:.3e} → {max_c:.4f}"
 
@@ -31,8 +30,22 @@ def afficher_stats_bbox(stats, cfg):
 
     table = util.TablePrinter(columns)
     table.header()
+    warnings = []
 
     def add_row(label, data, cmin, cmax):
+
+        min_ok = data["min"] >= cmin
+        max_ok = data["max"] <= cmax
+
+        if not min_ok:
+            warnings.append(
+                f"{label}: valeur MIN ({data['min']:.4f}) < limite config ({cmin})"
+            )
+
+        if not max_ok:
+            warnings.append(
+                f"{label}: valeur MAX ({data['max']:.4f}) > limite config ({cmax})"
+            )
 
         table.row([
             (label, True),
@@ -48,6 +61,22 @@ def afficher_stats_bbox(stats, cfg):
     add_row("Area",   stats["bbox_area"],   cfg["MIN_BBOX_AREA"], cfg["MAX_BBOX_AREA"])
 
     table.footer()
+
+    # --- Diagnostic global ---
+    if warnings:
+        display = dc.DisplayColor()
+        print()
+        display.print("Erreur : Dataset vs Configuration", colors["error"])
+
+        print("Les valeurs suivantes sont hors limites par rapport au fichier de configuration :\n")
+
+        for w in warnings:
+            print(f" - {w}")
+    else:
+        display = dc.DisplayColor()
+        print()
+        display.print("Dataset conforme aux limites de configuration", colors["ok"])
+
 
 def verifier_classes_dataset(class_distribution, class_names):
     n_classes = len(class_names)

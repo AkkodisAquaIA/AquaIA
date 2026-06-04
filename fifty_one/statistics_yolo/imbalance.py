@@ -1,6 +1,5 @@
 import numpy as np
 
-from config import process as pr
 from tools import utility as util
 
 #============================================================================================

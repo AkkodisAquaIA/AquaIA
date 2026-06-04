@@ -3,13 +3,12 @@ import re
 from PIL import Image
 from PIL import UnidentifiedImageError
 from pathlib import Path
-from collections import Counter, defaultdict
+from collections import  defaultdict
 from tqdm import tqdm
 
 from tools import utility as util
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
-# from config import process as pr
 from config import constants as ct
 
 
@@ -59,6 +58,7 @@ display = dc.DisplayColor()
 
 def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
 
+    display.print("Début de l'analyse", colors['info'])
 
     try:
         images_dir, labels_dir = util.get_dataset_paths(DATASET_DIR)
@@ -75,9 +75,10 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
     label_stems = set()
     all_bboxes = []
 
+    #====================================================================================================
     # Analyse des fichiers 'labels'
     for entry in tqdm(list(os.scandir(labels_dir)), # type: ignore 
-                    desc=" Analyse des labels",
+                    desc=" Labels",
                     unit=" fichier",
                     ncols=100,
                     position=0): 
@@ -99,7 +100,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
                 line = line.strip()
                 if not line:
                     # --- ligne vide ---
-                    erreurs_syntaxe["lignes_vides"].append(f"{entry.name} (ligne {i})")
+                    erreurs_syntaxe["lignes_vides"].append(f"{entry.name} (ligne {i})")     
                     rapport_detail[entry.name][i].append("lignes_vides")
                     ctrl_ok = False
                     continue
@@ -213,11 +214,13 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
                     rapport_detail[entry.name][i].extend(erreurs_ligne)
 
         if not has_content:
-            erreurs_syntaxe["labels_vides"].append(entry.name)
+            erreurs_syntaxe["labels_vides"].append(os.path.splitext(entry.name)[0])
             rapport_detail[entry.name][0].append("labels_vides")
             ctrl_ok = False
 
-    # --- Analyse images ---
+
+    #====================================================================================================
+    # Analyse des images
     image_paths = [p for p in Path(images_dir).glob("*") if p.suffix.lower() in ct.IMAGE_EXT] # type: ignore
     image_stems = {p.stem for p in image_paths}
 
@@ -232,35 +235,34 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
 
     # Vérification images invalides / corrompues
     images_invalides = []
+    images_sans_label = []
 
     for p in tqdm(
-        image_paths,
-        desc=" Vérification images",
-        unit=" image",
-        ncols=100,
-        position=0):
-    # for p in image_paths:
-        # --- image corrompue ---
-        if not is_valid_image(p):
-            images_invalides.append(p.name)
+            image_paths,
+            desc=" Images",
+            unit=" image",
+            ncols=100,
+            position=0):
 
+        # image invalide -> erreur puis image suivante
+        if not is_valid_image(p):
+            images_invalides.append(p.stem)
+            continue
+
+        # image valide -> vérification du label
+        if p.stem not in label_stems:
+            images_sans_label.append(p.stem)
+
+    # Synthèse des erreurs
     if images_invalides:
         erreurs_syntaxe["images_invalides"] = sorted(images_invalides)
         ctrl_ok = False
-    else:
 
-        # images sans label
-        images_sans_label = sorted(image_stems - label_stems)
-        if images_sans_label:
-            erreurs_syntaxe["images_sans_label"] = images_sans_label
-            ctrl_ok = False
-            
-        # images dupliquées
-        image_names = [p.name for p in image_paths]
-        duplicates = [k for k, v in Counter(image_names).items() if v > 1]
-        if duplicates:
-            erreurs_syntaxe["images_dupliquees"] = duplicates
+    if images_sans_label:
+        erreurs_syntaxe["images_sans_label"] = sorted(images_sans_label)
+        ctrl_ok = False
 
+    #====================================================================================
     # --- Affichage erreurs ---
     for key, values in erreurs_syntaxe.items():
         if values:

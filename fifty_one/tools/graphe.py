@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 
 import tools.utility as util
+from config import constants as ct
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 
@@ -126,6 +127,7 @@ def histogram_taille_bbox(
     x_label: str,
     y_label: str,
     cfg,
+    ymax :int
 ) -> None:
     """
     Display a simple histogram.
@@ -142,13 +144,17 @@ def histogram_taille_bbox(
     """
 
     plt.figure(figsize=(12, 6))
-    plt.hist(values, bins=50)
+    plt.hist(values, bins=ct.BINS)
 
     plt.title(title)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
 
     plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    
+    plt.ylim(top=ymax)
+
     plt.tight_layout()
     save_plot("histogram.png",  cfg)
     plt.show()

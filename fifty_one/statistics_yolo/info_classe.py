@@ -1,6 +1,6 @@
 
 from colorama import Fore, Style, init
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 from tools import utility as util
 import tools.display_color as dc
@@ -83,43 +83,48 @@ def info_classes(info_classes, cfg):
         ligne = blocs[i:i + classes_par_ligne]
         print("│ ".join(f"{b:<{bloc_width}}" for b in ligne))
 
+
     # Affichage de l'histogramme de distribution des classes
-    gr.histogram_classe(items, class_names, cfg, total )
+    print()
+    if util.answer_yes_or_no("Voulez-vous afficher le graphique") :
+        gr.histogram_classe(items, class_names, cfg, total )    
 
     # --- classes Rares ---------------------------------------
-    if cfg["RARE"] is not None:
-        classes_faibles = []
-        print()
-        for cls, count in items:
-            pct = (count / total) * 100
-            if pct < cfg["RARE"]:
-                name = class_names[cls] if class_names and cls < len(class_names) else f"UNKNOWN_{cls}"
-                classes_faibles.append((cls, name, count, pct))
+    if util.answer_yes_or_no("Voulez-vous voir les classes rares") :
 
-        if not classes_faibles:
-            display.print(f'Aucune classe sous {cfg["RARE"]}% ', colors['ok'])
-        else:
-            message = f'Classes Rares ({rary}) < {cfg["RARE"]}%'
-            display.print(message, colors['titre'])
-            # tri optionnel (du pire au moins pire)
-            classes_faibles.sort(key=lambda x: x[3])  # tri par %
+        if cfg["RARE"] is not None:
+            classes_faibles = []
+            print()
+            for cls, count in items:
+                pct = (count / total) * 100
+                if pct < cfg["RARE"]:
+                    name = class_names[cls] if class_names and cls < len(class_names) else f"UNKNOWN_{cls}"
+                    classes_faibles.append((cls, name, count, pct))
 
-            # --- regroupement par pourcentage ---
-            grouped = defaultdict(list)
+            if not classes_faibles:
+                display.print(f'Aucune classe sous {cfg["RARE"]}% ', colors['ok'])
+            else:
+                message = f'Classes Rares ({rary}) < {cfg["RARE"]}%'
+                display.print(message, colors['titre'])
+                # tri optionnel (du pire au moins pire)
+                classes_faibles.sort(key=lambda x: x[3])  # tri par %
 
-            for cls, name, count, pct in classes_faibles:
-                key = round(pct, 2)  # regroupe par % arrondi
-                grouped[key].append((cls, name, count))
+                # --- regroupement par pourcentage ---
+                grouped = defaultdict(list)
 
-            # tri par % croissant
-            for pct in sorted(grouped.keys()):
-                print(f"--- {pct:.2f}% ---")
+                for cls, name, count, pct in classes_faibles:
+                    key = round(pct, 2)  # regroupe par % arrondi
+                    grouped[key].append((cls, name, count))
 
-                entries = grouped[pct]
-                texts = [f"{cls} {name}" for cls, name, _ in entries]
+                # tri par % croissant
+                for pct in sorted(grouped.keys()):
+                    print(f"--- {pct:.2f}% ---")
 
-                max_width = max(len(t) for t in texts) + 2
-                for i in range(0, len(texts), ct.N_PER_LINE):
-                    print(" │ ".join(f"{t:<{max_width}}" for t in texts[i:i+ ct.N_PER_LINE]))
-                print()
+                    entries = grouped[pct]
+                    texts = [f"{cls} {name}" for cls, name, _ in entries]
 
+                    max_width = max(len(t) for t in texts) + 2
+                    for i in range(0, len(texts), ct.N_PER_LINE):
+                        print(" │ ".join(f"{t:<{max_width}}" for t in texts[i:i+ ct.N_PER_LINE]))
+                    print()
+                    

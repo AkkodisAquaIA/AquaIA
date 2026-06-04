@@ -8,18 +8,16 @@ from collections import Counter
 from colorama import Fore, Style
 from pathlib import Path
 import shutil
-import argparse
 import fiftyone as fo
 from collections import defaultdict
 from datetime import datetime
-
 from typing import TypedDict
 
 from tools import system as syst
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 from config import constants as ct
-from config import process as pr
+
 
 #=====================================================================================================
 
@@ -193,7 +191,7 @@ def get_dataset_paths(dataset_dir, split="train2017"):
 
     return images_dir, labels_dir
 
-def horodatage(file_name: str) -> str:
+def horodatage(file_name: str, defaut="") -> str:
 
     # Generate a timestamp (format: YYYYMMDD_HHMMSS)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") 
@@ -203,7 +201,7 @@ def horodatage(file_name: str) -> str:
     suffix = Path(file_name).suffix
 
     # Build a new filename including the timestamp
-    filename_with_timestamp = f"{timestamp}_{stem}_{suffix}"
+    filename_with_timestamp = f"{timestamp}_{defaut}_{stem}_{suffix}"
 
     return filename_with_timestamp
 
@@ -266,7 +264,7 @@ def calibrer_seuils_overflow(results : dict,
     ]
 
     if not outside_ratios:
-        display.print(" No overflow detected, using minimum thresholds.", colors['ok'])
+        display.print(" Aucun dépassement détecté, utilisation des seuils minimaux.", colors['ok'])
         return {
             "BBOX_OVERFLOW_WARNING": min_warning,
             "BBOX_OVERFLOW_ERROR": min_error
@@ -284,10 +282,10 @@ def calibrer_seuils_overflow(results : dict,
     if error_final <= warning_final:
         error_final = warning_final + 5.0  # small safety margin
 
-    display.print("Automatic threshold calibration:", colors["warning"])
-    print(f"  - Warning ({warning_percentile} percentile): "
+    display.print("Calibration automatique des seuils:", colors["warning"])
+    print(f"  - Avertissement ({warning_percentile} percentile): "
           f"{warning_calculated:.2f}% → Final: {warning_final:.2f}%")
-    print(f"  - Error   ({error_percentile} percentile): "
+    print(f"  - Erreur   ({error_percentile} percentile): "
           f"{error_calculated:.2f}% → Final: {error_final:.2f}%")
 
     return {
@@ -309,30 +307,30 @@ def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
 
     color = dc.DisplayColor()
 
-    color.print("Launching FiftyOne web interface...", colors['info'])
+    color.print("Lancement de l'interface web FiftyOne...", colors['info'])
     
     port = syst.get_free_port()
     session = None
     try:
         session = fo.launch_app(dataset, port=port, remote=False)
         color.print(f"tyOne web interface available at: http://127.0.0.1:{port}", colors['info'])
-        color.print("Waiting for the web interface to close", colors['wait'], bold=True)
-        color.print("Press CTRL+C to continue if needed.", colors['wait'], bold=True)
+        color.print("Attente de la fermeture de l'interface web", colors['wait'], bold=True)
+        color.print("Appuyez sur CTRL+C pour continuer si nécessaire.", colors['wait'], bold=True)
 
         # Wait until the session is closed
         try:
             session.wait()
         except KeyboardInterrupt:
-            color.print("CTRL+C detected, continuing program...", colors['warning'])
+            color.print("CTRL+C détecté, continuation du programme...", colors['warning'])
 
     except Exception as e:
-        color   .print("Failed to launch FiftyOne web interface.", colors['error'])
+        color   .print("Échec du lancement de l'interface web FiftyOne.", colors['error'])
         print("Error:", e)
 
     finally:
         if session is not None:
             session.close()
-            color.print("FiftyOne session closed, continuing program.", colors['info'])
+            color.print("FiftyOne session fermée, continuation du programme.", colors['info'])
 
 def rgb_to_ansi(rgb: tuple[int, int, int]) -> str:
     """Convert RGB color to ANSI escape code."""
@@ -382,7 +380,7 @@ def get_path_color(prompt: str, color_key: str = 'input') -> Path:
         if os.path.exists(path_input):
             return Path(path_input)
 
-        error_text: str = f"Invalid path: {path_input}. Please try again."
+        error_text: str = f"Chemin invalide: {path_input}. Veuillez réessayer."
         display.print(error_text, colors['error'])
 
 def selection(maxi) -> int:
@@ -412,20 +410,6 @@ def selection(maxi) -> int:
                         f"Réessayez! {ct.BELL}"
                     )
                 display.print(text, colors['error'])
-
-def draw_bar(value, vmin, vmax, length=50):
-    """
-    Barre visuelle normalisée
-    """
-    ratio = (value - vmin) / (vmax - vmin)
-    ratio = max(0, min(1, ratio))
-
-    filled = int(ratio * length)
-    empty = length - filled
-
-    scale = "█" * filled + "░" * empty
-    
-    return scale
 
 def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> bool:
     """
@@ -457,9 +441,127 @@ def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> b
         text = f"Réponse valide : (o/N) {ct.BELL}"
         display.print(text, colors['error'])
 
+def input_value(message: str, color_key: str = 'input') -> int:
+    """
+    This function returns a inter > 0 
+    """
+
+    display = dc.DisplayColor()
+
+    color = chck_color(color_key)
+
+    while True:
+        # Convert the input color from DISPLAY_COLORS to ANSI
+        input_color = rgb_to_ansi(color)
+        # Displays the prompt in color
+        colored_prompt = f"{input_color}[?] {message} : {Style.RESET_ALL}"
+
+        try:
+            value = int(input(colored_prompt).strip())
+            if value > 0:
+                return value
+            else: 
+                text = (
+                        f"la valeur doit être positive!! . "
+                        f"Réessayez! {ct.BELL}"
+                    )
+            display.print(text, colors['error'])
+
+        except ValueError:
+            text = (
+                        f"Ce n'est pas un nombre . "
+                        f"Réessayez! {ct.BELL}"
+                    )
+            display.print(text, colors['error'])
+
+def seuil():
+    """
+        Saisir deux seuils.
+        Les seuils doivent être compris entre 0 & 100.
+        on renvoit les deux seuils dans l'ordre croisant'
+        """
+    
+    display = dc.DisplayColor()
+
+    while True:
+        display.print("Entrez seuil 'Rare' & 'Dominant'", colors["input"])
+        entree = input(" - : ")
+        seuil = entree.split()
+        seuil.sort() # tri croisant des entrées
+
+        if not valider_seuil(seuil):
+            continue
+
+        seuil_rare = float(seuil[0])
+        seuil_dominant = seuil_rare if len(seuil) == 1 else float(seuil[1])
+
+        return seuil_rare, seuil_dominant
+
+def valider_seuil(seuil):
+    """
+    Controle la validitée des entrées
+    """
+    if len(seuil) != 2:
+        print("Veuillez entrer 2 valeurs.")
+        return False
+
+    try:
+        if  0.0 > float(seuil[0]) or float(seuil[0]) > 100.0:
+            print("Veuillez entrer un seuil compris entre 0.0 et 100.0")
+            return False
+    except ValueError:
+        print(f"{seuil[0]} n'est pas valide.")
+        return False
+
+    if len(seuil) == 2:
+        try:
+            float(seuil[1])
+        except ValueError:
+            print(f"{seuil[1]} n'est pas valide.")
+            return False
+
+    return True
+
+
+def afficher_mode(
+    label: str,
+    enabled: bool,
+    path: str | None = None,
+) -> None:
+    
+    display = dc.DisplayColor()
+
+    display.print(
+        f"{label} {'ON' if enabled else 'OFF'}",
+        colors["ok" if enabled else "warning"]
+    )
+
+    if enabled and path:
+        print(f"    Sauvegarde vers : {path}")
+
+    print()
+
+def draw_bar(value, vmin, vmax, length=50):
+    """
+    Barre visuelle normalisée
+    """
+    ratio = (value - vmin) / (vmax - vmin)
+    ratio = max(0, min(1, ratio))
+
+    filled = int(ratio * length)
+    empty = length - filled
+
+    scale = "█" * filled + "░" * empty
+    
+    return scale
+
 def titre_centre(texte, largeur=120, remplissage='—'):  # '—' 
     return f" {texte} ".center(largeur, remplissage)
 
+def sortie_de_programme():
+    display = dc.DisplayColor()
+    display.print(f"Programme terminé. Au revoir !{ct.BELL}", colors['goodbye'])
+    sys.exit(0)
 
 # ------------------------------
 # Function to display and save problematic items
@@ -488,7 +590,7 @@ def display_and_save_errors(
     display: dc.DisplayColor = dc.DisplayColor()
 
     if not items:
-        display.print(f"{title}: No issues detected.\n", colors['ok'])
+        display.print(f"{title}: Pas de problèmes détectés.\n", colors['ok'])
         return
 
     if sort:
@@ -497,8 +599,11 @@ def display_and_save_errors(
     # Save to file if report mode is enabled
     if cfg["REPORT_MODE"]:
 
-        new = horodatage(file_name)
-        file_path: Path = path_user / new
+        new = horodatage(file_name, defaut="def_conf")
+
+        new = f"def_conf_{file_name}"
+
+        file_path: Path = path_user / new  
 
         try:
             with open(file_path, "w", encoding="utf-8") as f:
@@ -528,10 +633,11 @@ def afficher_bbox_erreurs_compact(
             Maximum line width. If None, half terminal width is used.
     """
 
+
     display: dc.DisplayColor = dc.DisplayColor()
 
     if not bbox_erreurs:
-        display.print("No bounding box errors detected.", colors["ok"])
+        display.print("Pas d'erreurs de boîte englobante détectées.", colors["ok"])
         return
 
     if largeur_max_ligne is None:
@@ -541,7 +647,7 @@ def afficher_bbox_erreurs_compact(
     indent: str = " " * (categorie_max_len + 3)
     separateur: str = " | "
 
-    display.print(" --- Detected errors:", colors["error"])
+    display.print(" --- Erreurs détectées:", colors["error"])
 
     for categorie, chemins in bbox_erreurs.items():
         if not chemins:
@@ -553,7 +659,8 @@ def afficher_bbox_erreurs_compact(
             colors["error"]
         )
 
-        noms_images: list[str] = [Path(chemin).name for chemin in chemins]
+        nb_total = len(chemins)
+        noms_images = [Path(chemin).name for chemin in chemins[:ct.MAX_IMAGES_AFFICHEES]]
 
         ligne: str = ""
 
@@ -569,6 +676,12 @@ def afficher_bbox_erreurs_compact(
 
         if ligne:
             print(f"{indent}{ligne}")
+
+        if nb_total > ct.MAX_IMAGES_AFFICHEES:
+            display.print(
+                f"        ... {nb_total - ct.MAX_IMAGES_AFFICHEES} additional images not shown",
+                colors["warning"]
+            )
 
         print()
 
@@ -650,7 +763,7 @@ def afficher_dataset_statistics(
     total: int = sum(class_distribution.values())
 
     if not anomalies:
-        display.print("No anomalies detected", colors["ok"])
+        display.print("Pas d'anomalies détectées", colors["ok"])
         return
 
     anomalies_count: Counter[str] = Counter(a[0] for a in anomalies) # type: ignore
@@ -693,7 +806,7 @@ def save_anomalies_readable(
     # Generate a timestamp (format: YYYYMMDD_HHMMSS)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
  
-    new = horodatage(file_name)
+    new = horodatage(file_name, defaut="def")
     output_path =  path_user / new
 
     try:
@@ -715,8 +828,3 @@ def save_anomalies_readable(
              display.print(f"Impossible de sauvegarder : {output_path}", colors['error'])
 
     display.print(f" ****** '{file_name}' create *****", colors["warning"])        
-
-def sortie_de_programme():
-    display = dc.DisplayColor()
-    display.print(f"Programme terminé. Au revoir !{ct.BELL}", colors['goodbye'])
-    sys.exit(0)

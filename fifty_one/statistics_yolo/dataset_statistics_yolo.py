@@ -1,3 +1,5 @@
+
+from tools import system as syst
 import re
 import numpy as np
 from pathlib import Path
@@ -12,6 +14,7 @@ import statistics_yolo.anomalies as ano
 
 import tools.display_color as dc
 from tools import utility as util
+from tools import menu as menu
 from config import constants as ct
 from config.constants import DISPLAY_COLORS as colors
 from tools import graphe as gr
@@ -220,10 +223,9 @@ def dataset_statistics_yolo(DATASET_DIR, cfg):
         "class_to_images": class_to_images,
     }
 
-
 #==========================================================================================================
 
-def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None,  afficher_hist=False):
+def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None):
 
     display = dc.DisplayColor()
 
@@ -234,42 +236,98 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None,  af
     class_to_images = resultats.get("class_to_images", {})
 
     total_boxes = stats["bounding_boxes"]
-    total = sum(class_distribution.values())
+    # total = sum(class_distribution.values())
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
+    print()
+    display.print(f"Analyse terminé {"avec" if anomalies else "sans"} problème",
+                  colors["warning" if anomalies else "ok"]
+                  )
 
 
-    # ---- Information générales -----------------------------------------------
-    info_general = (total_boxes, total_classes, class_distribution, class_to_images )
-    ige.afficher_info_general(stats, info_general, class_names, cfg)
+    main_menu = menu.Menu('MAIN', style= "heavy")
+    while True : 
+        print()
+        display.print("Menu", colors['titre'])
+        main_menu.display_menu()
+        choice = main_menu.selection()
 
-    # ---- Information sur les classes -----------------------------------------
-    classes_info =(class_distribution, class_names)
-    icl.info_classes(classes_info, cfg)
+        if choice == 1:
+            # ---- Information générales --------------------------------------------------
+            syst.clear_screen()
+            display.print("Information générales", colors['titre'])
+            info_general = (total_boxes, total_classes, class_distribution, class_to_images )
+            ige.afficher_info_general(stats, info_general, class_names, cfg)
 
-   
-    # --- IMAGES PAR CLASSE --------------------------------------------------------
-    data_info_img_cla = (class_to_images, class_names)
-    iic.info_images_par_classe(data_info_img_cla)
-
-
-    # --- histogramme des tailles de bbox ---
-    if afficher_hist and bbox_areas:
-        gr.histogram_taille_bbox(bbox_areas,
-                      "Distribution des tailles de BBox",
-                      "Aire bbox",
-                      "Nombre",
-                      cfg,
-                      )
+        elif choice == 2:
+            # ---- Information sur les classes --------------------------------------------
+            syst.clear_screen()
+            display.print("Information sur les classes", colors['titre'])
+            classes_info =(class_distribution, class_names)
 
 
-    # --- anomalies ---------------------------------------------------------------
-    info_anomalie = (anomalies, resultats, afficher_hist)
-    ano.recherche_anomalie(stats, info_anomalie, path_user, cfg)
+            while True :
+                icl.info_classes(classes_info, cfg)
 
+                if util.answer_yes_or_no("Voulez-vous modifier la valeur des seuils") : 
+                         
 
-    # --- AFFICHAGE DES METRIQUES D'IMBALANCE ---
-    metrics = imb.imbalance_metrics(class_distribution, cfg)
-    imb.afficher_imbalance_avance(metrics, display, colors, cfg)
+                    cfg["RARE"], cfg["DOMINANT"]=  util.seuil() 
+                    # cfg["DOMINANT"] = 3
+                else :
+                    break
+        
+        elif choice == 3:   
+            # --- Images par classe -------------------------------------------------------
+            syst.clear_screen()
+            display.print("Images par classe", colors['titre'])
+            data_info_img_cla = (class_to_images, class_names)
+            iic.info_images_par_classe(data_info_img_cla)
+
+        elif choice == 4:
+            # --- histogramme des tailles de bbox -----------------------------------------
+            syst.clear_screen()
+            display.print("Distribution de la taille des BBoxes", colors['titre'])
+
+            bins =  ct.BINS 
+            
+            counts, bins = np.histogram(bbox_areas, bins=bins)
+            y_max = counts.max()
+            print(f" - Nombre maximun d'occurrences) : {y_max}")
+            print()
+
+            nb_maxi = y_max
+
+            while True :
+                gr.histogram_taille_bbox(bbox_areas,
+                            "Distribution des tailles de BBox",
+                            "Aire bbox",
+                            "Nombre",
+                            cfg,
+                            nb_maxi,
+                            )
+                if util.answer_yes_or_no("Voulez-vous modifier 'y_max'") : 
+                    nb_maxi = util.input_value("Entrer une valeur")
+                else :
+                    break
+
+        elif choice == 5:
+            # --- anomalies ---------------------------------------------------------------
+            syst.clear_screen()
+            display.print("Anomalies", colors['titre'])
+            info_anomalie = (anomalies, resultats)
+            ano.recherche_anomalie(stats, info_anomalie, path_user, cfg)
+
+        elif choice == 6:
+            # --- Affichage Métriques d'imbalance -----------------------------------------
+            syst.clear_screen()
+            display.print("Métriques d'imbalance", colors['titre'])
+            metrics = imb.imbalance_metrics(class_distribution, cfg)
+            imb.afficher_imbalance_avance(metrics, display, colors, cfg)
+
+        elif choice == 7:
+            # --- Sorte -------------------------------------------------------------------
+            if util.answer_yes_or_no("Voulez-vous sdortir"):
+                break
 
     return anomalies

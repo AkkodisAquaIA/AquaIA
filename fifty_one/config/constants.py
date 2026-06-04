@@ -14,8 +14,8 @@ INFO_PROD = r"""
 """
 
 
-# Random seed for reproducibility (ensures consistent results across runs)
-SEED = 0
+# # Random seed for reproducibility (ensures consistent results across runs)
+# SEED = 0
 
 # Chargement du dataset
 # True  -> Chargement via fichier de config 
@@ -42,14 +42,19 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 NB_CLASSES = 100
 
 # Max number of worst images displayed in report
-MAX_WORST_IMAGES = 6
+MAX_WORST_IMAGES = 15
 
+# Max number of images displayed in summary (if too many, only a sample is shown)
+MAX_IMAGES_AFFICHEES = 30
 
 # Width of tqdm progress bars
 TQDM_NCOLS = 150
 
 # Number of items displayed per line in reports
 N_PER_LINE = 5
+
+# valeur du 'Bin' pour Bargraphe
+BINS = 60
 
 #-----------------------------------------------------------------------------------
 # Display Colors & Prefixes (RGB + label prefix)
@@ -73,3 +78,52 @@ DISPLAY_COLORS = {
     'aqua':       (  0, 204, 153, "[~] "), # Standard teal
     'aqua_dark':  (  0, 102, 102, "[~] "), # Dark blue-green
 }
+
+
+MENUS = {
+    'MAIN': [
+        "Sélection des informations à afficher",
+        "Information générales",
+        "Information sur les classes",
+        "Images par classe",
+        "Taille des BBoxes",
+        "Anomalies",
+        "Métriques de déséquilibre des classes",
+        "Sortie"    ],
+}
+
+
+# symbols for frame creation
+PATTERN ={
+"double" : [".","╔", "╦", "╗",
+                "╠", "╬", "╣",
+                "╚", "╩", "╝",
+            "═", "║"
+           ],
+"simple" : [".","┌", "┬", "┐",
+                "├", "┼", "┤",
+                "└", "┴", "┘",
+            "─", "│"
+           ],
+"rounds" : [".","╭", "┬", "╮",
+                "├", "┼", "┤",
+                "╰", "┴", "╯",
+            "─", "│"
+           ],
+"heavy": [".","┏", "┳", "┓",   
+              "┣", "╋", "┫",   
+              "┗", "┻", "┛",   
+        "━", "┃"         
+        ],           
+"Unicode" : [".","┏", "┯", "┓",
+                 "┣", "┿", "┫",
+                 "┗", "┷", "┛",
+        "━", "┃","│"
+        ],
+"ASCII" : ["." ,"+" , "+" , "+",
+               "+", "+", "+",
+               "+", "+", "+",
+           "─", "│"
+           ],
+    }
+
