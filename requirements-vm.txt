@@ -8,3 +8,4 @@ matplotlib
 scipy
 termcolor
 pycocotools
+nvidia-dali-cuda130
