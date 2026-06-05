@@ -2,16 +2,16 @@
 # Model section: 
 # ----------------------------------------------------------------------
 model:
-  family: "yolo26"
-  size : "s"
-  init: "random"   # "pretrained" or "random"
+  family: "dinov3"
+  size : "small"
+  init: "pretrained"   # "pretrained" or "random"
 
 # ----------------------------------------------------------------------
 # Data section: train/val dataset
 # ----------------------------------------------------------------------
 data:
   # Dataset path consumed by the DINO trainer.
-  dataset_yaml: "datasets/coco_custom"
+  dataset_yaml: "datasets/coco8"
   # Image loader used by the DINO trainer. Use "npy" to keep the legacy path.
   loader: "jpg"
 
@@ -37,12 +37,12 @@ training:
 
   # ---------- DATA INPUT / LOADING ----------
   imgsz: 640
-  batch: 64
+  batch: 2
   workers: 0
 
   # ---------- TRAINING SCHEDULE ----------
   epochs: 500
-  # warmup_ratio: 0.05
+  warmup_ratio: 0.05
 
   # ---------- OPTIMIZER & LR ----------
   optimizer: "AdamW"
@@ -52,19 +52,19 @@ training:
   weight_decay: 0.00005
 
   # ---------- LOSS / MATCHER HYPERPARAMETERS ----------
-  # cost_class: 2.0
-  # cost_bbox: 5.0
-  # cost_giou: 2.0
-  # cost_bbox_type: "l1"
-  # cls: 4.0
-  # box: 5.0
-  # giou: 2.0
+  cost_class: 2.0
+  cost_bbox: 5.0
+  cost_giou: 2.0
+  cost_bbox_type: "l1"
+  cls: 4.0
+  box: 5.0
+  giou: 2.0
 
   # ---------- LOSS / BOX / CLS HYPERPARAMETERS ----------
   # See Ultralytics default.yaml for the latest recommended defaults.
-  box: 7.5            # box loss gain
-  cls: 0.5            # classification loss gain
-  dfl: 1.5            # distribution focal loss gain
+  # box: 7.5            # box loss gain
+  # cls: 0.5            # classification loss gain
+  # dfl: 1.5            # distribution focal loss gain
 
   # ---------- DATA AUGMENTATION ----------
   augment: true

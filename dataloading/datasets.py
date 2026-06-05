@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from typing import List, Tuple
-from utils.import_utils import (
+from detection.utils.import_utils import (
     fn,
     pipeline_def,
     types,
