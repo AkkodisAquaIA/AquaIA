@@ -1,11 +1,14 @@
 import os
 from pathlib import Path
 from typing import List, Tuple
-from nvidia.dali import pipeline_def
-import nvidia.dali.fn as fn
-import nvidia.dali.types as types
-from nvidia.dali.plugin.pytorch import DALIRaggedIterator, LastBatchPolicy
-import nvidia.dali.experimental.dynamic as ndd
+from utils.import_utils import (
+    fn,
+    pipeline_def,
+    types,
+    ndd,
+    DALIRaggedIterator,
+    LastBatchPolicy,
+)
 from PIL import Image
 
 import numpy as np
@@ -13,9 +16,8 @@ import torch
 import random
 from detection.utils.config_utils import load_class_names
 
+
 # TODO : AutoAugment: Learning Augmentation Strategies from Data
-
-
 @pipeline_def
 def create_detection_pipeline(dataset_src, stats, img_size=640, device="gpu"):
     encoded, labels, bboxes = fn.external_source(
