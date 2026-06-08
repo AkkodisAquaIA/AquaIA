@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Images, CheckCircle, XCircle, Copy, Layers, Clock, HardDrive, FolderOpen } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { getStats } from "@/lib/api";
+import { useAppStore } from "@/store/appStore";
 import type { DashboardStats } from "@/types";
 import { formatNumber, formatDate } from "@/lib/utils";
 
@@ -36,14 +37,17 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function DashboardPanel() {
+  const { currentUserId } = useAppStore();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getStats()
+    if (!currentUserId) return;
+    setLoading(true);
+    getStats(currentUserId)
       .then(setStats)
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentUserId]);
 
   if (loading) {
     return (

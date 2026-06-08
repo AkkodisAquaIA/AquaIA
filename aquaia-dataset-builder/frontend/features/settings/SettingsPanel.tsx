@@ -19,17 +19,19 @@ const CROP_PRESETS = [
 ];
 
 export default function SettingsPanel() {
-  const { cropWidth, cropHeight, setCropDimensions } = useAppStore();
+  const { cropWidth, cropHeight, setCropDimensions, currentUserId } = useAppStore();
   const [customW, setCustomW] = useState(String(cropWidth));
   const [customH, setCustomH] = useState(String(cropHeight));
   const [taxons, setTaxons] = useState<Taxon[]>([]);
 
   useEffect(() => {
-    getTaxons().then(setTaxons).catch(() => {});
-  }, []);
+    if (!currentUserId) return;
+    getTaxons(currentUserId).then(setTaxons).catch(() => {});
+  }, [currentUserId]);
 
   const handleClearReference = async (taxon: Taxon) => {
-    const updated = await setTaxonReference(taxon.id, null);
+    if (!currentUserId) return;
+    const updated = await setTaxonReference(taxon.id, null, currentUserId);
     setTaxons((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   };
 
@@ -52,7 +54,7 @@ export default function SettingsPanel() {
       <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
         {[
           { label: "API URL",   value: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api" },
-          { label: "Version",   value: "0.1.0" },
+          { label: "Version",   value: "0.2.0" },
           { label: "Database",  value: "SQLite" },
           { label: "Storage",   value: "./storage/" },
         ].map(({ label, value }) => (

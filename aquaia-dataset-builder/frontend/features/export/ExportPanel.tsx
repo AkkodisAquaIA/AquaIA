@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Download, Plus, Loader2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { getExports, createExport } from "@/lib/api";
+import { useAppStore } from "@/store/appStore";
 import type { ExportJob } from "@/types";
 import { formatDate } from "@/lib/utils";
 
@@ -16,27 +17,32 @@ const EXPORT_TYPES = [
 ];
 
 export default function ExportPanel() {
+  const { currentUserId } = useAppStore();
   const [jobs, setJobs] = useState<ExportJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState("classification");
 
-  const reload = () => getExports().then(setJobs).finally(() => setLoading(false));
+  const reload = () => {
+    if (!currentUserId) return;
+    getExports(currentUserId).then(setJobs).finally(() => setLoading(false));
+  };
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { reload(); }, [currentUserId]);
 
   // Poll running jobs every 3s
   useEffect(() => {
     const running = jobs.some((j) => j.status === "running");
-    if (!running) return;
-    const id = setInterval(() => getExports().then(setJobs), 3000);
+    if (!running || !currentUserId) return;
+    const id = setInterval(() => getExports(currentUserId).then(setJobs), 3000);
     return () => clearInterval(id);
-  }, [jobs]);
+  }, [jobs, currentUserId]);
 
   const handleCreate = async () => {
+    if (!currentUserId) return;
     setCreating(true);
     try {
-      const job = await createExport(selected);
+      const job = await createExport(currentUserId, selected);
       setJobs((prev) => [job, ...prev]);
     } finally {
       setCreating(false);
@@ -116,7 +122,7 @@ export default function ExportPanel() {
                     <td className="px-4 py-2.5">
                       {job.status === "done" ? (
                         <a
-                          href={`${API_BASE}/exports/${job.id}/download`}
+                          href={`${API_BASE}/exports/${job.id}/download?user_id=${currentUserId}`}
                           download
                           className="flex items-center gap-1 text-xs text-green-500 hover:text-green-400 transition-colors"
                         >

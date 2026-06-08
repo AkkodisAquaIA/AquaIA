@@ -64,7 +64,7 @@ export default function SearchPanel() {
 const LIMIT_OPTIONS = [10, 25, 50, 100, 200];
 
 function SearchByNameMode() {
-  const { searchQuery, setSearchQuery, selectedSources, toggleSource } = useAppStore();
+  const { searchQuery, setSearchQuery, selectedSources, toggleSource, currentUserId } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ImageRecord[]>([]);
   const [searched, setSearched] = useState(false);
@@ -72,11 +72,11 @@ function SearchByNameMode() {
   const [limit, setLimit] = useState(50);
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim() || !currentUserId) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await runSearch(searchQuery.trim(), selectedSources, limit);
+      const data = await runSearch(currentUserId, searchQuery.trim(), selectedSources, limit);
       setResults(data);
       setSearched(true);
     } catch {
@@ -184,6 +184,7 @@ function SearchByNameMode() {
 // ─── Mode 2: Add by URL ──────────────────────────────────────────────────────
 
 function AddByUrlMode() {
+  const { currentUserId } = useAppStore();
   const [url, setUrl] = useState("");
   const [scientificName, setScientificName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -191,12 +192,12 @@ function AddByUrlMode() {
   const [error, setError] = useState<string | null>(null);
 
   const handleAdd = async () => {
-    if (!url.trim()) return;
+    if (!url.trim() || !currentUserId) return;
     setLoading(true);
     setError(null);
     setResult(null);
     try {
-      const img = await importFromUrl(url.trim(), scientificName.trim() || undefined);
+      const img = await importFromUrl(currentUserId, url.trim(), scientificName.trim() || undefined);
       setResult(img);
       setUrl("");
       setScientificName("");
@@ -278,6 +279,7 @@ function AddByUrlMode() {
 // ─── Mode 3: Upload from disk ────────────────────────────────────────────────
 
 function UploadMode() {
+  const { currentUserId } = useAppStore();
   const [files, setFiles] = useState<File[]>([]);
   const [scientificName, setScientificName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -288,9 +290,7 @@ function UploadMode() {
 
   const addFiles = (incoming: FileList | null) => {
     if (!incoming) return;
-    const imgs = Array.from(incoming).filter((f) =>
-      f.type.startsWith("image/")
-    );
+    const imgs = Array.from(incoming).filter((f) => f.type.startsWith("image/"));
     setFiles((prev) => {
       const existing = new Set(prev.map((f) => f.name + f.size));
       return [...prev, ...imgs.filter((f) => !existing.has(f.name + f.size))];
@@ -307,11 +307,11 @@ function UploadMode() {
   }, []);
 
   const handleUpload = async () => {
-    if (!files.length) return;
+    if (!files.length || !currentUserId) return;
     setLoading(true);
     setError(null);
     try {
-      const imported = await uploadFiles(files, scientificName.trim() || undefined);
+      const imported = await uploadFiles(currentUserId, files, scientificName.trim() || undefined);
       setResults(imported);
       setFiles([]);
       setScientificName("");

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getImages, getTaxons, getDatasets, createDataset, deleteDataset, addImageToDataset, getDatasetImages, removeImageFromDataset, getAssignedImages } from "@/lib/api";
+import { useAppStore } from "@/store/appStore";
 import type { ImageRecord, Taxon, Dataset } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { Database, FolderOpen, Plus, Trash2, Images, Loader2, CheckSquare, Square, FolderPlus, ArrowLeft, X } from "lucide-react";
@@ -14,6 +15,7 @@ type Tab = "datasets" | "images" | "taxons";
 type AssignmentMap = Record<number, { dataset_id: number; dataset_name: string }>;
 
 export default function DatasetPanel() {
+  const { currentUserId } = useAppStore();
   const [activeTab, setActiveTab] = useState<Tab>("datasets");
   const [images, setImages]   = useState<ImageRecord[]>([]);
   const [taxons, setTaxons]   = useState<Taxon[]>([]);
@@ -22,13 +24,14 @@ export default function DatasetPanel() {
   const [loading, setLoading] = useState(true);
 
   const reload = async () => {
+    if (!currentUserId) return;
     setLoading(true);
     try {
       const [imgs, txs, dss, asgn] = await Promise.all([
-        getImages({ status: "validated", size: 100 }),
-        getTaxons(),
-        getDatasets(),
-        getAssignedImages(),
+        getImages(currentUserId, { status: "validated", size: 100 }),
+        getTaxons(currentUserId),
+        getDatasets(currentUserId),
+        getAssignedImages(currentUserId),
       ]);
       setImages(imgs.items);
       setTaxons(txs);
@@ -41,7 +44,7 @@ export default function DatasetPanel() {
     }
   };
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { reload(); }, [currentUserId]);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "datasets", label: `Datasets (${datasets.length})` },
@@ -75,9 +78,9 @@ export default function DatasetPanel() {
           <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : activeTab === "datasets" ? (
-        <DatasetsTab datasets={datasets} onRefresh={reload} />
+        <DatasetsTab userId={currentUserId!} datasets={datasets} onRefresh={reload} />
       ) : activeTab === "images" ? (
-        <ImagesTab images={images} datasets={datasets} assignments={assignments} onRefresh={reload} />
+        <ImagesTab userId={currentUserId!} images={images} datasets={datasets} assignments={assignments} onRefresh={reload} />
       ) : (
         <TaxonsTab taxons={taxons} />
       )}
@@ -88,7 +91,7 @@ export default function DatasetPanel() {
 
 // ── Datasets tab ─────────────────────────────────────────────────────────────
 
-function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: () => void }) {
+function DatasetsTab({ userId, datasets, onRefresh }: { userId: number; datasets: Dataset[]; onRefresh: () => void }) {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [creating, setCreating] = useState(false);
@@ -102,7 +105,7 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
     setOpenDataset(ds);
     setDsLoading(true);
     try {
-      const imgs = await getDatasetImages(ds.id);
+      const imgs = await getDatasetImages(userId, ds.id);
       setDsImages(imgs);
     } finally {
       setDsLoading(false);
@@ -111,7 +114,7 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
 
   const handleRemoveImage = async (imageId: number) => {
     if (!openDataset) return;
-    await removeImageFromDataset(openDataset.id, imageId);
+    await removeImageFromDataset(userId, openDataset.id, imageId);
     setDsImages((prev) => prev.filter((i) => i.id !== imageId));
     onRefresh();
   };
@@ -121,7 +124,7 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
     setCreating(true);
     setError(null);
     try {
-      await createDataset(name.trim(), desc.trim() || undefined);
+      await createDataset(userId, name.trim(), desc.trim() || undefined);
       setName("");
       setDesc("");
       setShowForm(false);
@@ -135,7 +138,7 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
   };
 
   const handleDelete = async (id: number) => {
-    await deleteDataset(id);
+    await deleteDataset(userId, id);
     onRefresh();
   };
 
@@ -287,8 +290,9 @@ function DatasetsTab({ datasets, onRefresh }: { datasets: Dataset[]; onRefresh: 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 function ImagesTab({
-  images, datasets, assignments, onRefresh,
+  userId, images, datasets, assignments, onRefresh,
 }: {
+  userId: number;
   images: ImageRecord[];
   datasets: Dataset[];
   assignments: AssignmentMap;
@@ -342,7 +346,7 @@ function ImagesTab({
 
     setAdding(true);
     try {
-      await Promise.all(toAdd.map((imgId) => addImageToDataset(targetId, imgId)));
+      await Promise.all(toAdd.map((imgId) => addImageToDataset(userId, targetId, imgId)));
       setSelected(new Set());
       setTargetDataset("");
       onRefresh();

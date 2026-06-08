@@ -6,6 +6,13 @@ export type PanelId =
   | "export"
   | "settings";
 
+export interface User {
+  id: number;
+  username: string;
+  display_name: string;
+  created_at: string;
+}
+
 export interface Taxon {
   id: number;
   scientific_name: string;
@@ -17,7 +24,9 @@ export interface Taxon {
 }
 
 export interface ImageRecord {
-  id: number;
+  id: number;         // UserImage.id
+  asset_id: number;   // ImageAsset.id
+  user_id: number;
   taxon_id: number | null;
   source_name: string;
   source_image_url: string;
@@ -34,20 +43,21 @@ export interface ImageRecord {
   notes: string | null;
   created_at: string;
   validated_at: string | null;
-  validated_by: string | null;
   taxon: Taxon | null;
 }
 
-export interface SearchQuery {
+export interface SearchHistory {
   id: number;
   query: string;
-  source: string | null;
+  sources: string | null;
   result_count: number;
   created_at: string;
 }
 
 export interface ExportJob {
   id: number;
+  user_id: number;
+  dataset_id: number | null;
   export_type: string;
   output_path: string | null;
   status: string;
@@ -56,6 +66,7 @@ export interface ExportJob {
 
 export interface Dataset {
   id: number;
+  user_id: number;
   name: string;
   description: string | null;
   created_at: string;
@@ -72,7 +83,7 @@ export interface DashboardStats {
   total_taxons: number;
   total_datasets: number;
   total_exports: number;
-  recent_searches: SearchQuery[];
+  recent_searches: SearchHistory[];
 }
 
 export interface PaginatedResponse<T> {
