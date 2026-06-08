@@ -52,7 +52,6 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(404, "Workspace not found")
-    total_users = await db.scalar(select(select(User).subquery().c.id.label("c")))
     from sqlalchemy import func
 
     count = await db.scalar(select(func.count(User.id)))

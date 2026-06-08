@@ -65,7 +65,7 @@ async def get_dataset(dataset_id: int, user_id: int = Query(..., ge=1), db: Asyn
 
 @router.get("/{dataset_id}/images", response_model=list[ImageRecordRead])
 async def get_dataset_images(dataset_id: int, user_id: int = Query(..., ge=1), db: AsyncSession = Depends(get_db)):
-    ds = await _get_dataset_or_404(db, dataset_id, user_id)
+    await _get_dataset_or_404(db, dataset_id, user_id)
     result = await db.execute(select(UserImage).join(DatasetImage, DatasetImage.user_image_id == UserImage.id).where(DatasetImage.dataset_id == dataset_id).options(*_UI_LOAD))
     uis = result.scalars().all()
     return [await _build_read_for_user(db, ui) for ui in uis]
@@ -83,7 +83,7 @@ async def add_image_to_dataset(
     user_id: int = Query(..., ge=1),
     db: AsyncSession = Depends(get_db),
 ):
-    ds = await _get_dataset_or_404(db, dataset_id, user_id)
+    await _get_dataset_or_404(db, dataset_id, user_id)
     ui = await db.get(UserImage, user_image_id)
     if not ui or ui.user_id != user_id:
         raise HTTPException(404, "Image not found in this workspace")
@@ -113,7 +113,7 @@ async def remove_image_from_dataset(
     user_id: int = Query(..., ge=1),
     db: AsyncSession = Depends(get_db),
 ):
-    ds = await _get_dataset_or_404(db, dataset_id, user_id)
+    await _get_dataset_or_404(db, dataset_id, user_id)
     row = await db.scalar(select(DatasetImage).where(DatasetImage.dataset_id == dataset_id, DatasetImage.user_image_id == user_image_id))
     if row:
         await db.delete(row)

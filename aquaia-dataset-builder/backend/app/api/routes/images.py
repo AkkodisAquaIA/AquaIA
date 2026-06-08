@@ -289,7 +289,6 @@ async def crop_image(
         setattr(new_asset, k, v)
 
     # Point UserImage to the new cropped asset
-    old_asset_id = ui.image_asset_id
     ui.image_asset_id = new_asset.id
     await db.flush()
 
