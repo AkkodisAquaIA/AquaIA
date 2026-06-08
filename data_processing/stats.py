@@ -31,7 +31,7 @@ def _get_sorted_jpg_files(dataset_dir):
     return sorted(jpg_files, key=_numeric_sort_key)
 
 
-def compute_and_save_stats(dataset_name="coco_custom", image_size=640):
+def compute_and_save_stats(dataset_name="coco_custom_match", image_size=640):
     dataset_dir = os.path.join(BASE_DIR, "datasets", dataset_name)
     sorted_files = _get_sorted_jpg_files(dataset_dir)
     n = len(sorted_files)
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Compute dataset stats.npy for mean and std")
-    parser.add_argument("--dataset", type=str, default="coco_custom", help="Name of the dataset")
+    parser.add_argument("--dataset", type=str, default="coco_custom_match", help="Name of the dataset")
     parser.add_argument("--image-size", type=int, default=640, help="Output image size")
     args = parser.parse_args()
     compute_and_save_stats(dataset_name=args.dataset, image_size=args.image_size)

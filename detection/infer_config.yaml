@@ -5,7 +5,7 @@ run:
   run_dir: null
 
 data:
-  test_data_root: "datasets/coco_custom"
+  test_data_root: "datasets/coco_custom_match"
   loader: "jpg"
   split: "test"
 
