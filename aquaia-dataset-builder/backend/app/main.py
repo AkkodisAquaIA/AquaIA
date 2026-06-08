@@ -13,44 +13,44 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	logger.info("Starting ADIAB backend — creating tables")
-	async with engine.begin() as conn:
-		await conn.run_sync(Base.metadata.create_all)
-		# SQLite doesn't add new columns to existing tables via create_all — migrate manually
-		for stmt in [
-			"ALTER TABLE taxons ADD COLUMN reference_image_id INTEGER REFERENCES image_records(id)",
-		]:
-			try:
-				from sqlalchemy import text
+    logger.info("Starting ADIAB backend — creating tables")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        # SQLite doesn't add new columns to existing tables via create_all — migrate manually
+        for stmt in [
+            "ALTER TABLE taxons ADD COLUMN reference_image_id INTEGER REFERENCES image_records(id)",
+        ]:
+            try:
+                from sqlalchemy import text
 
-				await conn.execute(text(stmt))
-			except Exception:
-				pass  # Column already exists
-	for path in [
-		settings.storage_raw,
-		settings.storage_validated,
-		settings.storage_rejected,
-		settings.storage_duplicates,
-		settings.storage_exports,
-		settings.storage_thumbnails,
-	]:
-		path.mkdir(parents=True, exist_ok=True)
-	logger.info("ADIAB backend ready")
-	yield
-	await engine.dispose()
+                await conn.execute(text(stmt))
+            except Exception:
+                pass  # Column already exists
+    for path in [
+        settings.storage_raw,
+        settings.storage_validated,
+        settings.storage_rejected,
+        settings.storage_duplicates,
+        settings.storage_exports,
+        settings.storage_thumbnails,
+    ]:
+        path.mkdir(parents=True, exist_ok=True)
+    logger.info("ADIAB backend ready")
+    yield
+    await engine.dispose()
 
 
 app = FastAPI(
-	title=settings.app_name,
-	version=settings.app_version,
-	lifespan=lifespan,
+    title=settings.app_name,
+    version=settings.app_version,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
-	CORSMiddleware,
-	allow_origins=settings.cors_origins,
-	allow_methods=["*"],
-	allow_headers=["*"],
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(stats.router, prefix="/api")
@@ -63,4 +63,4 @@ app.include_router(datasets.router, prefix="/api")
 
 @app.get("/health")
 async def health():
-	return {"status": "ok", "version": settings.app_version}
+    return {"status": "ok", "version": settings.app_version}
