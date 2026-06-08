@@ -158,10 +158,13 @@ Images are stored locally under `aquaia-dataset-builder/storage/` (never committ
 
 ```
 storage/
-├── raw/          ← downloaded images (named by DB id, e.g. 42.jpg)
-├── thumbnails/   ← auto-generated 256×256 previews
-├── exports/      ← generated zip files
-└── adiab.db      ← SQLite database
+├── raw/              ← shared downloaded images (named by asset id, e.g. 42.jpg)
+├── thumbnails/       ← shared auto-generated 256×256 previews
+├── exports/
+│   ├── user_1/       ← workspace-specific exports
+│   ├── user_2/
+│   └── user_3/
+└── adiab.db          ← SQLite database
 ```
 
 ## Architecture
@@ -172,6 +175,131 @@ aquaia-dataset-builder/
 ├── frontend/    Next.js 15 + TypeScript + TailwindCSS
 └── storage/     raw / validated / rejected / exports
 ```
+
+## Architecture: shared image assets, isolated workspaces
+
+ADIAB uses a **hybrid two-layer architecture** that separates physical image storage from per-user decisions. The goal is to avoid downloading the same image multiple times while keeping each workspace's validation queue, datasets, exports and statistics completely private.
+
+### Global shared layer
+
+| Element | Description |
+|---------|-------------|
+| `ImageAsset` | One record per unique image URL — the canonical image identity |
+| `Taxon` | Shared taxonomy (scientific name, common name, rank) |
+| Source metadata | Provider, source URL, author, license |
+| Raw image files | `storage/raw/{asset_id}.jpg` — written once, never duplicated |
+| Thumbnails | `storage/thumbnails/{asset_id}.jpg` — generated once |
+
+### User-isolated layer
+
+| Element | Description |
+|---------|-------------|
+| `User` / Workspace | Lightweight identity — display name only, no password |
+| `UserImage` | Per-user decision on an `ImageAsset` (status, notes) |
+| Validation status | `pending` / `validated` / `rejected` / `duplicate` — per workspace |
+| Datasets | Collections of validated images — private to each workspace |
+| Dataset memberships | Which images belong to which dataset — per workspace |
+| Exports | Generated zip files — per workspace, stored under `storage/exports/user_{id}/` |
+| Settings | Crop dimensions, preferences — per workspace |
+| Search history | Past queries and result counts — per workspace |
+| Dashboard statistics | Image counts, taxon count, recent searches — per workspace |
+
+### Data flow diagram
+
+```
+Internet sources
+(Wikimedia / iNaturalist / GBIF)
+        ↓
+   Image search
+        ↓
+Shared ImageAsset repository
+(one physical file per unique URL)
+        ↓
+┌──────────────────────┬──────────────────────┐
+│ Workspace A          │ Workspace B          │
+│ - own queue          │ - own queue          │
+│ - own statuses       │ - own statuses       │
+│ - own datasets       │ - own datasets       │
+│ - own exports        │ - own exports        │
+└──────────────────────┴──────────────────────┘
+```
+
+### Workflow
+
+1. A user selects or creates a workspace in the top-right selector.
+2. The user runs a search, e.g. `Ephemeroptera`.
+3. The backend fetches images from external sources and stores each **`ImageAsset` only once** globally (upsert by URL).
+4. For the active workspace, the backend creates **`UserImage`** records with status `pending`.
+5. Each workspace validates, rejects or marks images as duplicate **independently**.
+6. Datasets are created and managed only inside the current workspace.
+7. Exports are generated only from the current workspace's datasets or validated images.
+8. Dashboard statistics are calculated per workspace.
+
+### Concrete example
+
+- Workspace A validates image #42.
+- Workspace B rejects image #42.
+- Both decisions are valid — the `ImageAsset` is shared but each `UserImage` carries an independent status.
+- The physical file `storage/raw/42.jpg` exists **only once** on disk.
+
+### Database model overview
+
+| Model | Layer | Description |
+|-------|-------|-------------|
+| `User` | Isolated | A workspace — display name, created date. No passwords. |
+| `Taxon` | Shared | Scientific name, common name, rank, optional parent. |
+| `ImageAsset` | Shared | One record per unique image URL. Holds file path, hash, dimensions, metadata. |
+| `UserImage` | Isolated | Links a `User` to an `ImageAsset`. Holds status, notes, taxon override. |
+| `Dataset` | Isolated | Named collection owned by a workspace. |
+| `DatasetImage` | Isolated | Join table between `Dataset` and `UserImage`. |
+| `ExportJob` | Isolated | Export task — format, status, output path. Scoped to a workspace. |
+| `UserSettings` | Isolated | JSON settings blob per workspace (crop size, preferences). |
+| `SearchHistory` | Isolated | Past search queries and result counts per workspace. |
+| `UserTaxonReference` | Isolated | Per-workspace reference image for each taxon (shown in Validation Queue). |
+
+### Storage layout
+
+```
+storage/
+├── raw/              ← shared downloaded images  (named by asset id, e.g. 42.jpg)
+├── thumbnails/       ← shared thumbnails         (named by asset id)
+├── exports/
+│   ├── user_1/       ← workspace-specific exports
+│   ├── user_2/
+│   └── user_3/
+└── adiab.db          ← SQLite database
+```
+
+## Why this architecture?
+
+- **No duplicate downloads** — the same image fetched by multiple workspaces is downloaded and stored only once.
+- **Saves disk space** — `storage/raw/` grows with unique images, not with the number of users × images.
+- **Independent validation** — two users can make different decisions on the same image; neither affects the other.
+- **Private datasets** — each workspace builds its own curated collections without interference.
+- **Ready for authentication** — adding OAuth or password login later only requires linking an auth identity to an existing `User` row.
+- **Ready for collaborative annotation** — the shared `ImageAsset` layer makes it straightforward to compare annotations across workspaces.
+- **Scalable for a team** — adding a new workspace is a single `INSERT` into the `users` table; all infrastructure already handles multi-user access.
+
+## Workspace isolation rules
+
+- A workspace only sees its **own validation queue** (`UserImage` rows where `user_id` matches).
+- A workspace only sees its **own datasets** and dataset memberships.
+- A workspace only sees its **own exports** and can only download its own zip files.
+- A workspace has its **own settings** (crop size, preferences).
+- **Dashboard statistics** are calculated exclusively from the current workspace's `UserImage` rows.
+- **Image files and thumbnails** are globally shared — never per-user copies.
+- One image can have **different statuses** (validated / rejected / pending) in different workspaces simultaneously.
+
+## Example workflow with two users
+
+1. **Marie** creates workspace `Marie` in the selector.
+2. Marie searches `Ephemeroptera` → 50 images appear in her Validation Queue as `pending`.
+3. Marie validates 10 images and creates dataset `Ephemeroptera v1`.
+4. **Paul** creates workspace `Paul` in the selector.
+5. Paul's Validation Queue is **empty** — he has no `UserImage` rows yet.
+6. Paul searches `Ephemeroptera` → the backend reuses the existing `ImageAsset` records (no re-download) and creates Paul's own `UserImage` rows with status `pending`.
+7. Paul rejects several images that Marie validated — both decisions coexist independently.
+8. Marie exports `Ephemeroptera v1` as YOLO; Paul exports his own selection as CSV. Both get separate zip files under `storage/exports/user_1/` and `storage/exports/user_2/`.
 
 ## Development (without Docker)
 
