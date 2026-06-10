@@ -15,7 +15,8 @@ def normalize_imgsz(config, phase):
 
 def predict(model, samples, device, conf_thres, imgsz=640):
     images = samples["inputs"]
-    with torch.autocast(device_type=device, dtype=torch.float16, enabled=device == "cuda"):
+    images = images.to(device, non_blocking=True)
+    with torch.autocast(device_type=device, dtype=torch.float16, enabled=device != "cpu"):
         outputs = model(images)
 
     pred_boxes = outputs["pred_boxes"].float()

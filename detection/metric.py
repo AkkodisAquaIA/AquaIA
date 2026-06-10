@@ -3,7 +3,6 @@ import yaml
 from pathlib import Path
 import csv
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
-from dataloading.datasets import parse_batch
 from detection.utils.box_ops import box_cxcywh_to_xyxy
 
 
@@ -38,22 +37,34 @@ def save_metrics(metrics, output_dir):
         yaml.safe_dump(metrics, f, sort_keys=False)
 
     with (Path(output_dir) / "inference_metrics.csv").open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["split", "test_map_50", "test_map_50_95"])
+        writer = csv.DictWriter(f, fieldnames=["split", "map_50", "map_50_95"])
         writer.writeheader()
-        writer.writerow(
-            {
-                "test_map_50": metrics["test_map_50"],
-                "test_map_50_95": metrics["test_map_50_95"],
-            }
-        )
+        for key in sorted(metrics):
+            if not key.endswith("_map_50"):
+                continue
+            split = key.removesuffix("_map_50")
+            writer.writerow(
+                {
+                    "split": split,
+                    "map_50": metrics[key],
+                    "map_50_95": metrics[f"{split}_map_50_95"],
+                }
+            )
+
+
+def _image_size_xy(imgsz):
+    if isinstance(imgsz, (tuple, list)):
+        return imgsz[0], imgsz[1]
+    return imgsz, imgsz
 
 
 def _build_refs(targets, imgsz):
+    width, height = _image_size_xy(imgsz)
     refs = []
     for target in targets:
         target_boxes_xyxy = box_cxcywh_to_xyxy(target["boxes"]).clamp(0, 1)
-        target_boxes_xyxy[:, [0, 2]] *= imgsz
-        target_boxes_xyxy[:, [1, 3]] *= imgsz
+        target_boxes_xyxy[:, [0, 2]] *= width
+        target_boxes_xyxy[:, [1, 3]] *= height
         refs.append(
             {
                 "boxes": target_boxes_xyxy,
@@ -85,12 +96,12 @@ def evaluate_map(predictions, targets, imgsz, split, device):
 @torch.no_grad()
 def compute_metrics(model, dataloaders, predict_fn, device, conf_thresh):
     all_metrics = {}
-    imgsz = dataloaders[0].dataset.img_size
     for loader in dataloaders:
+        imgsz = loader.dataset.img_size
         predictions = []
         targets = []
         for batch in loader:
-            _, batch_targets, _ = parse_batch(batch)
+            batch_targets = loader.dataset.get_targets(batch)
             if isinstance(batch, list):
                 batch = batch[0]
             batch_preds = predict_fn(

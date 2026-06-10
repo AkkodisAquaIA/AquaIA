@@ -4,10 +4,11 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 import tqdm
 from transformers import get_scheduler
 
-from dataloading.datasets import JpgDALIDataset, DALIDetectionDataLoader, parse_batch
+from dataloading.datasets import JpgDALIDataset, DALIDetectionDataLoader, JpgDetectionDataset, parse_batch, detection_collate_fn
 from detection.dino.dino_detector import DINODetector
 from detection.dino.loss import SetCriterion
 from detection.metric import compute_metrics, log_epoch, print_metrics, update_log_dict
@@ -16,28 +17,46 @@ from detection.checkpoint import save_model_checkpoint, save_training_state_chec
 from detection.utils.config_utils import save_resolved_config
 from detection.utils.plot_utils import plot_metrics, save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
+from detection.utils.import_utils import DALI_AVAILABLE
 
 
 def get_datasets(
     data_yaml_path,
     batch_size,
+    device,
     img_size=640,
     loader="jpg",
 ):
     # TODO : currently GPU only because of DALI, but should be possible to support CPU-only training)
     # Compute random split for train and eval set
-    train_dataset = JpgDALIDataset(
-        dataset_root=data_yaml_path,
-        data_split="train",
-        img_size=img_size,
-        batch_size=batch_size,
-    )
-    val_dataset = JpgDALIDataset(
-        dataset_root=data_yaml_path,
-        data_split="val",
-        img_size=img_size,
-        batch_size=batch_size,
-    )
+    if DALI_AVAILABLE:
+        train_dataset = JpgDALIDataset(
+            dataset_root=data_yaml_path,
+            data_split="train",
+            img_size=img_size,
+            batch_size=batch_size,
+            device=device,
+        )
+        val_dataset = JpgDALIDataset(
+            dataset_root=data_yaml_path,
+            data_split="val",
+            img_size=img_size,
+            batch_size=batch_size,
+            device=device,
+        )
+    else:
+        train_dataset = JpgDetectionDataset(
+            dataset_root=data_yaml_path,
+            data_split="train",
+            img_size=img_size,
+            device=device,
+        )
+        val_dataset = JpgDetectionDataset(
+            dataset_root=data_yaml_path,
+            data_split="val",
+            img_size=img_size,
+            device=device,
+        )
     num_classes = train_dataset.num_classes
     return train_dataset, val_dataset, num_classes
 
@@ -75,13 +94,18 @@ def train_dino(config):
     train_set, val_set, num_classes = get_datasets(
         config["data"]["dataset_yaml"],
         training_config["batch"],
+        device=device,
         img_size=imgsz,
         loader=config["data"].get("loader", "jpg"),
     )
 
     # === Setup dataloaders ===
-    dataloader = DALIDetectionDataLoader(train_set, device="gpu")
-    val_dataloader = DALIDetectionDataLoader(val_set, device="gpu")
+    if DALI_AVAILABLE:
+        dataloader = DALIDetectionDataLoader(train_set, device="gpu")
+        val_dataloader = DALIDetectionDataLoader(val_set, device="gpu")
+    else:
+        dataloader = DataLoader(train_set, batch_size=training_config["batch"], shuffle=True, num_workers=3, pin_memory=True, collate_fn=detection_collate_fn)
+        val_dataloader = DataLoader(val_set, batch_size=training_config["batch"], shuffle=False, num_workers=3, collate_fn=detection_collate_fn)
 
     # === Config, save path and fun ===
     # root folder for training outputs (weights, logs, resolved config)
@@ -143,7 +167,12 @@ def train_dino(config):
         log_dict = {"avg": 0.0}
         progress = tqdm.tqdm(dataloader, desc=f"Epoch {epoch + 1}/{training_config['epochs']}")
         for batch in progress:
-            images, targets, _ = parse_batch(batch)
+            targets = train_set.get_targets(batch)
+            images, _ = parse_batch(batch)
+
+            # We have to move tensors to GPU manually when not using DALI
+            if not DALI_AVAILABLE:
+                images = images.to(device, non_blocking=True)
 
             optimizer.zero_grad(set_to_none=True)
             with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
@@ -175,7 +204,7 @@ def train_dino(config):
         print_metrics(epoch_metrics)
         metrics_history.append(epoch_metrics)
 
-        if best_metric < epoch_metrics["val_map_50_95"] or best_metric_dict is None:
+        if best_metric <= epoch_metrics["val_map_50_95"] or best_metric_dict is None:
             best_metric = epoch_metrics["val_map_50_95"]
             best_metric_dict = epoch_metrics.copy()
             # save best model
@@ -215,7 +244,7 @@ def train_dino(config):
     )
 
     # === Save some sampled predictions with the best model ===
-    best_checkpoint = torch.load(os.path.join(weights_dir, "last.pt"), map_location=device)
+    best_checkpoint = torch.load(os.path.join(weights_dir, "best.pt"), map_location=device)
     target_model = model._orig_mod if hasattr(model, "_orig_mod") else model
     target_model.load_state_dict(best_checkpoint["model_state_dict"])
 
