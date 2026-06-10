@@ -96,15 +96,7 @@ class BaseDetectionDataset:
                 * np.float32(255.0),
             }
         else:
-            # raise FileNotFoundError(f"Stats file not found: {stats_path}")
-            self.stats = {
-                "mean": np.zeros(3, dtype=np.float32) * np.float32(255.0),
-                "std": np.clip(
-                    np.ones(3, dtype=np.float32),
-                    min=1e-6,
-                )
-                * np.float32(255.0),
-            }
+            raise FileNotFoundError(f"Stats file not found: {stats_path}")
 
     def to_tensor(self, img: np.ndarray) -> torch.Tensor:
         return torch.from_numpy(img).float().permute(2, 0, 1)
