@@ -4,82 +4,61 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 import tqdm
-from torch.utils.data import DataLoader, random_split
 from transformers import get_scheduler
 
-from dataloading.datasets import JpgDetectionDataset, NpyDetectionDataset, detection_collate_fn, sample_dataset
+from dataloading.datasets import JpgDALIDataset, DALIDetectionDataLoader, JpgDetectionDataset, parse_batch, detection_collate_fn
 from detection.dino.dino_detector import DINODetector
 from detection.dino.loss import SetCriterion
-from detection.metric import evaluate_map, log_epoch, print_metrics, update_log_dict
+from detection.metric import compute_metrics, log_epoch, print_metrics, update_log_dict
 from detection.dino.utils.matcher import HungarianMatcher
 from detection.checkpoint import save_model_checkpoint, save_training_state_checkpoint
 from detection.utils.config_utils import save_resolved_config
-from detection.utils.plot_utils import plot_metrics, annotate_images_with_predictions
+from detection.utils.plot_utils import plot_metrics, save_sample_predictions
+from detection.dino.predict import predict, normalize_imgsz
+from detection.utils.import_utils import DALI_AVAILABLE
 
 
-@torch.no_grad()
-def save_sample_predictions(model, subset, output_dir, num_samples=20, conf=0.3, seed=0, device="cuda", use_amp=True):
-    images, image_files = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed)
-    print(image_files)
-    # Support both random_split Subset datasets and direct split datasets.
-    source_dataset = subset.dataset if hasattr(subset, "dataset") else subset
-    print(f"Sampled {len(image_files)} images from {source_dataset.dataset_root}")
-    images = images.to(device, non_blocking=device == "cuda")
-    with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
-        outputs = model(images)
-    outputs["pred_boxes"] = outputs["pred_boxes"].float()
-    outputs["pred_logits"] = outputs["pred_logits"].float()
-    annotate_images_with_predictions(
-        images=images,
-        outputs=outputs,
-        class_names=source_dataset.class_names,
-        conf_thres=conf,
-        output_dir=output_dir,
-        image_files=image_files,
-    )
-
-
-def normalize_imgsz(config):
-    model_family = str(config.get("model", {}).get("family", "")).lower()
-    patch_size = 14 if model_family == "dinov2" else 16
-    imgsz = int(config["training"]["imgsz"])
-    rounded_imgsz = max(patch_size, round(imgsz / patch_size) * patch_size)
-    if rounded_imgsz != imgsz:
-        print(f"Warning: imgsz={imgsz} is not divisible by patch size {patch_size}. Using imgsz={rounded_imgsz} instead.")
-        config["training"]["imgsz"] = rounded_imgsz
-    return int(config["training"]["imgsz"])
-
-
-def get_datasets(data_yaml_path, device, img_size, loader="jpg", train_fraction=0.9):
-    if loader == "npy":
-        # Compute random split for train and eval set
-        dataset = NpyDetectionDataset(
+def get_datasets(
+    data_yaml_path,
+    batch_size,
+    device,
+    img_size=640,
+    loader="jpg",
+):
+    # TODO : currently GPU only because of DALI, but should be possible to support CPU-only training)
+    # Compute random split for train and eval set
+    if DALI_AVAILABLE:
+        train_dataset = JpgDALIDataset(
             dataset_root=data_yaml_path,
+            data_split="train",
+            img_size=img_size,
+            batch_size=batch_size,
             device=device,
         )
-        train_size = int(train_fraction * len(dataset))
-        test_size = len(dataset) - train_size
-        generator = torch.Generator().manual_seed(42)
-
-        train_dataset, test_dataset = random_split(dataset, [train_size, test_size], generator=generator)
-        num_classes = dataset.num_classes
-        return train_dataset, test_dataset, num_classes
-
-    train_dataset = JpgDetectionDataset(
-        dataset_root=data_yaml_path,
-        img_size=(img_size, img_size),
-        device=device,
-        split="train",
-    )
-    test_dataset = JpgDetectionDataset(
-        dataset_root=data_yaml_path,
-        img_size=(img_size, img_size),
-        device=device,
-        split="val",
-    )
-    num_classes = max(train_dataset.num_classes, test_dataset.num_classes)
-    return train_dataset, test_dataset, num_classes
+        val_dataset = JpgDALIDataset(
+            dataset_root=data_yaml_path,
+            data_split="val",
+            img_size=img_size,
+            batch_size=batch_size,
+            device=device,
+        )
+    else:
+        train_dataset = JpgDetectionDataset(
+            dataset_root=data_yaml_path,
+            data_split="train",
+            img_size=img_size,
+            device=device,
+        )
+        val_dataset = JpgDetectionDataset(
+            dataset_root=data_yaml_path,
+            data_split="val",
+            img_size=img_size,
+            device=device,
+        )
+    num_classes = train_dataset.num_classes
+    return train_dataset, val_dataset, num_classes
 
 
 def build_scheduler(training_config, optimizer):
@@ -99,27 +78,6 @@ def build_scheduler(training_config, optimizer):
     return scheduler
 
 
-def compute_metrics(model, train_dataloader, eval_dataloader, metrics_dict, device, num_classes, conf_thresh):
-    train_metrics = evaluate_map(
-        model=model,
-        dataloader=train_dataloader,
-        device=device,
-        num_classes=num_classes,
-        conf_thresh=conf_thresh,
-    )
-    metrics_dict["train_map_50"] = train_metrics["map_50"]
-    metrics_dict["train_map_50_95"] = train_metrics["map_50_95"]
-    eval_metrics = evaluate_map(
-        model=model,
-        dataloader=eval_dataloader,
-        device=device,
-        num_classes=num_classes,
-        conf_thresh=conf_thresh,
-    )
-    metrics_dict.update(eval_metrics)
-
-
-# TODO : the image size specified inside the trainin_conig.yaml and the npy is not the same
 def train_dino(config):
     training_config = config["training"]
     output_config = config["output"]
@@ -132,34 +90,22 @@ def train_dino(config):
 
     use_amp = device == "cuda"
 
-    # === DINO related stuff ===
-    backbone_config = config.get("model", {})
-    backbone_family = str(backbone_config.get("family", "")).lower()
-    backbone_size = str(backbone_config.get("size", "").lower())
-    imgsz = normalize_imgsz(config)
-
-    train_set, test_set, num_classes = get_datasets(
+    imgsz = normalize_imgsz(config, "training")
+    train_set, val_set, num_classes = get_datasets(
         config["data"]["dataset_yaml"],
-        device,
+        training_config["batch"],
+        device=device,
         img_size=imgsz,
         loader=config["data"].get("loader", "jpg"),
     )
 
     # === Setup dataloaders ===
-    dataloader = DataLoader(
-        train_set,
-        batch_size=training_config["batch"],
-        shuffle=True,
-        num_workers=training_config["workers"],
-        collate_fn=detection_collate_fn,
-    )
-    eval_dataloader = DataLoader(
-        test_set,
-        batch_size=training_config["batch"],
-        shuffle=False,
-        num_workers=training_config["workers"],
-        collate_fn=detection_collate_fn,
-    )
+    if DALI_AVAILABLE:
+        dataloader = DALIDetectionDataLoader(train_set, device="gpu")
+        val_dataloader = DALIDetectionDataLoader(val_set, device="gpu")
+    else:
+        dataloader = DataLoader(train_set, batch_size=training_config["batch"], shuffle=True, num_workers=3, pin_memory=True, collate_fn=detection_collate_fn)
+        val_dataloader = DataLoader(val_set, batch_size=training_config["batch"], shuffle=False, num_workers=3, collate_fn=detection_collate_fn)
 
     # === Config, save path and fun ===
     # root folder for training outputs (weights, logs, resolved config)
@@ -168,6 +114,11 @@ def train_dino(config):
     # folder to save model weights (best and last)
     weights_dir = os.path.join(run_dir, "weights")
     os.makedirs(weights_dir, exist_ok=True)
+
+    # === DINO related stuff ===
+    backbone_config = config.get("model", {})
+    backbone_family = str(backbone_config.get("family", "")).lower()
+    backbone_size = str(backbone_config.get("size", "").lower())
 
     model = DINODetector(
         backbone_id=backbone_family + "_" + backbone_size,
@@ -215,8 +166,13 @@ def train_dino(config):
         epoch_loss = 0.0
         log_dict = {"avg": 0.0}
         progress = tqdm.tqdm(dataloader, desc=f"Epoch {epoch + 1}/{training_config['epochs']}")
-        for images, targets, _ in progress:
-            images = images.to(device, non_blocking=True)
+        for batch in progress:
+            targets = train_set.get_targets(batch)
+            images, _ = parse_batch(batch)
+
+            # We have to move tensors to GPU manually when not using DALI
+            if not DALI_AVAILABLE:
+                images = images.to(device, non_blocking=True)
 
             optimizer.zero_grad(set_to_none=True)
             with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
@@ -234,21 +190,22 @@ def train_dino(config):
         epoch_metrics = log_epoch(log_dict, max(len(dataloader), 1))
 
         # Add map50 and mAP50-95 evaluation at the end of each epoch (train and eval datasets)
-        compute_metrics(
+        model.eval()
+        metrics = compute_metrics(
             model=model,
-            train_dataloader=dataloader,
-            eval_dataloader=eval_dataloader,
-            metrics_dict=epoch_metrics,
+            dataloaders=[dataloader, val_dataloader],
+            predict_fn=predict,
             device=device,
-            num_classes=num_classes,
             conf_thresh=training_config.get("conf_thresh", 0.05),
         )
+        model.train()
+        epoch_metrics.update(metrics)
         epoch_metrics["epoch"] = epoch + 1
         print_metrics(epoch_metrics)
         metrics_history.append(epoch_metrics)
 
-        if best_metric < epoch_metrics["map_50_95"] or best_metric_dict is None:
-            best_metric = epoch_metrics["map_50_95"]
+        if best_metric <= epoch_metrics["val_map_50_95"] or best_metric_dict is None:
+            best_metric = epoch_metrics["val_map_50_95"]
             best_metric_dict = epoch_metrics.copy()
             # save best model
             save_model_checkpoint(
@@ -294,22 +251,22 @@ def train_dino(config):
     # Eval dataset
     save_sample_predictions(
         model=model,
-        subset=test_set,
+        subset=val_set,
+        predict_fn=predict,
         output_dir=Path(run_dir) / "eval_predictions",
         conf=0.3,
         seed=42,
         device=device,
-        use_amp=use_amp,
     )
     # Train dataset
     save_sample_predictions(
         model=model,
         subset=train_set,
+        predict_fn=predict,
         output_dir=Path(run_dir) / "train_predictions",
-        conf=0.3,
+        conf=training_config.get("conf", 0.3),
         seed=42,
         device=device,
-        use_amp=use_amp,
     )
 
     return model

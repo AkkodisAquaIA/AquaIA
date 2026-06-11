@@ -4,14 +4,14 @@
 model:
   family: "dinov3"
   size : "small"
-  init: "pretrained"
+  init: "pretrained"   # "pretrained" or "random"
 
 # ----------------------------------------------------------------------
 # Data section: train/val dataset
 # ----------------------------------------------------------------------
 data:
   # Dataset path consumed by the DINO trainer.
-  dataset_yaml: "datasets/coco_custom"
+  dataset_yaml: "datasets/coco8"
   # Image loader used by the DINO trainer. Use "npy" to keep the legacy path.
   loader: "jpg"
 
@@ -22,7 +22,7 @@ output:
   # Output directory. Relative path is resolved from YAML directory.
   exist_ok: true
   save_period: 0
-  plots: false
+  plots: true
 
 # ----------------------------------------------------------------------
 # Training section: arguments used by the DINO trainer
@@ -37,11 +37,11 @@ training:
 
   # ---------- DATA INPUT / LOADING ----------
   imgsz: 640
-  batch: 64
+  batch: 2
   workers: 0
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 5
+  epochs: 500
   warmup_ratio: 0.05
 
   # ---------- OPTIMIZER & LR ----------
@@ -60,10 +60,43 @@ training:
   box: 5.0
   giou: 2.0
 
+  # ---------- LOSS / BOX / CLS HYPERPARAMETERS ----------
+  # See Ultralytics default.yaml for the latest recommended defaults.
+  # box: 7.5            # box loss gain
+  # cls: 0.5            # classification loss gain
+  # dfl: 1.5            # distribution focal loss gain
+
+  # ---------- DATA AUGMENTATION ----------
+  augment: true
+
+  # Color jitter in HSV space.
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+
+  # Geometric transforms.
+  degrees: 10.0
+  translate: 0.10
+  scale: 0.50
+  shear: 2.0
+  perspective: 0.0005
+
+  # Flips.
+  flipud: 0.0
+  fliplr: 0.5
+
+  # Advanced augmentations.
+  mosaic: 0.80
+  mixup: 0.05
+  copy_paste: 0.0     # mainly for segmentation, harmless here
+
+  # Disable mosaic in the last N epochs to stabilize training.
+  close_mosaic: 40
+
   # ---------- INFERENCE / EVAL-RELATED ----------
-  conf: 0.05
+  conf: 0.3
   iou: 0.5
   val: true
 
   # ---------- PERFORMANCE / MISC ----------
-  compile: false
+  compile: true

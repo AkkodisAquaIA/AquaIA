@@ -2,19 +2,13 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
 from ultralytics.utils.plotting import Annotator
+from dataloading.datasets import sample_dataset
+import torch
 
-from detection.utils.box_ops import box_cxcywh_to_xyxy
 
-
-def annotate_images_with_predictions(images, outputs, class_names, conf_thres, output_dir, image_files):
+def annotate_images_with_predictions(images, predictions, class_names, output_dir, image_files):
     images = images.detach().cpu().float()
-    pred_boxes = outputs["pred_boxes"].detach().cpu()
-    pred_logits = outputs["pred_logits"].detach().cpu()
-    class_logits = pred_logits[..., : len(class_names)]
-    scores, labels = class_logits.sigmoid().max(dim=-1)
-
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -28,14 +22,16 @@ def annotate_images_with_predictions(images, outputs, class_names, conf_thres, o
         h, w = img_uint8.shape[:2]
 
         annotator = Annotator(img_uint8.copy(), line_width=2)
-        boxes_xyxy = box_cxcywh_to_xyxy(pred_boxes[i]).clamp(0, 1)
-        boxes_xyxy[:, [0, 2]] *= w
-        boxes_xyxy[:, [1, 3]] *= h
-
-        keep = scores[i] >= conf_thres
-        kept_boxes = boxes_xyxy[keep]
-        kept_scores = scores[i][keep]
-        kept_labels = labels[i][keep]
+        image_predictions = predictions[i]
+        boxes = image_predictions["boxes"].detach().cpu().float()
+        scale = boxes.new_tensor([w, h, w, h])
+        source_size = float(max(boxes.max().item(), 0.0)) if boxes.numel() else 0.0
+        if source_size <= 1.0:
+            kept_boxes = boxes * scale
+        else:
+            kept_boxes = boxes
+        kept_scores = image_predictions["scores"].detach().cpu().float()
+        kept_labels = image_predictions["labels"].detach().cpu().long()
 
         for box, score, label in zip(kept_boxes, kept_scores, kept_labels):
             x1, y1, x2, y2 = box.tolist()
@@ -47,23 +43,20 @@ def annotate_images_with_predictions(images, outputs, class_names, conf_thres, o
         plt.imsave(output_path, annotator.result())
 
 
-def annotate_yolo_predictions(results, class_names, conf_thres, output_dir, image_files):
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+@torch.no_grad()
+def save_sample_predictions(model, subset, output_dir, predict_fn, num_samples=20, conf=0.3, seed=0, device="cuda"):
+    samples = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
+    print(f"Sampled {len(samples['img_paths'])} images from {subset.dataset_root}")
+    model.eval()
+    predictions = predict_fn(model=model, samples=samples, device=device, conf_thres=conf)
 
-    for result, image_file in zip(results, image_files):
-        annotator = Annotator(result.orig_img.copy(), line_width=2)
-        boxes = result.boxes
-        if boxes is not None:
-            for box, score, label in zip(boxes.xyxy, boxes.conf, boxes.cls):
-                if float(score) < conf_thres:
-                    continue
-                label_idx = int(label)
-                label_name = class_names[label_idx] if label_idx < len(class_names) else str(label_idx)
-                annotator.box_label(box.tolist(), label=f"{label_name} {float(score):.2f}")
-
-        output_path = output_dir / f"{Path(image_file).stem}.png"
-        Image.fromarray(annotator.result()).save(output_path)
+    annotate_images_with_predictions(
+        images=samples["images"],
+        predictions=predictions,
+        class_names=subset.class_names,
+        output_dir=output_dir,
+        image_files=samples["img_paths"],
+    )
 
 
 def plot_metrics(run_dir, output_dir=None, metrics_filename="metrics.npy"):
