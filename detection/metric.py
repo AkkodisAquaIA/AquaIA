@@ -6,29 +6,59 @@ from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from detection.utils.box_ops import box_cxcywh_to_xyxy
 
 
-def update_log_dict(log_dict, loss_dict, epoch_loss):
+LOSS_DISPLAY_NAMES = {
+    "avg": "loss",
+    "loss_ce": "cls",
+    "loss_bbox": "bbox",
+    "loss_giou": "giou",
+    "class_error": "class_err",
+    "cardinality_error": "count_err",
+}
+
+METRIC_ORDER = (
+    "avg",
+    "loss_ce",
+    "loss_bbox",
+    "loss_giou",
+    "class_error",
+    "cardinality_error",
+)
+
+
+def update_metric_dict(log_dict, loss_dict, batch_loss, split, num_batches):
+    div = 1 / num_batches
     for key, value in loss_dict.items():
-        if key not in log_dict:
-            log_dict[key] = value
+        if key not in log_dict[split]:
+            log_dict[split][key] = value * div
         else:
-            log_dict[key] += value
+            log_dict[split][key] += value * div
 
-    log_dict["avg"] += epoch_loss
+    log_dict[split]["loss"] += batch_loss * div
 
 
-def log_epoch(log_dict, num_batch):
-    inv_batches = 1.0 / max(int(num_batch), 1)
-    averaged = {}
-    for key, value in log_dict.items():
-        if torch.is_tensor(value):
-            value = value.item()
-        averaged[key] = float(value) * inv_batches
-    return averaged
+def _format_metric(metric_name, value):
+    display_name = LOSS_DISPLAY_NAMES.get(metric_name, metric_name)
+    return f"{display_name}={value:.4f}"
 
 
 def print_metrics(metrics):
-    summary = " | ".join(f"{key}={metrics[key]:.4f}" for key in sorted(metrics) if isinstance(metrics[key], (int, float)))
-    print(summary)
+    print("-" * 5 + " Epoch summary " + "-" * 5)
+
+    for split, loss_dict in metrics.items():
+        if not isinstance(loss_dict, dict):
+            continue
+        print_summary = f" ■  {split:<5} : "
+        for key, value in loss_dict.items():
+            if torch.is_tensor(value):
+                value = value.item()
+            if not isinstance(value, (int, float)):
+                continue
+
+            print_summary += f"{_format_metric(key, value)} | "
+
+        print(print_summary[:-3])
+
+    print()
 
 
 def save_metrics(metrics, output_dir):
