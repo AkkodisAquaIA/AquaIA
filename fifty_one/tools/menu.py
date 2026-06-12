@@ -24,13 +24,50 @@ init(autoreset=True)
 
 #============================================================================
 
+# symbols for frame creation
+PATTERN ={
+"double" : [".","╔", "╦", "╗",
+                "╠", "╬", "╣",
+                "╚", "╩", "╝",
+            "═", "║"
+           ],
+"simple" : [".","┌", "┬", "┐",
+                "├", "┼", "┤",
+                "└", "┴", "┘",
+            "─", "│"
+           ],
+"rounds" : [".","╭", "┬", "╮",
+                "├", "┼", "┤",
+                "╰", "┴", "╯",
+            "─", "│"
+           ],
+"heavy": [".","┏", "┳", "┓",   
+              "┣", "╋", "┫",   
+              "┗", "┻", "┛",   
+        "━", "┃"         
+        ],           
+"Unicode" : [".","┏", "┯", "┓",
+                 "┣", "┿", "┫",
+                 "┗", "┷", "┛",
+        "━", "┃","│"
+        ],
+"ASCII" : ["." ,"+" , "+" , "+",
+               "+", "+", "+",
+               "+", "+", "+",
+           "─", "│"
+           ],
+    }
+
+#------------------------------------------------------------------------------
+
+# Menu class
 class Menu :
     """
     This class allows creating a menu and managing the input choice based on the selection.
     You can choose the frame format of the menu.
 
     You can choose the style of the menu frame between:
-    'simple', 'double', 'rounds', 'ASCII', or 'Unicode'.
+    'simple', 'double', 'heavy', 'rounds', 'ASCII', or 'Unicode'.
     The default style is 'double'.
     """
 
@@ -60,13 +97,14 @@ class Menu :
 
         # Select pattern
         style_mapping = {
-            'simple': ct.PATTERN['simple'],
-            'double' : ct.PATTERN['double'],
-            'rounds': ct.PATTERN['rounds'],
-            'heavy': ct.PATTERN['heavy'],
-            'Unicode' : ct.PATTERN['Unicode']
+            'simple': PATTERN['simple'],
+            'double' : PATTERN['double'],
+            'rounds': PATTERN['rounds'],
+            'heavy': PATTERN['heavy'],
+            'ASCII' : PATTERN['ASCII'],
+            'Unicode' : PATTERN['Unicode']
         }
-        self.frame = style_mapping.get(self.style, ct.PATTERN['double'])
+        self.frame = style_mapping.get(self.style, PATTERN['double'])
 
         self.ligne = 0
 

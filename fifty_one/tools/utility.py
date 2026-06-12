@@ -313,7 +313,7 @@ def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
     session = None
     try:
         session = fo.launch_app(dataset, port=port, remote=False)
-        color.print(f"tyOne web interface available at: http://127.0.0.1:{port}", colors['info'])
+        color.print(f"tyOne web interface accessible à l'adresse: http://127.0.0.1:{port}", colors['info'])
         color.print("Attente de la fermeture de l'interface web", colors['wait'], bold=True)
         color.print("Appuyez sur CTRL+C pour continuer si nécessaire.", colors['wait'], bold=True)
 
@@ -428,7 +428,9 @@ def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> b
         # Convert the input color from DISPLAY_COLORS to ANSI
         input_color = rgb_to_ansi(color)
         # Displays the prompt in color
-        colored_prompt = f"{input_color}[?] {message} (o/N, défaut = N) ? : {Style.RESET_ALL}"
+
+        rep_auto = " N/o " if not default else " O/n "
+        colored_prompt = f"{input_color}[?] {message} ({rep_auto}) ? : {Style.RESET_ALL}"
 
         reponse = input(colored_prompt).strip().lower()
         if reponse == "":
@@ -535,9 +537,6 @@ def afficher_mode(
         f"{label} {'ON' if enabled else 'OFF'}",
         colors["ok" if enabled else "warning"]
     )
-
-    if enabled and path:
-        print(f"    Sauvegarde vers : {path}")
 
     print()
 

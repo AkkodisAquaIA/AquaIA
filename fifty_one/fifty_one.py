@@ -5,10 +5,15 @@ from tools import system as syst
 if syst.est_linux():
     os.environ.setdefault("FIFTYONE_DATABASE_URI", "mongodb://127.0.0.1:27017")
 
+from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
 import yaml
 import shutil
+from contextlib import redirect_stdout
+import re
+from io import StringIO
+
 
 import fiftyone as fo
 import fiftyone.core.labels as fol
@@ -27,7 +32,57 @@ from tools import graphe as gr
 from tools import logo_win as lw
 from tools import logo_linux as ll
 
+ansi_escape = re.compile(
+    r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
+)
+
+
 #==========================================================================================
+
+def create_file_report(DATASET_DIR, path_save, cfg):
+
+    display = dc.DisplayColor()
+
+    liste_nom = DATASET_DIR.name
+    new_name = util.horodatage(liste_nom)+'.txt'
+    rapport: Path = path_save / new_name 
+    timestamp = datetime.now().strftime("%Y-%m-%d à %H:%M") 
+   
+    try:
+        with open(rapport, "w", encoding="utf-8") as f:
+            f.write(ct.INFO_PROD)
+            f.write("—" * 120)
+            f.write(f"\n - Nom du Dataset : *** {liste_nom} ***")
+            f.write(f"\n - créé le {timestamp}\n")
+            f.write("\n")
+            f.write(f" - Répertoire de sauvegarde : {path_save}")
+            if not cfg["REPORT_MODE"] :
+                f.write("\n  - Pas de sauvegarde des fichiers de défauts")
+            if not cfg["SAVE_PLOT"] :
+                f.write("\n  - Pas de sauvegarde des graphiques")
+            f.write("\n\n")
+            f.write("—" * 120)
+            f.write("\n\n")
+            
+    except FileNotFoundError:
+            display.print(f"Impossible de sauvegarder : {rapport}", colors['error'])
+
+    display.print(f"Fichier de Rapport : '{new_name}' create ", colors["ok"])
+
+    return rapport
+    
+def ecrire_sortie_dans_rapport(rapport, fonction, *args, **kwargs):
+    buffer = StringIO()
+
+    with redirect_stdout(buffer):
+        fonction(*args, **kwargs)
+
+    contenu = buffer.getvalue()
+    contenu = ansi_escape.sub('', contenu)
+
+    with open(rapport, "a", encoding="utf-8") as f:
+        f.write(contenu)
+
 
 def load_class_names(dataset_yaml_path):
 
@@ -43,7 +98,8 @@ def load_class_names(dataset_yaml_path):
 
     return names
 
-def statistique(DATASET_DIR, cfg, class_names, path_save):
+def statistique(DATASET_DIR, cfg, class_names, path_save, rapport):
+
      # ================= STATISTICS =================
     results = ds.dataset_statistics_yolo(DATASET_DIR, cfg)
 
@@ -64,7 +120,17 @@ def statistique(DATASET_DIR, cfg, class_names, path_save):
     if outside_ratios :
         gr.bbox_overflow(cfg, outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR) 
 
-    resultat = ds.afficher_dataset_statistics(results, cfg, path_save, class_names)
+    resultat = ds.afficher_dataset_statistics(results, cfg, path_save, rapport,  class_names)
+
+    ecrire_sortie_dans_rapport(
+        rapport,
+        ds.file_dataset_statistics,
+        results,
+        cfg,
+        path_save,
+        rapport,
+        class_names
+    )
 
     return resultat
 
@@ -225,12 +291,12 @@ def deplac_prob(DATASET_DIR, path_save,type_dep):
                     destination = backup_dir / source_file.name
                     
                     try:
-                        os.chmod(source_file, 0o777)  # sécurité Windows
+                        # os.chmod(source_file, 0o777)  # sécurité Windows
                         shutil.move(str(source_file), str(destination))
                     except Exception as e:
                         print(f"Erreur sur {source_file.name} : {e}")
                 else:
-                    print(f"Introuvable : {source_file.name}")
+                    print(f" - {source_file.name} : Introuvable/Supprimè")
 
 def sup_file_def(path_file):
 
@@ -246,6 +312,7 @@ def sup_file_def(path_file):
 #------------------------------------------------------------------------------------------------
 def main():
     # ================= CONFIG =================
+   
     fo.config.show_progress_bars = False 
 
     display = dc.DisplayColor()
@@ -282,16 +349,20 @@ def main():
     if not path_save.exists():
         path_save = Path.cwd() / "Report"
         path_save.mkdir(parents=True, exist_ok=True)  
-        tag_gen = "Création du répertoire de travail 'Report'"
+        tag_gen = "Création du répertoire de sauvegarde 'Report'"
         display.print(f"Chemin de sauvegadre invalide : {tag_gen}{ct.BELL}", colors["error"])
- 
+        display.print(f"Chemin de sauvegadre : {path_save}", colors["warning"])
+    else: 
+        display.print(f"Chemin de sauvegadre : {path_save}", colors["ok"])
+
+    print()
     # Report mode handling
-    util.afficher_mode("Report mode", cfg["REPORT_MODE"], path_save) # type: ignore
+    util.afficher_mode("Sauvegarde des Défauts :", cfg["REPORT_MODE"], path_save) # type: ignore
     if cfg["REPORT_MODE"] :
         sup_file_def(path_save)
 
     # Graphe mode handling
-    util.afficher_mode("Save Plot mode", cfg["SAVE_PLOT"], path_save) # type: ignore
+    util.afficher_mode("Sauvegarde des Graphiques :", cfg["SAVE_PLOT"], path_save) # type: ignore
 
 
     # Chargement du Répertoire du Dataset
@@ -300,7 +371,11 @@ def main():
     else :
         DATASET_DIR = util.get_path_color("Entrée le chemin du dataset")
 
-    
+    # Création d'un fichier de rapport
+    rapport = create_file_report(DATASET_DIR, path_save, cfg)
+
+
+    #  ------------------------------------------------------------------------------------------
     display.print("Démarrage du traitement", colors['titre'])
 
     # Chargement des noms de classes pour les stats
@@ -353,7 +428,7 @@ def main():
  
     # Affichage des erreurs détectées
     if not ctrl_ok:
-        display.print("-" * 80, colors['error'])
+        display.print("—" * 80, colors['error'])
         display.print(f"Erreurs détectées dans les images/labels. Arrêt du programme {ct.BELL}", colors['error'])
         total_errors = sum(len(v) for v in erreur.values())
         
@@ -370,21 +445,31 @@ def main():
         display.print(f"{label2:<{label_width}} {value2:>{value_width}}", colors['error'])    
         print()
         util.afficher_bbox_erreurs_compact(erreur)
-        display.print("-" * 80, colors['error'])
+        display.print("—" * 80, colors['error'])
 
-        deplac_prob(DATASET_DIR, path_save, "labels_orphelins")
-        deplac_prob(DATASET_DIR, path_save, "labels_vides")
+        ecrire_sortie_dans_rapport(
+            rapport,
+            util.afficher_bbox_erreurs_compact,
+            erreur
+        )
+ 
+        try:
+            deplac_prob(DATASET_DIR, path_save, "labels_invalides")
+            deplac_prob(DATASET_DIR, path_save, "labels_orphelins")
+            deplac_prob(DATASET_DIR, path_save, "labels_vides")
 
-        deplac_prob(DATASET_DIR, path_save, "images_sans_label")
-        deplac_prob(DATASET_DIR, path_save, "images_invalides")
-
+            deplac_prob(DATASET_DIR, path_save, "images_invalides")
+            deplac_prob(DATASET_DIR, path_save, "images_sans_label")
+        except FileNotFoundError:
+            display.print(f"   fichiers d'erreurs introuvables\n", colors['error'])
+            util.sortie_de_programme()
 
     # Si aucune erreur détectée, continuer l'analyse du dataset et création du dataset FiftyOne
     else:    
         print()
         display.print("Aucune erreur détectée. Analyse du Dataset...\n", colors['ok'])
 
-        def_image = statistique(DATASET_DIR, cfg, class_names, path_save) # type: ignore
+        def_image = statistique(DATASET_DIR, cfg, class_names, path_save, rapport) # type: ignore
 
 
         # ----- Résumé -----
@@ -407,10 +492,12 @@ def main():
             dataset = create_dataset(DATASET_DIR,anomalies=def_image)
             print()
 
+
         # Lancement de l'interface FiftyOne
         if def_image or lauch_fifty :
             util.launch_fiftyone_interface(dataset) # type: ignore
 
+        
     print()
     util.sortie_de_programme()
 

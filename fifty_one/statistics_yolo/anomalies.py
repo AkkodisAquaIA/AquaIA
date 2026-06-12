@@ -131,7 +131,7 @@ def compute_scores(anomalies, bbox_per_image, weights):
 # MAIN FUNCTION
 # ==============================================================
 
-def recherche_anomalie(stats, info_anomalie, path_user, cfg):
+def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
 
     display = dc.DisplayColor()
 
@@ -255,7 +255,7 @@ def recherche_anomalie(stats, info_anomalie, path_user, cfg):
     # GRAPH + EXPORT
     # ==========================================================
 
-    if util.answer_yes_or_no("Voulez-vous afficher le graphique"):
+    if not file and (util.answer_yes_or_no("Voulez-vous afficher le graphique")):
         type_counts = Counter(a["type"] for a in anomalies)
         gr.histogram_anomalies(type_counts, "Nombre", cfg, anomalies)
 

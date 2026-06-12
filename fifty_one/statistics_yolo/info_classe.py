@@ -16,7 +16,7 @@ init(autoreset=True)
 #================================================================================
 
 
-def info_classes(info_classes, cfg): 
+def info_classes(info_classes, file, cfg): 
   
     display = dc.DisplayColor()
 
@@ -35,7 +35,16 @@ def info_classes(info_classes, cfg):
     blocs = []
     dom, moy, rary = 0, 0, 0
 
-    for cls, count in items:
+    items_by_class = sorted(class_distribution.items())
+
+    items_by_freq = sorted(
+        class_distribution.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+
+    for cls, count in items_by_freq:   #  items
         pct = (count / total) * 100
         name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
 
@@ -86,11 +95,12 @@ def info_classes(info_classes, cfg):
 
     # Affichage de l'histogramme de distribution des classes
     print()
-    if util.answer_yes_or_no("Voulez-vous afficher le graphique") :
+
+    if not file and ( util.answer_yes_or_no("Voulez-vous afficher le graphique") ) :
         gr.histogram_classe(items, class_names, cfg, total )    
 
     # --- classes Rares ---------------------------------------
-    if util.answer_yes_or_no("Voulez-vous voir les classes rares") :
+    if  not file and ( util.answer_yes_or_no("Voulez-vous voir les classes rares") ):
 
         if cfg["RARE"] is not None:
             classes_faibles = []

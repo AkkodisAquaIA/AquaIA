@@ -7,7 +7,7 @@ from config.constants import DISPLAY_COLORS as colors
 #==============================================================================
 
 
-def info_images_par_classe(data_info_img_cla):
+def info_images_par_classe(data_info_img_cla, file):
 
     display = dc.DisplayColor()
  
@@ -79,43 +79,44 @@ def info_images_par_classe(data_info_img_cla):
         print("│ ".join(f"{item:<{col_width}}" for item in line))
     print()
 
-    # Affichage des noms des images par classe
-    tag = f"Affichage des noms des images par classe"
-    display.print(tag, colors['titre'])
-    while True:
-        tag = f"Entrez jusqu'à {MAX_CLASSES_SELECT} classes (ex: 1 3-5 8) ou 'Return' pour quitter : "
-        display.print(tag, colors['input']) 
-        user_input = input("  > ").strip()
+    if not file :
+        # Affichage des noms des images par classe
+        tag = f"Affichage des noms des images par classe"
+        display.print(tag, colors['titre'])
+        while True:
+            tag = f"Entrez jusqu'à {MAX_CLASSES_SELECT} classes (ex: 1 3-5 8) ou 'Return' pour quitter : "
+            display.print(tag, colors['input']) 
+            user_input = input("  > ").strip()
 
-        if user_input.lower() == '':
-            break
+            if user_input.lower() == '':
+                break
 
-        selected_classes = parse_selection(user_input, available_classes)            
+            selected_classes = parse_selection(user_input, available_classes)            
 
-        if not selected_classes:
+            if not selected_classes:
+                print()
+                display.print("Aucune classe valide sélectionnée.\n", colors['warning'])
+                continue
+
+            if len(selected_classes) > MAX_CLASSES_SELECT:
+                print()
+                display.print(f"Maximum {MAX_CLASSES_SELECT} classes autorisées.\n", colors['warning'])
+                continue    
+
+            for cls in selected_classes:
+
+                name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
+                all_images = sorted(class_to_images[cls])
+                images = all_images[:MAX_IMAGES_DISPLAY]
+
+                print(f"\n{cls:>2} {name}  ({len(all_images)} images)")
+
+                if images:
+                    max_width = max(len(img) for img in images) + 1
+                    for i in range(0, len(images), 5):
+                        ligne = images[i:i+5]
+                        print(" │ ".join(f"{img:<{max_width}}" for img in ligne))
+                        
+                if len(all_images) > MAX_IMAGES_DISPLAY:
+                    display.print(f"... + {len(all_images) - MAX_IMAGES_DISPLAY} autres images", colors['warning'])
             print()
-            display.print("Aucune classe valide sélectionnée.\n", colors['warning'])
-            continue
-
-        if len(selected_classes) > MAX_CLASSES_SELECT:
-            print()
-            display.print(f"Maximum {MAX_CLASSES_SELECT} classes autorisées.\n", colors['warning'])
-            continue    
-
-        for cls in selected_classes:
-
-            name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
-            all_images = sorted(class_to_images[cls])
-            images = all_images[:MAX_IMAGES_DISPLAY]
-
-            print(f"\n{cls:>2} {name}  ({len(all_images)} images)")
-
-            if images:
-                max_width = max(len(img) for img in images) + 1
-                for i in range(0, len(images), 5):
-                    ligne = images[i:i+5]
-                    print(" │ ".join(f"{img:<{max_width}}" for img in ligne))
-                    
-            if len(all_images) > MAX_IMAGES_DISPLAY:
-                display.print(f"... + {len(all_images) - MAX_IMAGES_DISPLAY} autres images", colors['warning'])
-        print()
