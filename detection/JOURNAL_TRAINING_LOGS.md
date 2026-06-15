@@ -39,7 +39,10 @@ python -m detection.list_runs
 | `detection/logging/run_registry.py` | ✅ Créé | Registre global des runs |
 | `detection/logging/checkpoint_manager.py` | ✅ Créé | Sauvegarde périodique + reprise |
 | `detection/list_runs.py` | ✅ Créé | Script CLI pour lister les runs |
-| `detection/dino/training/run.py` | ✅ Modifié | Intégration du nouveau système |
+| `detection/dino/training/run.py` | ✅ Modifié | Intégration du nouveau système + logique `--resume` |
+| `detection/train.py` | ✅ Modifié | Propagation du paramètre `resume_dir` |
+| `detection/checkpoint.py` | ✅ Modifié | Ajout `load_training_state_checkpoint` |
+| `main.py` | ✅ Modifié | Ajout argument `--resume` au sous-commande `train` |
 | `detection/yolo/training/run.py` | ⏳ À modifier | Intégration via callbacks Ultralytics |
 | `detection/train_config.yaml` | ✅ Modifié | Ajout section `logging:` + `output.project` |
 
@@ -209,32 +212,45 @@ Traçabilité complète de tous les runs, lisible en une commande.
 
 ---
 
-### 4.4 [⏳ À implémenter] Reprise depuis checkpoint (`--resume`)
+### 4.4 [✅ Implémenté] Reprise depuis checkpoint (`--resume`)
 
-**Fichier modifié :** `detection/train.py`, `detection/dino/training/run.py`
+**Fichiers modifiés :** `main.py`, `detection/train.py`, `detection/checkpoint.py`, `detection/logging/training_logger.py`, `detection/dino/training/run.py`
 
 #### Problème
 
 Si un run crashe à l'epoch 30/50 et que `last_training_state.pt` a été sauvegardé,
 il n'existe aucun mécanisme pour reprendre depuis cet epoch sans repartir de zéro.
 
-#### Solution prévue
+#### Solution implémentée
 
 ```bash
-python -m detection.train --config detection/train_config.yaml --resume runs/20250615_142200
+python main.py train --config detection/train_config.yaml --resume runs/20250615_142200
 ```
 
-- Charge `last_training_state.pt` (optimizer, scaler, scheduler)
-- Charge `last.pt` (poids modèle)
-- Lit `run_meta.json` pour connaître l'epoch de reprise
-- Met à jour le registre : `"status": "resumed"`
-- Reprend la boucle depuis `epoch_saved + 1`
+Flux d'exécution :
+1. `main.py` parse `--resume <run_dir>` et le transmet à `handle_train`
+2. `train_from_config(config_path, resume_dir=...)` → `train_dino(config, resume_dir=...)`
+3. Dans `train_dino` :
+   - Réutilise le même `run_dir` et `run_id` (pas de nouveau dossier)
+   - Charge `weights/last.pt` → poids du modèle (avant `torch.compile`)
+   - Charge `last_training_state.pt` → optimizer, scaler, scheduler via `load_training_state_checkpoint`
+   - Lit `run_meta.json` → récupère `best_val_loss` pour que `best.pt` reste cohérent
+   - Lance la boucle depuis `start_epoch + 1` au lieu de 0
+4. `TrainingLogger` en mode `resume=True` :
+   - Charge le `run_meta.json` existant (status → `"resumed"`, pid mis à jour)
+   - **Appende** à `train.log` et `train.jsonl` (mode `"a"`) — l'historique complet reste lisible
+   - Pas de `register_run` (l'entrée dans le registre existe déjà)
 
-Pour YOLO : natif via `resume=True` dans Ultralytics.
+#### Nouvelle fonction dans `checkpoint.py`
 
-#### Impact attendu
+```python
+def load_training_state_checkpoint(path, device="cpu"):
+    return torch.load(path, map_location=device)
+```
 
-Un crash ne signifie plus repartir de zéro — on reprend depuis le dernier checkpoint.
+#### Impact
+
+Un crash ne signifie plus repartir de zéro — on reprend depuis le dernier checkpoint périodique.
 
 ---
 
@@ -333,7 +349,7 @@ echo $! > runs/current.pid
 | Aucun fichier de log persistant | ✅ Résolu — `train.log` via `logging.FileHandler` |
 | Aucun registre de runs | ✅ Résolu — `runs/registry.jsonl` + `list_runs.py` |
 | Aucun indicateur "process vivant" | ✅ Résolu — `heartbeat` mis à jour tous les N batches |
-| Reprise depuis checkpoint impossible | ⏳ À implémenter (`--resume`) |
+| Reprise depuis checkpoint impossible | ✅ Résolu — `--resume <run_dir>` recharge last.pt + last_training_state.pt |
 | Intégration YOLO | ⏳ À implémenter (callbacks Ultralytics) |
 
 ### Smoke test local validé (sans GPU)
@@ -363,5 +379,9 @@ All assertions passed
 | `detection/logging/checkpoint_manager.py` | `CheckpointManager` — best + last périodique | 4.2 |
 | `detection/logging/run_registry.py` | Registre global — append + update par run_id | 4.3 |
 | `detection/list_runs.py` | CLI `python -m detection.list_runs` | 4.3 |
-| `detection/dino/training/run.py` | Intégration complète — print() → logger, try/except, heartbeat, checkpoint | 4.1–4.2 |
+| `detection/dino/training/run.py` | Intégration complète — print() → logger, try/except, heartbeat, checkpoint + logique resume | 4.1–4.4 |
 | `detection/train_config.yaml` | Ajout `output.project` + section `logging:` | 4.1–4.2 |
+| `main.py` | Argument `--resume <run_dir>` au sous-commande `train` | 4.4 |
+| `detection/train.py` | Propagation `resume_dir` vers `train_dino` | 4.4 |
+| `detection/checkpoint.py` | Ajout `load_training_state_checkpoint(path, device)` | 4.4 |
+| `detection/logging/training_logger.py` | Mode `resume=True` — append logs, charge meta existant | 4.4 |

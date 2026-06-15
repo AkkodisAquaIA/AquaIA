@@ -293,10 +293,10 @@ Modèle minimal pour valider le système sans GPU :
 - Dataset : sous-ensemble de 20 images en local
 
 Critères de validation :
-- [ ] `train.jsonl` contient une ligne par epoch après crash simulé (Ctrl+C)
-- [ ] `train.log` lisible et complet
-- [ ] `heartbeat` mis à jour pendant l'entraînement
-- [ ] `run_meta.json` status = `"interrupted"` après Ctrl+C
-- [ ] `last.pt` sauvegardé toutes les `save_period` epochs, pas seulement en fin
-- [ ] `list_runs.py` affiche le run avec le bon statut
-- [ ] Reprise depuis `--resume` repart de l'epoch sauvegardée
+- [x] `train.jsonl` contient une ligne par epoch après crash simulé (Ctrl+C)
+- [x] `train.log` lisible et complet
+- [x] `heartbeat` mis à jour pendant l'entraînement
+- [x] `run_meta.json` status = `"interrupted"` après Ctrl+C
+- [x] `last.pt` sauvegardé toutes les `save_period` epochs, pas seulement en fin
+- [x] `list_runs.py` affiche le run avec le bon statut
+- [x] Reprise depuis `--resume` repart de l'epoch sauvegardée
