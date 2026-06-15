@@ -19,10 +19,22 @@ data:
 # Output section: training artifact handling
 # ----------------------------------------------------------------------
 output:
-  # Output directory. Relative path is resolved from YAML directory.
+  # Root directory for run folders. Each run creates output/{YYYYMMDD_HHMMSS}/.
+  project: "runs"
   exist_ok: true
   save_period: 0
   plots: true
+
+# ----------------------------------------------------------------------
+# Logging section: persistent logs and checkpointing
+# ----------------------------------------------------------------------
+logging:
+  # Save last.pt + last_training_state.pt every N epochs (0 = only at end).
+  save_period: 5
+  # Update the heartbeat file every N batches.
+  heartbeat_every_n_batches: 10
+  # Path to the global run registry (one JSON line per run).
+  registry_path: "runs/registry.jsonl"
 
 # ----------------------------------------------------------------------
 # Training section: arguments used by the DINO trainer
