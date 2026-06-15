@@ -1,16 +1,53 @@
 import os
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
+from detection.utils.import_utils import (
+    fn,
+    pipeline_def,
+    types,
+    ndd,
+    DALIRaggedIterator,
+    LastBatchPolicy,
+)
+from PIL import Image
 
 import numpy as np
-from PIL import Image
 import torch
-from torch.utils.data import Dataset
 import random
 from detection.utils.config_utils import load_class_names
 
 
-class BaseDetectionDataset(Dataset):
+# TODO : AutoAugment: Learning Augmentation Strategies from Data
+@pipeline_def
+def create_detection_pipeline(dataset_src, stats, img_size=640, device="gpu"):
+    encoded, idx = fn.external_source(
+        source=dataset_src,
+        num_outputs=2,
+        batch=False,
+        parallel=True,
+        dtype=[types.UINT8, types.INT64],
+    )
+    decoding_device = "mixed" if device == "gpu" else device
+    # TODO : add cache/padding to the decoding part to avoid memory re-allocation
+    images = fn.decoders.image(encoded, device=decoding_device, output_type=types.RGB)
+    images = fn.resize(
+        images,
+        resize_x=img_size,
+        resize_y=img_size,
+        device=device,
+    )
+    inputs = fn.crop_mirror_normalize(
+        images,
+        device=device,
+        dtype=types.FLOAT,
+        output_layout="CHW",
+        mean=stats["mean"],
+        std=stats["std"],
+    )
+    return inputs, idx
+
+
+class BaseDetectionDataset:
     """
     Base class shared by NPY / PIL / RAM datasets.
 
@@ -20,71 +57,61 @@ class BaseDetectionDataset(Dataset):
     - normalization
     """
 
-    def __init__(self, dataset_root: str, stats_file: str = "stats.npy", device: str = "cpu", split: str = None, load_targets: bool = True):
+    def __init__(
+        self,
+        dataset_root: str,
+        data_split: str = "train",
+        stats_file: str = "stats.npy",
+        device: str = "cpu",
+    ):
         self.dataset_root = Path(dataset_root)
         self.stats_file = stats_file
-        self.device = torch.device(device)
-        self.split = split
-        self.num_classes = 0
+        self.data_split = data_split
+        self.img_dir = self.dataset_root / "images" / self.data_split
         self.load_stats()
-        self.class_names = load_class_names(dataset_root)
-        self.image_files = self.list_image_files()
-        if load_targets:
-            self.load_targets()
+        self.class_names, self.num_classes = load_class_names(dataset_root)
+        self.device = device
+        # Load targets to device directly to avoid repeated memcpy
+        # We do not need to think about targets device at all after this11
+        self.load_targets()
+
+        # if not (self.dataset_root / self.data_split).exists():
+        #     raise FileNotFoundError(f"Data split directory not found: {self.dataset_root / self.data_split}")
+
+    def __len__(self):
+        return len(self.target_files)
 
     def load_stats(self) -> None:
+        # /!\ Expect stats to be computed in normalized pixels in [0, 1] range
         stats_path = self.dataset_root / self.stats_file
 
         if stats_path.exists():
             stats = np.load(stats_path, allow_pickle=True).item()
             self.stats = {
-                "mean": torch.tensor(stats["mean"], dtype=torch.float32, device=self.device).view(-1, 1, 1),
-                "std": torch.clamp(
-                    torch.tensor(stats["std"], dtype=torch.float32, device=self.device).view(-1, 1, 1),
+                "mean": stats["mean"] * np.float32(255.0),
+                "std": np.clip(
+                    stats["std"],
                     min=1e-6,
-                ),
+                )
+                * np.float32(255.0),
             }
         else:
             raise FileNotFoundError(f"Stats file not found: {stats_path}")
 
-    def normalize_img(self, img: torch.Tensor) -> torch.Tensor:
-        img = img.to(self.device)
-        mean = self.stats["mean"].to(dtype=img.dtype)
-        std = self.stats["std"].to(dtype=img.dtype)
-        return (img - mean) / std
-
     def to_tensor(self, img: np.ndarray) -> torch.Tensor:
         return torch.from_numpy(img).float().permute(2, 0, 1)
-
-    def list_image_files(self) -> List[str]:
-        image_dir = self.dataset_root / "images"
-        if self.split is not None:
-            image_dir = image_dir / self.split
-        image_files = [str(path) for path in image_dir.glob("*.jpg")]
-        # If not using preprocess_to_npy.py, images need to be sorted here
-        return sorted(image_files, key=lambda path: self._numeric_sort_key(Path(path)))
 
     @staticmethod
     def _numeric_sort_key(path: Path):
         stem = path.stem
         return (0, int(stem)) if stem.isdigit() else (1, stem)
 
-    def get_sorted_label_files(self) -> List[str]:
-        label_dir = self.dataset_root / "labels"
-        if self.split is not None:
-            label_dir = label_dir / self.split
-        label_files = [str(path) for path in label_dir.glob("*.txt")]
-        return sorted(label_files, key=lambda path: self._numeric_sort_key(Path(path)))
+    def get_sorted_target_files(self) -> List[str]:
+        target_dir = self.dataset_root / "labels" / self.data_split
+        target_files = [path for path in target_dir.glob("*.txt")]
+        return sorted(target_files, key=self._numeric_sort_key)
 
-    def get_label_path(self, image_path: str) -> str:
-        """Given an image path, return the corresponding label path
-        by replacing the directory and extension."""
-        label_dir = self.dataset_root / "labels"
-        if self.split is not None:
-            label_dir = label_dir / self.split
-        return str(label_dir / f"{Path(image_path).stem}.txt")
-
-    def parse_label_line(self, line: str):
+    def parse_target_line(self, line: str):
         class_id, x_center, y_center, width, height = line.split()
         return int(class_id), [float(x_center), float(y_center), float(width), float(height)]
 
@@ -97,131 +124,208 @@ class BaseDetectionDataset(Dataset):
                     line = line.strip()
                     if not line:
                         continue
-                    class_id, bbox = self.parse_label_line(line)
+                    class_id, bbox = self.parse_target_line(line)
                     labels.append(class_id)
                     boxes.append(bbox)
+        # TODO : clean up, dict struct is not longer necessary
         return {
-            "labels": torch.tensor(labels, dtype=torch.int64, device=self.device),
-            "boxes": torch.tensor(boxes, dtype=torch.float32, device=self.device).reshape(-1, 4),
+            "labels": torch.tensor(labels, dtype=torch.int64).to(self.device),
+            "boxes": torch.tensor(boxes, dtype=torch.float32).reshape(-1, 4).to(self.device),
         }
 
     def load_targets(self) -> None:
-        label_files = self.get_sorted_label_files()
-        if not label_files:
-            label_dir = self.dataset_root / "labels"
-            if self.split is not None:
-                label_dir = label_dir / self.split
-            raise FileNotFoundError(f"No label files found under {label_dir}")
-        self.targets = [self.read_target(self.get_label_path(path)) for path in self.image_files]
-        if len(self.targets) != len(self.image_files):
-            raise ValueError(f"Label count mismatch for {self.dataset_root}: found {len(self.targets)} label files for {len(self.image_files)} images.")
-        # Determine num_classes based on both class names and label files to ensure we account for all classes
-        label_num_classes = 1 + max((int(t["labels"].max().item()) for t in self.targets if len(t["labels"]) > 0), default=0)
-        self.num_classes = max(len(self.class_names), label_num_classes)
+        self.target_files = self.get_sorted_target_files()
+        if not self.target_files:
+            raise FileNotFoundError(f"No label files found under {self.dataset_root / 'labels' / self.data_split}")
+        self.targets = [self.read_target(path) for path in self.target_files]
+
+    def get_targets(self, batch) -> List[dict]:
+        if isinstance(batch, list):
+            batch = batch[0]
+        return [self.targets[idx] for idx in batch["targets_idx"]]
+
+    def normalize_img(self, img: torch.Tensor) -> torch.Tensor:
+        mean = torch.from_numpy(self.stats["mean"]).to(dtype=img.dtype).view(-1, 1, 1)
+        std = torch.from_numpy(self.stats["std"]).to(dtype=img.dtype).view(-1, 1, 1)
+        return (img - mean) / std
 
 
-class NpyDetectionDataset(BaseDetectionDataset):
+class JpgDALIDataset(BaseDetectionDataset):
+    # TODO : only JPEG, need to think about TIFF handling
+
     def __init__(
         self,
         dataset_root: str,
+        data_split: str = "train",
+        batch_size: int = 16,
+        img_size: int = 640,
+        img_format: str = "jpg",
         stats_file: str = "stats.npy",
         device: str = "cpu",
     ):
-        super().__init__(dataset_root=dataset_root, stats_file=stats_file, device=device)
-        img_file = self.dataset_root / "npy_images.npy"
-        self.imgs = np.load(img_file).astype(np.float32)
-        if len(self.imgs) != len(self.image_files):
-            raise ValueError(f"Sample count mismatch for {self.dataset_root}: found {len(self.image_files)} images but {len(self.imgs)} NPY samples.")
+        super().__init__(
+            dataset_root=dataset_root,
+            data_split=data_split,
+            stats_file=stats_file,
+            device=device,
+        )
+        self.img_size = img_size
+        self.batch_size = batch_size
+        self.img_format = img_format
+        if img_format not in ["jpg", "jpeg"]:
+            raise NotImplementedError(f"Unsupported image format: {img_format}. Only jpg is currently supported.")
 
-    def __len__(self) -> int:
-        return len(self.imgs)
+        self.n = len(self.target_files)
+        self.indices = list(range(self.n))
+        self.full_iterations = self.n // batch_size
+        # Shuffling related stuff
+        self.perm = self.indices  # permutation of indices
+        self.last_seen_epoch = (
+            # so that we don't have to recompute the `self.perm` for every sample
+            None
+        )
 
-    def __getitem__(self, idx: int):
-        img = torch.from_numpy(self.imgs[idx]).float()
-        img = self.normalize_img(img)
-        tgt = self.targets[idx]
-        img_file = self.image_files[idx] if idx < len(self.image_files) else str(idx)
-        return img, tgt, img_file
+    @staticmethod
+    def _dali_tensor_to_torch(tensor):
+        return torch.from_dlpack(tensor.evaluate().data)
+
+    def __call__(self, sample_info):
+        sample_idx = sample_info.idx_in_epoch
+        if sample_info.iteration >= self.full_iterations:
+            # Indicate end of the epoch
+            raise StopIteration
+        if self.data_split == "train":
+            # Shuffling at the start of each epoch
+            if self.last_seen_epoch != sample_info.epoch_idx:
+                self.last_seen_epoch = sample_info.epoch_idx
+                self.perm = np.random.default_rng(seed=42 + sample_info.epoch_idx)
+                self.perm = self.perm.permutation(self.indices)
+        idx = self.perm[sample_idx]
+        img_id = self.target_files[idx].stem
+        img_path = self.img_dir / f"{img_id}.{self.img_format}"
+        # Encoded image bytes. DALI will decode this on the GPU.
+        encoded_img = np.frombuffer(img_path.read_bytes(), dtype=np.uint8)
+        return encoded_img, np.array([idx])
+
+    def __getitem__(self, key):
+        # Slow but useful for sampling a few images for visualization / testing
+        # Mirrors the DALI pipeline path using DALI dynamic operators.
+        idx = self.indices[key]
+        img_id = self.target_files[idx].stem
+        img_path = self.img_dir / f"{img_id}.{self.img_format}"
+
+        encoded_img = np.frombuffer(img_path.read_bytes(), dtype=np.uint8).copy()
+        device = "gpu" if self.device == "cuda" else "cpu"
+        decoding_device = "mixed" if device == "gpu" else device
+        mean = self.stats["mean"].astype(np.float32).tolist()
+        std = self.stats["std"].astype(np.float32).tolist()
+
+        img = ndd.decoders.image(encoded_img, device=decoding_device, output_type=types.RGB)
+        img = ndd.resize(
+            img,
+            resize_x=float(self.img_size),
+            resize_y=float(self.img_size),
+            device=device,
+        )
+        norm_img = ndd.crop_mirror_normalize(
+            img,
+            device=device,
+            dtype=types.FLOAT,
+            output_layout="CHW",
+            mean=mean,
+            std=std,
+        )
+        img = self._dali_tensor_to_torch(img).cpu().permute(2, 0, 1)
+        norm_img = self._dali_tensor_to_torch(norm_img)
+        sample = {
+            "image": img,
+            "input": norm_img,
+            "target_idx": idx,
+            "img_path": str(img_path),
+        }
+        return sample
 
 
 class JpgDetectionDataset(BaseDetectionDataset):
     def __init__(
         self,
         dataset_root: str,
-        img_size: Tuple[int, int],
+        img_size: int = 640,
         stats_file: str = "stats.npy",
         device: str = "cpu",
-        split: str = None,
+        data_split: str = "train",
     ):
-        super().__init__(dataset_root=dataset_root, stats_file=stats_file, device=device, split=split)
-        self.img_size = img_size
+        super().__init__(dataset_root=dataset_root, stats_file=stats_file, data_split=data_split, device=device)
+        self.img_size = (img_size, img_size)
 
     def __len__(self) -> int:
-        return len(self.image_files)
+        return len(self.target_files)
 
     def __getitem__(self, idx: int):
-        img = Image.open(self.image_files[idx]).convert("RGB").resize(self.img_size)
-        img = np.array(img, dtype=np.float32) / 255.0
+        img_id = self.target_files[idx].stem
+        img_path = self.img_dir / f"{img_id}.jpg"
+        img = Image.open(img_path).convert("RGB").resize(self.img_size)
+        img = np.array(img, dtype=np.float32)
         img = self.to_tensor(img)
-        img = self.normalize_img(img)
-        tgt = self.targets[idx]
-        img_file = self.image_files[idx]
-        return img, tgt, img_file
+        norm_img = self.normalize_img(img)
+        # tgt = self.targets[idx]
+        sample = {
+            "image": img,
+            "input": norm_img,
+            "target_idx": idx,
+            "img_path": str(img_path),
+        }
+        return sample
 
 
-class PilDetectionDataset(BaseDetectionDataset):
+class DALIDetectionDataLoader:
     def __init__(
         self,
-        dataset_root: str,
-        img_size: Tuple[int, int],
-        stats_file: str = "stats.npy",
-        device: str = "cpu",
+        dataset,
+        device="gpu",  # can be dropped and inferred from dataset, but keeping it explicit for now
+        num_threads=3,
+        py_num_workers=3,
+        py_start_method="spawn",
     ):
-        super().__init__(dataset_root=dataset_root, stats_file=stats_file, load_targets=False, device=device)
-        self.img_size = img_size
+        self.dataset = dataset
+        self.device = device
+        self.pipeline = create_detection_pipeline(
+            dataset_src=self.dataset.__call__,
+            stats=self.dataset.stats,
+            device=self.device,
+            img_size=self.dataset.img_size,
+            batch_size=self.dataset.batch_size,
+            num_threads=num_threads,
+            py_num_workers=py_num_workers,
+            py_start_method=py_start_method,
+        )
+        self.pipeline.build()
+        self.loader = DALIRaggedIterator(
+            pipelines=[self.pipeline],
+            output_map=["inputs", "targets_idx"],
+            output_types=[
+                DALIRaggedIterator.DENSE_TAG,
+                DALIRaggedIterator.DENSE_TAG,
+            ],
+            size=self.dataset.full_iterations * self.dataset.batch_size,
+            last_batch_policy=LastBatchPolicy.DROP,
+            auto_reset=True,
+        )
 
-    def __len__(self) -> int:
-        return len(self.image_files)
+    def __len__(self):
+        return self.dataset.full_iterations
 
-    def __getitem__(self, idx: int):
-        img = Image.open(self.image_files[idx]).convert("RGB").resize(self.img_size)
-        img = np.array(img, dtype=np.float32) / 255.0
-        img = self.to_tensor(img)
-        img = self.normalize_img(img)
-        return img
-
-
-class RAMDetectionDataset(BaseDetectionDataset):
-    def __init__(
-        self,
-        dataset_root: str,
-        img_size: Tuple[int, int],
-        stats_file: str = "stats.npy",
-        device: str = "cpu",
-    ):
-        super().__init__(dataset_root=dataset_root, stats_file=stats_file, load_targets=False, device=device)
-        self.img_size = img_size
-
-        imgs = []
-        for f in self.image_files:
-            img = Image.open(f).convert("RGB").resize(self.img_size)
-            imgs.append(np.array(img, dtype=np.float32) / 255.0)
-
-        self.imgs = np.stack(imgs, axis=0)
-
-    def __len__(self) -> int:
-        return len(self.imgs)
-
-    def __getitem__(self, idx: int):
-        img = self.to_tensor(self.imgs[idx])
-        img = self.normalize_img(img)
-        return img
+    def __iter__(self):
+        return iter(self.loader)
 
 
-def detection_collate_fn(batch):
-    images, targets, image_files = zip(*batch)
-    images = torch.stack(images, dim=0)
-    return images, list(targets), list(image_files)
+def parse_batch(batch):
+    if isinstance(batch, list):
+        batch = batch[0]
+    inputs = batch["inputs"]
+    # TODO : ugly but currently required. Need to modify downstream code to avoid this conversion
+    # targets = [{"labels": labels, "boxes": boxes} for labels, boxes in zip(batch["labels"], batch["bboxes"])]
+    return inputs, batch.get("img_paths", None)
 
 
 def sample_indices(dataset_size, num_samples, seed):
@@ -230,9 +334,21 @@ def sample_indices(dataset_size, num_samples, seed):
     return sorted(rng.sample(range(dataset_size), sample_size))
 
 
-def sample_dataset(dataset, num_samples, seed):
+def detection_collate_fn(batch):
+    collated_batch = {
+        "images": torch.stack([item["image"] for item in batch], dim=0),
+        "inputs": torch.stack([item["input"] for item in batch], dim=0),
+        "targets_idx": [item["target_idx"] for item in batch],
+        "img_paths": [item["img_path"] for item in batch],
+    }
+    return collated_batch
+
+
+def sample_dataset(dataset, num_samples, seed, device):
     sampled_indices = sample_indices(len(dataset), num_samples, seed)
     samples = [dataset[index] for index in sampled_indices]
-    images = torch.stack([sample[0] for sample in samples], dim=0)
-    img_files = [sample[2] for sample in samples]
-    return images, img_files
+    inputs = torch.stack([sample["input"] for sample in samples], dim=0).to(device)
+    imgs = torch.stack([sample["image"] for sample in samples], dim=0)
+    img_paths = [sample["img_path"] for sample in samples]
+    samples = {"inputs": inputs, "images": imgs, "img_paths": img_paths}
+    return samples
