@@ -6,7 +6,7 @@ import { getImages, updateImageStatus, cropImage, setTaxonReference } from "@/li
 import { useAppStore } from "@/store/appStore";
 import type { ImageRecord } from "@/types";
 import { cn } from "@/lib/utils";
-import ReactCrop, { type Crop as CropType, centerCrop, makeAspectCrop } from "react-image-crop";
+import ReactCrop, { type Crop as CropType } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 
 const FILTERS = [
@@ -26,7 +26,7 @@ function imgSrc(image: ImageRecord, bust?: number): string {
 }
 
 export default function ValidationPanel() {
-  const { validationFilter, setValidationFilter, cropWidth, cropHeight } = useAppStore();
+  const { validationFilter, setValidationFilter, cropWidth, cropHeight, currentUserId } = useAppStore();
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -61,9 +61,10 @@ export default function ValidationPanel() {
   };
 
   const load = useCallback(async () => {
+    if (!currentUserId) return;
     setLoading(true);
     try {
-      const data = await getImages({ status: validationFilter, page, size: 48 });
+      const data = await getImages(currentUserId, { status: validationFilter, page, size: 48 });
       setImages(data.items);
       setTotal(data.total);
       setPages(data.pages);
@@ -72,13 +73,14 @@ export default function ValidationPanel() {
     } finally {
       setLoading(false);
     }
-  }, [validationFilter, page]);
+  }, [currentUserId, validationFilter, page]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [validationFilter]);
 
   const handleStatus = async (id: number, status: string) => {
-    await updateImageStatus(id, status);
+    if (!currentUserId) return;
+    await updateImageStatus(currentUserId, id, status);
     const leavesFilter = status !== validationFilter;
     setImages((prev) => {
       const idx = prev.findIndex((img) => img.id === id);
@@ -192,7 +194,6 @@ export default function ValidationPanel() {
             {!cropMode ? (
               <button onClick={() => {
                 setCropMode(true);
-                // Pre-initialize crop centered on the displayed image
                 if (imgRef.current) {
                   const { width: dw, height: dh } = imgRef.current.getBoundingClientRect();
                   const scaleX = imgRef.current.naturalWidth / dw;
@@ -214,20 +215,20 @@ export default function ValidationPanel() {
                 <button
                   disabled={!crop?.width || saving}
                   onClick={async () => {
-                    if (!crop?.width || !imgRef.current || !selected) return;
+                    if (!crop?.width || !imgRef.current || !selected || !currentUserId) return;
                     setSaving(true);
                     try {
                       const el = imgRef.current;
                       const scaleX = el.naturalWidth / el.width;
                       const scaleY = el.naturalHeight / el.height;
                       const updated = await cropImage(
+                        currentUserId,
                         selected.id,
                         crop.x * scaleX,
                         crop.y * scaleY,
                         crop.width * scaleX,
                         crop.height * scaleY,
                       );
-                      // Stay in lightbox — show cropped result immediately
                       setSelected(updated);
                       setImages((prev) => prev.map((img) => img.id === updated.id ? updated : img));
                       setImgBust(Date.now());
@@ -372,10 +373,10 @@ export default function ValidationPanel() {
                     <button
                       disabled={settingRef}
                       onClick={async () => {
-                        if (!selected.taxon) return;
+                        if (!selected.taxon || !currentUserId) return;
                         setSettingRef(true);
                         try {
-                          const updated = await setTaxonReference(selected.taxon.id, selected.id);
+                          const updated = await setTaxonReference(selected.taxon.id, selected.id, currentUserId);
                           setSelected((prev) => prev ? { ...prev, taxon: updated } : prev);
                           setImages((prev) => prev.map((img) =>
                             img.taxon?.id === updated.id ? { ...img, taxon: updated } : img
@@ -393,10 +394,10 @@ export default function ValidationPanel() {
                 <button
                   disabled={settingRef}
                   onClick={async () => {
-                    if (!selected.taxon) return;
+                    if (!selected.taxon || !currentUserId) return;
                     setSettingRef(true);
                     try {
-                      const updated = await setTaxonReference(selected.taxon.id, selected.id);
+                      const updated = await setTaxonReference(selected.taxon.id, selected.id, currentUserId);
                       setSelected((prev) => prev ? { ...prev, taxon: updated } : prev);
                       setImages((prev) => prev.map((img) =>
                         img.taxon?.id === updated.id ? { ...img, taxon: updated } : img

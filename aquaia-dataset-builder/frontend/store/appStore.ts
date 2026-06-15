@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { PanelId, ImageRecord } from "@/types";
+import type { PanelId, ImageRecord, User } from "@/types";
+import { getUsers, createUser } from "@/lib/api";
 
 interface AppState {
   theme: "dark" | "light";
@@ -23,9 +24,18 @@ interface AppState {
   cropWidth: number;
   cropHeight: number;
   setCropDimensions: (w: number, h: number) => void;
+
+  // Workspace
+  currentUserId: number | null;
+  currentUserName: string;
+  workspaces: User[];
+  workspaceReady: boolean;
+  initWorkspace: () => Promise<void>;
+  setWorkspace: (id: number, name: string) => void;
+  setWorkspaces: (workspaces: User[]) => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   theme: "light",
   toggleTheme: () =>
     set((s) => {
@@ -66,4 +76,45 @@ export const useAppStore = create<AppState>((set) => ({
     }
     set({ cropWidth: w, cropHeight: h });
   },
+
+  // Workspace
+  currentUserId: null,
+  currentUserName: "",
+  workspaces: [],
+  workspaceReady: false,
+
+  initWorkspace: async () => {
+    try {
+      const users = await getUsers();
+      set({ workspaces: users });
+
+      if (users.length === 0) {
+        set({ workspaceReady: true });
+        return;
+      }
+
+      const savedId = typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("adiab-workspace-id") || "0")
+        : 0;
+
+      const saved = users.find((u) => u.id === savedId);
+      const target = saved ?? users[0];
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("adiab-workspace-id", String(target.id));
+      }
+      set({ currentUserId: target.id, currentUserName: target.display_name, workspaceReady: true });
+    } catch {
+      set({ workspaceReady: true });
+    }
+  },
+
+  setWorkspace: (id, name) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("adiab-workspace-id", String(id));
+    }
+    set({ currentUserId: id, currentUserName: name });
+  },
+
+  setWorkspaces: (workspaces) => set({ workspaces }),
 }));

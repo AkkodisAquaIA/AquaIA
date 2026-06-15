@@ -8,55 +8,55 @@ INATURALIST_API = "https://api.inaturalist.org/v1"
 
 
 class INaturalistConnector(BaseConnector):
-	name = "inaturalist"
-	rate_limit_delay = 0.5
+    name = "inaturalist"
+    rate_limit_delay = 0.5
 
-	async def search(self, query: str, limit: int = 50) -> list[ImageResult]:
-		results: list[ImageResult] = []
-		try:
-			async with httpx.AsyncClient(timeout=30) as client:
-				params = {
-					"taxon_name": query,
-					"per_page": min(limit, 200),
-					"photos": "true",
-					"license": "cc-by,cc-by-nc,cc-by-sa,cc-by-nc-sa,cc0",
-					"order_by": "votes",
-				}
-				resp = await client.get(f"{INATURALIST_API}/observations", params=params)
-				resp.raise_for_status()
-				data = resp.json()
+    async def search(self, query: str, limit: int = 50) -> list[ImageResult]:
+        results: list[ImageResult] = []
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                params = {
+                    "taxon_name": query,
+                    "per_page": min(limit, 200),
+                    "photos": "true",
+                    "license": "cc-by,cc-by-nc,cc-by-sa,cc-by-nc-sa,cc0",
+                    "order_by": "votes",
+                }
+                resp = await client.get(f"{INATURALIST_API}/observations", params=params)
+                resp.raise_for_status()
+                data = resp.json()
 
-				for obs in data.get("results", []):
-					photos = obs.get("photos", [])
-					if not photos:
-						continue
-					taxon = obs.get("taxon") or {}
-					sci_name = taxon.get("name") or query
-					user = obs.get("user", {})
+                for obs in data.get("results", []):
+                    photos = obs.get("photos", [])
+                    if not photos:
+                        continue
+                    taxon = obs.get("taxon") or {}
+                    sci_name = taxon.get("name") or query
+                    user = obs.get("user", {})
 
-					for photo in photos[:2]:
-						url = photo.get("url", "").replace("square", "original")
-						thumb = photo.get("url", "")
-						if not url:
-							continue
-						results.append(
-							ImageResult(
-								source_name=self.name,
-								source_image_url=url,
-								source_page_url=f"https://www.inaturalist.org/observations/{obs.get('id')}",
-								scientific_name=sci_name,
-								author=user.get("login"),
-								license=photo.get("license_code", "").upper(),
-								thumbnail_url=thumb,
-								metadata={
-									"observation_id": obs.get("id"),
-									"quality_grade": obs.get("quality_grade"),
-									"taxon_id": taxon.get("id"),
-								},
-							)
-						)
-						if len(results) >= limit:
-							return results
-		except Exception as e:
-			logger.warning(f"[inaturalist] search failed for '{query}': {e}")
-		return results
+                    for photo in photos[:2]:
+                        url = photo.get("url", "").replace("square", "original")
+                        thumb = photo.get("url", "")
+                        if not url:
+                            continue
+                        results.append(
+                            ImageResult(
+                                source_name=self.name,
+                                source_image_url=url,
+                                source_page_url=f"https://www.inaturalist.org/observations/{obs.get('id')}",
+                                scientific_name=sci_name,
+                                author=user.get("login"),
+                                license=photo.get("license_code", "").upper(),
+                                thumbnail_url=thumb,
+                                metadata={
+                                    "observation_id": obs.get("id"),
+                                    "quality_grade": obs.get("quality_grade"),
+                                    "taxon_id": taxon.get("id"),
+                                },
+                            )
+                        )
+                        if len(results) >= limit:
+                            return results
+        except Exception as e:
+            logger.warning(f"[inaturalist] search failed for '{query}': {e}")
+        return results
