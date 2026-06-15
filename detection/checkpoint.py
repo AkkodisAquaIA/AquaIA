@@ -34,3 +34,7 @@ def save_training_state_checkpoint(
     if scheduler_state_dict is not None:
         checkpoint["scheduler_state_dict"] = scheduler_state_dict
     torch.save(checkpoint, path)
+
+
+def load_training_state_checkpoint(path, device="cpu"):
+    return torch.load(path, map_location=device)

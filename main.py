@@ -11,6 +11,7 @@ def build_parser():
 
     train_parser = subparsers.add_parser("train", help="Train a model")
     train_parser.add_argument("--config", type=str, default=os.path.join("detection", "train_config.yaml"))
+    train_parser.add_argument("--resume", type=str, default=None, metavar="RUN_DIR", help="Resume training from an existing run directory (e.g. runs/20250615_142200)")
     train_parser.set_defaults(command_handler=handle_train)
 
     test_parser = subparsers.add_parser("infer", help="Run inference on train and test samples")
@@ -21,7 +22,7 @@ def build_parser():
 
 
 def handle_train(args):
-    return train_from_config(args.config)
+    return train_from_config(args.config, resume_dir=args.resume)
 
 
 def handle_test(args):
