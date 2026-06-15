@@ -13,6 +13,7 @@ class CheckpointManager:
     def step(self, epoch: int, model, optimizer, scaler, scheduler, is_best: bool) -> None:
         if is_best:
             from detection.checkpoint import save_model_checkpoint
+
             save_model_checkpoint(path=str(self.weights_dir / "best.pt"), model=model)
 
         if self.save_period > 0 and epoch % self.save_period == 0:
@@ -24,6 +25,7 @@ class CheckpointManager:
 
     def _save_last(self, epoch: int, model, optimizer, scaler, scheduler) -> None:
         from detection.checkpoint import save_model_checkpoint, save_training_state_checkpoint
+
         save_model_checkpoint(path=str(self.weights_dir / "last.pt"), model=model)
         save_training_state_checkpoint(
             path=str(self.run_dir / "last_training_state.pt"),

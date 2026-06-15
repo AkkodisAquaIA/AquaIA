@@ -1,4 +1,5 @@
 """CLI: python -m detection.list_runs"""
+
 import json
 import sys
 from pathlib import Path
@@ -6,9 +7,9 @@ from pathlib import Path
 REGISTRY_PATH = Path("runs/registry.jsonl")
 
 _COLOR = {
-    "running":     "\033[33m",
-    "done":        "\033[32m",
-    "error":       "\033[31m",
+    "running": "\033[33m",
+    "done": "\033[32m",
+    "error": "\033[31m",
     "interrupted": "\033[35m",
 }
 _RESET = "\033[0m"
@@ -44,14 +45,7 @@ def main() -> None:
         started = r.get("started_at", "")[:16].replace("T", " ")
         dataset = Path(r.get("dataset", "")).name[:27]
         status_col = f"{color}{status:<12}{_RESET}"
-        print(
-            f"{r.get('run_id', '?'):<22} "
-            f"{r.get('model', '?'):<20} "
-            f"{dataset:<28} "
-            f"{r.get('epochs', '?'):>4}  "
-            f"{status_col}  "
-            f"{started}"
-        )
+        print(f"{r.get('run_id', '?'):<22} {r.get('model', '?'):<20} {dataset:<28} {r.get('epochs', '?'):>4}  {status_col}  {started}")
 
 
 if __name__ == "__main__":

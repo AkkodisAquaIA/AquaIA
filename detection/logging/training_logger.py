@@ -62,10 +62,7 @@ class TrainingLogger:
         model_str = f"{model_cfg.get('family', '')}_{model_cfg.get('size', '')} ({model_cfg.get('init', '')})"
         self._logger.info(f"Run started — run_id={run_id} | pid={os.getpid()}")
         self._logger.info(f"Run dir: {run_dir}")
-        self._logger.info(
-            f"Model: {model_str} | epochs={training_cfg.get('epochs')} "
-            f"| batch={training_cfg.get('batch')} | lr={training_cfg.get('lr0')}"
-        )
+        self._logger.info(f"Model: {model_str} | epochs={training_cfg.get('epochs')} | batch={training_cfg.get('batch')} | lr={training_cfg.get('lr0')}")
 
     # ── Public API ──────────────────────────────────────────────────────────
 
@@ -99,11 +96,7 @@ class TrainingLogger:
             f.flush()
 
         elapsed_str = f"{int(elapsed // 60)}m{int(elapsed % 60)}s"
-        self._logger.info(
-            f"[EPOCH {epoch:>3}/{total_epochs}] "
-            f"train_loss={train_loss:.4f} | val_loss={val_loss:.4f} | "
-            f"lr={lr:.2e} | {elapsed_str}"
-        )
+        self._logger.info(f"[EPOCH {epoch:>3}/{total_epochs}] train_loss={train_loss:.4f} | val_loss={val_loss:.4f} | lr={lr:.2e} | {elapsed_str}")
 
         self._meta["current_epoch"] = epoch
         self._meta["last_updated"] = datetime.utcnow().isoformat()
