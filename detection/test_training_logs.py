@@ -31,7 +31,7 @@ def _fake_loss(epoch: int, split: str) -> float:
 
 
 def run_test(crash_at=None, use_tmp: bool = False) -> pathlib.Path:
-    from detection.logging import TrainingLogger, CheckpointManager, register_run, update_run_status
+    from detection.logging import TrainingLogger, register_run, update_run_status
 
     config = {
         "model": {"family": "test_model", "size": "nano", "init": "pretrained"},
@@ -102,7 +102,7 @@ def run_test(crash_at=None, use_tmp: bool = False) -> pathlib.Path:
 
 
 def verify(run_dir: pathlib.Path) -> None:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Verifying outputs in: {run_dir}")
     print("=" * 60)
 
@@ -143,7 +143,7 @@ def verify(run_dir: pathlib.Path) -> None:
     meta_path = run_dir / "run_meta.json"
     if meta_path.exists():
         meta = json.loads(meta_path.read_text())
-        print(f"\n[run_meta.json]")
+        print("\n[run_meta.json]")
         print(f"  status      : {meta['status']}")
         print(f"  current_epoch: {meta['current_epoch']}")
         print(f"  best_epoch  : {meta['best_epoch']}")
@@ -152,7 +152,7 @@ def verify(run_dir: pathlib.Path) -> None:
         print("[run_meta.json] MISSING")
         ok = False
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("RESULT:", "ALL GOOD" if ok else "SOME FILES MISSING")
     print("=" * 60)
 
@@ -170,6 +170,7 @@ def main() -> None:
     if args.list:
         print("\n--- Registry (python -m detection.list_runs) ---")
         from detection.list_runs import main as list_runs
+
         list_runs()
 
 
