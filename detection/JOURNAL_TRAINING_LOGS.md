@@ -34,14 +34,14 @@ python -m detection.list_runs
 |---------|--------|-------------|
 | `detection/TRAINING_LOGS.md` | ✅ Créé | Audit + architecture cible (document de référence) |
 | `detection/JOURNAL_TRAINING_LOGS.md` | ✅ Créé | Ce journal (trace des changements) |
-| `detection/logging/__init__.py` | ⏳ À créer | Package logging |
-| `detection/logging/training_logger.py` | ⏳ À créer | `TrainingLogger` — JSONL + log texte + heartbeat |
-| `detection/logging/run_registry.py` | ⏳ À créer | Registre global des runs |
-| `detection/logging/checkpoint_manager.py` | ⏳ À créer | Sauvegarde périodique + reprise |
-| `detection/list_runs.py` | ⏳ À créer | Script CLI pour lister les runs |
-| `detection/dino/training/run.py` | ⏳ À modifier | Intégration du nouveau système |
+| `detection/logging/__init__.py` | ✅ Créé | Package logging |
+| `detection/logging/training_logger.py` | ✅ Créé | `TrainingLogger` — JSONL + log texte + heartbeat |
+| `detection/logging/run_registry.py` | ✅ Créé | Registre global des runs |
+| `detection/logging/checkpoint_manager.py` | ✅ Créé | Sauvegarde périodique + reprise |
+| `detection/list_runs.py` | ✅ Créé | Script CLI pour lister les runs |
+| `detection/dino/training/run.py` | ✅ Modifié | Intégration du nouveau système |
 | `detection/yolo/training/run.py` | ⏳ À modifier | Intégration via callbacks Ultralytics |
-| `detection/train_config.yaml` | ⏳ À modifier | Ajout section `logging:` |
+| `detection/train_config.yaml` | ✅ Modifié | Ajout section `logging:` + `output.project` |
 
 ---
 
@@ -326,24 +326,42 @@ echo $! > runs/current.pid
 
 ## 7) Résultats observés
 
-*(rempli au fur et à mesure des implémentations et tests)*
-
 | Problème | Statut |
 |----------|--------|
-| Métriques perdues en cas de crash | ⏳ En cours |
-| `last.pt` perdu en cas de crash | ⏳ En cours |
-| Aucun fichier de log persistant | ⏳ En cours |
-| Aucun registre de runs | ⏳ En cours |
-| Aucun indicateur "process vivant" | ⏳ En cours |
-| Reprise depuis checkpoint impossible | ⏳ En cours |
+| Métriques perdues en cas de crash | ✅ Résolu — `train.jsonl` flush par epoch |
+| `last.pt` perdu en cas de crash | ✅ Résolu — `CheckpointManager` sauvegarde toutes les N epochs |
+| Aucun fichier de log persistant | ✅ Résolu — `train.log` via `logging.FileHandler` |
+| Aucun registre de runs | ✅ Résolu — `runs/registry.jsonl` + `list_runs.py` |
+| Aucun indicateur "process vivant" | ✅ Résolu — `heartbeat` mis à jour tous les N batches |
+| Reprise depuis checkpoint impossible | ⏳ À implémenter (`--resume`) |
+| Intégration YOLO | ⏳ À implémenter (callbacks Ultralytics) |
+
+### Smoke test local validé (sans GPU)
+
+```
+[2026-06-15 14:21:57] [INFO ] Run started — run_id=test_run | pid=59670
+[2026-06-15 14:21:57] [INFO ] Model: dinov3_small (pretrained) | epochs=10 | batch=4 | lr=0.001
+[2026-06-15 14:21:57] [INFO ] [EPOCH   1/10] train_loss=1.5000 | val_loss=1.2000 | lr=1.00e-03 | 0m0s
+[2026-06-15 14:21:57] [INFO ] [BEST ] New best at epoch 1 — val_loss=1.2000
+[2026-06-15 14:21:57] [INFO ] Training complete — total time: 0m0s
+All assertions passed
+  JSONL:      {"epoch": 1, "train_loss": 1.5, "val_loss": 1.2, ...}
+  heartbeat:  2026-06-15T12:21:57 epoch=1 batch=2/10
+  meta status: done | best_val_loss: 0.9
+```
 
 ---
 
 ## 8) Récapitulatif des changements par fichier
 
-*(mis à jour au fil des commits)*
-
 | Fichier | Modification | Section |
 |---------|-------------|---------|
 | `detection/TRAINING_LOGS.md` | Audit initial + architecture cible | — |
 | `detection/JOURNAL_TRAINING_LOGS.md` | Ce journal | — |
+| `detection/logging/__init__.py` | Nouveau package — exports publics | 4.1 |
+| `detection/logging/training_logger.py` | `TrainingLogger` — JSONL + log texte + heartbeat + run_meta | 4.1 |
+| `detection/logging/checkpoint_manager.py` | `CheckpointManager` — best + last périodique | 4.2 |
+| `detection/logging/run_registry.py` | Registre global — append + update par run_id | 4.3 |
+| `detection/list_runs.py` | CLI `python -m detection.list_runs` | 4.3 |
+| `detection/dino/training/run.py` | Intégration complète — print() → logger, try/except, heartbeat, checkpoint | 4.1–4.2 |
+| `detection/train_config.yaml` | Ajout `output.project` + section `logging:` | 4.1–4.2 |
