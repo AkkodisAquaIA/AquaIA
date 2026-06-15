@@ -112,7 +112,7 @@ save_model_checkpoint(path=os.path.join(weights_dir, "last.pt"), model=model)
 
 ---
 
-### 4.1 [⏳ À implémenter] `TrainingLogger` — logging JSONL + fichier texte
+### 4.1 [✅ Implémenté] `TrainingLogger` — logging JSONL + fichier texte
 
 **Fichier créé :** `detection/logging/training_logger.py`
 
@@ -121,7 +121,7 @@ save_model_checkpoint(path=os.path.join(weights_dir, "last.pt"), model=model)
 Tous les logs vont vers `print()` → stdout. Si le terminal SSH se ferme, il ne reste
 aucune trace de l'entraînement.
 
-#### Solution prévue
+#### Solution implémentée
 
 Classe `TrainingLogger` instanciée au début du run, écrivant dans :
 
@@ -141,14 +141,14 @@ Classe `TrainingLogger` instanciée au début du run, écrivant dans :
 
 Remplace tous les `print()` de `dino/training/run.py`.
 
-#### Impact attendu
+#### Impact
 
 Toute information produite pendant l'entraînement reste sur disque même après crash ou
 déconnexion SSH.
 
 ---
 
-### 4.2 [⏳ À implémenter] `CheckpointManager` — sauvegarde périodique intra-run
+### 4.2 [✅ Implémenté] `CheckpointManager` — sauvegarde périodique intra-run
 
 **Fichier créé :** `detection/logging/checkpoint_manager.py`  
 **Fichier modifié :** `detection/dino/training/run.py`
@@ -158,7 +158,7 @@ déconnexion SSH.
 `last.pt` et `last_training_state.pt` ne sont sauvegardés qu'en fin de run.
 Un crash à epoch 48/50 → perte de l'état de l'optimiseur et du modèle last.
 
-#### Solution prévue
+#### Solution implémentée
 
 `CheckpointManager` gérant la sauvegarde de `last.pt` + `last_training_state.pt`
 toutes les `save_period` epochs (configurable dans `train_config.yaml`).
@@ -173,13 +173,13 @@ logging:
 
 `save_period: 0` → comportement actuel (best seulement), sans régression.
 
-#### Impact attendu
+#### Impact
 
 Reprise possible depuis n'importe quelle epoch sauvegardée via `--resume`.
 
 ---
 
-### 4.3 [⏳ À implémenter] Registre global des runs
+### 4.3 [✅ Implémenté] Registre global des runs
 
 **Fichier créé :** `detection/logging/run_registry.py`  
 **Fichier créé :** `detection/list_runs.py`
@@ -189,7 +189,7 @@ Reprise possible depuis n'importe quelle epoch sauvegardée via `--resume`.
 Aucun moyen de savoir quels runs ont été lancés, quand, avec quel config, et quel est leur
 statut final.
 
-#### Solution prévue
+#### Solution implémentée
 
 Fichier `runs/registry.jsonl` (une ligne JSON par run) :
 ```json
@@ -206,7 +206,7 @@ run_id               model           dataset               epochs  status      s
 20250614_180022      dinov3_small    coco_custom_match     50      error       2025-06-14 18:00
 ```
 
-#### Impact attendu
+#### Impact
 
 Traçabilité complète de tous les runs, lisible en une commande.
 
@@ -354,17 +354,32 @@ echo $! > runs/current.pid
 
 ### Smoke test local validé (sans GPU)
 
+```bash
+# Run normal
+python -m detection.test_training_logs
+
+# Crash simulé à epoch 2
+python -m detection.test_training_logs --crash
+
+# Crash puis resume (scénario complet)
+python -m detection.test_training_logs --crash --resume --list
 ```
-[2026-06-15 14:21:57] [INFO ] Run started — run_id=test_run | pid=59670
-[2026-06-15 14:21:57] [INFO ] Model: dinov3_small (pretrained) | epochs=10 | batch=4 | lr=0.001
-[2026-06-15 14:21:57] [INFO ] [EPOCH   1/10] train_loss=1.5000 | val_loss=1.2000 | lr=1.00e-03 | 0m0s
-[2026-06-15 14:21:57] [INFO ] [BEST ] New best at epoch 1 — val_loss=1.2000
-[2026-06-15 14:21:57] [INFO ] Training complete — total time: 0m0s
-All assertions passed
-  JSONL:      {"epoch": 1, "train_loss": 1.5, "val_loss": 1.2, ...}
-  heartbeat:  2026-06-15T12:21:57 epoch=1 batch=2/10
-  meta status: done | best_val_loss: 0.9
+
+Résultat observé après `--crash --resume` :
 ```
+[train.jsonl] 5 lignes
+  epoch=1  (run initial — avant crash)
+  epoch=2  (resume — repart de l'epoch 2)
+  epoch=3
+  epoch=4
+  epoch=5
+
+[run_meta.json] status: done | current_epoch: 5 | best_val_loss: 0.37
+[train.log]     30 lignes continues (pas de doublon)
+[heartbeat]     epoch=5 batch=10/10
+```
+
+Fix appliqué : handlers Python `logging` vidés avant réajout pour éviter les lignes doublées en cas de resume dans le même process.
 
 ---
 
