@@ -1,7 +1,7 @@
-import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import copy
 
 from ..utils import box_ops
 from .utils.misc import accuracy, get_world_size
@@ -45,7 +45,7 @@ class SetCriterion(nn.Module):
     def __init__(self, num_classes, matcher, focal_alpha=0.25, reparam=False):
         """Create the criterion.
         Parameters:
-            num_classes: number of object categories, omitting the special no-object category
+            num_classes: number of object categories.
             matcher: module able to compute a matching between targets and proposals
             weight_dict: dict containing as key the names of the losses and as values their relative weight.
             focal_alpha: alpha in Focal Loss
@@ -69,6 +69,7 @@ class SetCriterion(nn.Module):
 
         target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])  # flatten
 
+        # background class is the last one (num_classes)
         target_classes = torch.full(
             src_logits.shape[:2],
             self.num_classes,
@@ -86,10 +87,8 @@ class SetCriterion(nn.Module):
         )
         target_classes_onehot.scatter_(2, target_classes.unsqueeze(-1), 1)
 
+        # Supervision for the no-object tokens is all zeros
         target_classes_onehot = target_classes_onehot[:, :, :-1]
-
-        # print(target_classes_onehot[0][:10])
-        # print(src_logits[0][:10])
 
         loss_ce = (
             sigmoid_focal_loss(
@@ -116,7 +115,7 @@ class SetCriterion(nn.Module):
         device = pred_logits.device
         tgt_lengths = torch.as_tensor([len(v["labels"]) for v in targets], device=device)
         # Count the number of predictions that are NOT "no-object" (which is the last class)
-        card_pred = (pred_logits.argmax(-1) != pred_logits.shape[-1] - 1).sum(1)
+        card_pred = (pred_logits.sigmoid().max(-1).values >= 0.5).sum(1)
         card_err = F.l1_loss(card_pred.float(), tgt_lengths.float())
         losses = {"cardinality_error": card_err}
         return losses

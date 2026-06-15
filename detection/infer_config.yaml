@@ -1,13 +1,13 @@
 # AquaIA - DETR+DINO inference config
 
 run:
-  runs_root: "results/detect/dinov3_plus_pretrained"
+  runs_root: "results/detect/dinov3_small_pretrained"
   run_dir: null
 
 data:
   test_data_root: "datasets/coco_custom"
   loader: "jpg"
-  split: "test"
+  split: "train"
 
 inference:
   batch: 8

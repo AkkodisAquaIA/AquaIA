@@ -2,19 +2,78 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
 from ultralytics.utils.plotting import Annotator
+from dataloading.datasets import sample_dataset
+import torch
 
-from detection.utils.box_ops import box_cxcywh_to_xyxy
+
+METRIC_DISPLAY_NAMES = {
+    "loss": "Loss",
+    "loss_ce": "Classification Loss",
+    "loss_bbox": "Box Loss",
+    "loss_giou": "GIoU Loss",
+    "class_error": "Class Error",
+    "cardinality_error": "Cardinality Error",
+}
+
+METRIC_ORDER = (
+    "loss",
+    "loss_ce",
+    "loss_bbox",
+    "loss_giou",
+    "class_error",
+    "cardinality_error",
+)
 
 
-def annotate_images_with_predictions(images, outputs, class_names, conf_thres, output_dir, image_files):
+def _as_float(value):
+    if torch.is_tensor(value):
+        value = value.detach().cpu().item()
+    if isinstance(value, (int, float, np.floating, np.integer)):
+        return float(value)
+    return None
+
+
+def _flatten_metrics(entry):
+    flattened = {}
+    for key, value in entry.items():
+        if key == "epoch":
+            continue
+
+        if isinstance(value, dict):
+            for nested_key, nested_value in value.items():
+                metric_value = _as_float(nested_value)
+                if metric_value is not None:
+                    flattened[f"{key}/{nested_key}"] = metric_value
+            continue
+
+        metric_value = _as_float(value)
+        if metric_value is not None:
+            flattened[key] = metric_value
+
+    return flattened
+
+
+def _group_metrics_by_name(flattened_history):
+    grouped = {}
+    for entry in flattened_history:
+        for key in entry:
+            if "/" in key:
+                split, metric_name = key.split("/", 1)
+            else:
+                split, metric_name = key, key
+            grouped.setdefault(metric_name, set()).add(split)
+    return grouped
+
+
+def _ordered_metric_names(metric_names):
+    ordered = [metric_name for metric_name in METRIC_ORDER if metric_name in metric_names]
+    ordered.extend(sorted(metric_name for metric_name in metric_names if metric_name not in METRIC_ORDER))
+    return ordered
+
+
+def annotate_images_with_predictions(images, predictions, class_names, output_dir, image_files):
     images = images.detach().cpu().float()
-    pred_boxes = outputs["pred_boxes"].detach().cpu()
-    pred_logits = outputs["pred_logits"].detach().cpu()
-    class_logits = pred_logits[..., : len(class_names)]
-    scores, labels = class_logits.sigmoid().max(dim=-1)
-
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -28,14 +87,16 @@ def annotate_images_with_predictions(images, outputs, class_names, conf_thres, o
         h, w = img_uint8.shape[:2]
 
         annotator = Annotator(img_uint8.copy(), line_width=2)
-        boxes_xyxy = box_cxcywh_to_xyxy(pred_boxes[i]).clamp(0, 1)
-        boxes_xyxy[:, [0, 2]] *= w
-        boxes_xyxy[:, [1, 3]] *= h
-
-        keep = scores[i] >= conf_thres
-        kept_boxes = boxes_xyxy[keep]
-        kept_scores = scores[i][keep]
-        kept_labels = labels[i][keep]
+        image_predictions = predictions[i]
+        boxes = image_predictions["boxes"].detach().cpu().float()
+        scale = boxes.new_tensor([w, h, w, h])
+        source_size = float(max(boxes.max().item(), 0.0)) if boxes.numel() else 0.0
+        if source_size <= 1.0:
+            kept_boxes = boxes * scale
+        else:
+            kept_boxes = boxes
+        kept_scores = image_predictions["scores"].detach().cpu().float()
+        kept_labels = image_predictions["labels"].detach().cpu().long()
 
         for box, score, label in zip(kept_boxes, kept_scores, kept_labels):
             x1, y1, x2, y2 = box.tolist()
@@ -47,23 +108,20 @@ def annotate_images_with_predictions(images, outputs, class_names, conf_thres, o
         plt.imsave(output_path, annotator.result())
 
 
-def annotate_yolo_predictions(results, class_names, conf_thres, output_dir, image_files):
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+@torch.no_grad()
+def save_sample_predictions(model, subset, output_dir, predict_fn, num_samples=20, conf=0.3, seed=0, device="cuda"):
+    samples = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
+    print(f"Sampled {len(samples['img_paths'])} images from {subset.dataset_root}")
+    model.eval()
+    predictions = predict_fn(model=model, samples=samples, device=device, conf_thres=conf)
 
-    for result, image_file in zip(results, image_files):
-        annotator = Annotator(result.orig_img.copy(), line_width=2)
-        boxes = result.boxes
-        if boxes is not None:
-            for box, score, label in zip(boxes.xyxy, boxes.conf, boxes.cls):
-                if float(score) < conf_thres:
-                    continue
-                label_idx = int(label)
-                label_name = class_names[label_idx] if label_idx < len(class_names) else str(label_idx)
-                annotator.box_label(box.tolist(), label=f"{label_name} {float(score):.2f}")
-
-        output_path = output_dir / f"{Path(image_file).stem}.png"
-        Image.fromarray(annotator.result()).save(output_path)
+    annotate_images_with_predictions(
+        images=samples["images"],
+        predictions=predictions,
+        class_names=subset.class_names,
+        output_dir=output_dir,
+        image_files=samples["img_paths"],
+    )
 
 
 def plot_metrics(run_dir, output_dir=None, metrics_filename="metrics.npy"):
@@ -82,28 +140,40 @@ def plot_metrics(run_dir, output_dir=None, metrics_filename="metrics.npy"):
     if not metrics_history:
         return None
     epochs = [entry["epoch"] for entry in metrics_history]
-    metric_keys = []
-    for key, value in metrics_history[0].items():
-        if key == "epoch":
-            continue
-        if isinstance(value, (int, float, np.floating, np.integer)):
-            metric_keys.append(key)
+    flattened_history = [_flatten_metrics(entry) for entry in metrics_history]
+    grouped_metrics = _group_metrics_by_name(flattened_history)
+    metric_names = _ordered_metric_names(grouped_metrics)
+    if not metric_names:
+        return None
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    for key in metric_keys:
-        values = np.asarray([entry[key] for entry in metrics_history], dtype=np.float32)
-        max_value = float(np.max(np.abs(values))) if values.size else 0.0
-        if max_value == 0.0 or max_value <= 1.0:
-            normalized_values = values
-        else:
-            normalized_values = values / max_value
-        ax.plot(epochs, normalized_values, label=key)
+    num_cols = 2 if len(metric_names) > 1 else 1
+    num_rows = int(np.ceil(len(metric_names) / num_cols))
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(6 * num_cols, 4 * num_rows), squeeze=False)
+    axes = axes.ravel()
 
-    ax.set_title("Training Metrics")
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Normalized Value")
-    ax.grid(True, alpha=0.3)
-    ax.legend()
+    for ax, metric_name in zip(axes, metric_names):
+        splits = [split for split in ("train", "val") if split in grouped_metrics[metric_name]]
+        splits.extend(sorted(split for split in grouped_metrics[metric_name] if split not in {"train", "val"}))
+        plotted = False
+        for split in splits:
+            key = metric_name if split == metric_name else f"{split}/{metric_name}"
+            values = np.asarray([entry.get(key, np.nan) for entry in flattened_history], dtype=np.float32)
+            if np.all(np.isnan(values)):
+                continue
+            ax.plot(epochs, values, marker="o", linewidth=1.8, label=split)
+            plotted = True
+
+        ax.set_title(METRIC_DISPLAY_NAMES.get(metric_name, metric_name))
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel("Value")
+        ax.grid(True, alpha=0.3)
+        if plotted:
+            ax.legend()
+
+    for ax in axes[len(metric_names) :]:
+        ax.axis("off")
+
+    fig.suptitle("Training Metrics", y=0.995)
     fig.tight_layout()
 
     output_path = output_dir / "metrics.png"

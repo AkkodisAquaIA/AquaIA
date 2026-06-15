@@ -16,7 +16,36 @@ docker compose up --build
 - Backend API: http://localhost:8000
 - API docs: http://localhost:8000/docs
 
-## Docker commands
+## Production deployment (shared server)
+
+To deploy ADIAB on a server so the whole team can access it, run from the `aquaia-dataset-builder/` directory:
+
+```bash
+cd aquaia-dataset-builder
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+The app is then accessible at `http://<server-ip>` (port 80). No other port needs to be open.
+
+**What's different from dev:**
+
+| | Dev (`docker-compose.yml`) | Prod (`docker-compose.prod.yml`) |
+|--|--|--|
+| Entry point | Frontend :3000, API :8000 (separate ports) | Nginx :80 (single entry point) |
+| Frontend build | `next dev` (hot reload) | `next build` + `next start` (optimised) |
+| Backend | `uvicorn --reload` | `uvicorn --workers 2` (no hot reload) |
+| Storage | bind-mounted `./storage/` | same |
+
+Storage data (`storage/raw`, `storage/thumbnails`, `storage/exports`, `adiab.db`) is preserved on the server between restarts — it is never removed by `docker compose down`.
+
+To update ADIAB after a git pull, re-run:
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+---
+
+## Docker commands (dev)
 
 > Run all commands from the `aquaia-dataset-builder/` directory.
 

@@ -145,7 +145,6 @@ async def lifespan(app: FastAPI):
         settings.storage_exports,
     ]:
         path.mkdir(parents=True, exist_ok=True)
-
     logger.info("ADIAB backend ready")
     yield
     await engine.dispose()

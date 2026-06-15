@@ -27,6 +27,7 @@ dataloading/*.png
 coco128
 detection/sam/*_result_det_*/
 detection/sam/*_result_det/
+/runs
 
 #Linter
 .ruff_cache/

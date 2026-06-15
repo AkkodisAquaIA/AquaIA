@@ -2,7 +2,7 @@ from pathlib import Path
 
 from detection.utils.config_utils import find_latest_run_dir, load_infer_config, load_run_config
 from detection.dino.inference.run import test_dino
-# from detection.yolo.inference.run import test_yolo
+from detection.yolo.inference.run import test_yolo
 
 
 def test(config):
@@ -16,8 +16,8 @@ def test(config):
     model_family = str(model_config.get("family", "")).lower()
     if model_family.startswith("dino"):
         return test_dino(config)
-    # if model_family.startswith("yolo"):
-    #     return test_yolo(config)
+    if model_family.startswith("yolo"):
+        return test_yolo(config)
     raise ValueError(f"Unsupported test backend for model config: {model_config}")
 
 
