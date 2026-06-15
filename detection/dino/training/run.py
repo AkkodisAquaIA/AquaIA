@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -78,7 +79,7 @@ def build_scheduler(training_config, optimizer):
     return scheduler
 
 
-def train_dino(config):
+def train_dino(config, resume_dir=None):
     training_config = config["training"]
     output_config = config["output"]
     log_config = config.get("logging", {})
@@ -109,19 +110,24 @@ def train_dino(config):
         val_dataloader = DataLoader(val_set, batch_size=training_config["batch"], shuffle=False, num_workers=3, collate_fn=detection_collate_fn)
 
     # === Run directory ===
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(output_config.get("project", "runs"), run_id)
-    os.makedirs(run_dir, exist_ok=output_config.get("exist_ok", True))
+    if resume_dir:
+        run_dir = str(resume_dir)
+        run_id = Path(run_dir).name
+    else:
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = os.path.join(output_config.get("project", "runs"), run_id)
+    os.makedirs(run_dir, exist_ok=True)
     weights_dir = os.path.join(run_dir, "weights")
     os.makedirs(weights_dir, exist_ok=True)
 
     # === Logging & checkpointing ===
-    logger = TrainingLogger(run_dir=run_dir, run_id=run_id, config=config)
+    logger = TrainingLogger(run_dir=run_dir, run_id=run_id, config=config, resume=bool(resume_dir))
     checkpoint_mgr = CheckpointManager(
         run_dir=run_dir,
         save_period=log_config.get("save_period", 0),
     )
-    register_run(config=config, run_id=run_id, run_dir=run_dir, pid=os.getpid())
+    if not resume_dir:
+        register_run(config=config, run_id=run_id, run_dir=run_dir, pid=os.getpid())
     logger.log_device(
         device=device,
         use_amp=use_amp,
@@ -168,6 +174,34 @@ def train_dino(config):
     scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
     best_validation_loss = float("inf")
     metrics_history = []
+    start_epoch = 0
+
+    # === Load checkpoint if resuming (before compile) ===
+    if resume_dir:
+        from detection.checkpoint import load_training_state_checkpoint
+
+        last_weights = os.path.join(run_dir, "weights", "last.pt")
+        last_state = os.path.join(run_dir, "last_training_state.pt")
+
+        if os.path.exists(last_weights):
+            ckpt = torch.load(last_weights, map_location=device)
+            base_model = model._orig_mod if hasattr(model, "_orig_mod") else model
+            base_model.load_state_dict(ckpt["model_state_dict"])
+            logger.info(f"[RESUME] Loaded model weights from {last_weights}")
+
+        if os.path.exists(last_state):
+            state = load_training_state_checkpoint(last_state, device=device)
+            optimizer.load_state_dict(state["optimizer_state_dict"])
+            scaler.load_state_dict(state["scaler_state_dict"])
+            if scheduler is not None and "scheduler_state_dict" in state:
+                scheduler.load_state_dict(state["scheduler_state_dict"])
+            start_epoch = state["epoch"]
+            logger.info(f"[RESUME] Resuming from epoch {start_epoch + 1}/{training_config['epochs']}")
+
+        meta_path = Path(run_dir) / "run_meta.json"
+        if meta_path.exists():
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            best_validation_loss = float(meta.get("best_val_loss") or "inf")
 
     model.train()
     criterion.train()
@@ -176,7 +210,7 @@ def train_dino(config):
 
     # === Training loop ===
     try:
-        for epoch in range(training_config["epochs"]):
+        for epoch in range(start_epoch, training_config["epochs"]):
             metric_dict = {"train": {}, "val": {}}
             logger.info(f"========== Epoch {epoch + 1}/{training_config['epochs']} ==========")
 

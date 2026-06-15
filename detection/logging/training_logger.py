@@ -10,7 +10,7 @@ from typing import Optional
 class TrainingLogger:
     """Persistent training logger: JSONL per epoch, text log, heartbeat, run_meta.json."""
 
-    def __init__(self, run_dir: str, run_id: str, config: dict):
+    def __init__(self, run_dir: str, run_id: str, config: dict, resume: bool = False):
         self.run_dir = Path(run_dir)
         self.run_id = run_id
         self.start_time = time.time()
@@ -22,7 +22,7 @@ class TrainingLogger:
         self._heartbeat_path = self.run_dir / "heartbeat"
         self._meta_path = self.run_dir / "run_meta.json"
 
-        # Python logger with file + stream handlers
+        # Python logger — append mode so resume continues the same log file
         self._logger = logging.getLogger(f"training.{run_id}")
         self._logger.setLevel(logging.INFO)
         self._logger.propagate = False
@@ -30,37 +30,44 @@ class TrainingLogger:
             "[%(asctime)s] [%(levelname)-5s] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
-        fh = logging.FileHandler(self._log_path, encoding="utf-8")
+        fh = logging.FileHandler(self._log_path, mode="a", encoding="utf-8")
         fh.setFormatter(fmt)
         self._logger.addHandler(fh)
         sh = logging.StreamHandler()
         sh.setFormatter(fmt)
         self._logger.addHandler(sh)
 
-        # Initial run_meta
         training_cfg = config.get("training", {})
         model_cfg = config.get("model", {})
-        self._meta = {
-            "run_id": run_id,
-            "status": "running",
-            "started_at": datetime.utcnow().isoformat(),
-            "last_updated": datetime.utcnow().isoformat(),
-            "pid": os.getpid(),
-            "config": {
-                "model": f"{model_cfg.get('family', '')}_{model_cfg.get('size', '')}",
-                "epochs": training_cfg.get("epochs", 0),
-                "batch": training_cfg.get("batch", 0),
-                "lr": training_cfg.get("lr0"),
-            },
-            "best_epoch": None,
-            "best_val_loss": None,
-            "current_epoch": 0,
-            "total_epochs": training_cfg.get("epochs", 0),
-        }
+
+        if resume and self._meta_path.exists():
+            self._meta = json.loads(self._meta_path.read_text(encoding="utf-8"))
+            self._meta["status"] = "resumed"
+            self._meta["pid"] = os.getpid()
+            self._meta["last_updated"] = datetime.utcnow().isoformat()
+        else:
+            self._meta = {
+                "run_id": run_id,
+                "status": "running",
+                "started_at": datetime.utcnow().isoformat(),
+                "last_updated": datetime.utcnow().isoformat(),
+                "pid": os.getpid(),
+                "config": {
+                    "model": f"{model_cfg.get('family', '')}_{model_cfg.get('size', '')}",
+                    "epochs": training_cfg.get("epochs", 0),
+                    "batch": training_cfg.get("batch", 0),
+                    "lr": training_cfg.get("lr0"),
+                },
+                "best_epoch": None,
+                "best_val_loss": None,
+                "current_epoch": 0,
+                "total_epochs": training_cfg.get("epochs", 0),
+            }
         self._write_meta()
 
         model_str = f"{model_cfg.get('family', '')}_{model_cfg.get('size', '')} ({model_cfg.get('init', '')})"
-        self._logger.info(f"Run started — run_id={run_id} | pid={os.getpid()}")
+        action = "RESUMED" if resume else "started"
+        self._logger.info(f"Run {action} — run_id={run_id} | pid={os.getpid()}")
         self._logger.info(f"Run dir: {run_dir}")
         self._logger.info(f"Model: {model_str} | epochs={training_cfg.get('epochs')} | batch={training_cfg.get('batch')} | lr={training_cfg.get('lr0')}")
 
