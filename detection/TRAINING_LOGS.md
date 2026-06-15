@@ -285,14 +285,69 @@ Chaque étape est indépendante et testable séparément avec un petit modèle e
 
 ---
 
-## Test local prévu (avant VM)
+## Tests
 
-Modèle minimal pour valider le système sans GPU :
-- `model.family: yolo11`, `model.size: n`, `model.init: pretrained`
-- `training.epochs: 3`, `training.batch: 4`, `training.device: cpu`
-- Dataset : sous-ensemble de 20 images en local
+### En local (sans GPU, sans dataset)
 
-Critères de validation :
+Le script `detection/test_training_logs.py` simule des epochs sans torch ni dataset.
+
+```bash
+# Run normal (5 epochs complets)
+python -m detection.test_training_logs
+
+# Crash simulé à l'epoch 2
+python -m detection.test_training_logs --crash
+
+# Crash puis resume (scénario complet)
+python -m detection.test_training_logs --crash --resume
+
+# Avec affichage du registre
+python -m detection.test_training_logs --crash --resume --list
+```
+
+Résultat attendu après `--crash --resume` :
+
+| Fichier | Contenu attendu |
+|---------|----------------|
+| `train.jsonl` | 5 lignes — epoch 1 (avant crash) + epochs 2-5 (après resume) |
+| `train.log` | Log continu sans rupture visible, ~30 lignes |
+| `run_meta.json` | `status: done`, `current_epoch: 5` |
+| `heartbeat` | `epoch=5 batch=10/10` |
+
+### Sur la VM (Tesla T4, entraînement réel)
+
+```bash
+# Connexion
+ssh -i /path/to/key.pem user@vm-ip
+
+# Lancer dans tmux pour survivre à la déconnexion SSH
+tmux new -s training
+python main.py train --config detection/train_config.yaml
+
+# Détacher (le process continue même si SSH se ferme)
+Ctrl+B, D
+
+# Suivre les métriques en temps réel depuis un autre terminal
+tail -f runs/<run_id>/train.jsonl
+
+# Vérifier que le process est vivant (timestamp récent = OK)
+cat runs/<run_id>/heartbeat
+
+# Lister tous les runs
+python -m detection.list_runs
+
+# Se reconnecter à la session tmux
+tmux attach -t training
+```
+
+En cas de crash, reprendre depuis le dernier checkpoint :
+
+```bash
+python main.py train --config detection/train_config.yaml --resume runs/<run_id>
+```
+
+### Critères de validation
+
 - [x] `train.jsonl` contient une ligne par epoch après crash simulé (Ctrl+C)
 - [x] `train.log` lisible et complet
 - [x] `heartbeat` mis à jour pendant l'entraînement
@@ -300,3 +355,14 @@ Critères de validation :
 - [x] `last.pt` sauvegardé toutes les `save_period` epochs, pas seulement en fin
 - [x] `list_runs.py` affiche le run avec le bon statut
 - [x] Reprise depuis `--resume` repart de l'epoch sauvegardée
+
+---
+
+## Notes opérationnelles
+
+### Checkpoint bloquant
+
+`torch.save()` est synchrone — la boucle d'entraînement est en pause pendant la sauvegarde.
+Pour DINO sur T4 avec `save_period: 5`, l'impact est de 1-3 secondes toutes les 5 epochs,
+négligeable face à la durée d'une epoch. Si ça devient un goulot, la solution est de déléguer
+le `torch.save` à un thread avec clonage des tenseurs au préalable.
