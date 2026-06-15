@@ -22,10 +22,11 @@ class TrainingLogger:
         self._heartbeat_path = self.run_dir / "heartbeat"
         self._meta_path = self.run_dir / "run_meta.json"
 
-        # Python logger — append mode so resume continues the same log file
+        # Python logger — clear any handlers from a previous run with the same run_id
         self._logger = logging.getLogger(f"training.{run_id}")
         self._logger.setLevel(logging.INFO)
         self._logger.propagate = False
+        self._logger.handlers.clear()
         fmt = logging.Formatter(
             "[%(asctime)s] [%(levelname)-5s] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",

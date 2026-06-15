@@ -2,17 +2,19 @@
 Test script for the training logs system — no GPU, no dataset, no torch required.
 
 Usage:
-    python -m detection.test_training_logs          # full run (5 epochs)
-    python -m detection.test_training_logs --crash  # Ctrl+C after epoch 2 to test interrupt
-    python -m detection.test_training_logs --list   # show registry after a run
+    python -m detection.test_training_logs                    # full run (5 epochs)
+    python -m detection.test_training_logs --crash            # Ctrl+C at epoch 2
+    python -m detection.test_training_logs --crash --resume   # crash then resume from epoch 2
+    python -m detection.test_training_logs --list             # show registry after a run
 
 What is tested:
     - train.jsonl  : one line per epoch, flushed immediately
     - train.log    : human-readable log file
     - heartbeat    : updated every 2 batches (simulated)
-    - run_meta.json: status = running → done / interrupted / error
+    - run_meta.json: status = running → done / interrupted / error / resumed
     - registry     : one entry added per run
     - list_runs    : display of the registry
+    - --resume     : logger appends to existing files, meta status = "resumed"
 """
 
 import argparse
@@ -30,7 +32,7 @@ def _fake_loss(epoch: int, split: str) -> float:
     return round(base * math.exp(-0.3 * epoch) + random.uniform(-0.05, 0.05), 4)
 
 
-def run_test(crash_at=None, use_tmp: bool = False) -> pathlib.Path:
+def run_test(crash_at=None, resume_dir=None, use_tmp: bool = False) -> pathlib.Path:
     from detection.logging import TrainingLogger, register_run, update_run_status
 
     config = {
@@ -44,15 +46,31 @@ def run_test(crash_at=None, use_tmp: bool = False) -> pathlib.Path:
         "data": {"dataset_yaml": "datasets/test_dataset"},
     }
 
-    run_dir = pathlib.Path("runs") / time.strftime("%Y%m%d_%H%M%S_test")
-    if use_tmp:
-        run_dir = pathlib.Path(tempfile.mkdtemp())
-    run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "weights").mkdir(exist_ok=True)
+    if resume_dir:
+        run_dir = pathlib.Path(resume_dir)
+        run_id = run_dir.name
+        resume = True
+    else:
+        run_dir = pathlib.Path("runs") / time.strftime("%Y%m%d_%H%M%S_test")
+        if use_tmp:
+            run_dir = pathlib.Path(tempfile.mkdtemp())
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "weights").mkdir(exist_ok=True)
+        run_id = run_dir.name
+        resume = False
 
-    run_id = run_dir.name
-    logger = TrainingLogger(run_dir=str(run_dir), run_id=run_id, config=config)
-    register_run(config=config, run_id=run_id, run_dir=str(run_dir), pid=__import__("os").getpid())
+    logger = TrainingLogger(run_dir=str(run_dir), run_id=run_id, config=config, resume=resume)
+    if not resume:
+        register_run(config=config, run_id=run_id, run_dir=str(run_dir), pid=__import__("os").getpid())
+
+    # Determine start epoch from meta (simulates what train_dino does with last_training_state.pt)
+    start_epoch = 1
+    if resume:
+        meta_path = run_dir / "run_meta.json"
+        if meta_path.exists():
+            meta = json.loads(meta_path.read_text())
+            start_epoch = meta.get("current_epoch", 0) + 1
+            print(f"\n[TEST] Resuming from epoch {start_epoch}/{config['training']['epochs']}")
 
     logger.log_device("cpu", False, "test_dataset (train=100 val=20)")
     logger.info("Starting simulated training loop (no real model)")
@@ -60,7 +78,7 @@ def run_test(crash_at=None, use_tmp: bool = False) -> pathlib.Path:
     best_val = float("inf")
 
     try:
-        for epoch in range(1, config["training"]["epochs"] + 1):
+        for epoch in range(start_epoch, config["training"]["epochs"] + 1):
             logger.info(f"========== Epoch {epoch}/{config['training']['epochs']} ==========")
 
             # Simulate batches
@@ -160,12 +178,20 @@ def verify(run_dir: pathlib.Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--crash", action="store_true", help="Simulate Ctrl+C at epoch 2")
+    parser.add_argument("--resume", action="store_true", help="After --crash, resume from the interrupted run")
     parser.add_argument("--list", action="store_true", help="Show run registry after test")
     args = parser.parse_args()
 
     crash_at = 2 if args.crash else None
     run_dir = run_test(crash_at=crash_at)
     verify(run_dir)
+
+    if args.resume:
+        print(f"\n{'=' * 60}")
+        print("RESUMING from interrupted run...")
+        print("=" * 60)
+        resumed_dir = run_test(resume_dir=run_dir)
+        verify(resumed_dir)
 
     if args.list:
         print("\n--- Registry (python -m detection.list_runs) ---")
