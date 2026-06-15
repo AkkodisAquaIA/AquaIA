@@ -7,6 +7,7 @@ from collections import  defaultdict
 from tqdm import tqdm
 
 from tools import utility as util
+from tools import rapport as rp
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 from config import constants as ct
@@ -60,9 +61,11 @@ def round_coords(x, y, w, h, decimals=4):
 #-----------------------------------------------------------------------------------
 display = dc.DisplayColor()
 
-def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
+def validate_yolo_dataset_detailed(DATASET_DIR, path_user, rapport, cfg):
 
+    print()
     display.print("Début de l'analyse", colors['info'])
+    display.print(" Analyse de la conformité", colors['info'])
 
     try:
         images_dir, labels_dir = util.get_dataset_paths(DATASET_DIR)
@@ -79,10 +82,12 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
     label_stems = set()
     all_bboxes = []
 
+    rp.suivi("Analyse conformité", rapport, "D")
+
     #====================================================================================================
     # Analyse des fichiers 'labels'
     for entry in tqdm(list(os.scandir(labels_dir)), # type: ignore 
-                    desc=" Labels",
+                    desc=" - Labels",
                     unit=" fichier",
                     ncols=100,
                     position=0): 
@@ -259,7 +264,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
     
     for p in tqdm(
             image_paths,
-            desc=" Images",
+            desc=" - Images",
             unit=" image",
             ncols=100,
             position=0):
@@ -299,6 +304,9 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, cfg):
                 f"{key}.txt",
                 key.replace("_", " ").capitalize()
             )
+    
+    rp.suivi("Analyse conformité", rapport)
+    
     #
     # all_bboxes : liste avec toutes les Bboxes
     # rapport_detail    : collections.defaultdict

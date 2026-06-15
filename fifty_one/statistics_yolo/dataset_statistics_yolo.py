@@ -2,7 +2,9 @@
 from tools import system as syst
 import re
 import numpy as np
+from tqdm import tqdm
 from pathlib import Path
+from datetime import datetime
 from collections import Counter, defaultdict
 from collections import defaultdict
 
@@ -11,10 +13,10 @@ import statistics_yolo.info_general as ige
 import statistics_yolo.info_classe as icl
 import statistics_yolo.info_img_classe as iic
 import statistics_yolo.anomalies as ano
-# import statistics_yolo.creation_rapport as cr
 
 import tools.display_color as dc
 from tools import utility as util
+from tools import rapport as rp
 from tools import menu as menu
 from config import constants as ct
 from config.constants import DISPLAY_COLORS as colors
@@ -33,7 +35,10 @@ def compute_stats(values):
         "max": float(np.max(arr))
     }
 
-def dataset_statistics_yolo(DATASET_DIR, cfg):
+def dataset_statistics_yolo(DATASET_DIR, rapport, cfg):
+
+    display = dc.DisplayColor()
+    display.print(" Analyse statistique", colors['info'])
 
     images_dir, labels_dir = util.get_dataset_paths(DATASET_DIR)
 
@@ -50,8 +55,20 @@ def dataset_statistics_yolo(DATASET_DIR, cfg):
 
     total_boxes = 0
 
+
+
+    rp.suivi("Analyse statistique", rapport, "D")
+
     # --- lecture labels ---
-    for label_file in labels_dir.glob("*.txt"):
+    label_files = labels_dir.glob("*.txt")
+    for label_file in tqdm(
+        label_files,
+        total=len(list(labels_dir.glob("*.txt"))),
+        desc=" - Labels",
+        unit=" fichier",
+        ncols=100,
+        position=0
+    ):
 
         image_name = label_file.with_suffix(".jpg").name
 
@@ -90,10 +107,10 @@ def dataset_statistics_yolo(DATASET_DIR, cfg):
 
 
     image_count = len([
-        f for f in Path(images_dir).rglob("*.*")
+        f for f in Path(images_dir).glob("*.*")
         if f.suffix.lower() in ct.IMAGE_EXT
         ])
-    label_count = len(list(Path(labels_dir).rglob("*.txt")))
+    label_count = len(list(Path(labels_dir).glob("*.txt")))
 
 
     # --- statistiques générales ---
@@ -110,13 +127,22 @@ def dataset_statistics_yolo(DATASET_DIR, cfg):
     anomalies = []
 
     # --- détection anomalies bbox ---
-    for img_name, x, y, w, h in zip(
-        image_paths,
-        bbox_centers_x,
-        bbox_centers_y,
-        bbox_widths,
-        bbox_heights
-    ):
+
+    for img_name, x, y, w, h in tqdm(
+        zip(
+            image_paths,
+            bbox_centers_x,
+            bbox_centers_y,
+            bbox_widths,
+            bbox_heights
+        ),
+        desc=" - Images",
+        unit=" image",
+        ncols=100,
+        total=len(image_paths),  # indispensable
+        position=0
+        ):
+
 
         area = w * h
 
@@ -212,6 +238,9 @@ def dataset_statistics_yolo(DATASET_DIR, cfg):
                 "image": img_name
             })
 
+    rp.suivi("Analyse statistique", rapport)
+
+
     return {
 
         "stats": stats,
@@ -249,7 +278,7 @@ def generer_rapport(resultats, fichier):
 
 #==========================================================================================================
 
-def afficher_dataset_statistics(resultats, cfg, path_user, rapport, class_names=None):
+def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None):
 
     display = dc.DisplayColor()
 
@@ -263,8 +292,12 @@ def afficher_dataset_statistics(resultats, cfg, path_user, rapport, class_names=
     # total = sum(class_distribution.values())
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
+
+
+
+
     print()
-    display.print(f"Analyse terminé {"avec" if anomalies else "sans"} problème",
+    display.print(f"Analyse terminé {'avec' if anomalies else 'sans'} problème",
                   colors["warning" if anomalies else "ok"]
                   )
 
@@ -354,7 +387,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, rapport, class_names=
 
         elif choice == 7:
             # --- Sortie ------------------------------------------------------------------
-            if util.answer_yes_or_no("Voulez-vous sdortir", True):
+            if util.answer_yes_or_no("Voulez-vous sortir", True):
                 break
 
     return anomalies
@@ -362,7 +395,7 @@ def afficher_dataset_statistics(resultats, cfg, path_user, rapport, class_names=
     #====================================================================================
     #====================================================================================
 
-def file_dataset_statistics(resultats, cfg, path_user, rapport, class_names=None):
+def file_dataset_statistics(resultats, cfg, path_user, class_names=None):
 
     display = dc.DisplayColor()
 
@@ -410,6 +443,5 @@ def file_dataset_statistics(resultats, cfg, path_user, rapport, class_names=None
 
     print("\n")
     display.print("Fin du Rapport", colors['titre'])
-    print("\n")
 
     return 

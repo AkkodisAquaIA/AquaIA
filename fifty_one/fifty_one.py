@@ -28,60 +28,17 @@ from config.constants import DISPLAY_COLORS as colors
 
 from tools import utility as util
 import tools.display_color as dc
+from tools import rapport as rp
 from tools import graphe as gr
 from tools import logo_win as lw
 from tools import logo_linux as ll
 
-ansi_escape = re.compile(
-    r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
-)
+# ansi_escape = re.compile(
+#     r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
+# )
 
 
-#==========================================================================================
-
-def create_file_report(DATASET_DIR, path_save, cfg):
-
-    display = dc.DisplayColor()
-
-    liste_nom = DATASET_DIR.name
-    new_name = util.horodatage(liste_nom)+'.txt'
-    rapport: Path = path_save / new_name 
-    timestamp = datetime.now().strftime("%Y-%m-%d à %H:%M") 
-   
-    try:
-        with open(rapport, "w", encoding="utf-8") as f:
-            f.write(ct.INFO_PROD)
-            f.write("—" * 120)
-            f.write(f"\n - Nom du Dataset : *** {liste_nom} ***")
-            f.write(f"\n - créé le {timestamp}\n")
-            f.write("\n")
-            f.write(f" - Répertoire de sauvegarde : {path_save}")
-            if not cfg["REPORT_MODE"] :
-                f.write("\n  - Pas de sauvegarde des fichiers de défauts")
-            if not cfg["SAVE_PLOT"] :
-                f.write("\n  - Pas de sauvegarde des graphiques")
-            f.write("\n\n")
-            f.write("—" * 120)
-            f.write("\n\n")
-            
-    except FileNotFoundError:
-            display.print(f"Impossible de sauvegarder : {rapport}", colors['error'])
-
-    display.print(f"Fichier de Rapport : '{new_name}' create ", colors["ok"])
-
-    return rapport
-    
-def ecrire_sortie_dans_rapport(rapport, fonction, *args, **kwargs):
-    buffer = StringIO()
-
-    with redirect_stdout(buffer):
-        fonction(*args, **kwargs)
-
-    contenu = buffer.getvalue()
-    contenu = ansi_escape.sub('', contenu)
-
-    with open(rapport, "a", encoding="utf-8") as f:
-        f.write(contenu)
+#========================================================================================
 
 
 def load_class_names(dataset_yaml_path):
@@ -101,7 +58,7 @@ def load_class_names(dataset_yaml_path):
 def statistique(DATASET_DIR, cfg, class_names, path_save, rapport):
 
      # ================= STATISTICS =================
-    results = ds.dataset_statistics_yolo(DATASET_DIR, cfg)
+    results = ds.dataset_statistics_yolo(DATASET_DIR, rapport, cfg)
 
     seuils = util.calibrer_seuils_overflow(
         results,
@@ -120,15 +77,14 @@ def statistique(DATASET_DIR, cfg, class_names, path_save, rapport):
     if outside_ratios :
         gr.bbox_overflow(cfg, outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR) 
 
-    resultat = ds.afficher_dataset_statistics(results, cfg, path_save, rapport,  class_names)
+    resultat = ds.afficher_dataset_statistics(results, cfg, path_save, class_names)
 
-    ecrire_sortie_dans_rapport(
+    rp.ecrire_sortie_dans_rapport(
         rapport,
         ds.file_dataset_statistics,
         results,
         cfg,
         path_save,
-        rapport,
         class_names
     )
 
@@ -278,14 +234,14 @@ def deplac_prob(DATASET_DIR, path_save,type_dep):
         display.print(f"Des {nom} ont été trouvé !", colors["warning"])
         if util.answer_yes_or_no(f"Voulez-vous déplacer ces {type_d}") :
 
-            backup_dir = DATASET_DIR / type_d / "backup"       # DATASET_DIR / "labels/backup"  
+            backup_dir = DATASET_DIR / type_d / "problems" 
             backup_dir.mkdir(exist_ok=True)
 
             with open(type_dep, "r", encoding="utf-8") as f:
                 names = [line.strip() for line in f if line.strip()]
 
             for name in names:
-                source_file = DATASET_DIR / type_d / "train2017" / f"{name}{ext}"  # DATASET_DIR / "labels/train2017" / f"{name}.txt"
+                source_file = DATASET_DIR / type_d / "train2017" / f"{name}{ext}" 
                 
                 if source_file.exists():
                     destination = backup_dir / source_file.name
@@ -338,22 +294,28 @@ def main():
         util.sortie_de_programme()
         return
     
-    
     print()
     vc.controle(cfg) # type: ignore
     print()
 
     
     # Contrôle répertoire de sauvegarde
-    path_save: Path = Path(cfg["SAVE_USER"]) 
+    path_save = Path(cfg["SAVE_USER"])
+
     if not path_save.exists():
         path_save = Path.cwd() / "Report"
-        path_save.mkdir(parents=True, exist_ok=True)  
-        tag_gen = "Création du répertoire de sauvegarde 'Report'"
-        display.print(f"Chemin de sauvegadre invalide : {tag_gen}{ct.BELL}", colors["error"])
-        display.print(f"Chemin de sauvegadre : {path_save}", colors["warning"])
-    else: 
-        display.print(f"Chemin de sauvegadre : {path_save}", colors["ok"])
+        path_save.mkdir(parents=True, exist_ok=True)
+
+        display.print(
+            f"Chemin de sauvegarde invalide : création du répertoire 'Report'{ct.BELL}",
+            colors["error"]
+        )
+        color = colors["warning"]
+    else:
+        color = colors["ok"]
+
+    display.print(f"Chemin de sauvegarde : {path_save}", color)
+
 
     print()
     # Report mode handling
@@ -371,9 +333,7 @@ def main():
     else :
         DATASET_DIR = util.get_path_color("Entrée le chemin du dataset")
 
-    # Création d'un fichier de rapport
-    rapport = create_file_report(DATASET_DIR, path_save, cfg)
-
+    
 
     #  ------------------------------------------------------------------------------------------
     display.print("Démarrage du traitement", colors['titre'])
@@ -416,6 +376,11 @@ def main():
     print()
     dataset_yaml =  DATASET_DIR / dataset_yaml_
 
+
+    # Création d'un fichier de rapport
+    rapport = rp.create_file_report(DATASET_DIR, path_save, nom, cfg)
+
+
     try:
         class_names = load_class_names(dataset_yaml)
     except Exception as e:
@@ -424,7 +389,7 @@ def main():
 
     ctrl_ok = False
     # validation des labels avant création du dataset FiftyOne
-    erreur, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_save, cfg)
+    erreur, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_save, rapport, cfg)
  
     # Affichage des erreurs détectées
     if not ctrl_ok:
@@ -447,7 +412,7 @@ def main():
         util.afficher_bbox_erreurs_compact(erreur)
         display.print("—" * 80, colors['error'])
 
-        ecrire_sortie_dans_rapport(
+        rp.ecrire_sortie_dans_rapport(
             rapport,
             util.afficher_bbox_erreurs_compact,
             erreur
@@ -467,7 +432,7 @@ def main():
     # Si aucune erreur détectée, continuer l'analyse du dataset et création du dataset FiftyOne
     else:    
         print()
-        display.print("Aucune erreur détectée. Analyse du Dataset...\n", colors['ok'])
+        display.print("Aucune erreur détectée. Poursuite de l'analyse...\n", colors['ok'])
 
         def_image = statistique(DATASET_DIR, cfg, class_names, path_save, rapport) # type: ignore
 
@@ -479,23 +444,25 @@ def main():
         if not def_image:
             display.print("Dataset Ok ", colors['ok'])
 
-            display.print("Création du dataset pour FiftyOne", colors['titre'])
-            dataset = create_dataset(DATASET_DIR, yaml_path= dataset_yaml)
+            # TODO
+            # display.print("Création du dataset pour FiftyOne", colors['titre'])
+            # dataset = create_dataset(DATASET_DIR, yaml_path= dataset_yaml)
 
-            print()
-            lauch_fifty = util.answer_yes_or_no("Voulez-vous lancer Fifty_one") 
+            # print()
+            # lauch_fifty = util.answer_yes_or_no("Voulez-vous lancer Fifty_one") 
     
-        else:
+        # else:
 
-            display.print("Dataset non valide ", colors['warning'])
-            display.print("Création d'un dataset d'anomalies pour FiftyOne et lancement de celui-ci", colors['titre'])
-            dataset = create_dataset(DATASET_DIR,anomalies=def_image)
-            print()
+            # TODO
+            # display.print("Dataset non valide ", colors['warning'])
+            # display.print("Création d'un dataset d'anomalies pour FiftyOne et lancement de celui-ci", colors['titre'])
+            # dataset = create_dataset(DATASET_DIR,anomalies=def_image)
+            # print()
 
-
-        # Lancement de l'interface FiftyOne
-        if def_image or lauch_fifty :
-            util.launch_fiftyone_interface(dataset) # type: ignore
+        # TODO
+        # # Lancement de l'interface FiftyOne
+        # if def_image or lauch_fifty :
+        #     util.launch_fiftyone_interface(dataset) # type: ignore
 
         
     print()
