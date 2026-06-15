@@ -11,13 +11,17 @@ from transformers import get_scheduler
 from dataloading.datasets import JpgDALIDataset, DALIDetectionDataLoader, JpgDetectionDataset, parse_batch, detection_collate_fn
 from detection.dino.dino_detector import DINODetector
 from detection.dino.loss import SetCriterion
-from detection.metric import compute_metrics, log_epoch, print_metrics, update_log_dict
+from detection.metric import compute_metrics, print_metrics, update_metric_dict
 from detection.dino.utils.matcher import HungarianMatcher
 from detection.checkpoint import save_model_checkpoint, save_training_state_checkpoint
 from detection.utils.config_utils import save_resolved_config
 from detection.utils.plot_utils import plot_metrics, save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
 from detection.utils.import_utils import DALI_AVAILABLE
+
+# TODO :
+# - Add training state freq to tradeoff training speed for robustness
+# - Offload logging and checkpointing to a remote process
 
 
 def get_datasets(
@@ -101,10 +105,10 @@ def train_dino(config):
 
     # === Setup dataloaders ===
     if DALI_AVAILABLE:
-        dataloader = DALIDetectionDataLoader(train_set, device="gpu")
+        train_dataloader = DALIDetectionDataLoader(train_set, device="gpu")
         val_dataloader = DALIDetectionDataLoader(val_set, device="gpu")
     else:
-        dataloader = DataLoader(train_set, batch_size=training_config["batch"], shuffle=True, num_workers=3, pin_memory=True, collate_fn=detection_collate_fn)
+        train_dataloader = DataLoader(train_set, batch_size=training_config["batch"], shuffle=True, num_workers=3, pin_memory=True, collate_fn=detection_collate_fn)
         val_dataloader = DataLoader(val_set, batch_size=training_config["batch"], shuffle=False, num_workers=3, collate_fn=detection_collate_fn)
 
     # === Config, save path and fun ===
@@ -153,8 +157,7 @@ def train_dino(config):
     scheduler = build_scheduler(training_config, optimizer)
 
     scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
-    best_metric = 0.0
-    best_metric_dict = None
+    best_validation_loss = float("inf")
     metrics_history = []
 
     model.train()
@@ -163,62 +166,71 @@ def train_dino(config):
         model = torch.compile(model)
 
     for epoch in range(training_config["epochs"]):
-        epoch_loss = 0.0
-        log_dict = {"avg": 0.0}
-        progress = tqdm.tqdm(dataloader, desc=f"Epoch {epoch + 1}/{training_config['epochs']}")
-        for batch in progress:
-            targets = train_set.get_targets(batch)
-            images, _ = parse_batch(batch)
+        metric_dict = {"train": {}, "val": {}}
+        print(f"========== Epoch {epoch + 1}/{training_config['epochs']} ==========")
+        for loader in [train_dataloader, val_dataloader]:
+            split = loader.dataset.data_split
+            training = split == "train"
 
-            # We have to move tensors to GPU manually when not using DALI
-            if not DALI_AVAILABLE:
-                images = images.to(device, non_blocking=True)
+            epoch_loss = 0.0
+            metric_dict[split]["loss"] = 0.0
+            progress = tqdm.tqdm(loader, desc="- Training   " if training else "- Validation ", unit="batch")
 
-            optimizer.zero_grad(set_to_none=True)
-            with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
-                outputs = model(images)
-                loss_dict = criterion(outputs, targets)
-            total_loss = sum(loss_dict[key] * loss_weight_dict[key] for key in loss_dict if key in loss_weight_dict)
-            scaler.scale(total_loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            if not training:
+                model.eval()
+            else:
+                model.train()
+            # Disable grad computation for validation set
+            with torch.set_grad_enabled(training):
+                for batch in progress:
+                    targets = loader.dataset.get_targets(batch)
+                    images, _ = parse_batch(batch)
 
-            epoch_loss += float(total_loss.item())
-            progress.set_postfix(loss=float(total_loss.item()))
-            update_log_dict(log_dict, loss_dict, epoch_loss)
+                    # We have to move tensors to GPU manually when not using DALI
+                    if not DALI_AVAILABLE:
+                        images = images.to(device, non_blocking=True)
 
-        epoch_metrics = log_epoch(log_dict, max(len(dataloader), 1))
+                    with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
+                        outputs = model(images)
+                        loss_dict = criterion(outputs, targets)
+                    total_loss = sum(loss_dict[key] * loss_weight_dict[key] for key in loss_dict if key in loss_weight_dict)
 
-        # Add map50 and mAP50-95 evaluation at the end of each epoch (train and eval datasets)
-        model.eval()
-        metrics = compute_metrics(
-            model=model,
-            dataloaders=[dataloader, val_dataloader],
-            predict_fn=predict,
-            device=device,
-            conf_thresh=training_config.get("conf_thresh", 0.05),
-        )
-        model.train()
-        epoch_metrics.update(metrics)
-        epoch_metrics["epoch"] = epoch + 1
-        print_metrics(epoch_metrics)
-        metrics_history.append(epoch_metrics)
+                    if training:
+                        optimizer.zero_grad(set_to_none=True)
+                        scaler.scale(total_loss).backward()
+                        scaler.step(optimizer)
+                        scaler.update()
 
-        if best_metric <= epoch_metrics["val_map_50_95"] or best_metric_dict is None:
-            best_metric = epoch_metrics["val_map_50_95"]
-            best_metric_dict = epoch_metrics.copy()
+                    batch_loss = float(total_loss.item())
+                    epoch_loss += batch_loss
+                    progress.set_postfix(
+                        **{key: f"{float(value.item()):.4f}" for key, value in loss_dict.items() if key in loss_weight_dict},
+                    )
+                    update_metric_dict(metric_dict, loss_dict, batch_loss, loader.dataset.data_split, progress.total)
+
+                if training and scheduler is not None:
+                    scheduler.step()
+
+        metric_dict["epoch"] = epoch + 1
+        metrics_history.append(metric_dict)
+        print_metrics(metric_dict)
+
+        validation_loss = metric_dict["val"]["loss"]
+        if validation_loss <= best_validation_loss:
+            print(f"New best model found at epoch {epoch + 1} with loss: {validation_loss:.4f}")
+            best_validation_loss = validation_loss
             # save best model
             save_model_checkpoint(
                 path=os.path.join(weights_dir, "best.pt"),
                 model=model,
             )
-            print(f"New best model found at epoch {epoch + 1} with mAP50-95: {best_metric:.4f}")
 
-        if scheduler is not None:
-            scheduler.step()
+    # === Training ended ===
 
+    # /!\ ---- TODO : should be inside the training loop and remote
     # save last model
     save_model_checkpoint(path=os.path.join(weights_dir, "last.pt"), model=model)
+
     # Save training state (optimizer, scaler and scheduler states) for potential resuming
     save_training_state_checkpoint(
         path=os.path.join(run_dir, "last_training_state.pt"),
@@ -227,13 +239,11 @@ def train_dino(config):
         scaler_state_dict=scaler.state_dict(),
         scheduler_state_dict=scheduler.state_dict() if scheduler is not None else None,
     )
+    # ----
 
     # Save and plot metrics
     np.save(os.path.join(run_dir, "metrics.npy"), metrics_history, allow_pickle=True)
     plot_metrics(run_dir)
-
-    # Save best metrics
-    np.save(os.path.join(run_dir, "best_metric.npy"), best_metric_dict, allow_pickle=True)
 
     save_resolved_config(
         path=os.path.join(run_dir, "resolved_config.yaml"),
@@ -245,12 +255,26 @@ def train_dino(config):
 
     # === Save some sampled predictions with the best model ===
     best_checkpoint = torch.load(os.path.join(weights_dir, "best.pt"), map_location=device)
-    target_model = model._orig_mod if hasattr(model, "_orig_mod") else model
-    target_model.load_state_dict(best_checkpoint["model_state_dict"])
+    best_model = model._orig_mod if hasattr(model, "_orig_mod") else model
+    best_model.load_state_dict(best_checkpoint["model_state_dict"])
+
+    # Add map50 and mAP50-95 evaluation at the end of training (train and eval datasets)
+    best_model.eval()
+    metrics = compute_metrics(
+        model=best_model,
+        dataloaders=[train_dataloader, val_dataloader],
+        predict_fn=predict,
+        device=device,
+        conf_thresh=training_config.get("conf_thresh", 0.05),
+    )
+    print(metrics)
+
+    # Save best metrics
+    np.save(os.path.join(run_dir, "best_metric.npy"), metrics, allow_pickle=True)
 
     # Eval dataset
     save_sample_predictions(
-        model=model,
+        model=best_model,
         subset=val_set,
         predict_fn=predict,
         output_dir=Path(run_dir) / "eval_predictions",
@@ -260,7 +284,7 @@ def train_dino(config):
     )
     # Train dataset
     save_sample_predictions(
-        model=model,
+        model=best_model,
         subset=train_set,
         predict_fn=predict,
         output_dir=Path(run_dir) / "train_predictions",
@@ -269,4 +293,4 @@ def train_dino(config):
         device=device,
     )
 
-    return model
+    return best_model

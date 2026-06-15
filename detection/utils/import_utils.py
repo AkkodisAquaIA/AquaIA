@@ -1,7 +1,7 @@
 import torch
 
 try:
-    import nvidia.dalia as dali
+    import nvidia.dali as dali
     import nvidia.dali.experimental.dynamic as ndd  # noqa: F401
     from nvidia.dali.plugin.pytorch import DALIRaggedIterator, LastBatchPolicy  # noqa: F401
 
