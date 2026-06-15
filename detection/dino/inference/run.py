@@ -53,11 +53,11 @@ def test_dino(config):
         device=device,
     )
     imgsz = normalize_imgsz(config, "inference")
-
+    data_split = data_cfg.get("split", "test")
     if DALI_AVAILABLE:
         test_dataset = JpgDALIDataset(
             dataset_root=test_data_root,
-            data_split="test",
+            data_split=data_split,
             img_size=imgsz,
             batch_size=inference_config["batch"],
             device=device,
@@ -66,7 +66,7 @@ def test_dino(config):
     else:
         test_dataset = JpgDetectionDataset(
             dataset_root=test_data_root,
-            data_split="test",
+            data_split=data_split,
             img_size=imgsz,
             device=device,
         )
@@ -88,6 +88,7 @@ def test_dino(config):
         conf_thresh=inference_config.get("conf", 0.3),
         device=device,
     )
+    print(metrics)
     save_metrics(metrics, output_dir)
 
     return output_dir

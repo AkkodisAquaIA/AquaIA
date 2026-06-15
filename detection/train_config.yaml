@@ -11,7 +11,7 @@ model:
 # ----------------------------------------------------------------------
 data:
   # Dataset path consumed by the DINO trainer.
-  dataset_yaml: "datasets/coco128"
+  dataset_yaml: "datasets/coco_custom"
   # Image loader used by the DINO trainer. Use "npy" to keep the legacy path.
   loader: "jpg"
 
@@ -41,7 +41,7 @@ training:
   workers: 0
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 10
+  epochs: 2
   warmup_ratio: 0.05
 
   # ---------- OPTIMIZER & LR ----------

@@ -1,10 +1,10 @@
 import os
 
 
-# TODO : temporaire, DINOv3 sera téléchargé depuis le sharepoint idéalement
-ROOT_DIR = os.path.expanduser("~/.cache/torch/hub")
-DINOV2_LOCAL_REPO = os.path.join(ROOT_DIR, "facebookresearch_dinov2_main")
-DINOV3_LOCAL_REPO = os.path.join(ROOT_DIR, "facebookresearch_dinov3_main")
+default_dir = os.path.expanduser("~/.cache")
+ROOT_DIR = os.environ.get("AQUAIA_MODEL_ROOT_DIR", default_dir)
+DINOV2_LOCAL_REPO = os.path.join(ROOT_DIR + "/torch/hub", "facebookresearch_dinov2_main")
+DINOV3_LOCAL_REPO = os.path.join(ROOT_DIR + "/torch/hub", "facebookresearch_dinov3_main")
 
 DINO_ID_MAPPING = {
     "dinov2_small": {
@@ -37,4 +37,8 @@ DINO_ID_MAPPING = {
 def resolve_backbone_id(backbone_id):
     if backbone_id not in DINO_ID_MAPPING:
         raise ValueError(f"Backbone id {backbone_id} not found in mapping")
-    return DINO_ID_MAPPING[backbone_id]
+    dino_backbone_info = DINO_ID_MAPPING[backbone_id]
+    local_repo = dino_backbone_info["repo_or_dir"]
+    if not os.path.exists(local_repo):
+        raise ValueError(f"Le dossier contenant les modèles DINO n'existe pas : {local_repo}.")
+    return dino_backbone_info

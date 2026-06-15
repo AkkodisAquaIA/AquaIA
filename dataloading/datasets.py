@@ -136,7 +136,7 @@ class BaseDetectionDataset:
     def load_targets(self) -> None:
         self.target_files = self.get_sorted_target_files()
         if not self.target_files:
-            raise FileNotFoundError(f"No label files found under {self.dataset_root / 'labels'}")
+            raise FileNotFoundError(f"No label files found under {self.dataset_root / 'labels' / self.data_split}")
         self.targets = [self.read_target(path) for path in self.target_files]
 
     def get_targets(self, batch) -> List[dict]:

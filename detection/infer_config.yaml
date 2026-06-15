@@ -5,9 +5,9 @@ run:
   run_dir: null
 
 data:
-  test_data_root: "datasets/coco128"
+  test_data_root: "datasets/coco_custom"
   loader: "jpg"
-  split: "test"
+  split: "train"
 
 inference:
   batch: 8
