@@ -22,30 +22,15 @@ DINO_ID_MAPPING = {
         "model": "dinov2_vitl14_reg",
         "source": "local",
     },
-    "dinov3_small": {
-        "repo_or_dir": DINOV3_LOCAL_REPO,
-        "model": "dinov3_vits16",
-        "source": "local",
-        "weights": os.path.join(ROOT_DIR, "torch/hub/checkpoints/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"),
-    },
+    "dinov3_small": {"repo_or_dir": DINOV3_LOCAL_REPO, "model": "dinov3_vits16", "source": "local", "weights": os.path.join(ROOT_DIR, "checkpoints/dinov3_vits16_pretrain_lvd1689m-08c60483.pth")},
     "dinov3_plus": {
         "repo_or_dir": DINOV3_LOCAL_REPO,
         "model": "dinov3_vits16plus",
         "source": "local",
-        "weights": os.path.join(ROOT_DIR, "torch/hub/checkpoints/dinov3_vits16plus_pretrain_lvd1689m-4057cbaa.pth"),
+        "weights": os.path.join(ROOT_DIR, "checkpoints/dinov3_vits16plus_pretrain_lvd1689m-4057cbaa.pth"),
     },
-    "dinov3_base": {
-        "repo_or_dir": DINOV3_LOCAL_REPO,
-        "model": "dinov3_vitb16",
-        "source": "local",
-        "weights": os.path.join(ROOT_DIR, "torch/hub/checkpoints/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth"),
-    },
-    "dinov3_large": {
-        "repo_or_dir": DINOV3_LOCAL_REPO,
-        "model": "dinov3_vitl16",
-        "source": "local",
-        "weights": os.path.join(ROOT_DIR, "torch/hub/checkpoints/dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd.pth"),
-    },
+    "dinov3_base": {"repo_or_dir": DINOV3_LOCAL_REPO, "model": "dinov3_vitb16", "source": "local", "weights": os.path.join(ROOT_DIR, "checkpoints/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth")},
+    "dinov3_large": {"repo_or_dir": DINOV3_LOCAL_REPO, "model": "dinov3_vitl16", "source": "local", "weights": os.path.join(ROOT_DIR, "checkpoints/dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd.pth")},
 }
 
 
