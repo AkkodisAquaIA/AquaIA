@@ -19,7 +19,7 @@ def main() -> None:
         print(f"No registry found at {REGISTRY_PATH}. No runs have been recorded yet.")
         sys.exit(0)
 
-    lines = [l.strip() for l in REGISTRY_PATH.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [line.strip() for line in REGISTRY_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
     if not lines:
         print("Registry is empty.")
         sys.exit(0)
