@@ -1,7 +1,6 @@
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
-import textwrap
 
 def extraire_noms_dossiers(fichier_excel, colonne):
     """
