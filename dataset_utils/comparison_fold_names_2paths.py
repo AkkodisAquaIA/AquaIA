@@ -29,8 +29,6 @@ def comparer_dossiers(path1, path2):
     dossiers2 = {d for d in os.listdir(path2) if os.path.isdir(os.path.join(path2, d))}
 
     # Comparaisons
-    uniquement_dans_1 = dossiers1 - dossiers2
-    uniquement_dans_2 = dossiers2 - dossiers1
     communs = dossiers1 & dossiers2
 
     print(f"\nNombre de dossiers en commun : {len(communs)}")
