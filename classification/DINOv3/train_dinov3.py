@@ -158,24 +158,6 @@ CFG = Config()
 # =========================
 # UTILS
 # =========================
-# def infer_block_index(name: str):
-#     patterns = [
-#         r"^layer\.(\d+)\.",
-#         r"^layers\.(\d+)\.",
-#         r"^block\.(\d+)\.",
-#         r"^blocks\.(\d+)\.",
-#         r"\.layer\.(\d+)\.",
-#         r"\.layers\.(\d+)\.",
-#         r"\.block\.(\d+)\.",
-#         r"\.blocks\.(\d+)\.",
-#     ]
-
-#     for p in patterns:
-#         m = re.search(p, name)
-#         if m:
-#             return int(m.group(1))
-
-#     return None
 
 
 def get_lrs(optimizer: optim.Optimizer) -> Dict[str, float]:
