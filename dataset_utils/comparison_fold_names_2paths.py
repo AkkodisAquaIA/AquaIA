@@ -18,10 +18,10 @@ def compter_images(dossier):
 def comparer_dossiers(path1, path2):
     # Vérification des chemins
     if not os.path.exists(path1):
-        print(f"❌ Le chemin n'existe pas : {path1}")
+        print(f"Le chemin n'existe pas : {path1}")
         return
     if not os.path.exists(path2):
-        print(f"❌ Le chemin n'existe pas : {path2}")
+        print(f"Le chemin n'existe pas : {path2}")
         return
 
     # Récupérer uniquement les dossiers
@@ -33,15 +33,7 @@ def comparer_dossiers(path1, path2):
     uniquement_dans_2 = dossiers2 - dossiers1
     communs = dossiers1 & dossiers2
 
-    # # Résultats
-    # print("\n Dossiers uniquement dans le premier chemin :")
-    # for d in sorted(uniquement_dans_1):
-    #     print(f" - {d}")
-
-    # print("\n Dossiers uniquement dans le second chemin :")
-    # for d in sorted(uniquement_dans_2):
-    #     print(f" - {d}")
-    print(f"\n📊 Nombre de dossiers en commun : {len(communs)}")
+    print(f"\nNombre de dossiers en commun : {len(communs)}")
     print("\nDossiers communs :")
     for d in sorted(communs):
         chemin1 = os.path.join(path1, d)
@@ -59,7 +51,7 @@ def comparer_dossiers(path1, path2):
 
 
 if __name__ == "__main__":
-    # 👉 MODIFIE CES CHEMINS
+    # MODIFIE CES CHEMINS
     path1 = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/PERLA_cropped"
     path2 = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026"
 
