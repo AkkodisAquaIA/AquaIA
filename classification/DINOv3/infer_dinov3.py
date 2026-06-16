@@ -24,20 +24,18 @@ from common_dinov3 import DinoV3Classifier
 # =========================
 # CONFIG
 # =========================
-# RUN_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/FIN-Benthic1-2_dinov3/focal_none/")
-# INPUT_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited_oldNames/test")
 
 import os
 
-run_dir: str = os.environ.get(
+RUN_DIR = Path(os.environ.get(
     "RUN_DIR",
-    "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/focal_auto/"
-)
-make_subrun_with_timestamp: bool = True
-data_dir: str = os.environ.get(
+    "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/unfreeze1/focal_05/20260602-115513"
+))
+
+INPUT_DIR = Path(os.environ.get(
     "DATA_DIR",
-    "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited_oldNames/test"
-)
+    "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited/test"
+))
 
 CHECKPOINT_NAME = "best.pt"
 
@@ -211,7 +209,7 @@ class LabeledFolderDataset(Dataset):
             cls_dir = root / cls_name
             if not cls_dir.exists():
                 continue
-            for p in cls_dir.iterdir():
+            for p in sorted(cls_dir.iterdir()):
                 if p.is_file() and p.suffix.lower() in EXTS:
                     self.samples.append((p, cls_idx))
 
@@ -267,7 +265,7 @@ def predict_labeled(model, loader, criterion, device, use_amp: bool):
         x = x.to(device, non_blocking=True)
         y = y.to(device, non_blocking=True)
 
-        with torch.cuda.amp.autocast(enabled=(use_amp and device.type == "cuda")):
+        with torch.amp.autocast("cuda", enabled=(use_amp and device.type == "cuda")):
             logits = model(x)
             loss = criterion(logits, y)
             probs = torch.softmax(logits, dim=1)

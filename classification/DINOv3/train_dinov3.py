@@ -6,8 +6,11 @@ import json, time, re
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, Optional, Tuple
+import os
 
 import torch
+torch.cuda.empty_cache()
+
 import torch.nn as nn
 import torch.optim as optim
 from torch.cuda.amp import autocast, GradScaler
@@ -21,26 +24,57 @@ from transformers import AutoImageProcessor
 from common_dinov3 import (
     ensure_dir, write_json, set_seed, get_env_info,
     DinoV3Classifier, freeze_all, unfreeze_last_n_blocks,
-    save_checkpoint
+    save_checkpoint, infer_block_index
 )
 
 from losses import FocalLoss
 
-def compute_class_weights_from_imagefolder(train_ds, num_classes: int) -> torch.Tensor:
+def compute_class_weights_from_imagefolder(
+    train_ds,
+    num_classes: int,
+    mode: str = "sqrt_inv",
+    max_weight: float = 5.0,
+    eps: float = 1e-8
+) -> torch.Tensor:
     """
-    Calcule des poids de classes inverses des fréquences à partir de train_ds.targets.
-    Retourne un tenseur de forme (C,).
+    Calcule des poids de classes à partir de train_ds.targets.
+
+    mode:
+        - "inv"      : inverse fréquence classique
+        - "sqrt_inv" : inverse racine carrée, plus doux
+        - "log_inv"  : pondération logarithmique, encore plus stable
     """
-    counts = torch.bincount(torch.tensor(train_ds.targets, dtype=torch.long), minlength=num_classes).float()
+
+    counts = torch.bincount(
+        torch.tensor(train_ds.targets, dtype=torch.long),
+        minlength=num_classes
+    ).float()
 
     if torch.any(counts == 0):
         missing = (counts == 0).nonzero(as_tuple=True)[0].tolist()
         raise RuntimeError(f"Certaines classes n'ont aucun sample dans train: {missing}")
 
-    # inverse fréquence
-    weights = counts.sum() / counts
+    freq = counts / counts.sum()
 
-    # normalisation pour garder une échelle raisonnable
+    if mode == "inv":
+        weights = 1.0 / (freq + eps)
+
+    elif mode == "sqrt_inv":
+        weights = 1.0 / torch.sqrt(freq + eps)
+
+    elif mode == "log_inv":
+        weights = 1.0 / torch.log(1.02 + freq)
+
+    else:
+        raise ValueError(f"Mode inconnu : {mode}")
+
+    # normalisation
+    weights = weights / weights.mean()
+
+    # éviter des poids trop extrêmes
+    weights = torch.clamp(weights, max=max_weight)
+
+    # re-normalisation après clamp
     weights = weights / weights.mean()
 
     return weights
@@ -48,43 +82,48 @@ def compute_class_weights_from_imagefolder(train_ds, num_classes: int) -> torch.
 # =========================
 # CONFIG
 # =========================
+import os
+from dataclasses import dataclass, field
+from typing import Optional
+
+
 @dataclass
 class Config:
-  
-    import os
-
-    run_dir: str = os.environ.get(
+    # --- paths
+    run_dir: str = field(default_factory=lambda: os.environ.get(
         "RUN_DIR",
-        "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/focal_auto"
-    )
+        "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/unfreeze1/focal_05"
+    ))
     make_subrun_with_timestamp: bool = True
-    data_dir: str = os.environ.get(
+
+    data_dir: str = field(default_factory=lambda: os.environ.get(
         "DATA_DIR",
         "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited"
-    )
+    ))
+
+    # --- model
     model_id: str = "facebook/dinov3-vits16-pretrain-lvd1689m"
+    token: Optional[str] = field(default_factory=lambda: os.environ.get("HF_TOKEN"))
 
-    os.makedirs(run_dir, exist_ok=True)
-
-    if not os.path.isdir(data_dir):
-        raise FileNotFoundError(f"data_dir introuvable : {data_dir}")
-
-    epochs: int = 150
+    # --- training
+    epochs: int = int(os.environ.get("EPOCHS", 30))
     batch_size: int = 32
 
     lr_head: float = 1e-3
     lr_backbone: float = 3e-5
     weight_decay: float = 0.05
     dropout: float = 0.0
-    unfreeze_last_n_blocks: int = 0
+    unfreeze_last_n_blocks: int = int(os.environ.get("UNFREEZE", 1))
 
     use_amp: bool = True
     num_workers: int = 4
     seed: int = 42
 
-    early_patience = 999
-    early_min_delta = 1e-5
+    # --- early stopping
+    early_patience: int = int(os.environ.get("EARLY_PATIENCE", 15))
+    early_min_delta: float = 1e-5
 
+    # --- scheduler
     scheduler: str = "cosine"
     cosine_tmax_epochs: Optional[int] = None
     plateau_factor: float = 0.5
@@ -93,12 +132,25 @@ class Config:
 
     save_last: bool = True
 
-    # --- loss config
-    loss_name: str = "focal"   # "ce" | "focal"
-    focal_gamma: float = 2.0
-    focal_alpha_mode: str = "auto"   # "none" | "scalar" | "auto"
+    # --- loss
+    loss_name: str = "focal"  #"ce"# 
+    focal_gamma: float = 0.5
+    focal_alpha_mode: str = "auto"
     focal_alpha_scalar: Optional[float] = None
     focal_ignore_index: int = -100
+
+    # --- post-init (validation + création dossiers)
+    def __post_init__(self):
+        # créer dossier résultats
+        os.makedirs(self.run_dir, exist_ok=True)
+
+        # vérifier dataset
+        if not os.path.isdir(self.data_dir):
+            raise FileNotFoundError(f"data_dir introuvable : {self.data_dir}")
+
+        # warning token
+        if self.token is None:
+            print("⚠️ HF_TOKEN non défini (modèle gated ?)")
 
 
 CFG = Config()
@@ -106,19 +158,24 @@ CFG = Config()
 # =========================
 # UTILS
 # =========================
-def infer_block_index(name: str):
-    patterns = [
-        r"\.encoder\.layers\.(\d+)\.",
-        r"\.encoder\.layer\.(\d+)\.",
-        r"\.layers\.(\d+)\.",
-        r"\.layer\.(\d+)\.",
-        r"\.blocks\.(\d+)\.",
-    ]
-    for p in patterns:
-        m = re.search(p, name)
-        if m:
-            return int(m.group(1))
-    return None
+# def infer_block_index(name: str):
+#     patterns = [
+#         r"^layer\.(\d+)\.",
+#         r"^layers\.(\d+)\.",
+#         r"^block\.(\d+)\.",
+#         r"^blocks\.(\d+)\.",
+#         r"\.layer\.(\d+)\.",
+#         r"\.layers\.(\d+)\.",
+#         r"\.block\.(\d+)\.",
+#         r"\.blocks\.(\d+)\.",
+#     ]
+
+#     for p in patterns:
+#         m = re.search(p, name)
+#         if m:
+#             return int(m.group(1))
+
+#     return None
 
 
 def get_lrs(optimizer: optim.Optimizer) -> Dict[str, float]:
@@ -128,6 +185,13 @@ def get_lrs(optimizer: optim.Optimizer) -> Dict[str, float]:
 def build_criterion(cfg: Config, device: torch.device, train_ds=None, num_classes: Optional[int] = None):
     if cfg.loss_name.lower() == "ce":
         return nn.CrossEntropyLoss(), None
+    #     alpha = compute_class_weights_from_imagefolder(
+    #     train_ds,
+    #     num_classes,
+    #     mode="sqrt_inv",
+    #     max_weight=5.0
+    # ).to(device)
+    #     return torch.nn.CrossEntropyLoss(weight=alpha), None
 
     elif cfg.loss_name.lower() == "focal":
         alpha = None
@@ -143,7 +207,12 @@ def build_criterion(cfg: Config, device: torch.device, train_ds=None, num_classe
         elif cfg.focal_alpha_mode == "auto":
             if train_ds is None or num_classes is None:
                 raise ValueError("train_ds et num_classes sont requis si focal_alpha_mode='auto'")
-            alpha = compute_class_weights_from_imagefolder(train_ds, num_classes).to(device)
+            alpha = compute_class_weights_from_imagefolder(
+            train_ds,
+            num_classes,
+            mode="sqrt_inv",
+            max_weight=5.0
+        ).to(device)
             print(f"[INFO] Focal alpha auto = {alpha.detach().cpu().tolist()}")
 
         else:
@@ -244,7 +313,7 @@ def main():
     if not train_dir.exists() or not val_dir.exists():
         raise RuntimeError(f"On attend {train_dir} et {val_dir}")
 
-    processor = AutoImageProcessor.from_pretrained(CFG.model_id)
+    processor = AutoImageProcessor.from_pretrained(CFG.model_id, token=CFG.token)
 
     def to_pixel_values(pil_img):
         return processor(images=pil_img, return_tensors="pt")["pixel_values"].squeeze(0)
@@ -276,8 +345,22 @@ def main():
     )
 
     model = DinoV3Classifier(CFG.model_id, num_classes=num_classes, dropout=CFG.dropout)
+
+    for name, _ in model.backbone.named_parameters():
+        idx = infer_block_index(name)
+        if idx is not None:
+            print(name, "->", idx)
+            break
+
     freeze_all(model.backbone)
     unfreeze_last_n_blocks(model.backbone, CFG.unfreeze_last_n_blocks)
+
+    print("UNFREEZE =", CFG.unfreeze_last_n_blocks)
+
+    print(
+    "Trainable backbone params:",
+    sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)
+    )
 
     for p in model.head.parameters():
         p.requires_grad = True
