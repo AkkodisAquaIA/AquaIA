@@ -1,6 +1,5 @@
 from pathlib import Path
 import cv2
-import numpy as np
 
 def score_image(path):
     img = cv2.imread(str(path))
