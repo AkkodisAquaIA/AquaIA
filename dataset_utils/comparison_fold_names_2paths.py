@@ -1,9 +1,9 @@
 import os
 
-import os
 
 # Extensions d'images à prendre en compte
 EXTENSIONS_IMAGES = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"}
+
 
 def compter_images(dossier):
     count = 0
@@ -14,6 +14,7 @@ def compter_images(dossier):
             if ext.lower() in EXTENSIONS_IMAGES:
                 count += 1
     return count
+
 
 def comparer_dossiers(path1, path2):
     # Vérification des chemins
@@ -43,9 +44,6 @@ def comparer_dossiers(path1, path2):
         print(f"{d}")
         print(f"   - Images dans path1 : {nb1}")
         print(f"   - Images dans path2 : {nb2}")
-
-
-    
 
 
 if __name__ == "__main__":

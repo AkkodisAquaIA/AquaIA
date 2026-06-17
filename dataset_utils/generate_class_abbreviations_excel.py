@@ -52,10 +52,7 @@ def generate_excel_and_check(classes_dir, output_file):
             ws.append([class_name, abbreviated_name])
 
             if abbreviated_name in abbreviations:
-                duplicates.setdefault(abbreviated_name, set()).update([
-                    class_name,
-                    abbreviations[abbreviated_name]
-                ])
+                duplicates.setdefault(abbreviated_name, set()).update([class_name, abbreviations[abbreviated_name]])
             else:
                 abbreviations[abbreviated_name] = class_name
 
@@ -78,11 +75,13 @@ def generate_cvat_labels(classes_dir, output_file="cvat_labels.json"):
         if folder.is_dir():
             short_name = abbreviate_class_name(folder.name)
 
-            labels.append({
-                "name": short_name,
-                "type": "rectangle",  # adapté pour détection
-                "attributes": []
-            })
+            labels.append(
+                {
+                    "name": short_name,
+                    "type": "rectangle",  # adapté pour détection
+                    "attributes": [],
+                }
+            )
 
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(labels, f, indent=4, ensure_ascii=False)

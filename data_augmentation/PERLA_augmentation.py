@@ -27,12 +27,14 @@ def construire_pipeline():
         h, w = TAILLE_IMAGE
         transforms.append(A.Resize(height=h, width=w))
 
-    transforms.extend([
-        A.HorizontalFlip(p=0.5),
-        A.Rotate(limit=20, border_mode=cv2.BORDER_REFLECT_101, p=0.7),
-        A.RandomBrightnessContrast(0.2, 0.2, p=0.5),
-        A.GaussNoise(p=0.15),
-    ])
+    transforms.extend(
+        [
+            A.HorizontalFlip(p=0.5),
+            A.Rotate(limit=20, border_mode=cv2.BORDER_REFLECT_101, p=0.7),
+            A.RandomBrightnessContrast(0.2, 0.2, p=0.5),
+            A.GaussNoise(p=0.15),
+        ]
+    )
 
     return A.Compose(transforms)
 

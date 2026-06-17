@@ -56,43 +56,22 @@ def generer_correspondance_excel(fichier1, fichier2, fichier_sortie):
     df1 = df1.copy()
     df2 = df2.copy()
 
-    df1 = df1.rename(columns={
-        df1.columns[0]: "classe_fichier1",
-        df1.columns[1]: "nb_images"
-    })
+    df1 = df1.rename(columns={df1.columns[0]: "classe_fichier1", df1.columns[1]: "nb_images"})
 
-    df2 = df2.rename(columns={
-        df2.columns[0]: "classe_fichier2"
-    })
+    df2 = df2.rename(columns={df2.columns[0]: "classe_fichier2"})
 
     # Extraction Famille / Genre / Espece
-    df1[["famille", "genre", "espece"]] = df1["classe_fichier1"].apply(
-        lambda x: pd.Series(extraire_famille_genre_espece_depuis_fichier1(x))
-    )
+    df1[["famille", "genre", "espece"]] = df1["classe_fichier1"].apply(lambda x: pd.Series(extraire_famille_genre_espece_depuis_fichier1(x)))
 
-    df2[["famille", "genre", "espece"]] = df2["classe_fichier2"].apply(
-        lambda x: pd.Series(extraire_famille_genre_espece_depuis_fichier2(x))
-    )
+    df2[["famille", "genre", "espece"]] = df2["classe_fichier2"].apply(lambda x: pd.Series(extraire_famille_genre_espece_depuis_fichier2(x)))
 
     # Jointure sur famille, genre, espece
-    fusion = df1.merge(
-        df2,
-        on=["famille", "genre", "espece"],
-        how="left"
-    )
+    fusion = df1.merge(df2, on=["famille", "genre", "espece"], how="left")
 
     # Détection des cas ambigus (plusieurs correspondances)
-    doublons_df2 = (
-        df2.groupby(["famille", "genre", "espece"])
-        .size()
-        .reset_index(name="nb_correspondances")
-    )
+    doublons_df2 = df2.groupby(["famille", "genre", "espece"]).size().reset_index(name="nb_correspondances")
 
-    fusion = fusion.merge(
-        doublons_df2,
-        on=["famille", "genre", "espece"],
-        how="left"
-    )
+    fusion = fusion.merge(doublons_df2, on=["famille", "genre", "espece"], how="left")
 
     # Statut de correspondance
     def definir_statut(row):
@@ -109,11 +88,7 @@ def generer_correspondance_excel(fichier1, fichier2, fichier_sortie):
     # colonne 1 = classe correspondante du fichier 2
     # colonne 2 = nombre d'images du fichier 1
     resultat = fusion[["classe_fichier2", "nb_images", "classe_fichier1", "statut"]].copy()
-    resultat = resultat.rename(columns={
-        "classe_fichier2": "classe_correspondante_fichier2",
-        "nb_images": "nombre_images",
-        "classe_fichier1": "classe_originale_fichier1"
-    })
+    resultat = resultat.rename(columns={"classe_fichier2": "classe_correspondante_fichier2", "nb_images": "nombre_images", "classe_fichier1": "classe_originale_fichier1"})
 
     # Feuilles complémentaires utiles
     non_trouves = resultat[resultat["statut"] == "non_trouve"].copy()

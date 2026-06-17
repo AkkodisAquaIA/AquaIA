@@ -19,22 +19,18 @@ def convert_cr3_to_tiff(input_dir, output_dir):
 
             try:
                 with rawpy.imread(input_path) as raw:
-
                     rgb = raw.postprocess(
                         # Balance des blancs robuste
-                        use_camera_wb=False,   # souvent foireux sur CR3
-                        use_auto_wb=True,      # beaucoup plus fiable
-
+                        use_camera_wb=False,  # souvent foireux sur CR3
+                        use_auto_wb=True,  # beaucoup plus fiable
                         # Luminosité correcte
                         no_auto_bright=False,
-                        bright=1.2,            # ajuste si trop sombre
-
+                        bright=1.2,  # ajuste si trop sombre
                         # Qualité maximale
-                        output_bps=16,         # TIFF 16 bits
+                        output_bps=16,  # TIFF 16 bits
                         demosaic_algorithm=rawpy.DemosaicAlgorithm.AHD,
-
                         # Pas de réduction de taille
-                        half_size=False
+                        half_size=False,
                     )
 
                 iio.imwrite(output_path, rgb)
@@ -48,11 +44,7 @@ def convert_cr3_to_tiff(input_dir, output_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convertir des fichiers CR3 en TIFF")
     parser.add_argument("input_dir", help="Dossier contenant les fichiers CR3")
-    parser.add_argument(
-        "--output_dir",
-        default=None,
-        help="Dossier de sortie (optionnel)"
-    )
+    parser.add_argument("--output_dir", default=None, help="Dossier de sortie (optionnel)")
 
     args = parser.parse_args()
 

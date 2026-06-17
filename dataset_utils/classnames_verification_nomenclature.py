@@ -1,5 +1,6 @@
 import os
 
+
 def check_folder_names(path):
     # Vérifie que le chemin existe
     if not os.path.isdir(path):

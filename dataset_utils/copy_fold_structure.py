@@ -1,5 +1,6 @@
 import os
 
+
 def copy_folder_structure(src_path, dst_path):
     # Vérifie que le dossier source existe
     if not os.path.exists(src_path):

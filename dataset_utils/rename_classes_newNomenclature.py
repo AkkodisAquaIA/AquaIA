@@ -91,10 +91,7 @@ def load_mapping(excel_path):
         mapping[old_name] = new_name
 
     if duplicates:
-        raise ValueError(
-            "Plusieurs correspondances incohérentes trouvées pour : "
-            + ", ".join(sorted(set(duplicates)))
-        )
+        raise ValueError("Plusieurs correspondances incohérentes trouvées pour : " + ", ".join(sorted(set(duplicates))))
 
     return mapping
 
@@ -152,39 +149,16 @@ def rename_class_folders(root_dir, mapping, dry_run=False, copy_instead_of_renam
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Renomme des dossiers/classes d'images à partir d'un tableau Excel."
-    )
-    parser.add_argument(
-        "--root-dir",
-        required=True,
-        help="Dossier racine contenant les dossiers/classes d'images"
-    )
-    parser.add_argument(
-        "--excel",
-        required=True,
-        help="Chemin vers le fichier Excel"
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Affiche les changements sans rien modifier"
-    )
-    parser.add_argument(
-        "--copy",
-        action="store_true",
-        help="Copie les dossiers au lieu de les renommer"
-    )
+    parser = argparse.ArgumentParser(description="Renomme des dossiers/classes d'images à partir d'un tableau Excel.")
+    parser.add_argument("--root-dir", required=True, help="Dossier racine contenant les dossiers/classes d'images")
+    parser.add_argument("--excel", required=True, help="Chemin vers le fichier Excel")
+    parser.add_argument("--dry-run", action="store_true", help="Affiche les changements sans rien modifier")
+    parser.add_argument("--copy", action="store_true", help="Copie les dossiers au lieu de les renommer")
 
     args = parser.parse_args()
 
     mapping = load_mapping(args.excel)
-    rename_class_folders(
-        root_dir=args.root_dir,
-        mapping=mapping,
-        dry_run=args.dry_run,
-        copy_instead_of_rename=args.copy
-    )
+    rename_class_folders(root_dir=args.root_dir, mapping=mapping, dry_run=args.dry_run, copy_instead_of_rename=args.copy)
 
 
 if __name__ == "__main__":

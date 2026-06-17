@@ -15,11 +15,7 @@ def generate_cvat_labels(classes_path, output_file="cvat_labels.json"):
 
     for folder in sorted(classes_dir.iterdir()):
         if folder.is_dir():
-            labels.append({
-                "name": folder.name,
-                "type": "any",
-                "attributes": []
-            })
+            labels.append({"name": folder.name, "type": "any", "attributes": []})
 
     data = labels
 

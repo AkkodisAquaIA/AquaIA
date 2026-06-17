@@ -1,6 +1,7 @@
 from pathlib import Path
 import cv2
 
+
 def score_image(path):
     img = cv2.imread(str(path))
 
@@ -21,13 +22,7 @@ def score_image(path):
     # score combiné (à ajuster)
     score = resolution * 0.5 + sharpness * 1000 + size * 0.0001
 
-    return {
-        "fichier": path.name,
-        "resolution": resolution,
-        "sharpness": sharpness,
-        "size": size,
-        "score": score
-    }
+    return {"fichier": path.name, "resolution": resolution, "sharpness": sharpness, "size": size, "score": score}
 
 
 def meilleure_image(dossier):

@@ -28,6 +28,7 @@ SEUIL_CLASSE_RARE = 10
 # FONCTIONS UTILITAIRES
 # =========================
 
+
 def normaliser_nom_colonne(col):
     return str(col).strip().lower()
 
@@ -111,11 +112,7 @@ def calculer_stats(df_final, noms_datasets, seuil_classe_rare=20):
     df_stats_classes["nb_datasets_presents"] = (df_stats_classes[noms_datasets] > 0).sum(axis=1)
 
     # Présence partielle / complète
-    df_stats_classes["presence"] = df_stats_classes["nb_datasets_presents"].apply(
-        lambda x: "tous_les_datasets"
-        if x == len(noms_datasets)
-        else ("un_seul_dataset" if x == 1 else "plusieurs_datasets")
-    )
+    df_stats_classes["presence"] = df_stats_classes["nb_datasets_presents"].apply(lambda x: "tous_les_datasets" if x == len(noms_datasets) else ("un_seul_dataset" if x == 1 else "plusieurs_datasets"))
 
     # Classe rare selon le total
     df_stats_classes["classe_rare"] = df_stats_classes["total_images"] < seuil_classe_rare
@@ -157,42 +154,40 @@ def calculer_stats(df_final, noms_datasets, seuil_classe_rare=20):
     for nom in noms_datasets:
         total_images_dataset = int(df_final[nom].sum())
         nb_classes_dataset = int((df_final[nom] > 0).sum())
-        moyenne_par_classe_presente = round(
-            df_final.loc[df_final[nom] > 0, nom].mean(), 2
-        ) if nb_classes_dataset > 0 else 0
+        moyenne_par_classe_presente = round(df_final.loc[df_final[nom] > 0, nom].mean(), 2) if nb_classes_dataset > 0 else 0
 
-        resume_datasets.append({
-            "dataset": nom,
-            "total_images": total_images_dataset,
-            "nb_classes_presentes": nb_classes_dataset,
-            "moyenne_images_par_classe_presente": moyenne_par_classe_presente,
-        })
+        resume_datasets.append(
+            {
+                "dataset": nom,
+                "total_images": total_images_dataset,
+                "nb_classes_presentes": nb_classes_dataset,
+                "moyenne_images_par_classe_presente": moyenne_par_classe_presente,
+            }
+        )
 
     df_resume_datasets = pd.DataFrame(resume_datasets)
 
     # Résumé général
-    df_resume_global = pd.DataFrame([
-        {"metrique": "nb_datasets", "valeur": len(noms_datasets)},
-        {"metrique": "nb_classes_total", "valeur": total_classes},
-        {"metrique": "nb_images_total", "valeur": total_images_global},
-        {"metrique": f"nb_classes_rares_total_<_{seuil_classe_rare}", "valeur": classes_rares},
-        {"metrique": "nb_classes_presentes_dans_tous_les_datasets", "valeur": classes_presentes_partout},
-        {"metrique": "nb_classes_presentes_dans_un_seul_dataset", "valeur": classes_presentes_un_seul},
-    ])
+    df_resume_global = pd.DataFrame(
+        [
+            {"metrique": "nb_datasets", "valeur": len(noms_datasets)},
+            {"metrique": "nb_classes_total", "valeur": total_classes},
+            {"metrique": "nb_images_total", "valeur": total_images_global},
+            {"metrique": f"nb_classes_rares_total_<_{seuil_classe_rare}", "valeur": classes_rares},
+            {"metrique": "nb_classes_presentes_dans_tous_les_datasets", "valeur": classes_presentes_partout},
+            {"metrique": "nb_classes_presentes_dans_un_seul_dataset", "valeur": classes_presentes_un_seul},
+        ]
+    )
 
     # Sous-ensembles utiles
     df_classes_rares = df_stats_classes[df_stats_classes["classe_rare"]].copy()
     df_classes_rares = df_classes_rares.sort_values(["total_images", "classe"], ascending=[True, True])
 
     df_classes_absentes_partiellement = df_stats_classes[df_stats_classes["nb_datasets_absents"] > 0].copy()
-    df_classes_absentes_partiellement = df_classes_absentes_partiellement.sort_values(
-        ["nb_datasets_absents", "classe"], ascending=[False, True]
-    )
+    df_classes_absentes_partiellement = df_classes_absentes_partiellement.sort_values(["nb_datasets_absents", "classe"], ascending=[False, True])
 
     df_classes_tres_desequilibrees = df_stats_classes[df_stats_classes["ratio_desequilibre"] >= 5].copy()
-    df_classes_tres_desequilibrees = df_classes_tres_desequilibrees.sort_values(
-        ["ratio_desequilibre", "classe"], ascending=[False, True]
-    )
+    df_classes_tres_desequilibrees = df_classes_tres_desequilibrees.sort_values(["ratio_desequilibre", "classe"], ascending=[False, True])
 
     return {
         "stats_classes": df_stats_classes,
@@ -220,24 +215,16 @@ def sauvegarder_resultats(df_final, stats_dict, fichier_datasheet, fichier_stats
 # PROGRAMME PRINCIPAL
 # =========================
 
+
 def main():
     df_final, noms_datasets = fusionner_datasets(FICHIERS_DATASETS)
 
     # Ajouter la colonne total
     df_final["Total nb images"] = df_final[noms_datasets].sum(axis=1)
 
-    stats_dict = calculer_stats(
-        df_final=df_final,
-        noms_datasets=noms_datasets,
-        seuil_classe_rare=SEUIL_CLASSE_RARE
-    )
+    stats_dict = calculer_stats(df_final=df_final, noms_datasets=noms_datasets, seuil_classe_rare=SEUIL_CLASSE_RARE)
 
-    sauvegarder_resultats(
-        df_final=df_final,
-        stats_dict=stats_dict,
-        fichier_datasheet=FICHIER_SORTIE_DATASHEET,
-        fichier_stats=FICHIER_SORTIE_STATS
-    )
+    sauvegarder_resultats(df_final=df_final, stats_dict=stats_dict, fichier_datasheet=FICHIER_SORTIE_DATASHEET, fichier_stats=FICHIER_SORTIE_STATS)
 
     print("=== TERMINÉ ===")
     print(f"Datasheet créé : {FICHIER_SORTIE_DATASHEET}")

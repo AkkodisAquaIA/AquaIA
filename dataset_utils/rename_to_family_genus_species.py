@@ -76,32 +76,14 @@ def rename_class_folders(root_dir: str, dry_run: bool = False, copy_instead_of_r
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Renomme des dossiers/classes de Embranchement_Classe_Ordre_Famille_Genre_espece vers Famille_Genre_espece."
-    )
-    parser.add_argument(
-        "--root-dir",
-        required=True,
-        help="Dossier racine contenant les dossiers/classes"
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Affiche les changements sans rien modifier"
-    )
-    parser.add_argument(
-        "--copy",
-        action="store_true",
-        help="Copie les dossiers au lieu de les renommer"
-    )
+    parser = argparse.ArgumentParser(description="Renomme des dossiers/classes de Embranchement_Classe_Ordre_Famille_Genre_espece vers Famille_Genre_espece.")
+    parser.add_argument("--root-dir", required=True, help="Dossier racine contenant les dossiers/classes")
+    parser.add_argument("--dry-run", action="store_true", help="Affiche les changements sans rien modifier")
+    parser.add_argument("--copy", action="store_true", help="Copie les dossiers au lieu de les renommer")
 
     args = parser.parse_args()
 
-    rename_class_folders(
-        root_dir=args.root_dir,
-        dry_run=args.dry_run,
-        copy_instead_of_rename=args.copy
-    )
+    rename_class_folders(root_dir=args.root_dir, dry_run=args.dry_run, copy_instead_of_rename=args.copy)
 
 
 if __name__ == "__main__":
