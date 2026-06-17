@@ -1,0 +1,10 @@
+--extra-index-url https://pypi.nvidia.com
+torchmetrics>=0.11,<2.0
+transformers>=4.40,<4.52
+ultralytics
+tqdm
+matplotlib
+scipy
+termcolor
+pycocotools
+nvidia-dali-cuda130

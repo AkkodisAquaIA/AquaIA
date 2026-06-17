@@ -2,15 +2,14 @@
 # train_dinov3.py
 
 from __future__ import annotations
-import json, time, re
-from dataclasses import dataclass, asdict
+import json
+import time
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 import os
 
 import torch
-torch.cuda.empty_cache()
-
 import torch.nn as nn
 import torch.optim as optim
 from torch.cuda.amp import autocast, GradScaler
@@ -21,21 +20,14 @@ from torchvision.datasets import ImageFolder
 from torchvision.transforms import Compose, Lambda
 from transformers import AutoImageProcessor
 
-from common_dinov3 import (
-    ensure_dir, write_json, set_seed, get_env_info,
-    DinoV3Classifier, freeze_all, unfreeze_last_n_blocks,
-    save_checkpoint, infer_block_index
-)
+from common_dinov3 import ensure_dir, write_json, set_seed, get_env_info, DinoV3Classifier, freeze_all, unfreeze_last_n_blocks, save_checkpoint, infer_block_index
 
 from losses import FocalLoss
 
-def compute_class_weights_from_imagefolder(
-    train_ds,
-    num_classes: int,
-    mode: str = "sqrt_inv",
-    max_weight: float = 5.0,
-    eps: float = 1e-8
-) -> torch.Tensor:
+torch.cuda.empty_cache()
+
+
+def compute_class_weights_from_imagefolder(train_ds, num_classes: int, mode: str = "sqrt_inv", max_weight: float = 5.0, eps: float = 1e-8) -> torch.Tensor:
     """
     Calcule des poids de classes à partir de train_ds.targets.
 
@@ -45,10 +37,7 @@ def compute_class_weights_from_imagefolder(
         - "log_inv"  : pondération logarithmique, encore plus stable
     """
 
-    counts = torch.bincount(
-        torch.tensor(train_ds.targets, dtype=torch.long),
-        minlength=num_classes
-    ).float()
+    counts = torch.bincount(torch.tensor(train_ds.targets, dtype=torch.long), minlength=num_classes).float()
 
     if torch.any(counts == 0):
         missing = (counts == 0).nonzero(as_tuple=True)[0].tolist()
@@ -79,27 +68,19 @@ def compute_class_weights_from_imagefolder(
 
     return weights
 
+
 # =========================
 # CONFIG
 # =========================
-import os
-from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
 class Config:
     # --- paths
-    run_dir: str = field(default_factory=lambda: os.environ.get(
-        "RUN_DIR",
-        "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/unfreeze1/focal_05"
-    ))
+    run_dir: str = field(default_factory=lambda: os.environ.get("RUN_DIR", "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/unfreeze1/focal_05"))
     make_subrun_with_timestamp: bool = True
 
-    data_dir: str = field(default_factory=lambda: os.environ.get(
-        "DATA_DIR",
-        "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited"
-    ))
+    data_dir: str = field(default_factory=lambda: os.environ.get("DATA_DIR", "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited"))
 
     # --- model
     model_id: str = "facebook/dinov3-vits16-pretrain-lvd1689m"
@@ -133,7 +114,7 @@ class Config:
     save_last: bool = True
 
     # --- loss
-    loss_name: str = "focal"  #"ce"# 
+    loss_name: str = "focal"  # "ce"#
     focal_gamma: float = 0.5
     focal_alpha_mode: str = "auto"
     focal_alpha_scalar: Optional[float] = None
@@ -154,6 +135,7 @@ class Config:
 
 
 CFG = Config()
+
 
 # =========================
 # UTILS
@@ -189,12 +171,7 @@ def build_criterion(cfg: Config, device: torch.device, train_ds=None, num_classe
         elif cfg.focal_alpha_mode == "auto":
             if train_ds is None or num_classes is None:
                 raise ValueError("train_ds et num_classes sont requis si focal_alpha_mode='auto'")
-            alpha = compute_class_weights_from_imagefolder(
-            train_ds,
-            num_classes,
-            mode="sqrt_inv",
-            max_weight=5.0
-        ).to(device)
+            alpha = compute_class_weights_from_imagefolder(train_ds, num_classes, mode="sqrt_inv", max_weight=5.0).to(device)
             print(f"[INFO] Focal alpha auto = {alpha.detach().cpu().tolist()}")
 
         else:
@@ -216,7 +193,7 @@ def build_criterion(cfg: Config, device: torch.device, train_ds=None, num_classe
 
     else:
         raise ValueError(f"loss_name inconnu: {cfg.loss_name}")
-    
+
 
 # =========================
 # TRAIN / EVAL
@@ -339,19 +316,14 @@ def main():
 
     print("UNFREEZE =", CFG.unfreeze_last_n_blocks)
 
-    print(
-    "Trainable backbone params:",
-    sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)
-    )
+    print("Trainable backbone params:", sum(p.numel() for p in model.backbone.parameters() if p.requires_grad))
 
     for p in model.head.parameters():
         p.requires_grad = True
 
     model.to(device)
 
-    criterion, focal_alpha_resolved = build_criterion(
-    CFG, device, train_ds=train_ds, num_classes=num_classes
-    )
+    criterion, focal_alpha_resolved = build_criterion(CFG, device, train_ds=train_ds, num_classes=num_classes)
     print(f"[INFO] Loss={CFG.loss_name}")
 
     head_params = [p for p in model.head.parameters() if p.requires_grad]

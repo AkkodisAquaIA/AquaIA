@@ -1,0 +1,174 @@
+# .github/workflows/cd.yml
+#
+# AquaIA continuous deployment.
+#
+# Trigger:   every push (including merged PR) to the `development` branch.
+# Builds:    one Docker image, tagged `dev-<short-sha>` plus the floating
+#            `dev-latest`, pushed to Docker Hub.
+# Deploys:   image pulled and started on the Azure VM under the stack
+#            directory (cf. Repository Variable STACK_DIR_STAGING),
+#            Compose project name `aquaia-staging`.
+#
+# This single workflow replaces the former cd-staging + cd-prod split.
+# For a research project (batch train/infer, no 24/7 user-facing service),
+# a staging/prod distinction adds complexity without benefit. To pin a stable
+# version on the VM, edit .env manually (IMAGE_TAG=dev-<sha>) and restart.
+# See docs/cicd_architecture.md for the full rationale and the kept-aside
+# cd-prod.yml design (to be restored if the project exposes a public API).
+#
+# When `main` becomes the up-to-date branch, change ONLY the trigger below
+# (`branches: [development]` → `[main]`). See docs/cicd_architecture.md.
+
+name: cd
+
+on:
+  push:
+    branches: [development]
+
+# One deploy at a time. Do NOT cancel an in-flight deploy — interrupting
+# `docker compose up -d` mid-flight leaves the VM in a half-pulled state.
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+  STACK_DIR: ${{ vars.STACK_DIR_STAGING }}
+  IMAGE_NAME: aquaia
+  COMPOSE_PROJECT: aquaia-staging
+  CONTAINER_NAME: aquaia-staging
+  VM_USER: deploy
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # build-push — produce the runtime image and publish it to Docker Hub.
+  # ---------------------------------------------------------------------------
+  build-push:
+    name: build & push (Docker Hub)
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tags.outputs.image_tag }}
+      image_ref: ${{ steps.tags.outputs.image_ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          IMAGE_TAG="dev-${SHORT_SHA}"
+          IMAGE_REF="${DOCKERHUB_NAMESPACE}/${IMAGE_NAME}"
+          {
+            echo "image_tag=${IMAGE_TAG}"
+            echo "image_ref=${IMAGE_REF}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Will push ${IMAGE_REF}:${IMAGE_TAG} and ${IMAGE_REF}:dev-latest"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/build/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.image_ref }}:${{ steps.tags.outputs.image_tag }}
+            ${{ steps.tags.outputs.image_ref }}:dev-latest
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+          cache-from: type=gha,scope=cd
+          cache-to: type=gha,mode=max,scope=cd
+
+  # ---------------------------------------------------------------------------
+  # deploy — render .env, copy compose + env, pull, restart, smoke.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: deploy → Azure VM
+    runs-on: ubuntu-latest
+    needs: build-push
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${SSH_PRIVATE_KEY}" > ~/.ssh/aquaia_ci
+          chmod 600 ~/.ssh/aquaia_ci
+          ssh-keyscan -H "${VM_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Render .env
+        env:
+          IMAGE_TAG: ${{ needs.build-push.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/aquaia.env <<EOF
+          # Rendered by cd.yml at $(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          # for commit ${GITHUB_SHA}.
+          IMAGE_TAG=${IMAGE_TAG}
+          DOCKERHUB_NAMESPACE=${DOCKERHUB_NAMESPACE}
+          STACK_NAME=staging
+          EOF
+          echo "Rendered .env:"
+          sed 's/^/  /' /tmp/aquaia.env
+
+      - name: Copy compose & .env to the VM
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+        run: |
+          set -euo pipefail
+          scp -i ~/.ssh/aquaia_ci \
+              -o StrictHostKeyChecking=accept-new \
+              deploy/docker-compose.yml \
+              "${VM_USER}@${VM_HOST}:${STACK_DIR}/docker-compose.yml"
+          scp -i ~/.ssh/aquaia_ci \
+              -o StrictHostKeyChecking=accept-new \
+              /tmp/aquaia.env \
+              "${VM_USER}@${VM_HOST}:${STACK_DIR}/.env"
+
+      - name: Pull, restart, prune & smoke
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/aquaia_ci \
+              -o StrictHostKeyChecking=accept-new \
+              "${VM_USER}@${VM_HOST}" \
+              STACK_DIR="${STACK_DIR}" \
+              COMPOSE_PROJECT="${COMPOSE_PROJECT}" \
+              CONTAINER_NAME="${CONTAINER_NAME}" \
+              bash -s <<'REMOTE'
+          set -euo pipefail
+          cd "${STACK_DIR}"
+          echo "[remote] pulling image referenced by .env"
+          docker compose -p "${COMPOSE_PROJECT}" pull
+          echo "[remote] (re)starting idle profile"
+          docker compose -p "${COMPOSE_PROJECT}" --profile idle up -d --remove-orphans
+          echo "[remote] cleaning unused images"
+          docker image prune -af
+          echo "[remote] smoke test"
+          docker exec "${CONTAINER_NAME}" python main.py --help
+          echo "[remote] OK"
+          REMOTE
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/aquaia_ci

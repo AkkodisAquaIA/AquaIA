@@ -25,14 +25,16 @@ for col in colonnes_requises:
 if "Classe IA" not in df.columns:
     df["Classe IA"] = ""
 
+
 # Fonction pour nettoyer les noms de dossiers
 def nettoyer_nom(valeur, fallback=None):
     if pd.isna(valeur) or str(valeur).strip() == "":
         return fallback if fallback else "Inconnu"
     valeur = str(valeur).strip()
-    for char in ['/', '\\', ':', '*', '?', '"', '<', '>', '|']:
+    for char in ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]:
         valeur = valeur.replace(char, "_")
     return valeur
+
 
 # === TRAITEMENT ===
 for index, row in df.iterrows():

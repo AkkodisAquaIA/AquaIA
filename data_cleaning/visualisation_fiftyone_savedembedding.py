@@ -1,14 +1,13 @@
 import fiftyone as fo
 import fiftyone.brain as fob
 
-#Pour afficher les datasets enregistrés :
+# Pour afficher les datasets enregistrés :
 print(fo.list_datasets())
-#Pour supprimer:
-#fo.delete_dataset("dedup_dinov3_Diura_nan")
+# Pour supprimer:
+# fo.delete_dataset("dedup_dinov3_Diura_nan")
 Saved_embedding_name = "coco-2017-validation"
 
 if Saved_embedding_name in fo.list_datasets():
-
     dataset = fo.load_dataset(Saved_embedding_name)
 
     print("n total:", len(dataset))
