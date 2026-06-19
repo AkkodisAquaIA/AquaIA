@@ -70,14 +70,14 @@ def controle(cfg):
     cfg["DOMINANT"] = normalize_min_max(warnings, cfg["DOMINANT"], "DOMINANT", 0.0, 100.0)
     cfg["DOMINANT"], cfg["RARE"]  = swap(warnings, cfg["DOMINANT"], cfg["RARE"], "Class imbalance thresholds")
 
-    cfg["RATIO_OK"] = normalize_min_max(warnings, cfg["RATIO_OK"], "RATIO OK", 1, 10) 
-    cfg["RATIO_WARNING"] = normalize_min_max(warnings, cfg["RATIO_WARNING"], "RATIO WARNING", 50, 999)
+    # cfg["RATIO_OK"] = normalize_min_max(warnings, cfg["RATIO_OK"], "RATIO OK", 1, 10) 
+    # cfg["RATIO_WARNING"] = normalize_min_max(warnings, cfg["RATIO_WARNING"], "RATIO WARNING", 50, 999)
 
-    cfg["ENTROPY_OK"] = normalize_min_max(warnings, cfg["ENTROPY_OK"], "ENTROPY OK", 0.76, 1.0) 
-    cfg["ENTROPY_WARNING"] = normalize_min_max(warnings, cfg["ENTROPY_WARNING"], "ENTROPY WARNING", 0.0, 0.75)
+    # cfg["ENTROPY_OK"] = normalize_min_max(warnings, cfg["ENTROPY_OK"], "ENTROPY OK", 0.76, 1.0) 
+    # cfg["ENTROPY_WARNING"] = normalize_min_max(warnings, cfg["ENTROPY_WARNING"], "ENTROPY WARNING", 0.0, 0.75)
     
-    cfg["SCORE_OK"] = normalize_min_max(warnings, cfg["SCORE_OK"], "SCORE OK", 80, 100) 
-    cfg["SCORE_WARNING"] = normalize_min_max(warnings, cfg["SCORE_WARNING"], "SCORE WARNING", 0, 60)
+    # cfg["SCORE_OK"] = normalize_min_max(warnings, cfg["SCORE_OK"], "SCORE OK", 80, 100) 
+    # cfg["SCORE_WARNING"] = normalize_min_max(warnings, cfg["SCORE_WARNING"], "SCORE WARNING", 0, 60)
 
 
     if len(warnings) != 0 :
@@ -86,6 +86,7 @@ def controle(cfg):
         for w in warnings:            
             display.print(w, colors["warning"])
         display.print('----------------------------------------------------------------------*', colors["warning"])
+        print()
 
 
     if ct.LOAD_DIR:

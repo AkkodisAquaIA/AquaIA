@@ -1,10 +1,11 @@
+import os
+from collections import defaultdict
 
 from tools import system as syst
 import re
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
-from datetime import datetime
 from collections import Counter, defaultdict
 from collections import defaultdict
 
@@ -22,6 +23,9 @@ from config import constants as ct
 from config.constants import DISPLAY_COLORS as colors
 from tools import graphe as gr
 
+display = dc.DisplayColor()
+
+#==========================================================================================
 
 #==========================================================================================
 
@@ -35,9 +39,77 @@ def compute_stats(values):
         "max": float(np.max(arr))
     }
 
-def dataset_statistics_yolo(DATASET_DIR, rapport, cfg):
+
+def save_anomalies_readable(
+    anomalies: list[util.Anomaly],
+    file_name: str,
+    path_user: Path
+    ) -> None:
+    """
+    Sauvegarde les anomalies dans un fichier texte lisible :
+    - Résumé des anomalies par type
+    - Images regroupées par type
+    - Plusieurs images par ligne (configurable via ct.N_PER_LINE)
+    """
 
     display = dc.DisplayColor()
+
+    # Regroupement par type
+    anomalies_by_type = defaultdict(set)
+    for a in anomalies:
+        typ = a.get("type")
+        img_name = os.path.basename(a.get("image", "unknown"))
+        if typ and img_name:
+            anomalies_by_type[typ].add(img_name)
+
+    # Tri alphabétique des images par type
+    for typ in anomalies_by_type:
+        anomalies_by_type[typ] = sorted(anomalies_by_type[typ]) # type: ignore
+
+    new = util.horodatage(file_name, defaut="def")
+    output_path =  path_user / new
+
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            # --- Résumé ---
+            if len(anomalies) == 0:
+                f.write("[√] Aucune anomalie détectée \n\n")
+            else:
+
+                f.write(f" - {util.format_nombre(len(anomalies))} anomalie(s) détectée(s) :\n") 
+                
+                anomalies_by_type = defaultdict(list)
+
+                for a in anomalies:
+                    typ = a["type"] # type: ignore
+                    img = os.path.basename(a["image"]) # type: ignore
+                    anomalies_by_type[typ].append(img)
+
+                for typ, imgs in anomalies_by_type.items():
+                    f.write(
+                        f"   - {typ}: {util.format_nombre(len(imgs))} anomalie(s) sur {util.format_nombre(len(set(imgs)))} image(s)\n"
+                    )
+                
+                f.write("\n")
+                # --- Détails par type ---
+                for typ, images in anomalies_by_type.items():
+                    f.write(f"--- {typ} ---\n")
+                    for i in range(0, len(images), ct.N_PER_LINE):
+                        line_images = images[i:i+ ct.N_PER_LINE] # type: ignore
+                        f.write(" | ".join(line_images) + "\n")
+                    f.write("\n")
+
+                display.print(f" ****** '{file_name}' create *****", colors["warning"])
+
+    except FileNotFoundError:
+             display.print(f"Impossible de sauvegarder : {output_path}", colors['error'])
+
+            
+
+#==========================================================================================================
+
+def dataset_statistics_yolo(DATASET_DIR, rapport, cfg):
+
     display.print(" Analyse statistique", colors['info'])
 
     images_dir, labels_dir = util.get_dataset_paths(DATASET_DIR)
@@ -57,7 +129,7 @@ def dataset_statistics_yolo(DATASET_DIR, rapport, cfg):
 
 
 
-    rp.suivi("Analyse statistique", rapport, "D")
+    debut = rp.suivi("Analyse statistique", rapport, "D")
 
     # --- lecture labels ---
     label_files = labels_dir.glob("*.txt")
@@ -136,8 +208,8 @@ def dataset_statistics_yolo(DATASET_DIR, rapport, cfg):
             bbox_widths,
             bbox_heights
         ),
-        desc=" - Images",
-        unit=" image",
+        desc=" - Bboxes",
+        unit=" bbox",
         ncols=100,
         total=len(image_paths),  # indispensable
         position=0
@@ -238,8 +310,10 @@ def dataset_statistics_yolo(DATASET_DIR, rapport, cfg):
                 "image": img_name
             })
 
-    rp.suivi("Analyse statistique", rapport)
+    fin =rp.suivi("Analyse statistique", rapport)
 
+    # calcul du temps d'analyse
+    rp.temps_de_traitement(debut, fin ,rapport )
 
     return {
 
@@ -253,34 +327,7 @@ def dataset_statistics_yolo(DATASET_DIR, rapport, cfg):
         "class_to_images": class_to_images,
     }
 
-
-def generer_rapport(resultats, fichier):
-
-    util.quoi("\n******************\n")
-
-    with open(fichier, "w", encoding="utf-8") as f:
-
-        stats = resultats["stats"]
-
-        f.write("=== RAPPORT DATASET ===\n\n")
-        f.write(f"Images : {stats['images']}\n")
-        f.write(f"Labels : {stats['labels']}\n")
-        f.write(f"Bounding boxes : {stats['bounding_boxes']}\n")
-
-        f.write("\n=== DISTRIBUTION DES CLASSES ===\n")
-        for cls, nb in resultats["class_distribution"].items():
-            f.write(f"Classe {cls} : {nb}\n")
-
-        f.write("\n=== ANOMALIES ===\n")
-        for anomaly in resultats["anomalies"]:
-            f.write(f"{anomaly}\n")
-
-
-#==========================================================================================================
-
 def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None):
-
-    display = dc.DisplayColor()
 
     stats = resultats["stats"]
     class_distribution = resultats["class_distribution"]
@@ -293,11 +340,8 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None):
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
 
-
-
-
     print()
-    display.print(f"Analyse terminé {'avec' if anomalies else 'sans'} problème",
+    display.print(f"Analyse statistique terminé {'avec' if anomalies else 'sans'} problème",
                   colors["warning" if anomalies else "ok"]
                   )
 
@@ -397,8 +441,6 @@ def afficher_dataset_statistics(resultats, cfg, path_user, class_names=None):
 
 def file_dataset_statistics(resultats, cfg, path_user, class_names=None):
 
-    display = dc.DisplayColor()
-
     stats = resultats["stats"]
     class_distribution = resultats["class_distribution"]
     anomalies = resultats["anomalies"]
@@ -409,7 +451,7 @@ def file_dataset_statistics(resultats, cfg, path_user, class_names=None):
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
     print()
-    display.print(f"Analyse terminé {"avec" if anomalies else "sans"} problème",
+    display.print(f"Analyse statistique terminé {"avec" if anomalies else "sans"} problème",
                     colors["warning" if anomalies else "ok"]
                     )
 
@@ -436,12 +478,14 @@ def file_dataset_statistics(resultats, cfg, path_user, class_names=None):
     info_anomalie = (anomalies, resultats)
     ano.recherche_anomalie(stats, info_anomalie, path_user, True, cfg)
 
-    # --- Affichage Métriques d'imbalance -----------------------------------------
+    # 6 --- Métriques d'imbalance -----------------------------------------
     display.print("Métriques d'imbalance", colors['titre'])
     metrics = imb.imbalance_metrics(class_distribution, cfg)
     imb.afficher_imbalance_avance(metrics, display, colors, cfg)
 
+    # --- Rapport de défauts de conformité
+    save_anomalies_readable(anomalies, "erreurs_dataset.txt", path_user)
+
     print("\n")
-    display.print("Fin du Rapport", colors['titre'])
 
     return 

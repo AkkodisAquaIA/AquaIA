@@ -1,4 +1,4 @@
-import sys
+
 from config.config_loader import Config
 from pathlib import Path
 
@@ -25,7 +25,6 @@ def load_config():
     try:
         config = {
             # --- General ---
-            "REPORT_MODE": cfg.get_bool("general", "REPORT_MODE"),
             "SAVE_PLOT": cfg.get_bool("general", "SAVE_PLOT"),
 
             "SAVE_USER": cfg.SAVE_USER,
@@ -52,15 +51,15 @@ def load_config():
             "DOMINANT": cfg.get_float("dataset","DOMINANT"),
             "RARE": cfg.get_float("dataset","RARE"),
 
-            # --- Scoring ---
-            "RATIO_OK": cfg.get_float("scoring","RATIO_OK"),
-            "RATIO_WARNING": cfg.get_float("scoring","RATIO_WARNING"),
+            # # --- Scoring ---
+            # "RATIO_OK": cfg.get_float("scoring","RATIO_OK"),
+            # "RATIO_WARNING": cfg.get_float("scoring","RATIO_WARNING"),
 
-            "ENTROPY_OK": cfg.get_float("scoring","ENTROPY_OK"),
-            "ENTROPY_WARNING": cfg.get_float("scoring","ENTROPY_WARNING"),
+            # "ENTROPY_OK": cfg.get_float("scoring","ENTROPY_OK"),
+            # "ENTROPY_WARNING": cfg.get_float("scoring","ENTROPY_WARNING"),
 
-            "SCORE_OK": cfg.get_float("scoring","SCORE_OK"),
-            "SCORE_WARNING": cfg.get_float("scoring","SCORE_WARNING"),
+            # "SCORE_OK": cfg.get_float("scoring","SCORE_OK"),
+            # "SCORE_WARNING": cfg.get_float("scoring","SCORE_WARNING"),
 
         }
 
@@ -93,4 +92,4 @@ def load_config():
         display.print("----------------------------------", colors["error"])
         print()
         util.sortie_de_programme()
-        sys.exit(1)
+

@@ -6,7 +6,6 @@ from config.constants import DISPLAY_COLORS as colors
 
 #==============================================================================
 
-
 def info_images_par_classe(data_info_img_cla, file):
 
     display = dc.DisplayColor()

@@ -101,9 +101,9 @@ def afficher_info_general(stats, info_general, class_names, cfg):
 
     # --- résumé général ---
     display.print("Dataset Summary", colors["titre"])
-    print(f"{'Images':18}: {stats['images']}")
-    print(f"{'Labels':18}: {stats['labels']}")
-    print(f"{'Bounding boxes':18}: {total_boxes}")
+    print(f"{'Images':18}: {util.format_nombre(stats['images'])}")
+    print(f"{'Labels':18}: {util.format_nombre(stats['labels'])}")
+    print(f"{'Bounding boxes':18}: {util.format_nombre(total_boxes)}") 
     print(f"{'BBox / image':18}: {total_boxes / stats['images']:.2f}")
     print(f"{'Classes':18}: {total_classes}")
     print()

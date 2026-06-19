@@ -1,3 +1,4 @@
+
 from collections import Counter, defaultdict
 
 from tools import utility as util
@@ -5,6 +6,7 @@ from config import constants as ct
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 from tools import graphe as gr
+
 
 # ==============================================================
 # COLOR UTIL
@@ -152,7 +154,7 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
     display.print("Recherche d'anomalies", colors['titre'])
 
     if not anomalies:
-        display.print("Aucune anomalie trouvée !!", colors['ok'])
+        display.print(" - Aucune anomalie trouvée !!", colors['ok'])
         return
 
     types = list(type_to_id.keys())
@@ -171,8 +173,11 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
     # ==========================================================
 
     display.print("---------------- ANOMALIES ----------------------", colors['warning'])
+    display.print(f" - Affichage maximun des {ct.MAX_WORST_IMAGES} pires images", colors['warning'])
+    display.print(f"    Liste compléte dans le rapport", colors['warning'])
+    print()
 
-    print("------ LEGENDES ------")
+    print("----------------------- LEGENDES -----------------------")
     print("1 : bbox_trop_petite        │ 2 : bbox_trop_grande")
     print("3 : surface_trop_petite     │ 4 : surface_trop_grande")
     print("5 : bbox_warning_hors_zone  │ 6 : bbox_error_hors_zone")
@@ -187,7 +192,7 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
 
     print(
         f"{'TOTAL DEFAUTS':25} "
-        f"{total_defauts}"
+        f"{util.format_nombre(total_defauts)}"
     )
 
     # ==========================================================
@@ -228,19 +233,19 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
             )
 
     # ==========================================================
-    # STATS
+    # STATS        
     # ==========================================================
 
     images_problematiques = sum(1 for d in scores.values() if d["count"] > 0)
     pct_images = (images_problematiques / stats["images"]) * 100 if stats["images"] else 0
 
     display.print(
-        f"Images avec anomalies : {images_problematiques} ({pct_images:.3f}%)",
+        f"Images avec anomalies : {util.format_nombre(images_problematiques)} ({pct_images:.3f}%)",
         colors['warning']
     )
 
     display.print(
-        f"Total anomalies : {len(anomalies)}",
+        f"Total anomalies : {util.format_nombre(len(anomalies))}",
         colors['warning']
     )
 
@@ -258,6 +263,3 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
     if not file and (util.answer_yes_or_no("Voulez-vous afficher le graphique")):
         type_counts = Counter(a["type"] for a in anomalies)
         gr.histogram_anomalies(type_counts, "Nombre", cfg, anomalies)
-
-    if cfg["REPORT_MODE"]:
-        util.save_anomalies_readable(resultats['anomalies'], "erreurs_dataset.txt", path_user)

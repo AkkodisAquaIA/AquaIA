@@ -37,7 +37,7 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 NB_CLASSES = 100
 
 # Max number of worst images displayed in report
-MAX_WORST_IMAGES = 15
+MAX_WORST_IMAGES = 12
 
 # Max number of images displayed in summary (if too many, only a sample is shown)
 MAX_IMAGES_AFFICHEES = 30
@@ -46,7 +46,7 @@ MAX_IMAGES_AFFICHEES = 30
 TQDM_NCOLS = 150
 
 # Number of items displayed per line in reports
-N_PER_LINE = 5
+N_PER_LINE = 7
 
 # valeur du 'Bin' pour Bargraphe
 BINS = 60

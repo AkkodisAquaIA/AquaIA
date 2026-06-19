@@ -56,6 +56,53 @@ def round_bbox(cls, x, y, w, h, decimals=4):
 def round_coords(x, y, w, h, decimals=4):
     return (round(x, decimals), round(y, decimals), round(w, decimals), round(h, decimals))
 
+def display_and_save_errors(
+    cfg,
+    path_user: Path,
+    items: list[str],
+    file_name: str,
+    title: str,
+    sort: bool = True,
+    full_path: bool = False,
+) -> None:
+    """
+    Display and optionally save problematic items to a file.
+
+    Args:
+        path_user (Path): Base directory where the report will be saved.
+        items (List[str]): List of file paths or file names.
+        file_name (str): Output report file name.
+        title (str): Section title for display.
+        sort (bool): Whether to sort items alphabetically.
+        full_path (bool): If True, write full paths; otherwise file names only.
+    """
+
+    display = dc.DisplayColor()
+
+    if not items:
+        display.print(f"{title}: Pas de problèmes détectés.\n", colors['ok'])
+        return
+
+    if sort:
+        items = sorted(items, key=lambda p: str(p))
+
+    # Save to file if report mode is enabled
+    new = util.horodatage(file_name, defaut="def_conf")
+
+    new = f"def_conf_{file_name}"
+
+    file_path: Path = path_user / new  
+
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            for x in items:
+                f.write(str(x) if full_path else Path(x).name)
+                f.write("\n")
+    except FileNotFoundError:
+            display.print(f"Impossible de sauvegarder : {file_path}", colors['error'])
+
+    display.print(f" *** Fichier erreur : '{file_name}' create ", colors["warning"])
+
 
 #==================================================================================
 #-----------------------------------------------------------------------------------
@@ -72,6 +119,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, rapport, cfg):
 
     except FileNotFoundError as e:
         display.print(str(e), colors['error'])
+        rp.repport_def(e, rapport)
         util.sortie_de_programme()
 
     split_pattern = re.compile(r"[,\s]+")
@@ -82,7 +130,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, rapport, cfg):
     label_stems = set()
     all_bboxes = []
 
-    rp.suivi("Analyse conformité", rapport, "D")
+    debut = rp.suivi("Analyse conformité", rapport, "D")
 
     #====================================================================================================
     # Analyse des fichiers 'labels'
@@ -297,7 +345,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, rapport, cfg):
     for key, values in erreurs_syntaxe.items():
         if values:
             print()
-            util.display_and_save_errors(
+            display_and_save_errors(
                 cfg,
                 path_user,
                 sorted(values),
@@ -305,8 +353,11 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, rapport, cfg):
                 key.replace("_", " ").capitalize()
             )
     
-    rp.suivi("Analyse conformité", rapport)
+    fin = rp.suivi("Analyse conformité", rapport)
     
+    # calcul du temps d'analyse
+    rp.temps_de_traitement(debut, fin ,rapport )
+
     #
     # all_bboxes : liste avec toutes les Bboxes
     # rapport_detail    : collections.defaultdict
