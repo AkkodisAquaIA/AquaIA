@@ -4,8 +4,8 @@ from pathlib import Path
 # ======================
 # CONFIG
 # ======================
-ROOT_PATH = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/AQUA-IA_dataset/FIN-Benthic"
-SUFFIX = "_FIN-Benthic"
+ROOT_PATH = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/PERLA"
+SUFFIX = "_PERLA"
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
 

@@ -1,91 +1,25 @@
 import os
 import matplotlib.pyplot as plt
+import pandas as pd
 
-CLASSES_IA = [
-    "Polycentropodidae_Cyrnus_flavidus",
-    "Polycentropodidae_Plectrocnemia_sp",
-    "Phryganeidae_Agrypnia_sp",
-    "Lepidostomatidae_Lepidostoma_hirtum",
-    "Polycentropodidae_Neureclipsis_bimaculata",
-    "Hydroptilidae_Oxyethira_sp",
-    "Philopotamidae_Chimarra_sp",
-    "Leptoceridae_Ceraclea_sp",
-    "Goeridae_Silo_pallipes",
-    "Hydroptilidae_Ithytrichia_sp",
-    "Philopotamidae_Philopotamus_sp",
-    "Limnephilidae_Genus_sp",
-    "Heptageniidae_Heptagenia_dalecarlica",
-    "Heptageniidae_Heptagenia_sulphurea",
-    "Ephemerellidae_Ephemerella_aurivillii",
-    "Ephemerellidae_Ephemerella_mucronata",
-    "Leptophlebiidae_Habrophlebia_sp",
-    "Baetidae_Baetis_rhodani",
-    "Baetidae_Baetis_digitatus",
-    "Baetidae_Baetis_niger",
-    "Baetidae_Baetis_vernus",
-    "Ameletidae_Ameletus_inopinatus",
-    "Baetidae_Centroptilum_luteolum",
-    "Corixidae_Callicorixa_wollastoni",
-    "Planorbidae_Gyraulus_sp",
-    "Asellidae_Asellus_aquaticus",
-    "Sialidae_Sialis_lutaria",
-    "Sialidae_Sialis_fuliginosa",
-    "Sialidae_Sialis_morio",
-    "Chloroperlidae_Siphonoperla_burmeisteri",
-    "Perlodidae_Diura_nanseni",
-    "Perlodidae_Diura_others",
-    "Perlodidae_Diura_bicaudata",
-    "Taeniopterygidae_Brachyptera_risi",
-    "Nemouridae_Nemoura_sp",
-    "Nemouridae_Nemoura_avicularis",
-    "Nemouridae_Nemoura_cinerea",
-    "Nemouridae_Nemoura_flexuosa",
-    "Perlodidae_Isoperla_sp",
-    "Psychodidae_Genus_sp",
-    "Taeniopterygidae_Taeniopteryx_nebulosa",
-    "Nemouridae_Protonemura_sp",
-    "Leuctridae_Leuctra_sp",
-    "Leuctridae_Leuctra_fusca",
-    "Leuctridae_Leuctra_hippopus",
-    "Leuctridae_Leuctra_nigra",
-    "Sphaeriidae_Pisidium_sp",
-    "Pediciidae_Dicranota_sp",
-    "Empididae_Chelifera_sp",
-    "Empididae_Hemerodromia_sp",
-    "Athericidae_Atherix_sp",
-    "Chironomidae_Genus_sp",
-    "Ceratopogonidae_Genus_sp",
-    "Elmidae_Elmis_aenea_adult",
-    "Elmidae_Elmis_aenea_larva",
-    "Elmidae_Elmis_aenea",
-    "Scirtidae_Elodes_sp",
-    "Limoniidae_Eloeophila_sp",
-    "Gammaridae_Gammarus_sp",
-    "Hydraenidae_Hydraena_sp",
-    "Hydracarina_Genus_sp",
-    "Hydropsychidae_Hydropsyche_saxonica",
-    "Hydropsychidae_Hydropsyche_pellucidula",
-    "Hydropsychidae_Hydropsyche_siltalai",
-    "Leptophlebiidae_Paraleptophlebia_sp",
-    "Leptophlebiidae_Leptophlebia_sp",
-    "Elmidae_Limnius_volckmari",
-    "Brachycentridae_Micrasema_gelidum",
-    "Brachycentridae_Micrasema_setiferum",
-    "Elmidae_Oulimnius_tuberculatus_adult",
-    "Elmidae_Oulimnius_tuberculatus_larva",
-    "Elmidae_Oulimnius_tuberculatus",
-    "Polycentropodidae_Polycentropus_flavomaculatus",
-    "Polycentropodidae_Polycentropus_irroratus",
-    "Rhyacophilidae_Rhyacophila_fasciata",
-    "Rhyacophilidae_Rhyacophila_nubila",
-    "Simuliidae_Genus_sp",
-    "Sericostomatidae_Sericostoma_personatum",
-    "Glossosomatidae_Agapetus_sp",
-    "Nemouridae_Amphinemura_borealis",
-    "Capniidae_Capnopsis_schilleri",
-    "Heptageniidae_Kageronia_fuscogrisea",
-    "Sphaeriidae_Sphaerium_sp",
-]
+
+def extraire_noms_dossiers(fichier_excel, colonne):
+    """
+    fichier_excel : chemin vers le fichier Excel
+    colonne : nom de la colonne contenant les noms de dossiers
+    """
+
+    # Lire le fichier Excel
+    df = pd.read_excel(fichier_excel)
+
+    # Vérifier que la colonne existe
+    if colonne not in df.columns:
+        raise ValueError(f"La colonne '{colonne}' n'existe pas dans le fichier.")
+
+    # Extraire les noms (en supprimant les valeurs vides)
+    liste_dossiers = df[colonne].dropna().astype(str).tolist()
+
+    return liste_dossiers
 
 
 def plot_images_per_class(root_path, extensions=(".jpg", ".jpeg", ".png", ".tif", ".tiff")):
@@ -110,22 +44,32 @@ def plot_images_per_class(root_path, extensions=(".jpg", ".jpeg", ".png", ".tif"
 
     print("nb class =", c)
 
-    plt.figure(figsize=(16, 6))
+    plt.figure(figsize=(18, 7))
 
-    bars = plt.bar(CLASSES_IA, counts)
+    bars = plt.bar(range(len(CLASSES_IA)), counts)
 
-    plt.xticks(rotation=90)
+    plt.xticks(ticks=range(len(CLASSES_IA)), labels=CLASSES_IA, rotation=90, ha="center", fontsize=4)
+
     plt.xlabel("Classes IA")
     plt.ylabel("Nombre d'images")
     plt.title("Nombre d'images par classe")
 
-    # --- ajout du nombre d'images sur chaque barre ---
+    # --- ajout du nombre d'images verticalement ---
     for bar, count in zip(bars, counts):
         height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width() / 2, height, str(count), ha="center", va="bottom", fontsize=8)
+        plt.text(bar.get_x() + bar.get_width() / 2, height, str(count), ha="center", va="bottom", fontsize=8, rotation=90)
 
     plt.tight_layout()
+    plt.subplots_adjust(bottom=0.25)
     plt.show()
 
 
-plot_images_per_class("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited/train")
+# 🔹 Exemple d'utilisation
+fichier = "/home/sarah.laroui/Bureau/AQUA-IA/Docs/AQUA-IA_dataset/AQUA-IA_dataset_Nb_images_per_class.xlsx"
+colonne_dossiers = "Classe"
+
+CLASSES_IA = extraire_noms_dossiers(fichier, colonne_dossiers)
+
+print(CLASSES_IA)
+
+plot_images_per_class("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/NOT_USED/AQUA-IA_dataset_mars2026")
