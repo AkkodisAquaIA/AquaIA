@@ -3,11 +3,11 @@ from colorama import Fore, Style, init
 from collections import defaultdict
 
 from tools import utility as util
+from tools import system as syst
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 from config import constants as ct
 from tools import graphe as gr
-
 
 init(autoreset=True)
 
@@ -20,84 +20,94 @@ def info_classes(info_classes, file, cfg):
   
     display = dc.DisplayColor()
 
-    class_distribution = info_classes[0]
-    class_names =  info_classes[1]
+    while  True:
 
-    total = sum(class_distribution.values())
+        syst.clear_screen()
 
-    items = sorted(class_distribution.items())
+        class_distribution = info_classes[0]
+        class_names =  info_classes[1]
 
-    max_name_len = max(
-        len(class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}")
-        for cls, _ in items
-    )
+        total = sum(class_distribution.values())
 
-    blocs = []
-    dom, moy, rary = 0, 0, 0
+        items = sorted(class_distribution.items())
 
-    items_by_class = sorted(class_distribution.items())
-
-    items_by_freq = sorted(
-        class_distribution.items(),
-        key=lambda x: x[1],
-        reverse=True
-    )
-
-
-    for cls, count in items_by_freq:   #  items
-        pct = (count / total) * 100
-        name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
-
-        # Couleur automatique selon importance
-        if pct < cfg["RARE"] :
-            color = Fore.RED
-            rary +=1
-        elif pct < cfg["DOMINANT"] :
-            color = Fore.YELLOW
-            moy +=1
-        else:
-            color = Fore.GREEN
-            dom +=1
-
-        BAR_WIDTH = 20 # largeur maximale de la barre pour 100% (ajustable)
-        bbare = util.draw_bar(pct, 0, 100, BAR_WIDTH)
-
-        bloc = (
-            f"{color}"
-            f"{cls:>2} "
-            f"{name:<{max_name_len}} "
-            f'{count:5} '
-            f"{pct:5.2f}% "
-            f"{bbare}"
-            f"{Style.RESET_ALL}"
+        max_name_len = max(
+            len(class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}")
+            for cls, _ in items
         )
 
-        blocs.append(bloc)
+        blocs = []
+        dom, moy, rary = 0, 0, 0
 
-    tag = f"Répartition des classes ({rary + moy + dom})"
-    display.print(tag , colors['titre'])
-    legend_colored = (
-        f'{Fore.GREEN}■ ({dom}) ≥ {cfg["DOMINANT"]}% Dominant{Style.RESET_ALL}   '
-        f'│ {Fore.YELLOW}■ ({moy}) {cfg["RARE"]}–{cfg["DOMINANT"]}% Moyen{Style.RESET_ALL}   '
-        f'│ {Fore.RED}■ ({rary}) < {cfg["RARE"]}% Rare{Style.RESET_ALL}'
-    ).center(140)
-    print(f"{legend_colored}\n")
+        items_by_class = sorted(class_distribution.items())
 
-    # Largeur terminal
-    term_width = 220 # shutil.get_terminal_size().columns (317)
-    bloc_width = max(len(b) for b in blocs) + 1
-    classes_par_ligne = max(1, term_width // bloc_width)
+        items_by_freq = sorted(
+            class_distribution.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
 
-    for i in range(0, len(blocs), classes_par_ligne):
-        ligne = blocs[i:i + classes_par_ligne]
-        print("│ ".join(f"{b:<{bloc_width}}" for b in ligne))
+        for cls, count in items_by_freq:   #  items
+            pct = (count / total) * 100
+            name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
+
+            # Couleur automatique selon importance
+            if pct < cfg["RARE"] :
+                color = Fore.RED
+                rary +=1
+            elif pct < cfg["DOMINANT"] :
+                color = Fore.YELLOW
+                moy +=1
+            else:
+                color = Fore.GREEN
+                dom +=1
+
+            BAR_WIDTH = 20 # largeur maximale de la barre pour 100% (ajustable)
+            bbare = util.draw_bar(pct, 0, 100, BAR_WIDTH)
+
+            bloc = (
+                f"{color}"
+                f"{cls:>2} "
+                f"{name:<{max_name_len}} "
+                f'{count:5} '
+                f"{pct:5.2f}% "
+                f"{bbare}"
+                f"{Style.RESET_ALL}"
+            )
+
+            blocs.append(bloc)
+
+        tag = f"Répartition des classes ({rary + moy + dom})"
+        display.print(tag , colors['titre'])
+        legend_colored = (
+            f'{Fore.GREEN}■ ({dom}) ≥ {cfg["DOMINANT"]}% Dominant{Style.RESET_ALL}   '
+            f'│ {Fore.YELLOW}■ ({moy}) {cfg["RARE"]}–{cfg["DOMINANT"]}% Moyen{Style.RESET_ALL}   '
+            f'│ {Fore.RED}■ ({rary}) < {cfg["RARE"]}% Rare{Style.RESET_ALL}'
+        ).center(140)
+        print(f"{legend_colored}\n")
+
+        # Largeur terminal
+        term_width = 220 # shutil.get_terminal_size().columns (317)
+        bloc_width = max(len(b) for b in blocs) + 1
+        classes_par_ligne = max(1, term_width // bloc_width)
+
+        for i in range(0, len(blocs), classes_par_ligne):
+            ligne = blocs[i:i + classes_par_ligne]
+            print("│ ".join(f"{b:<{bloc_width}}" for b in ligne))
 
 
-    # Affichage de l'histogramme de distribution des classes
-    print()
+        # Affichage de l'histogramme de distribution des classes
+        print()
 
-    if not file and ( util.answer_yes_or_no("Voulez-vous afficher le graphique") ) :
-        gr.histogram_classe(items, class_names, cfg, total )    
+        if not file and ( util.answer_yes_or_no("Voulez-vous afficher le graphique") ) :
+            display.print("Attente fermeture du graphe", colors['wait'])
+            gr.histogram_classe(items, class_names, cfg, total )    
+
+        if  file or not util.answer_yes_or_no("Voulez-vous modifier la valeur des seuils") : 
+            break         
+
+        cfg["RARE"], cfg["DOMINANT"]=  util.seuil() 
+
 
     # --- classes Rares ---------------------------------------
     if  not file and ( util.answer_yes_or_no("Voulez-vous voir les classes rares") ):

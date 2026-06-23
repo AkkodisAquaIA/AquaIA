@@ -173,8 +173,13 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
     # ==========================================================
 
     display.print("---------------- ANOMALIES ----------------------", colors['warning'])
-    display.print(f" - Affichage maximun des {ct.MAX_WORST_IMAGES} pires images", colors['warning'])
-    display.print(f"    Liste compléte dans le rapport", colors['warning'])
+    if len(anomalies) == 1: 
+        display.print(f" - La pire image ", colors['warning'])
+    elif len(anomalies) <= ct.MAX_WORST_IMAGES:
+        display.print(f" - Les {len(anomalies)} pires images", colors['warning'])
+    else:     
+        display.print(f" - Les {ct.MAX_WORST_IMAGES} premières pires images", colors['warning'])
+        display.print(f"    Liste compléte dans le rapport", colors['warning'])
     print()
 
     print("----------------------- LEGENDES -----------------------")
@@ -239,6 +244,7 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
     images_problematiques = sum(1 for d in scores.values() if d["count"] > 0)
     pct_images = (images_problematiques / stats["images"]) * 100 if stats["images"] else 0
 
+    print()
     display.print(
         f"Images avec anomalies : {util.format_nombre(images_problematiques)} ({pct_images:.3f}%)",
         colors['warning']
@@ -261,5 +267,6 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
     # ==========================================================
 
     if not file and (util.answer_yes_or_no("Voulez-vous afficher le graphique")):
+        display.print("Attente fermeture du graphe", colors['wait'])
         type_counts = Counter(a["type"] for a in anomalies)
         gr.histogram_anomalies(type_counts, "Nombre", cfg, anomalies)

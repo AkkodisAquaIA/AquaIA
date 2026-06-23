@@ -6,7 +6,10 @@ import tkinter as tk
 
 # ============================================================================
 def splash_screen_circle(image_path, duration=3000):
-
+    """
+    Splash screen circulaire avec un cercle extérieur clair
+    et texte centré foncé.
+    """                                                                          
     splash = tk.Tk()
 
     splash.overrideredirect(True)

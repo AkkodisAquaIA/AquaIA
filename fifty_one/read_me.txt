@@ -1,12 +1,9 @@
-un ficiher 'aqua_ia_conf.ini' permet de régler certains paramètres. Si ce fichier n'est pas correcte ou absent, le programme s'arrête 
+﻿un fichier 'aqua_ia_conf.ini' permet de régler certains paramètres. Si ce fichier n'est pas correcte ou absent, le programme s'arrête 
 
-Le programme commence par une analyse complète du dataset afin de vérifier sa conformité et sa qualité. 
+Le programme commence par une analyse complète du Dataset afin de vérifier sa conformité et sa qualité. 
 Cette analyse repose sur une série de contrôles classés en deux catégories :
 
-Warnings (avertissements) : n’interrompent pas l’exécution du programme
-Erreurs : interrompent immédiatement le programme
-
-🔍 1. Contrôles effectués sur le dataset
+🔍 1. Contrôles effectués sur le Dataset
 
 Les vérifications suivantes sont réalisées :
 
@@ -15,13 +12,9 @@ Vérification que les images sont dans un format valide
 Vérification que chaque image possède un label associé
 Validation du contenu des fichiers de labels (voir ci-dessous)
 
-👉 Important :
-
-Tous les contrôles provoquent une erreur bloquante.
-
 🧾 2. Contrôles sur les fichiers de labels
 
-Chaque fichier de label est analysé selon les règles suivantes :
+Chaque fichier ‘label’ est analysé selon les règles suivantes :
 
 Pas de ligne vide
 Chaque ligne doit contenir exactement 5 champs
@@ -33,9 +26,14 @@ Détection de bounding boxes (Bboxes) en double
 Détection de classes différentes pour une même coordonnée
 Identification d’un IoU suspect (Voir en fin de fichier)
 
-📊 3. Calculs statistiques (si aucune erreur)
+👉 Important :
+A la fin de cette analyse, les fichiers qui présentent des défauts sont déplacés dans un répertoire ‘problems’ pour chaque type. Pour les images, leurs fichiers ‘label’ associés est lui aussi déplacé. 
 
-Si aucun problème bloquant n’est détecté, le programme calcule plusieurs statistiques sur le dataset :
+
+
+📊 3. Calculs statistiques 
+
+Les calculs se font donc sur un Dataset propre. Le programme calcule plusieurs statistiques sur le Dataset :
 
 📈 Informations générales
 Nombre total d’images
@@ -51,12 +49,14 @@ Minimum
 Maximum
 Moyenne
 Écart-type
+
+
 🏷️ 4. Analyse des classes
 
 Le programme compare les classes définies dans le fichier YAML avec celles présentes dans les labels :
 
-Classes présentes dans le YAML mais absentes du dataset
-Classes présentes dans le dataset mais absentes du YAML
+Classes présentes dans le YAML mais absentes du Dataset
+Classes présentes dans le Dataset mais absentes du YAML
 
 Ensuite, il fournit :
 
@@ -77,7 +77,7 @@ Deux seuils permettent de catégoriser les classes en trois groupes :
 
 🖼️ Évaluation de la qualité des images
 
-Le programme calcule un score de qualité par image afin d’identifier les images les plus problématiques du dataset.
+Le programme calcule un score de qualité par image afin d’identifier les images les plus problématiques du Dataset.
 
 Cette évaluation repose sur l’analyse des anomalies détectées sur les bounding boxes (Bboxes).
 
@@ -126,24 +126,24 @@ Le pourcentage de Bboxes problématiques
 
 👉 Cela permet de cibler rapidement les images nécessitant une correction.
 
-📈 5. Indicateurs globaux du dataset
+📈 5. Indicateurs globaux du Dataset
 Le programme calcule également des métriques globales :
 
 Nombre d’images problématiques (au moins une anomalie détectée)
 Pourcentage d’images impactées
 Nombre total de Bboxes problématiques
-Score moyen du dataset
+Score moyen du Dataset
 
-👉 Le score moyen donne une vision globale de la qualité du dataset.
+👉 Le score moyen donne une vision globale de la qualité du Dataset.
 
 🎯 Objectif
 Cette approche permet de :
     Prioriser les corrections (focus sur les pires images)
-    Évaluer rapidement la qualité globale du dataset
-    Suivre l’amélioration du dataset au fil des itérations
+    Évaluer rapidement la qualité globale du Dataset
+    Suivre l’amélioration du Dataset au fil des itérations
 
 
-⚖️ Analyse avancée du déséquilibre du dataset
+⚖️ Analyse avancée du déséquilibre du Dataset
 
 Le programme réalise une analyse du déséquilibre entre les classes afin d’évaluer la qualité de la distribution des données.
 
@@ -162,7 +162,7 @@ Ratio élevé → forte dominance de certaines classes
 👉 Exemple :
 
 Ratio = 10 → acceptable
-Ratio = 100+ → dataset très déséquilibré
+Ratio = 100+ → Dataset très déséquilibré
 🧠 2. Entropie normalisée
 L’entropie normalisée mesure la diversité globale des classes, en tenant compte de leur distribution.
 
@@ -185,8 +185,8 @@ L’entropie (répartition globale)
 
 👉 Ce score permet d’obtenir une évaluation synthétique du dataset :
 
-Score faible → dataset déséquilibré
-Score élevé → dataset bien équilibré
+Score faible → Dataset déséquilibré
+Score élevé → Dataset bien équilibré
 
 🎨 4. Visualisation des métriques
 Chaque métrique est affichée avec :

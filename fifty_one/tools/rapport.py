@@ -206,7 +206,7 @@ def finalisation_du_rapport(rapport, erreur, path_save):
     # --- Finalisation du Rapport ---------------------------------------------
     # --- Ecriture des défauts de conformitè ----------------------------------
     with open(rapport, "a", encoding="utf-8") as destination:
-        titre_rapport(destination,". . + . .")
+        titre_rapport(destination,"+ . . + . . +")
         titre_rapport(destination,"Listes complétes des Erreurs de Conformité & Anomalies")
         destination.write("\n")
         titre_rapport(destination,"Erreurs de Conformité")

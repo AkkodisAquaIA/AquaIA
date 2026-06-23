@@ -3,6 +3,7 @@ from config import constants as ct
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 
+from tools import utility as util
 
 #=======================================================================================================
 
@@ -64,21 +65,25 @@ def controle(cfg):
     cfg["PERCENTILE_ERROR"] = normalize_min_max(warnings, cfg["PERCENTILE_ERROR"], "PERCENTILE_ERROR", 90.0, 99.0)
 
     cfg["MIN_BBOX_OVERFLOW_WARNING"] = normalize_min_max(warnings, cfg["MIN_BBOX_OVERFLOW_WARNING"], "MIN_BBOX_OVERFLOW_WARNING",  5.0, 20.0)
-    cfg["MIN_BBOX_OVERFLOW_WARNING"] = normalize_min_max(warnings, cfg["MIN_BBOX_OVERFLOW_WARNING"], "MIN_BBOX_OVERFLOW_WARNING", 15.0, 40.0)
+    cfg["MIN_BBOX_OVERFLOW_ERROR"] = normalize_min_max(warnings, cfg["MIN_BBOX_OVERFLOW_ERROR"], "MIN_BBOX_OVERFLOW_ERROR", 15.0, 40.0)
 
     cfg["RARE"] = normalize_min_max(warnings, cfg["RARE"], "RARE", 0.0, 100.0)
     cfg["DOMINANT"] = normalize_min_max(warnings, cfg["DOMINANT"], "DOMINANT", 0.0, 100.0)
     cfg["DOMINANT"], cfg["RARE"]  = swap(warnings, cfg["DOMINANT"], cfg["RARE"], "Class imbalance thresholds")
 
-    # cfg["RATIO_OK"] = normalize_min_max(warnings, cfg["RATIO_OK"], "RATIO OK", 1, 10) 
-    # cfg["RATIO_WARNING"] = normalize_min_max(warnings, cfg["RATIO_WARNING"], "RATIO WARNING", 50, 999)
 
-    # cfg["ENTROPY_OK"] = normalize_min_max(warnings, cfg["ENTROPY_OK"], "ENTROPY OK", 0.76, 1.0) 
-    # cfg["ENTROPY_WARNING"] = normalize_min_max(warnings, cfg["ENTROPY_WARNING"], "ENTROPY WARNING", 0.0, 0.75)
-    
-    # cfg["SCORE_OK"] = normalize_min_max(warnings, cfg["SCORE_OK"], "SCORE OK", 80, 100) 
-    # cfg["SCORE_WARNING"] = normalize_min_max(warnings, cfg["SCORE_WARNING"], "SCORE WARNING", 0, 60)
+    profile = cfg.get("PROFILES", "normal").strip().lower()
 
+    if profile not in ct.PROFILES:
+        warnings.append(
+            f"Profil inconnu '{profile}' : utilisation du profil normal"
+        )
+        profile = "normal"
+
+    cfg["IMBALANCE"] = ct.PROFILES[profile]
+
+
+    # -----------------------------------------------------------------------------------
 
     if len(warnings) != 0 :
 

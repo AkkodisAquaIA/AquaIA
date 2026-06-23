@@ -1,6 +1,11 @@
 import numpy as np
 
 from tools import utility as util
+import tools.display_color as dc
+from config.constants import DISPLAY_COLORS as colors
+from config import constants as ct
+
+display = dc.DisplayColor()
 
 #============================================================================================
 
@@ -72,12 +77,16 @@ def evaluate_metric(
 #----------------------------------------------------------------------------------------
 def afficher_imbalance_avance(metrics, display, colors, cfg):
 
+    print()
+    display.print(f"Utilisation d'un profil {cfg["IMBALANCE"][2]}", colors['info'])
+    print()
+
     imbalance_score = float(metrics["imbalance_score"])
     
     evaluate_metric(
         label="Score déséquilibre",
         value=imbalance_score,
-        thresholds=(0.30, 0.10),
+        thresholds=(cfg["IMBALANCE"][1], cfg["IMBALANCE"][0]),
         statuses=(
             "Fort",
             "Modéré",
@@ -97,19 +106,18 @@ def afficher_imbalance_avance(metrics, display, colors, cfg):
     )
     print(
         "Un score proche de 0 indique un dataset équilibré, "
-        "un score proche de 1 indique un fort déséquilibre.\n"
+    "un score proche de 1 indique un fort déséquilibre.\n"
     )
 
 
     # --- DIAGNOSTIC ---
-    print("Diagnostic :")
+    display.print("  - Diagnostic :", colors['info'])
 
-    messages = []
-    if imbalance_score < 0.10:
-        print("- Dataset globalement équilibré")
+    if imbalance_score < cfg["IMBALANCE"][0]:
+        display.print(f"- Dataset globalement équilibré", colors['ok'])
 
-    elif imbalance_score < 0.30:
-        print("- Dataset modérément déséquilibré")
-
+    elif imbalance_score < cfg["IMBALANCE"][1]:
+        display.print(f"- Dataset modérément déséquilibré", colors['warning'])
+        
     else:
-        print("- Dataset fortement déséquilibré")
+        display.print(f"- Dataset fortement déséquilibré !!! {ct.BELL}", colors['error'])

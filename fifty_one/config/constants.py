@@ -36,6 +36,15 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 # Nombre maximal de classe
 NB_CLASSES = 100
 
+
+# imbalance
+PROFILES = {
+        "strict":   (0.05, 0.20, "strict"),
+        "normal":   (0.10, 0.30, "normal"),
+        "tolerant": (0.15, 0.40, "tolerant"),
+    }
+
+
 # Max number of worst images displayed in report
 MAX_WORST_IMAGES = 12
 
@@ -84,5 +93,6 @@ MENUS = {
         "Taille des BBoxes",
         "Anomalies",
         "Métriques de déséquilibre des classes",
+        "Lancement Fifty_One",
         "Sortie"    ],
 }

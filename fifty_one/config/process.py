@@ -17,6 +17,7 @@ def load_config():
     fichier = Path("aqua_ia_conf.ini")
     if not fichier.is_file():
         display.print(f"Le fichier de paramètre 'aqua_ia_conf.ini' est introuvable !!! {ct.BELL}", colors['error'])
+        print()
         util.sortie_de_programme()
         exit(1)
 
@@ -52,15 +53,9 @@ def load_config():
             "RARE": cfg.get_float("dataset","RARE"),
 
             # # --- Scoring ---
-            # "RATIO_OK": cfg.get_float("scoring","RATIO_OK"),
-            # "RATIO_WARNING": cfg.get_float("scoring","RATIO_WARNING"),
+            "PROFILES": cfg.get_str("scoring", "PROFILES")
 
-            # "ENTROPY_OK": cfg.get_float("scoring","ENTROPY_OK"),
-            # "ENTROPY_WARNING": cfg.get_float("scoring","ENTROPY_WARNING"),
-
-            # "SCORE_OK": cfg.get_float("scoring","SCORE_OK"),
-            # "SCORE_WARNING": cfg.get_float("scoring","SCORE_WARNING"),
-
+ 
         }
 
         # --- Vérification des répertoires ---
