@@ -22,8 +22,10 @@ def info_classes(info_classes, file, cfg):
 
     while  True:
 
-        syst.clear_screen()
+        if not file :
+            syst.clear_screen()
 
+        display.print("(2) Information sur les classes", colors['titre'])
         class_distribution = info_classes[0]
         class_names =  info_classes[1]
 

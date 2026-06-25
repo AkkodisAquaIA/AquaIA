@@ -6,11 +6,9 @@ import numpy as np
 import platform
 from colorama import Fore, Style
 from pathlib import Path
-import fiftyone as fo
 from datetime import datetime
 from typing import TypedDict
 
-from tools import system as syst
 import tools.display_color as dc
 from config.constants import DISPLAY_COLORS as colors
 from config import constants as ct
@@ -292,41 +290,6 @@ def calibrer_seuils_overflow(results : dict,
         "BBOX_OVERFLOW_WARNING": warning_final,
         "BBOX_OVERFLOW_ERROR": error_final
     }
-
-def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
-    """
-    Launches the FiftyOne web app for a given dataset.
-
-    Args:
-        dataset (fo.Dataset): The FiftyOne dataset to visualize.
-    """
-
-    display = dc.DisplayColor()    
-
-    display.print("Lancement de l'interface web FiftyOne...", colors['info'])
-    
-    port = syst.get_free_port()
-    session = None
-    try:
-        session = fo.launch_app(dataset, port=port, remote=False)
-        display.print(f"tyOne web interface accessible à l'adresse: http://127.0.0.1:{port}", colors['info'])
-        display.print("Attente de la fermeture de l'interface web", colors['wait'], bold=True)
-        display.print("Appuyez sur CTRL+C pour continuer si nécessaire.", colors['wait'], bold=True)
-
-        # Wait until the session is closed
-        try:
-            session.wait()
-        except KeyboardInterrupt:
-            display.print("CTRL+C détecté, continuation du programme...", colors['warning'])
-
-    except Exception as e:
-        display.print("Échec du lancement de l'interface web FiftyOne.", colors['error'])
-        print("Error:", e)
-
-    finally:
-        if session is not None:
-            session.close()
-            display.print("FiftyOne session fermée, continuation du programme.", colors['info'])
 
 def rgb_to_ansi(rgb: tuple[int, int, int]) -> str:
     """Convert RGB color to ANSI escape code."""

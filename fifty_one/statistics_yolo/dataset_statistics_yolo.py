@@ -476,14 +476,14 @@ def afficher_dataset_statistics(DATASET_DIR,resultats, cfg,  dataset_yaml, path_
         if choice == 1:
             # ---- Information générales --------------------------------------------------
             syst.clear_screen()
-            display.print("Information générales", colors['titre'])
+            display.print("(1) Information générales", colors['titre'])
             info_general = (total_boxes, total_classes, class_distribution, class_to_images )
             ige.afficher_info_general(stats, info_general, class_names, cfg)
 
         elif choice == 2:
             # ---- Information sur les classes --------------------------------------------
             syst.clear_screen()
-            display.print("Information sur les classes", colors['titre'])
+            display.print("(2) Information sur les classes", colors['titre'])
             classes_info =(class_distribution, class_names)
 
             icl.info_classes(classes_info, False, cfg)
@@ -491,14 +491,14 @@ def afficher_dataset_statistics(DATASET_DIR,resultats, cfg,  dataset_yaml, path_
         elif choice == 3:   
             # --- Images par classe -------------------------------------------------------
             syst.clear_screen()
-            display.print("Images par classe", colors['titre'])
+            display.print("(3) Images par classe", colors['titre'])
             data_info_img_cla = (class_to_images, class_names)
             iic.info_images_par_classe(data_info_img_cla, False)
 
         elif choice == 4:
             # --- histogramme des tailles de bbox -----------------------------------------
             syst.clear_screen()
-            display.print("Distribution de la taille des BBoxes", colors['titre'])
+            display.print("(4) Distribution de la taille des BBoxes", colors['titre'])
 
             nb_bins = ct.BINS
 
@@ -532,28 +532,29 @@ def afficher_dataset_statistics(DATASET_DIR,resultats, cfg,  dataset_yaml, path_
         elif choice == 5:
             # --- anomalies ---------------------------------------------------------------
             syst.clear_screen()
-            display.print("Anomalies", colors['titre'])
+            display.print("(5) Anomalies", colors['titre'])
             info_anomalie = (anomalies, resultats)
             ano.recherche_anomalie(stats, info_anomalie, path_user, False, cfg)
 
         elif choice == 6:
             # --- Affichage Métriques d'imbalance -----------------------------------------
             syst.clear_screen()
-            display.print("Métriques d'imbalance", colors['titre'])
+            display.print("(6) Métriques d'imbalance", colors['titre'])
             metrics = imb.imbalance_metrics(class_distribution, cfg)
             imb.afficher_imbalance_avance(metrics, display, colors, cfg)
 
         elif choice == 7:
             # --- Lancement de Fifty_One
             syst.clear_screen()
-            display.print("Lancement de FiftyOne", colors['titre'])
+            display.print("(7) Lancement de FiftyOne", colors['titre'])
 
             data_fifty_one =(anomalies, DATASET_DIR, dataset_yaml)
             lfo.lautch_fifty_one(data_fifty_one)
 
         elif choice == 8:
             # --- Sortie ------------------------------------------------------------------
-            if util.answer_yes_or_no("Voulez-vous sortir", True):
+            display.print("(8) Sortie du programme", colors['titre'])
+            if util.answer_yes_or_no("Voulez-vous sortir"):
                 break
 
     return   # anomalies

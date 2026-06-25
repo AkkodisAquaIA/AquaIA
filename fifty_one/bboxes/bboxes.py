@@ -101,7 +101,12 @@ def display_and_save_errors(
     except FileNotFoundError:
             display.print(f"Impossible de sauvegarder : {file_path}", colors['error'])
 
-    display.print(f" *** Fichier erreur : '{file_name}' create ", colors["warning"])
+    # display.print(f" *** Fichier erreur : '{file_path}' create ", colors["warning"])
+
+    total = len(items)
+    pl = "" if total == 1 else "s"   
+    resultat = Path(file_name).stem.replace("_", " ")
+    display.print(f" -'{resultat}': {total} Erreur{pl} trouvée{pl}", colors["warning"])
 
 
 #==================================================================================

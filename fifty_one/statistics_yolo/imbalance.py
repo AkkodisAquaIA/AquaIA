@@ -78,7 +78,7 @@ def evaluate_metric(
 def afficher_imbalance_avance(metrics, display, colors, cfg):
 
     print()
-    display.print(f"Utilisation d'un profil {cfg["IMBALANCE"][2]}", colors['info'])
+    display.print(f"Utilisation d'un profil {cfg['IMBALANCE'][2]}", colors['info'])
     print()
 
     imbalance_score = float(metrics["imbalance_score"])

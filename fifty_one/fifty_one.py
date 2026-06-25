@@ -2,18 +2,17 @@
 import os
 import re
 import random
+from tqdm import tqdm
 from tools import system as syst
 
 if syst.est_linux():
     os.environ.setdefault("FIFTYONE_DATABASE_URI", "mongodb://127.0.0.1:27017")
 
 from pathlib import Path
-# from collections import defaultdict
 import yaml
 import shutil
 from datetime import datetime
 import fiftyone as fo
-# import fiftyone.core.labels as fol
 
 from bboxes import bboxes as bb
 from statistics_yolo import dataset_statistics_yolo as ds
@@ -48,6 +47,85 @@ def choix_logo():
 
     return random.choice(fichiers) if fichiers else Path("logo/image_01.png")
 
+def creation_file_yaml(DATASET_DIR ):
+    labels_dir = DATASET_DIR / "labels" / "train2017"
+
+    classes = set()
+
+    fault_file = []
+
+    txt_files = list(labels_dir.glob("*.txt"))
+
+    for txt_file in tqdm(txt_files, 
+                        desc="Analyse des labels",
+                        unit=" labels",
+                        ncols=100,
+                        position=0):
+        try : 
+            with open(txt_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+
+                    if not line:
+                        continue
+
+                    try:
+                        class_id = int(line.split()[0])
+                        classes.add(class_id)
+                    except (ValueError, IndexError):
+                        pass
+
+        except UnicodeDecodeError:
+            
+            tag = f" - Fichier ignoré : {txt_file.name} : (contenu non UTF-8 ou fichier non texte)" 
+            fault_file.append(tag)
+
+        except Exception as e:
+
+            tag = f" - Fichier ignoré : {txt_file.name} ({e})" 
+            fault_file.append(tag)
+
+
+    if len(fault_file) != 0 :
+        print()
+        for f in fault_file :        
+
+            display.print(f,colors['warning'])
+        print()
+
+    if not classes:
+        display.print(
+            "Aucune classe détectée dans les fichiers labels.",
+            colors['error']
+        )
+    else:
+        nc = max(classes) + 1
+
+        contenu_defaut = {
+            "path": ".",
+            "train": "images/train2017",
+            "val": "images/train2017",  # à adapter si nécessaire
+            "nc": nc,
+            "names": [f"classe_{i}" for i in range(nc)]
+        }
+
+        dataset_yaml_ = DATASET_DIR / "default.yaml"
+
+        with open(dataset_yaml_, "w", encoding="utf-8") as f:
+            yaml.dump(
+                contenu_defaut,
+                f,
+                allow_unicode=True,
+                sort_keys=False
+            )
+
+        display.print(
+            f"Fichier créé avec {nc} classes détectées",
+            colors['ok']
+        )
+        print()
+
+#==========================================================================
 
 def load_class_names(dataset_yaml_path):
 
@@ -166,14 +244,19 @@ def main():
     # Efface l'écran avant de commencer
     syst.clear_screen()
 
-    # Choix aléatoire d'un logo
-    logo = choix_logo()
+    try:
+        # Choix aléatoire d'un logo
+        logo = choix_logo()
 
-    # affichage du logo
-    if syst.est_windows():
-        lw.splash_screen_circle(logo) 
-    else:
-        ll.splash_screen_circle(logo)
+        # affichage du logo
+        if syst.est_windows():
+            lw.splash_screen_circle(logo) 
+        else:
+            ll.splash_screen_circle(logo)
+    except FileNotFoundError :
+        print()
+        display.print("Le répertoire 'logo' est introuvable ou vide", colors['error'])
+        print()
 
     display.print(ct.INFO_PROD, colors['aqua_light'])
 
@@ -245,35 +328,16 @@ def main():
     dataset_yaml_ = ""
 
     # Gestion des fichiers .yaml
-    # Si aucun fichier .yaml trouvé -> message d'erreur et sortie du programme
+    # Si aucun fichier .yaml trouvé -> Création d'un fichier '.yaml' par défaut
     if len(yaml_files) == 0:
-        # display.print(f"Aucun fichier '.yaml' trouvé dans : \n   {DATASET_DIR}", colors['error'])
-        # print()
-        # util.sortie_de_programme()
-        
-        #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-        pass
+  
         display.print(
-            f"Aucun fichier '.yaml' trouvé dans :\n   {DATASET_DIR}\nCréation d'un fichier par défaut.",
+            f"Aucun fichier '.yaml' trouvé dans :\n   {DATASET_DIR}\n - Création d'un fichier par défaut.",
             colors['warning']
         )
 
-        # Nom du fichier par défaut
-        dataset_yaml_ = DATASET_DIR / "default.yaml"
-
-        # Contenu minimal
-        contenu_defaut = {
-            "names": ["classe_1"],
-            "nc": 1
-        }
-
-        with open(dataset_yaml_, "w", encoding="utf-8") as f:
-            yaml.dump(contenu_defaut, f, allow_unicode=True)
-
-        display.print(f"Fichier créé : {dataset_yaml_}", colors['ok'])
-
-
-        #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        creation_file_yaml(DATASET_DIR)
+        dataset_yaml_= DATASET_DIR / "default.yaml"
 
     # Si un seul fichier .yaml trouvé -> on l'utilise
     elif len(yaml_files) == 1:
@@ -318,6 +382,7 @@ def main():
 
     if not yaml_ok :
         rp.repport_def(tag, rapport)
+        print()
         util.sortie_de_programme()
 
 
@@ -380,6 +445,8 @@ def main():
 
     # --- Finalisation du Rapport ---------------------------------------------
     rp.finalisation_du_rapport(rapport, erreur, path_save)
+
+
 
     # --- Affichage des résultats ---------------------------------------------
     ds.afficher_dataset_statistics(DATASET_DIR, results, cfg, dataset_yaml ,path_save, class_names) # type: ignore
