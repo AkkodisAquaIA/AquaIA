@@ -14,16 +14,18 @@ import shutil
 from datetime import datetime
 import fiftyone as fo
 
-from bboxes import bboxes as bb
-from statistics_yolo import dataset_statistics_yolo as ds
-
+# --- Bibliothèques utilisateur ---------------------------------------------------------
 from config import valid_conf as vc
 from config.process import load_config
 from config import constants as ct
-from config.constants import DISPLAY_COLORS as colors
 
+from bboxes import bboxes as bb
+from statistics_yolo import dataset_statistics_yolo as ds
+
+from tools import menu as menu
 from tools import utility as util
 import tools.display_color as dc
+from tools.display_color import DISPLAY_COLORS as colors
 from tools import rapport as rp
 from tools import graphe as gr
 from tools import logo_win as lw
@@ -308,7 +310,6 @@ def main():
     # Graphe mode handling
     util.afficher_mode("Sauvegarde des Graphiques :", cfg["SAVE_PLOT"]) # type: ignore
 
-
     # Chargement du Répertoire du Dataset
     if ct.LOAD_DIR :
         DATASET_DIR : Path = Path(cfg["DATASET_DIR"]) # type: ignore
@@ -317,10 +318,14 @@ def main():
     
 
     #  ------------------------------------------------------------------------------------------
-    display.print("Démarrage du traitement", colors['titre'])
+    data = Path(DATASET_DIR.name)
+    display.print("Démarrage du traitement", colors['data_ok'], data) # type: ignore
 
     # Chargement des noms de classes pour les stats
     DATASET_DIR  = Path(DATASET_DIR )
+
+    # Gestion des fichiers .yaml
+    display.print("Gestion des fichiers '.yaml'", colors['titre']) # type: ignore
 
     # Recherche des fichiers .yaml
     # yaml_files = list(DATASET_DIR.glob("*.yaml")) + list(DATASET_DIR.glob("*.yml"))
@@ -339,29 +344,26 @@ def main():
         creation_file_yaml(DATASET_DIR)
         dataset_yaml_= DATASET_DIR / "default.yaml"
 
-    # Si un seul fichier .yaml trouvé -> on l'utilise
+    # Un seul fichier -> on l'utilise
     elif len(yaml_files) == 1:
-        # Un seul fichier -> on l'utilise
         dataset_yaml_ =  yaml_files[0]
 
-    # Si plusieurs fichiers .yaml trouvés -> demander lequel utiliser
+    # Sélection d'un fichier
     else:
-        # Plusieurs fichiers -> demander lequel utiliser
-        display.print("Plusieurs fichiers YAML trouvés :", colors['warning'])
 
-        for i, file in enumerate(yaml_files, start=1):
-            print(f"  - {i} : {file.name}")
-
-        choix = util.selection(len(yaml_files)) 
-        dataset_yaml_ = yaml_files[choix]
+        file_name = [f.stem for f in yaml_files]  #  stem or name depending on your needs
+        menu_items = ["'.YAML' disponible"] + file_name 
+        mm = menu.Menu("Dynamic", menu_items, style= 'rounds') # type: ignore
+        mm.display_menu()
+        choice = mm.selection()
+        dataset_yaml_ = yaml_files[choice - 1]
 
     # Chargement
-    nom = Path(dataset_yaml_).name
+    nom = Path(dataset_yaml_).stem #  stem or name depending on your needs
 
     display.print(f"fichier '.yaml' utilisé : {nom}", colors['ok'])
     print()
     dataset_yaml =  DATASET_DIR / dataset_yaml_
-
 
     # Création d'un fichier de rapport
     rapport = rp.create_file_report(DATASET_DIR, path_save, nom, cfg)
@@ -401,13 +403,13 @@ def main():
     else:
         print()
         display.print(" !!! Des erreurs de conformité ont été trouvées !!!\n"
-                      "  les fichiers seront déplacés vers le répertoire 'problems' \n"
+                      "  les fichiers seront déplacés vers les répertoires 'problems' de 'images' & 'labels' \n"
                       , colors['warning'])
 
         # Récupération des labels avec problèmes de conformité  
         liste_def(path_save)    
 
-        # Déplacement des fichiers problèmatiques dans le répertoire 'problem'
+        # Déplacement des fichiers problèmatiques dans les répertoires 'problem'
         try:
             deplac_prob(DATASET_DIR, path_save, "labels_invalides")
             deplac_prob(DATASET_DIR, path_save, "labels_orphelins")
@@ -428,28 +430,31 @@ def main():
 
 
     print()    
-    # --- Calcul statistiques sur le Dataset --------------------------------------------
+    # --- Calcul statistiques sur le Dataset ---------------------------------------------
     results = statistique(DATASET_DIR, cfg, class_names, path_save, rapport) # type: ignore
-
-
-    # --- Mise à Jour du Rapport de Sortie ----------------------------------------------
+    #--- Mise à Jour du Rapport de Sortie ------------------------------------------------
     rp.ecrire_sortie_dans_rapport(
         rapport,
-        ds.file_dataset_statistics,
+        ds.afficher_dataset_statistics,
+        ct.FICHIER,
+        DATASET_DIR, 
         results,
-        cfg,
-        path_save,
-        class_names # type: ignore
-    )
+        cfg, 
+        dataset_yaml,
+        class_names) # type: ignore
 
 
-    # --- Finalisation du Rapport ---------------------------------------------
+    # --- Finalisation du Rapport --------------------------------------------------------
     rp.finalisation_du_rapport(rapport, erreur, path_save)
 
 
+    # --- Visualisation des résultats sur Ecran ------------------------------------------
+    ds.afficher_dataset_statistics(ct.ECRAN,
+                                   DATASET_DIR, 
+                                   results, cfg, 
+                                   dataset_yaml,
+                                   class_names) # type: ignore
 
-    # --- Affichage des résultats ---------------------------------------------
-    ds.afficher_dataset_statistics(DATASET_DIR, results, cfg, dataset_yaml ,path_save, class_names) # type: ignore
 
     print()
     util.sortie_de_programme()

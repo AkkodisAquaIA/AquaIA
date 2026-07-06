@@ -7,8 +7,8 @@ import re
 import shutil
 
 from config import constants as ct
-from config.constants import DISPLAY_COLORS as colors
 import tools.display_color as dc
+from tools.display_color import DISPLAY_COLORS as colors
 from tools import utility as util
 
 display = dc.DisplayColor()
@@ -17,11 +17,11 @@ display = dc.DisplayColor()
 
 def lige_de_liaison(file):
     file.write("\n")
-    file.write("—" * 120)
+    file.write("—" * ct.DISPLAY_WIDTH)
     file.write("\n")
 
 def titre_rapport(file, texte):
-    file.write(f" {texte} ".center(120, "—"))
+    file.write(f" {texte} ".center(ct.DISPLAY_WIDTH, "—"))
     file.write("\n")
 
 def suivi(texte, rapport, type=""):
@@ -163,7 +163,7 @@ def create_file_report(DATASET_DIR, path_save, nom, cfg):
     try:
         with open(rapport, "w", encoding="utf-8") as f:
             f.write(ct.INFO_PROD)
-            f.write("—" * 120)
+            f.write("—" * ct.DISPLAY_WIDTH)
             f.write(f"\n - Nom du Dataset      : *** {liste_nom} ***")
             f.write(f"\n - Nom du fichier YAML : *** {nom} ***")
             f.write("\n")
@@ -171,8 +171,8 @@ def create_file_report(DATASET_DIR, path_save, nom, cfg):
             if not cfg["SAVE_PLOT"] :
                 f.write("\n  - Pas de sauvegarde des graphiques")
             f.write("\n\n")
-            f.write("—" * 120)
-            
+            f.write("—" * ct.DISPLAY_WIDTH)
+
     except FileNotFoundError:
             display.print(f"Impossible de sauvegarder : {rapport}", colors['error'])
 

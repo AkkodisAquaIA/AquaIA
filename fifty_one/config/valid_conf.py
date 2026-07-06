@@ -1,9 +1,8 @@
 
 from config import constants as ct
 import tools.display_color as dc
-from config.constants import DISPLAY_COLORS as colors
+from tools.display_color import DISPLAY_COLORS as colors
 
-from tools import utility as util
 
 #=======================================================================================================
 

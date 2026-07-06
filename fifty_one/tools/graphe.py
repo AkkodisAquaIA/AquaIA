@@ -7,7 +7,7 @@ import numpy as np
 import tools.utility as util
 from config import constants as ct
 import tools.display_color as dc
-from config.constants import DISPLAY_COLORS as colors
+from tools.display_color import DISPLAY_COLORS as colors
 
 #-----------------------------------------------------------------------------------
 def save_plot(filename: str, cfg) -> None:

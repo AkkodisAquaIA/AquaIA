@@ -4,7 +4,7 @@ from pathlib import Path
 
 from tools import utility as util
 import tools.display_color as dc
-from config.constants import DISPLAY_COLORS as colors
+from tools.display_color import DISPLAY_COLORS as colors
 from config import constants as ct
 
 
@@ -17,9 +17,8 @@ def load_config():
     fichier = Path("aqua_ia_conf.ini")
     if not fichier.is_file():
         display.print(f"Le fichier de paramètre 'aqua_ia_conf.ini' est introuvable !!! {ct.BELL}", colors['error'])
-        print()
         util.sortie_de_programme()
-        exit(1)
+
 
     cfg = Config("aqua_ia_conf.ini")
 
@@ -55,7 +54,6 @@ def load_config():
             # # --- Scoring ---
             "PROFILES": cfg.get_str("scoring", "PROFILES")
 
- 
         }
 
         # --- Vérification des répertoires ---
@@ -85,6 +83,6 @@ def load_config():
         display.print("-----                       ------", colors["error"])
         display.print(e, colors["error"]) # type: ignore
         display.print("----------------------------------", colors["error"])
-        print()
+
         util.sortie_de_programme()
 

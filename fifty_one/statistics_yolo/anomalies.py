@@ -4,14 +4,14 @@ from collections import Counter, defaultdict
 from tools import utility as util
 from config import constants as ct
 import tools.display_color as dc
-from config.constants import DISPLAY_COLORS as colors
+from tools.display_color import DISPLAY_COLORS as colors
 from tools import graphe as gr
 
+display = dc.DisplayColor()
 
 # ==============================================================
 # COLOR UTIL
 # ==============================================================
-
 def colorize(value, color):
     r, g, b, _ = color
     rgb = f"\033[38;2;{r};{g};{b}m"
@@ -21,7 +21,6 @@ def colorize(value, color):
 # ==============================================================
 # DATA PREPARATION
 # ==============================================================
-
 def build_anomaly_matrix(anomalies, types, id_to_type):
     matrix = defaultdict(lambda: defaultdict(int))
 
@@ -29,7 +28,6 @@ def build_anomaly_matrix(anomalies, types, id_to_type):
         matrix[a["image"]][a["type"]] += 1
 
     return matrix
-
 
 def compute_totals(anomaly_matrix, id_to_type):
     totaux = {i: 0 for i in range(1, 7)}
@@ -45,8 +43,7 @@ def compute_totals(anomaly_matrix, id_to_type):
 # ==============================================================
 # DISPLAY TABLE
 # ==============================================================
-
-def display_table(anomaly_matrix, sorted_images, totaux, id_to_type):
+def display_table( sorted_images, id_to_type):
     col_width = 5
 
     header = f"{'Image':25} │ " + " │ ".join(f"{i:^{col_width}}" for i in range(1, 7))
@@ -74,7 +71,6 @@ def display_table(anomaly_matrix, sorted_images, totaux, id_to_type):
         line_parts.append(f"{row_sum:^{col_width}}")
         print(" │ ".join(line_parts))
 
-
 def display_totals(totaux, col_width=5):
     total_line = [f"{'TOTAL':25}"]
 
@@ -94,7 +90,6 @@ def display_totals(totaux, col_width=5):
 # ==============================================================
 # SCORE
 # ==============================================================
-
 def compute_scores(anomalies, bbox_per_image, weights):
     max_weight = max(weights.values())
 
@@ -133,9 +128,13 @@ def compute_scores(anomalies, bbox_per_image, weights):
 # MAIN FUNCTION
 # ==============================================================
 
-def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
+def recherche_anomalie(mode_aff, stats, info_anomalie, cfg):
 
-    display = dc.DisplayColor()
+    mode_affichage = mode_aff[0]
+    etat_dataset = mode_aff[1]
+    nom_dataset = mode_aff[2]
+
+    display.print("(5) Anomalies", colors[etat_dataset], nom_dataset) 
 
     anomalies = info_anomalie[0]
     resultats = info_anomalie[1]
@@ -188,7 +187,7 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
     print("5 : bbox_warning_hors_zone  │ 6 : bbox_error_hors_zone")
     print()
 
-    display_table(anomaly_matrix, sorted_images, totaux, id_to_type)
+    display_table( sorted_images,  id_to_type)
 
     print("─" * 80)
     display_totals(totaux)
@@ -196,7 +195,7 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
     total_defauts = sum(totaux.values())
 
     print(
-        f"{'TOTAL DEFAUTS':25} "
+        f"{'TOTAL DEFAUTS : ':18} "
         f"{util.format_nombre(total_defauts)}"
     )
 
@@ -266,7 +265,7 @@ def recherche_anomalie(stats, info_anomalie, path_user, file, cfg):
     # GRAPH + EXPORT
     # ==========================================================
 
-    if not file and (util.answer_yes_or_no("Voulez-vous afficher le graphique")):
+    if mode_affichage == ct.ECRAN and (util.answer_yes_or_no("Voulez-vous afficher le graphique")):
         display.print("Attente fermeture du graphe", colors['wait'])
         type_counts = Counter(a["type"] for a in anomalies)
         gr.histogram_anomalies(type_counts, "Nombre", cfg, anomalies)

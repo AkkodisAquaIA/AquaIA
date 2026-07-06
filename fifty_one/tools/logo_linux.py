@@ -130,7 +130,7 @@ def splash_screen_circle(image_path, duration=3000):
     )
 
     # garder référence image
-    canvas.image = photo
+    canvas.image = photo # type: ignore
 
     # ------------------------------------------------------------------------
     # Transparence Windows uniquement

@@ -9,9 +9,10 @@ from tqdm import tqdm
 from tools import utility as util
 from tools import rapport as rp
 import tools.display_color as dc
-from config.constants import DISPLAY_COLORS as colors
+from tools.display_color import DISPLAY_COLORS as colors
 from config import constants as ct
 
+display = dc.DisplayColor()
 
 #==================================================================================
 
@@ -57,7 +58,6 @@ def round_coords(x, y, w, h, decimals=4):
     return (round(x, decimals), round(y, decimals), round(w, decimals), round(h, decimals))
 
 def display_and_save_errors(
-    cfg,
     path_user: Path,
     items: list[str],
     file_name: str,
@@ -76,8 +76,6 @@ def display_and_save_errors(
         sort (bool): Whether to sort items alphabetically.
         full_path (bool): If True, write full paths; otherwise file names only.
     """
-
-    display = dc.DisplayColor()
 
     if not items:
         display.print(f"{title}: Pas de problèmes détectés.\n", colors['ok'])
@@ -100,18 +98,15 @@ def display_and_save_errors(
                 f.write("\n")
     except FileNotFoundError:
             display.print(f"Impossible de sauvegarder : {file_path}", colors['error'])
-
-    # display.print(f" *** Fichier erreur : '{file_path}' create ", colors["warning"])
-
-    total = len(items)
+    
+    total = len(util.format_nombre( len(items)))
     pl = "" if total == 1 else "s"   
     resultat = Path(file_name).stem.replace("_", " ")
-    display.print(f" -'{resultat}': {total} Erreur{pl} trouvée{pl}", colors["warning"])
+    display.print(f" '{resultat}': {total} Erreur{pl} trouvée{pl}", colors["warning"])
 
 
 #==================================================================================
 #-----------------------------------------------------------------------------------
-display = dc.DisplayColor()
 
 def validate_yolo_dataset_detailed(DATASET_DIR, path_user, rapport, cfg):
 
@@ -254,7 +249,7 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, rapport, cfg):
                     if len(seen_coords_classes[coords_tuple]) > 1:
                         erreurs_syntaxe["bbox_classes_differentes"].append(f"{entry.name} (ligne {i})")
                         erreurs_ligne.append("bbox_classes_differentes")
-                        ctrl_ok = False
+                        ctrl_ok =   False
 
                     # --- IoU suspect ---
                     current_box = (x, y, w, h)
@@ -351,7 +346,6 @@ def validate_yolo_dataset_detailed(DATASET_DIR, path_user, rapport, cfg):
         if values:
             print()
             display_and_save_errors(
-                cfg,
                 path_user,
                 sorted(values),
                 f"{key}.txt",

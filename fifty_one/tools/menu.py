@@ -15,9 +15,9 @@ from colorama import init, Style
 
 # Local application imports
 from config import constants as ct
-from config.constants import DISPLAY_COLORS as colors
 from tools import utility as util
 from tools import display_color as dc
+from tools.display_color import DISPLAY_COLORS as colors
 
 # Initialize colorama
 init(autoreset=True)

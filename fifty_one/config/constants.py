@@ -1,3 +1,6 @@
+
+from os import get_terminal_size
+
 #==========================================================================================
 # Logo
 INFO_PROD = r"""
@@ -8,10 +11,6 @@ INFO_PROD = r"""
    └────────────────────────────────────────────┘
 """
 
-
-# # Random seed for reproducibility (ensures consistent results across runs)
-# SEED = 0
-
 # Chargement du dataset
 # True  -> Chargement via fichier de config 
 # False -> Saisie manuelle des chemins 
@@ -19,6 +18,14 @@ LOAD_DIR = True
 
 # System bell sound (used to alert on errors)
 BELL = "\a"
+
+# Width of the display for console output (in characters)
+DISPLAY_WIDTH = min(180, get_terminal_size().columns)
+
+
+
+ECRAN = False
+FICHIER = True
 
 
 #-----------------------------------------------------------------------------------
@@ -59,29 +66,6 @@ N_PER_LINE = 7
 
 # valeur du 'Bin' pour Bargraphe
 BINS = 60
-
-#-----------------------------------------------------------------------------------
-# Display Colors & Prefixes (RGB + label prefix)
-#-----------------------------------------------------------------------------------
-
-DISPLAY_COLORS = {
-    # Standard statuses
-    'error':   (204,  51,   0, "[X] "),    # Red           → critical error
-    'warning': (204, 204,   0, "[!] "),    # Yellow/Orange → warning
-    'input':   (153, 204,  51, "[?] "),    # Light green   → user input
-    'ok':      ( 51, 153,   0, "[√] "),    # Green         → success
-    'info':    ( 51, 102, 255, "[I] "),    # Blue          → informational message
-    'wait':    (255, 153,  51, "[...] "),  # Orange        → processing/wait
-    'goodbye': (255,  16, 240, "[<3] "),   # Purple        → exit message
-
-    # Custom prefixes for specific message types
-    'titre':   ( 0,  204, 153, "T"),        # Standard teal → ———— Titre ————
-
-    # Aqua-IA themed colors (blue-green palette)
-    'aqua_light': (102, 255, 204, "[~] "), # Light turquoise
-    'aqua':       (  0, 204, 153, "[~] "), # Standard teal
-    'aqua_dark':  (  0, 102, 102, "[~] "), # Dark blue-green
-}
 
 
 MENUS = {

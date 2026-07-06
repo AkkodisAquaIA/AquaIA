@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import TypedDict
 
 import tools.display_color as dc
-from config.constants import DISPLAY_COLORS as colors
+from tools.display_color import DISPLAY_COLORS as colors
 from config import constants as ct
 
 #=====================================================================================================
@@ -514,12 +514,10 @@ def draw_bar(value, vmin, vmax, length=50):
     
     return scale
 
-def titre_centre(texte, largeur=120, remplissage='—'):  # '—' 
-    return f" {texte} ".center(largeur, remplissage)
 
 def sortie_de_programme():
 
     display = dc.DisplayColor()
-
+    print()
     display.print(f"Programme terminé. Au revoir !{ct.BELL}", colors['goodbye'])
     sys.exit(0)

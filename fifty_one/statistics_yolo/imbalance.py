@@ -2,7 +2,7 @@ import numpy as np
 
 from tools import utility as util
 import tools.display_color as dc
-from config.constants import DISPLAY_COLORS as colors
+from tools.display_color import DISPLAY_COLORS as colors
 from config import constants as ct
 
 display = dc.DisplayColor()
@@ -75,7 +75,13 @@ def evaluate_metric(
     print(f"{'':25}  {bare}\n")
 
 #----------------------------------------------------------------------------------------
-def afficher_imbalance_avance(metrics, display, colors, cfg):
+def afficher_imbalance_avance(mode_aff, metrics, display, cfg): 
+
+    mode_affichage = mode_aff[0]
+    etat_dataset = mode_aff[1]
+    nom_dataset = mode_aff[2]
+
+    display.print("(6) Métriques d'imbalance", colors[etat_dataset], nom_dataset) 
 
     print()
     display.print(f"Utilisation d'un profil {cfg['IMBALANCE'][2]}", colors['info'])

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from tools import utility as util
 import tools.display_color as dc
-from config.constants import DISPLAY_COLORS as colors
+from tools.display_color import DISPLAY_COLORS as colors
 
 #============================================================================
 def afficher_stats_bbox(stats, cfg):
@@ -90,14 +90,21 @@ def verifier_classes_dataset(class_distribution, class_names):
 #============================================================================
 
 
-def afficher_info_general(stats, info_general, class_names, cfg):
+def afficher_info_general(mode_aff, stats, info_general, class_names, cfg):
 
     display = dc.DisplayColor()
+
+    mode_affichage = mode_aff[0]
+    etat_dataset = mode_aff[1]
+    nom_dataset = mode_aff[2]
 
     total_boxes = info_general[0]
     total_classes = info_general[1]
     class_distribution = info_general[2] 
     class_to_images = info_general[3]
+
+    display.print("(1) Information générales", colors[etat_dataset], nom_dataset) # type: ignore
+
 
     # --- résumé général ---
     display.print("Dataset Summary", colors["titre"])

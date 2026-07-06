@@ -1,4 +1,5 @@
 
+import os
 from pathlib import Path
 from collections import defaultdict
 import fiftyone as fo
@@ -8,9 +9,11 @@ from tools import system as syst
 from tools import utility as util
 from config import constants as ct
 import tools.display_color as dc
-from config.constants import DISPLAY_COLORS as colors
+from tools.display_color import DISPLAY_COLORS as colors
 
 display = dc.DisplayColor()
+
+_DATASET_CACHE = {}
 
 # =======================================================================================
 def group_anomalies(anomalies):
@@ -21,40 +24,45 @@ def group_anomalies(anomalies):
 
 def create_dataset(DATASET_DIR,  yaml_path=None, anomalies=None):
 
-    dataset_name = (
-                f"{Path(DATASET_DIR).name}"
-                f"{'_def' if anomalies is not None else '_ok'}"
-                )
+    is_def = bool(anomalies)
+    dataset_name = f"{DATASET_DIR.stem}_{'def' if is_def else 'ok'}"
 
     display.print("Création du dataset FiftyOne :", colors['info'])
     print(f"    '{dataset_name}'")
 
-    if dataset_name in fo.list_datasets():
-        fo.delete_dataset(dataset_name)
-
-    fo.close_app()
+    print()
+    if not anomalies :   
+        display.print(" - Dataset Ok", colors['ok'])
+        display.print(f" - Création du dataset avec fichier '.yaml': {Path(yaml_path).stem}\n", colors['ok']) # stem or name depending on your needs
+    else:
+        display.print(" - Dataset non valide", colors['warning'])
+        display.print(" - Création d'un dataset d'anomalies\n",colors['warning'])
 
     # Mini barre
     progress = util.MiniProgressBar("Chargement dataset", width=20)
     progress.start()
 
-
     try:
         # =========================================================
-        # CAS 1 : dataset classique YOLO
+        # CAS 1 : dataset classique YOLO sans anomalies
         # =========================================================
-        if anomalies is None:
+        if not anomalies :
+         
             dataset = fo.Dataset.from_dir(
                 dataset_type=fo.types.YOLOv5Dataset, # type: ignore
                 dataset_dir=str(DATASET_DIR),
                 yaml_path=str(yaml_path),
-                name=dataset_name
+                name=dataset_name,
+                overwrite=True
             )
 
         # =========================================================
         # CAS 2 : dataset avec anomalies
         # =========================================================
         else:
+
+            if fo.dataset_exists(dataset_name):
+                fo.delete_dataset(dataset_name)
 
             dataset = fo.Dataset(dataset_name)
 
@@ -134,6 +142,50 @@ def create_dataset(DATASET_DIR,  yaml_path=None, anomalies=None):
 
     return dataset
 
+def is_valid_dataset(name):
+    if not fo.dataset_exists(name):
+        return False
+    ds = fo.load_dataset(name)
+    return fo.dataset_exists(name) and len(ds) > 0
+
+def get_dataset(DATASET_DIR, dataset_yaml, anomalies):
+
+    is_def = bool(anomalies)
+    dataset_name = f"{DATASET_DIR.stem}_{'def' if is_def else 'ok'}"
+
+
+    # 1. Cache Python (IMPORTANT)
+    if dataset_name in _DATASET_CACHE:
+
+        cached = _DATASET_CACHE[dataset_name]
+
+        if len(cached) > 0:
+            display.print("Dataset 'Fifty_One' déjà chargé depuis le cache :", colors['info'])
+            return cached
+
+    else:
+        # 2. Dataset FiftyOne déjà existant
+        if is_valid_dataset(dataset_name):
+
+            dataset = fo.load_dataset(dataset_name)
+
+        else:
+ 
+            if fo.dataset_exists(dataset_name):
+               fo.delete_dataset(dataset_name)
+
+            dataset = create_dataset(
+                DATASET_DIR,
+                yaml_path=dataset_yaml,
+                anomalies=anomalies
+            )
+
+    # 4. Cache mémoire
+    _DATASET_CACHE[dataset_name] = dataset # type: ignore
+
+    return dataset # type: ignore
+
+
 def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
     """
     Launches the FiftyOne web app for a given dataset.
@@ -171,28 +223,23 @@ def launch_fiftyone_interface(dataset: fo.Dataset) -> None:
 
 # =======================================================================================
 
-def lautch_fifty_one(data_fifty_one):
+def launch_fifty_one(mode_aff, data_fifty_one):
+
+    mode_affichage = mode_aff[0]
+    etat_dataset = mode_aff[1]
+    nom_dataset = mode_aff[2]
+
+    display.print("(7) Lancement de FiftyOne", colors[etat_dataset], nom_dataset) # type: ignore
+
+    # if mode_affichage == ct.ECRAN :
 
     anomalies    = data_fifty_one[0]
     DATASET_DIR  = data_fifty_one[1]
     dataset_yaml = data_fifty_one[2]
 
-    try:
-        if not anomalies:
-            display.print(" - Dataset Ok", colors['ok'])
-            display.print(f" - Création du dataset avec fichier : {Path(dataset_yaml).name}\n", colors['ok'])
-
-            dataset = create_dataset(DATASET_DIR, yaml_path=dataset_yaml)
-
-        else:
-            display.print(" - Dataset non valide", colors['warning'])
-            display.print(" - Création d'un dataset d'anomalies\n",colors['warning'])
-
-            dataset = create_dataset(DATASET_DIR, anomalies=anomalies)
-        
-    except ValueError:
-        display.print(f"!!! Dataset non valide !!!\n{ct.BELL}", colors['error'])
-        util.sortie_de_programme()
+    dataset = get_dataset(DATASET_DIR, dataset_yaml, anomalies)
 
     # Lancement de Fifty_One
     launch_fiftyone_interface(dataset) # type: ignore   
+
+

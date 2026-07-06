@@ -1,20 +1,26 @@
-
+from config import constants as ct
+from tools import utility as util
 import tools.display_color as dc
-from config.constants import DISPLAY_COLORS as colors
+from tools.display_color import DISPLAY_COLORS as colors
 
 #==============================================================================
 
 #==============================================================================
 
-def info_images_par_classe(data_info_img_cla, file):
+def info_images_par_classe(mode_aff, data_info_img_cla):
 
     display = dc.DisplayColor()
+
+    mode_affichage = mode_aff[0]
+    etat_dataset = mode_aff[1]
+    nom_dataset = mode_aff[2]
+
  
     class_to_images = data_info_img_cla[0]
     class_names = data_info_img_cla[1]
- 
-    display.print("Nombres d'images par classe", colors['titre'])
 
+    display.print("(3) Nombres d'images par classe", colors[etat_dataset], nom_dataset) # type: ignore
+ 
     MAX_IMAGES_DISPLAY = 30     # nombre max d'images par classe
     MAX_CLASSES_SELECT = 6      # max classes que l'utilisateur peut demander
 
@@ -33,14 +39,15 @@ def info_images_par_classe(data_info_img_cla, file):
                     start, end = map(int, part.split("-"))
                     for i in range(start, end + 1):
                         if i in available_classes:
-                            result.add(i)
+
+                            result.add(i)  
                 except ValueError:
                     continue
             else:
                 try:
                     num = int(part)
                     if num in available_classes:
-                        result.add(num)
+                        result.add(num)   
                 except ValueError:
                     continue
 
@@ -66,7 +73,7 @@ def info_images_par_classe(data_info_img_cla, file):
     rows = []
     for cls in available_classes:
         name = class_names[cls] if class_names and cls < len(class_names) else f"UNK_{cls}"
-        count = len(class_to_images[cls])
+        count = util.format_nombre(len(class_to_images[cls]))
         formatted = f"{cls:>3} - {name:<{max_name_length}} : {count:>{max_count_length}}"
         rows.append(formatted)
 
@@ -78,7 +85,7 @@ def info_images_par_classe(data_info_img_cla, file):
         print("│ ".join(f"{item:<{col_width}}" for item in line))
     print()
 
-    if not file :
+    if mode_affichage == ct.ECRAN :
         # Affichage des noms des images par classe
         tag = f"Affichage des noms des images par classe"
         display.print(tag, colors['titre'])

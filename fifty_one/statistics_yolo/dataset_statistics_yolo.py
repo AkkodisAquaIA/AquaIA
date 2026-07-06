@@ -1,6 +1,5 @@
 import os
 from collections import defaultdict
-
 import re
 import numpy as np
 from tqdm import tqdm
@@ -10,21 +9,21 @@ from collections import defaultdict
 import fiftyone as fo
 import fiftyone.core.labels as fol
 
-
 from statistics_yolo import imbalance as imb
 import statistics_yolo.info_general as ige
 import statistics_yolo.info_classe as icl
 import statistics_yolo.info_img_classe as iic
+import statistics_yolo.taille_bboxes as itp
 import statistics_yolo.anomalies as ano
 import statistics_yolo.lautch_fifty_one as lfo
 
 from tools import system as syst
 import tools.display_color as dc
+from tools.display_color import DISPLAY_COLORS as colors
 from tools import utility as util
 from tools import rapport as rp
 from tools import menu as menu
 from config import constants as ct
-from config.constants import DISPLAY_COLORS as colors
 from tools import graphe as gr
 
 display = dc.DisplayColor()
@@ -41,11 +40,10 @@ def compute_stats(values):
         "max": float(np.max(arr))
     }
 
-
 def save_anomalies_readable(
     anomalies: list[util.Anomaly],
     file_name: str,
-    path_user: Path
+    cfg
     ) -> None:
     """
     Sauvegarde les anomalies dans un fichier texte lisible :
@@ -67,7 +65,7 @@ def save_anomalies_readable(
         anomalies_by_type[typ] = sorted(anomalies_by_type[typ]) # type: ignore
 
     new = util.horodatage(file_name, defaut="def")
-    output_path =  path_user / new
+    output_path = Path(cfg["SAVE_USER"]) / new
 
     try:
         with open(output_path, "w", encoding="utf-8") as f:
@@ -99,10 +97,10 @@ def save_anomalies_readable(
                         f.write(" | ".join(line_images) + "\n")
                     f.write("\n")
 
-                display.print(f" ****** '{file_name}' create *****", colors["warning"])
-
     except FileNotFoundError:
              display.print(f"Impossible de sauvegarder : {output_path}", colors['error'])
+
+           
 
 def group_anomalies(anomalies):
     grouped = defaultdict(list)
@@ -447,8 +445,7 @@ def dataset_statistics_yolo(DATASET_DIR, rapport, cfg):
         "class_to_images": class_to_images,
     }
 
-
-def afficher_dataset_statistics(DATASET_DIR,resultats, cfg,  dataset_yaml, path_user, class_names=None):
+def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dataset_yaml, class_names=None):
 
     stats = resultats["stats"]
     class_distribution = resultats["class_distribution"]
@@ -457,8 +454,17 @@ def afficher_dataset_statistics(DATASET_DIR,resultats, cfg,  dataset_yaml, path_
     class_to_images = resultats.get("class_to_images", {})
 
     total_boxes = stats["bounding_boxes"]
-    # total = sum(class_distribution.values())
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
+
+    mode_aff =[
+        mode_affichage,                        # Ecran ou Fichier
+        'data_df' if anomalies else 'data_ok', # etat_dataset,
+        Path(DATASET_DIR.name)                 # non_du_dataset
+    ]    
+
+        # --- Rapport de défauts de conformité
+    if mode_affichage == ct.FICHIER :
+        save_anomalies_readable(anomalies, "erreurs_dataset.txt", cfg)
 
 
     print()
@@ -466,151 +472,66 @@ def afficher_dataset_statistics(DATASET_DIR,resultats, cfg,  dataset_yaml, path_
                   colors["warning" if anomalies else "ok"]
                   )
 
+    # Création et affichage du menu principal 
+    choice = 0
     main_menu = menu.Menu('MAIN', style= "heavy")
     while True : 
 
-        display.print("Menu", colors['titre'])
-        main_menu.display_menu()
-        choice = main_menu.selection()
+        if mode_affichage == ct.ECRAN :
+            display.print("Menu", colors['titre'])
+            main_menu.display_menu()
+            choice = main_menu.selection()
+        else:
+            choice +=1
 
         if choice == 1:
             # ---- Information générales --------------------------------------------------
             syst.clear_screen()
-            display.print("(1) Information générales", colors['titre'])
             info_general = (total_boxes, total_classes, class_distribution, class_to_images )
-            ige.afficher_info_general(stats, info_general, class_names, cfg)
+            ige.afficher_info_general(mode_aff, stats, info_general, class_names, cfg)
 
         elif choice == 2:
             # ---- Information sur les classes --------------------------------------------
             syst.clear_screen()
-            display.print("(2) Information sur les classes", colors['titre'])
             classes_info =(class_distribution, class_names)
-
-            icl.info_classes(classes_info, False, cfg)
+            icl.info_classes(mode_aff, classes_info, cfg)
                      
         elif choice == 3:   
             # --- Images par classe -------------------------------------------------------
             syst.clear_screen()
-            display.print("(3) Images par classe", colors['titre'])
             data_info_img_cla = (class_to_images, class_names)
-            iic.info_images_par_classe(data_info_img_cla, False)
+            iic.info_images_par_classe(mode_aff, data_info_img_cla)
 
         elif choice == 4:
             # --- histogramme des tailles de bbox -----------------------------------------
             syst.clear_screen()
-            display.print("(4) Distribution de la taille des BBoxes", colors['titre'])
-
-            nb_bins = ct.BINS
-
-            counts, edges = np.histogram(bbox_areas, bins=nb_bins)
-            y_max = counts.max()
-
-            print(f" - Nombre maximum d'occurrences : {util.format_nombre(y_max)}")
-            print()
-
-            y_max_affichage = y_max
-
-            while True:
-
-                display.print("Attente fermeture du graphe", colors['wait'])
-                gr.histogram_taille_bbox(
-                    bbox_areas,
-                    "Distribution des tailles de BBox",
-                    "Aire bbox",
-                    "Nombre",
-                    cfg,
-                    y_max_affichage,
-                )
-
-                if not util.answer_yes_or_no("Voulez-vous modifier la valeur de 'y_max'"):
-                    break
-
-                y_max_affichage = int(
-                    util.input_value("Entrer une valeur")
-                )
+            if mode_affichage == ct.ECRAN :
+                itp.taille_bboxes(mode_aff, bbox_areas, cfg)
 
         elif choice == 5:
             # --- anomalies ---------------------------------------------------------------
             syst.clear_screen()
-            display.print("(5) Anomalies", colors['titre'])
             info_anomalie = (anomalies, resultats)
-            ano.recherche_anomalie(stats, info_anomalie, path_user, False, cfg)
+            ano.recherche_anomalie(mode_aff, stats, info_anomalie,cfg)
 
         elif choice == 6:
             # --- Affichage Métriques d'imbalance -----------------------------------------
             syst.clear_screen()
-            display.print("(6) Métriques d'imbalance", colors['titre'])
             metrics = imb.imbalance_metrics(class_distribution, cfg)
-            imb.afficher_imbalance_avance(metrics, display, colors, cfg)
-
+            imb.afficher_imbalance_avance(mode_aff, metrics, display, cfg) 
+ 
         elif choice == 7:
             # --- Lancement de Fifty_One
             syst.clear_screen()
-            display.print("(7) Lancement de FiftyOne", colors['titre'])
-
-            data_fifty_one =(anomalies, DATASET_DIR, dataset_yaml)
-            lfo.lautch_fifty_one(data_fifty_one)
+            if mode_affichage == ct.ECRAN :
+                data_fifty_one =(anomalies, DATASET_DIR, dataset_yaml)
+                lfo.launch_fifty_one(mode_aff, data_fifty_one)
 
         elif choice == 8:
             # --- Sortie ------------------------------------------------------------------
-            display.print("(8) Sortie du programme", colors['titre'])
-            if util.answer_yes_or_no("Voulez-vous sortir"):
+            if mode_affichage == ct.ECRAN :
+                display.print("(8) Sortie du programme", colors['titre'])
+            if mode_affichage == ct.FICHIER or util.answer_yes_or_no("Voulez-vous sortir"):
                 break
 
     return   # anomalies
-
-    #====================================================================================
-    #====================================================================================
-
-def file_dataset_statistics(resultats, cfg, path_user, class_names=None):
-
-    stats = resultats["stats"]
-    class_distribution = resultats["class_distribution"]
-    anomalies = resultats["anomalies"]
-    class_to_images = resultats.get("class_to_images", {})
-
-    total_boxes = stats["bounding_boxes"]
-    # total = sum(class_distribution.values())
-    total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
-
-    print()
-    display.print(f"Analyse statistique terminé {'avec' if anomalies else 'sans'} problème",
-                    colors["warning" if anomalies else "ok"]
-                    )
-
-    #  1 ---- Information générales --------------------------------------------------
-    display.print("Information générales", colors['titre'])
-    info_general = (total_boxes, total_classes, class_distribution, class_to_images )
-    ige.afficher_info_general(stats, info_general, class_names, cfg)
-
-
-    # 2 ---- Information sur les classes ---------------------------------------------
-    display.print("Information sur les classes", colors['titre'])
-    classes_info =(class_distribution, class_names)
-    icl.info_classes(classes_info, True, cfg)    
-                
-
-    # # 3 --- Images par classe ------------------------------------------------------
-    display.print("Images par classe", colors['titre'])
-    data_info_img_cla = (class_to_images, class_names)
-    iic.info_images_par_classe(data_info_img_cla, True)
-
-    # # 4 --- histogramme des tailles de bbox ----------------------------------------
-    # Pas de données à afficher
-
-    # 5 --- anomalies ---------------------------------------------------------------
-    display.print("Anomalies", colors['titre'])
-    info_anomalie = (anomalies, resultats)
-    ano.recherche_anomalie(stats, info_anomalie, path_user, True, cfg)
-
-    # 6 --- Métriques d'imbalance -----------------------------------------
-    display.print("Métriques d'imbalance", colors['titre'])
-    metrics = imb.imbalance_metrics(class_distribution, cfg)
-    imb.afficher_imbalance_avance(metrics, display, colors, cfg)
-
-    # --- Rapport de défauts de conformité
-    save_anomalies_readable(anomalies, "erreurs_dataset.txt", path_user)
-
-    print("\n")
-
-    return 
