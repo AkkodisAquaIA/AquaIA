@@ -1,18 +1,19 @@
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ── User ──────────────────────────────────────────────────────────────────────
 
 
 class UserCreate(BaseModel):
-    display_name: str
+    display_name: str = Field(..., max_length=100)
+    password: str = Field(..., min_length=6, max_length=128, pattern=r"^\d+$")
 
 
 class UserUpdate(BaseModel):
-    display_name: str
+    display_name: str = Field(..., max_length=100)
 
 
 class UserRead(BaseModel):
@@ -22,6 +23,10 @@ class UserRead(BaseModel):
     display_name: str
     is_protected: bool = False
     created_at: datetime
+
+
+class UserWithToken(UserRead):
+    access_token: str
 
 
 # ── Taxon ──────────────────────────────────────────────────────────────────────
@@ -160,9 +165,12 @@ class DatasetRead(BaseModel):
 # ── Import ─────────────────────────────────────────────────────────────────────
 
 
+ALLOWED_SOURCES = {"wikimedia", "inaturalist", "gbif"}
+
+
 class ImportUrlRequest(BaseModel):
-    url: str
-    scientific_name: Optional[str] = None
+    url: str = Field(..., max_length=2048)
+    scientific_name: Optional[str] = Field(None, max_length=300)
     user_id: int
 
 
@@ -170,9 +178,9 @@ class ImportUrlRequest(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    query: str
-    sources: list[str] = ["wikimedia", "inaturalist", "gbif"]
-    limit: int = 50
+    query: str = Field(..., max_length=500)
+    sources: list[str] = Field(default=["wikimedia", "inaturalist", "gbif"], max_length=10)
+    limit: int = Field(50, ge=1, le=200)
     taxon_id: Optional[int] = None
     user_id: int
 
@@ -190,7 +198,7 @@ class SearchHistoryRead(BaseModel):
 
 
 class ExportRequest(BaseModel):
-    export_type: str
+    export_type: Literal["coco", "yolo", "csv", "raw"]
     user_id: int
     dataset_id: Optional[int] = None
     parameters: Optional[dict[str, Any]] = None

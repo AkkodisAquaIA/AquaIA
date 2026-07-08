@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.api.deps import verify_workspace_access
 from app.db.database import get_db
 from app.models.models import User
-from app.schemas.schemas import UserCreate, UserRead, UserUpdate
+from app.schemas.schemas import UserCreate, UserRead, UserUpdate, UserWithToken
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -24,19 +24,28 @@ async def list_users(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
-@router.post("", response_model=UserRead, status_code=201)
+@router.post("", response_model=UserWithToken, status_code=201)
 async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db)):
+    from app.api.routes.auth import _hash, _make_token
+
     username = _slugify(body.display_name)
-    # Ensure unique username
     base = username
     counter = 2
     while await db.scalar(select(User).where(User.username == username)):
         username = f"{base}_{counter}"
         counter += 1
-    user = User(username=username, display_name=body.display_name)
+    user = User(username=username, display_name=body.display_name, password_hash=_hash(body.password))
     db.add(user)
     await db.flush()
-    return user
+    token = _make_token(user.id)
+    return UserWithToken(
+        id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        is_protected=user.is_protected,
+        created_at=user.created_at,
+        access_token=token,
+    )
 
 
 @router.patch("/{user_id}", response_model=UserRead)

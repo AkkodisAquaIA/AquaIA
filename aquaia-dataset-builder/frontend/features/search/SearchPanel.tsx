@@ -473,7 +473,7 @@ function UploadMode() {
 
 function ImageCard({ image }: { image: ImageRecord }) {
   const src = image.local_path
-    ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/images/${image.id}/thumbnail`
+    ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/images/${image.id}/thumbnail?user_id=${image.user_id}`
     : image.source_image_url;
 
   return (

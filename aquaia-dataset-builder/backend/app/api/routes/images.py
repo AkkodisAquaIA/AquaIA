@@ -1,7 +1,10 @@
 import hashlib
+import ipaddress
+import socket
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 from pydantic import BaseModel
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Query, UploadFile
@@ -11,6 +14,7 @@ from sqlalchemy import select, func, delete as sql_delete
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import verify_workspace_access
+from app.core.config import settings
 from app.db.database import get_db
 from app.models.models import ImageAsset, UserImage, User
 from app.schemas.schemas import ImageRecordRead, ImageStatusUpdate, ImportUrlRequest, image_record_read
@@ -22,6 +26,46 @@ router = APIRouter(prefix="/images", tags=["images"])
 
 VALID_STATUSES = {"pending", "validated", "rejected", "duplicate", "review_later"}
 IMAGE_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "tif", "tiff", "bmp"}
+
+_PRIVATE_NETS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("0.0.0.0/8"),
+]
+
+
+def _validate_url_safe(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(400, "Only http/https URLs are allowed")
+    host = parsed.hostname
+    if not host:
+        raise HTTPException(400, "Invalid URL: missing hostname")
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        raise HTTPException(400, f"Cannot resolve hostname: {host}")
+    for info in infos:
+        addr = info[4][0]
+        try:
+            ip = ipaddress.ip_address(addr)
+            if any(ip in net for net in _PRIVATE_NETS):
+                raise HTTPException(400, "URL resolves to a private or reserved address")
+        except ValueError:
+            pass
+
+
+def _safe_path(stored: Optional[str], *roots: Path) -> Path:
+    if not stored:
+        raise HTTPException(404, "File not available")
+    resolved = Path(stored).resolve()
+    if not any(str(resolved).startswith(str(r.resolve())) for r in roots):
+        raise HTTPException(403, "Access denied")
+    return resolved
+
 
 _UI_LOAD = [selectinload(UserImage.asset).selectinload(ImageAsset.taxon), selectinload(UserImage.taxon)]
 
@@ -126,6 +170,7 @@ async def import_from_url(
     db: AsyncSession = Depends(get_db),
 ):
     await verify_workspace_access(body.user_id, authorization, db)
+    _validate_url_safe(body.url)
     await _get_user_or_404(db, body.user_id)
 
     taxon = None
@@ -335,22 +380,30 @@ async def crop_image(
 
 
 @router.get("/{user_image_id}/file")
-async def serve_image_file(user_image_id: int, db: AsyncSession = Depends(get_db)):
+async def serve_image_file(
+    user_image_id: int,
+    user_id: int = Query(..., ge=1),
+    db: AsyncSession = Depends(get_db),
+):
     ui = await db.get(UserImage, user_image_id, options=[selectinload(UserImage.asset)])
-    if not ui or not ui.asset.local_path:
-        raise HTTPException(404, "Local file not available")
-    path = Path(ui.asset.local_path)
+    if not ui or ui.user_id != user_id:
+        raise HTTPException(404, "Image not found in this workspace")
+    path = _safe_path(ui.asset.local_path, settings.storage_raw, settings.storage_validated, settings.storage_rejected, settings.storage_duplicates)
     if not path.exists():
         raise HTTPException(404, "File not found on disk")
     return FileResponse(path)
 
 
 @router.get("/{user_image_id}/thumbnail")
-async def serve_thumbnail(user_image_id: int, db: AsyncSession = Depends(get_db)):
+async def serve_thumbnail(
+    user_image_id: int,
+    user_id: int = Query(..., ge=1),
+    db: AsyncSession = Depends(get_db),
+):
     ui = await db.get(UserImage, user_image_id, options=[selectinload(UserImage.asset)])
-    if not ui or not ui.asset.thumbnail_path:
-        raise HTTPException(404, "Thumbnail not available")
-    path = Path(ui.asset.thumbnail_path)
+    if not ui or ui.user_id != user_id:
+        raise HTTPException(404, "Image not found in this workspace")
+    path = _safe_path(ui.asset.thumbnail_path, settings.storage_thumbnails)
     if not path.exists():
         raise HTTPException(404, "Thumbnail not found on disk")
     return FileResponse(path, media_type="image/jpeg")

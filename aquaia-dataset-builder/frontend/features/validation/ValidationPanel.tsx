@@ -21,7 +21,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 function imgSrc(image: ImageRecord, bust?: number): string {
   if (image.local_path)
-    return `${API_BASE}/images/${image.id}/file${bust ? `?t=${bust}` : ""}`;
+    return `${API_BASE}/images/${image.id}/file?user_id=${image.user_id}${bust ? `&t=${bust}` : ""}`;
   return image.source_image_url;
 }
 
@@ -264,7 +264,7 @@ export default function ValidationPanel() {
                   <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-[var(--bg-input)] border border-[var(--border)] relative">
                     {t.reference_image_id ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={`${API_BASE}/images/${t.reference_image_id}/thumbnail`} alt="" className="w-full h-full object-cover" />
+                      <img src={`${API_BASE}/images/${t.reference_image_id}/thumbnail?user_id=${currentUserId}`} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[var(--text-ghost)]">
                         <FolderOpen className="w-6 h-6" />
@@ -619,7 +619,7 @@ export default function ValidationPanel() {
                 <div className="relative flex-1 min-h-0 rounded-lg overflow-hidden border border-amber-500/30 bg-[var(--bg-input)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`${API_BASE}/images/${selected.taxon.reference_image_id}/thumbnail`}
+                    src={`${API_BASE}/images/${selected.taxon.reference_image_id}/thumbnail?user_id=${selected.user_id}`}
                     alt="reference"
                     className="w-full h-full object-cover"
                   />

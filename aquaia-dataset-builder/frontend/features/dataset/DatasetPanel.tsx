@@ -171,7 +171,7 @@ function DatasetsTab({ userId, datasets, onRefresh }: { userId: number; datasets
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-2">
           {dsImages.map((img) => {
             const src = img.local_path
-              ? `${API_BASE_DS}/images/${img.id}/thumbnail`
+              ? `${API_BASE_DS}/images/${img.id}/thumbnail?user_id=${img.user_id}`
               : img.source_image_url;
             return (
               <div key={img.id} className="group relative aspect-square rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--bg-input)]">
@@ -420,7 +420,7 @@ function ImagesTab({
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-2">
         {images.map((img) => {
           const src = img.local_path
-            ? `${API_BASE}/images/${img.id}/thumbnail`
+            ? `${API_BASE}/images/${img.id}/thumbnail?user_id=${img.user_id}`
             : img.source_image_url;
           const isSelected = selected.has(img.id);
           const assignment = assignments[img.id];

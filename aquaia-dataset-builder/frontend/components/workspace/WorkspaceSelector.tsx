@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Plus, Check, Users, Loader2, Pencil, Trash2, Lock, Eye, EyeOff } from "lucide-react";
 import { useAppStore } from "@/store/appStore";
-import { createUser, deleteUser, updateUser, getUsers, setWorkspacePassword, loginWorkspace } from "@/lib/api";
+import { createUser, deleteUser, updateUser, getUsers } from "@/lib/api";
 import type { User } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -59,14 +59,12 @@ export default function WorkspaceSelector() {
     if (newPassword !== newPasswordConfirm) { setCreateError("PINs do not match"); return; }
     setSaving(true);
     try {
-      const user = await createUser(newName.trim());
-      await setWorkspacePassword(user.id, newPassword);
-      const tokenData = await loginWorkspace(user.id, newPassword);
+      const result = await createUser(newName.trim(), newPassword);
       if (typeof window !== "undefined") {
-        localStorage.setItem(`adiab-token-${user.id}`, tokenData.access_token);
+        localStorage.setItem(`adiab-token-${result.id}`, result.access_token);
       }
       await refreshWorkspaces();
-      setWorkspace(user.id, user.display_name);
+      setWorkspace(result.id, result.display_name);
       resetCreateForm();
     } catch {
       setCreateError("Failed to create workspace");

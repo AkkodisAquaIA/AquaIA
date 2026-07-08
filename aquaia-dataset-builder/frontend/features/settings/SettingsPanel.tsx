@@ -196,7 +196,7 @@ export default function SettingsPanel() {
                 <div className="aspect-square">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`${API_BASE}/images/${t.reference_image_id}/thumbnail`}
+                    src={`${API_BASE}/images/${t.reference_image_id}/thumbnail?user_id=${currentUserId}`}
                     alt={t.scientific_name}
                     className="w-full h-full object-cover"
                   />

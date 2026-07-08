@@ -8,7 +8,7 @@ import type {
   Taxon,
   TaxonQueueItem,
   ExportJob,
-  User,
+  UserWithToken,
 } from "@/types";
 
 const api = axios.create({
@@ -29,17 +29,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401 — clear stale token and open login modal
+// On 401 — clear stale token(s) and open login modal
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== "undefined") {
       const { useAppStore } = require("@/store/appStore");
       const { currentUserId, currentUserName, openLoginModal } = useAppStore.getState();
-      if (currentUserId) {
-        localStorage.removeItem(`adiab-token-${currentUserId}`);
-        openLoginModal(currentUserId, currentUserName);
-      }
+      // Clear all workspace tokens
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("adiab-token-"))
+        .forEach((k) => localStorage.removeItem(k));
+      if (currentUserId) openLoginModal(currentUserId, currentUserName);
     }
     return Promise.reject(err);
   }
@@ -49,8 +50,8 @@ api.interceptors.response.use(
 export const getUsers = () =>
   api.get<User[]>("/users").then((r) => r.data);
 
-export const createUser = (display_name: string) =>
-  api.post<User>("/users", { display_name }).then((r) => r.data);
+export const createUser = (display_name: string, password: string) =>
+  api.post<UserWithToken>("/users", { display_name, password }).then((r) => r.data);
 
 export const updateUser = (id: number, display_name: string) =>
   api.patch<User>(`/users/${id}`, { display_name }).then((r) => r.data);

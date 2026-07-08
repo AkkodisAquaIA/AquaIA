@@ -15,18 +15,20 @@ async def verify_workspace_access(
     authorization: Optional[str],
     db: AsyncSession,
 ) -> None:
-    """Raise 401/403 if workspace is password-protected and token is absent/invalid."""
+    """Raise 401/403 if the caller does not hold a valid token for this workspace."""
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(404, "Workspace not found")
-    if not user.password_hash:
-        return  # open workspace — anyone can write
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "This workspace is password-protected")
+        raise HTTPException(401, "Authentication required")
     token = authorization[7:]
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
-        if int(payload.get("sub", -1)) != user_id:
+        try:
+            sub = int(payload.get("sub", -1))
+        except (TypeError, ValueError):
+            raise HTTPException(401, "Invalid token claims")
+        if sub != user_id:
             raise HTTPException(403, "Token does not belong to this workspace")
     except JWTError:
         raise HTTPException(401, "Invalid or expired token")

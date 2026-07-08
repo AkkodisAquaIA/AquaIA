@@ -14,6 +14,10 @@ export interface User {
   created_at: string;
 }
 
+export interface UserWithToken extends User {
+  access_token: string;
+}
+
 export interface Taxon {
   id: number;
   scientific_name: string;
