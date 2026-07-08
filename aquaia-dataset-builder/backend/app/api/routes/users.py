@@ -1,9 +1,11 @@
 import re
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.api.deps import verify_workspace_access
 from app.db.database import get_db
 from app.models.models import User
 from app.schemas.schemas import UserCreate, UserRead, UserUpdate
@@ -38,7 +40,13 @@ async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{user_id}", response_model=UserRead)
-async def update_user(user_id: int, body: UserUpdate, db: AsyncSession = Depends(get_db)):
+async def update_user(
+    user_id: int,
+    body: UserUpdate,
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_workspace_access(user_id, authorization, db)
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(404, "Workspace not found")
@@ -48,7 +56,12 @@ async def update_user(user_id: int, body: UserUpdate, db: AsyncSession = Depends
 
 
 @router.delete("/{user_id}", status_code=204)
-async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_user(
+    user_id: int,
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_workspace_access(user_id, authorization, db)
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(404, "Workspace not found")
