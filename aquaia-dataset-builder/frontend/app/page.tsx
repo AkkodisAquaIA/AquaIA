@@ -25,7 +25,7 @@ function ActivePanel() {
 }
 
 export default function Home() {
-  const { initWorkspace, workspaceReady } = useAppStore();
+  const { initWorkspace, workspaceReady, currentUserId } = useAppStore();
 
   useEffect(() => {
     initWorkspace();
@@ -60,12 +60,19 @@ export default function Home() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
-          {workspaceReady ? (
-            <ActivePanel />
-          ) : (
+          {!workspaceReady ? (
             <div className="flex items-center justify-center h-full">
               <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : !currentUserId ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+              <p className="text-[var(--text-base)] font-medium">No workspace selected</p>
+              <p className="text-sm text-[var(--text-dim)]">
+                Click <span className="font-medium text-[var(--text-base)]">Add workspace</span> in the top-right to create one.
+              </p>
+            </div>
+          ) : (
+            <ActivePanel />
           )}
         </main>
       </div>
