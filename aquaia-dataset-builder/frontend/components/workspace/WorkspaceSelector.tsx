@@ -51,23 +51,16 @@ export default function WorkspaceSelector() {
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    if (newPassword && newPassword.length < 4) {
-      setCreateError("Password must be at least 4 characters");
-      return;
-    }
-    if (newPassword && newPassword !== newPasswordConfirm) {
-      setCreateError("Passwords do not match");
-      return;
-    }
+    if (!newPassword) { setCreateError("Password is required"); return; }
+    if (newPassword.length < 4) { setCreateError("Password must be at least 4 characters"); return; }
+    if (newPassword !== newPasswordConfirm) { setCreateError("Passwords do not match"); return; }
     setSaving(true);
     try {
       const user = await createUser(newName.trim());
-      if (newPassword) {
-        await setWorkspacePassword(user.id, newPassword);
-        const tokenData = await loginWorkspace(user.id, newPassword);
-        if (typeof window !== "undefined") {
-          localStorage.setItem(`adiab-token-${user.id}`, tokenData.access_token);
-        }
+      await setWorkspacePassword(user.id, newPassword);
+      const tokenData = await loginWorkspace(user.id, newPassword);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`adiab-token-${user.id}`, tokenData.access_token);
       }
       await refreshWorkspaces();
       setWorkspace(user.id, user.display_name);
@@ -207,27 +200,25 @@ export default function WorkspaceSelector() {
                     type={showNewPwd ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => { setNewPassword(e.target.value); setCreateError(""); }}
-                    placeholder="Password (optional)"
+                    placeholder="Password"
                     className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500/40 pr-7"
                   />
                   <button type="button" onClick={() => setShowNewPwd(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
                     {showNewPwd ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                   </button>
                 </div>
-                {newPassword && (
-                  <input
-                    type={showNewPwd ? "text" : "password"}
-                    value={newPasswordConfirm}
-                    onChange={(e) => { setNewPasswordConfirm(e.target.value); setCreateError(""); }}
-                    placeholder="Confirm password…"
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500/40"
-                  />
-                )}
+                <input
+                  type={showNewPwd ? "text" : "password"}
+                  value={newPasswordConfirm}
+                  onChange={(e) => { setNewPasswordConfirm(e.target.value); setCreateError(""); }}
+                  placeholder="Confirm password"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500/40"
+                />
                 {createError && <p className="text-[10px] text-red-400 px-1">{createError}</p>}
                 <div className="flex gap-2">
                   <button
                     onClick={handleCreate}
-                    disabled={saving || !newName.trim() || (!!newPassword && !newPasswordConfirm)}
+                    disabled={saving || !newName.trim() || !newPassword || !newPasswordConfirm}
                     className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg bg-green-600/20 hover:bg-green-600/40 text-green-400 disabled:opacity-40 transition-colors"
                   >
                     {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
