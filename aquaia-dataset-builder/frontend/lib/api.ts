@@ -190,3 +190,18 @@ export const removeWorkspacePassword = (userId: number, currentPassword: string)
 
 export const getWorkspaceAuthStatus = (userId: number) =>
   api.get<{ user_id: number; is_protected: boolean }>(`/auth/status/${userId}`).then((r) => r.data);
+
+export const downloadExport = async (userId: number, jobId: number) => {
+  const res = await api.get(`/exports/${jobId}/download`, {
+    params: { user_id: userId },
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(new Blob([res.data]));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `export-${jobId}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};

@@ -198,7 +198,7 @@ class SearchHistoryRead(BaseModel):
 
 
 class ExportRequest(BaseModel):
-    export_type: Literal["coco", "yolo", "csv", "raw"]
+    export_type: Literal["classification", "yolo", "coco", "csv"]
     user_id: int
     dataset_id: Optional[int] = None
     parameters: Optional[dict[str, Any]] = None

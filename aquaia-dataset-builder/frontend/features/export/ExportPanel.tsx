@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Download, Plus, Loader2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
-import { getExports, createExport } from "@/lib/api";
+import { getExports, createExport, downloadExport } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
 import type { ExportJob } from "@/types";
 import { formatDate } from "@/lib/utils";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 const EXPORT_TYPES = [
   { id: "classification", label: "Classification folders", desc: "class/image.jpg structure" },
@@ -121,14 +119,13 @@ export default function ExportPanel() {
                     <td className="px-4 py-2.5 text-[var(--text-muted)] text-xs">{formatDate(job.created_at)}</td>
                     <td className="px-4 py-2.5">
                       {job.status === "done" ? (
-                        <a
-                          href={`${API_BASE}/exports/${job.id}/download?user_id=${currentUserId}`}
-                          download
+                        <button
+                          onClick={() => currentUserId && downloadExport(currentUserId, job.id)}
                           className="flex items-center gap-1 text-xs text-green-500 hover:text-green-400 transition-colors"
                         >
                           <Download className="w-3.5 h-3.5" />
                           Download
-                        </a>
+                        </button>
                       ) : job.status === "running" ? (
                         <Loader2 className="w-3.5 h-3.5 text-[var(--text-muted)] animate-spin" />
                       ) : (
