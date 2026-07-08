@@ -15,6 +15,7 @@ export default function WorkspaceSelector() {
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showNewPwdConfirm, setShowNewPwdConfirm] = useState(false);
   const [createError, setCreateError] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
@@ -46,14 +47,16 @@ export default function WorkspaceSelector() {
     setNewPassword("");
     setNewPasswordConfirm("");
     setShowNewPwd(false);
+    setShowNewPwdConfirm(false);
     setCreateError("");
   };
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    if (!newPassword) { setCreateError("Password is required"); return; }
-    if (newPassword.length < 6) { setCreateError("Password must be at least 6 characters"); return; }
-    if (newPassword !== newPasswordConfirm) { setCreateError("Passwords do not match"); return; }
+    if (!newPassword) { setCreateError("PIN is required"); return; }
+    if (!/^\d+$/.test(newPassword)) { setCreateError("PIN must contain digits only"); return; }
+    if (newPassword.length < 6) { setCreateError("PIN must be at least 6 digits"); return; }
+    if (newPassword !== newPasswordConfirm) { setCreateError("PINs do not match"); return; }
     setSaving(true);
     try {
       const user = await createUser(newName.trim());
@@ -195,25 +198,35 @@ export default function WorkspaceSelector() {
                   placeholder="Workspace name…"
                   className="w-full bg-[var(--bg-input)] border border-green-500/40 rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none"
                 />
+                <p className="text-[10px] text-[var(--text-muted)] px-1">PIN — numbers only, minimum 6 digits</p>
                 <div className="relative">
                   <input
                     type={showNewPwd ? "text" : "password"}
+                    inputMode="numeric"
+                    pattern="\d*"
                     value={newPassword}
-                    onChange={(e) => { setNewPassword(e.target.value); setCreateError(""); }}
-                    placeholder="Password"
+                    onChange={(e) => { setNewPassword(e.target.value.replace(/\D/g, "")); setCreateError(""); }}
+                    placeholder="PIN (e.g. 123456)"
                     className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500/40 pr-7"
                   />
                   <button type="button" onClick={() => setShowNewPwd(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
                     {showNewPwd ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                   </button>
                 </div>
-                <input
-                  type={showNewPwd ? "text" : "password"}
-                  value={newPasswordConfirm}
-                  onChange={(e) => { setNewPasswordConfirm(e.target.value); setCreateError(""); }}
-                  placeholder="Confirm password"
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500/40"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPwdConfirm ? "text" : "password"}
+                    inputMode="numeric"
+                    pattern="\d*"
+                    value={newPasswordConfirm}
+                    onChange={(e) => { setNewPasswordConfirm(e.target.value.replace(/\D/g, "")); setCreateError(""); }}
+                    placeholder="Confirm PIN"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500/40 pr-7"
+                  />
+                  <button type="button" onClick={() => setShowNewPwdConfirm(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                    {showNewPwdConfirm ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  </button>
+                </div>
                 {createError && <p className="text-[10px] text-red-400 px-1">{createError}</p>}
                 <div className="flex gap-2">
                   <button
