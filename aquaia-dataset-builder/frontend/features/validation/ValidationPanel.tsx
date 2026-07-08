@@ -32,6 +32,10 @@ export default function ValidationPanel() {
   const [taxons, setTaxons] = useState<TaxonQueueItem[]>([]);
   const [loadingTaxons, setLoadingTaxons] = useState(true);
   const [selectedTaxon, setSelectedTaxon] = useState<TaxonQueueItem | null>(null);
+  const [clearMode, setClearMode] = useState(false);
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
+  const [confirmBulkClear, setConfirmBulkClear] = useState(false);
+  const [bulkClearing, setBulkClearing] = useState(false);
 
   const loadTaxons = useCallback(async () => {
     if (!currentUserId) return;
@@ -42,6 +46,24 @@ export default function ValidationPanel() {
   }, [currentUserId]);
 
   useEffect(() => { if (!selectedTaxon) loadTaxons(); }, [loadTaxons, selectedTaxon]);
+
+  const totalCheckedImages = taxons
+    .filter((t) => checkedIds.has(t.taxon_id))
+    .reduce((s, t) => s + t.total, 0);
+
+  const handleBulkClear = async () => {
+    if (!currentUserId) return;
+    setBulkClearing(true);
+    try {
+      await Promise.all([...checkedIds].map((id) => clearImages(currentUserId, undefined, id)));
+      setTaxons((prev) => prev.filter((t) => !checkedIds.has(t.taxon_id)));
+      setCheckedIds(new Set());
+      setClearMode(false);
+      setConfirmBulkClear(false);
+    } finally {
+      setBulkClearing(false);
+    }
+  };
 
   // ── Image grid ─────────────────────────────────────────────────────────────
   const [images, setImages] = useState<ImageRecord[]>([]);
@@ -135,6 +157,73 @@ export default function ValidationPanel() {
             <h1 className="text-xl font-semibold text-[var(--text-base)]">Validation Queue</h1>
             <p className="text-sm text-[var(--text-dim)] mt-0.5">{taxons.length} species</p>
           </div>
+
+          {taxons.length > 0 && (
+            <div className="flex items-center gap-2">
+              {clearMode ? (
+                <>
+                  {/* Select all / none */}
+                  <button
+                    onClick={() =>
+                      setCheckedIds(
+                        checkedIds.size === taxons.length
+                          ? new Set()
+                          : new Set(taxons.map((t) => t.taxon_id))
+                      )
+                    }
+                    className="text-xs text-[var(--text-dim)] hover:text-[var(--text-base)] transition-colors"
+                  >
+                    {checkedIds.size === taxons.length ? "Deselect all" : "Select all"}
+                  </button>
+
+                  {/* Confirm inline */}
+                  {confirmBulkClear ? (
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 border border-red-500/30 rounded-lg">
+                      <span className="text-xs text-red-400">
+                        Clear {checkedIds.size} species ({totalCheckedImages} images)?
+                      </span>
+                      <button
+                        disabled={bulkClearing}
+                        onClick={handleBulkClear}
+                        className="px-2 py-0.5 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-xs rounded transition-colors"
+                      >
+                        {bulkClearing ? "…" : "Confirm"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmBulkClear(false)}
+                        className="p-0.5 text-[var(--text-dim)] hover:text-[var(--text-base)] transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      disabled={checkedIds.size === 0}
+                      onClick={() => setConfirmBulkClear(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:border-red-500/50 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Clear selected{checkedIds.size > 0 ? ` (${checkedIds.size})` : ""}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => { setClearMode(false); setCheckedIds(new Set()); setConfirmBulkClear(false); }}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setClearMode(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:border-red-500/50 hover:text-red-400 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Clean up
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {loadingTaxons ? (
@@ -148,61 +237,76 @@ export default function ValidationPanel() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto">
-            {taxons.map((t) => (
-              <button
-                key={t.taxon_id}
-                onClick={() => { setSelectedTaxon(t); setSelected(null); setPage(1); }}
-                className="group flex items-center gap-3 p-3 bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--border-hi)] rounded-xl text-left transition-all"
-              >
-                {/* Thumbnail */}
-                <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-[var(--bg-input)] border border-[var(--border)]">
-                  {t.reference_image_id ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={`${API_BASE}/images/${t.reference_image_id}/thumbnail`}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[var(--text-ghost)]">
-                      <FolderOpen className="w-6 h-6" />
-                    </div>
+            {taxons.map((t) => {
+              const isChecked = checkedIds.has(t.taxon_id);
+              return (
+                <button
+                  key={t.taxon_id}
+                  onClick={() => {
+                    if (clearMode) {
+                      setCheckedIds((prev) => {
+                        const next = new Set(prev);
+                        isChecked ? next.delete(t.taxon_id) : next.add(t.taxon_id);
+                        return next;
+                      });
+                    } else {
+                      setSelectedTaxon(t); setSelected(null); setPage(1);
+                    }
+                  }}
+                  className={cn(
+                    "group flex items-center gap-3 p-3 bg-[var(--bg-card)] border rounded-xl text-left transition-all",
+                    clearMode && isChecked
+                      ? "border-red-500/50 bg-red-500/5"
+                      : "border-[var(--border)] hover:border-[var(--border-hi)]"
                   )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium italic text-[var(--text-base)] truncate leading-tight">
-                    {t.scientific_name}
-                  </p>
-                  {t.common_name && (
-                    <p className="text-xs text-[var(--text-dim)] truncate mt-0.5">{t.common_name}</p>
-                  )}
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {t.pending > 0 && (
-                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-orange-500/15 text-orange-400 border border-orange-500/20">
-                        {t.pending} pending
-                      </span>
+                >
+                  {/* Checkbox (clear mode) or Thumbnail */}
+                  <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-[var(--bg-input)] border border-[var(--border)] relative">
+                    {t.reference_image_id ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={`${API_BASE}/images/${t.reference_image_id}/thumbnail`} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[var(--text-ghost)]">
+                        <FolderOpen className="w-6 h-6" />
+                      </div>
                     )}
-                    {t.validated > 0 && (
-                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-green-500/15 text-green-400 border border-green-500/20">
-                        {t.validated} ✓
-                      </span>
-                    )}
-                    {t.rejected > 0 && (
-                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-red-500/15 text-red-400 border border-red-500/20">
-                        {t.rejected} ✗
-                      </span>
-                    )}
-                    {t.duplicate > 0 && (
-                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-purple-500/15 text-purple-400 border border-purple-500/20">
-                        {t.duplicate} dup
-                      </span>
+                    {clearMode && (
+                      <div className={cn(
+                        "absolute inset-0 flex items-center justify-center transition-colors",
+                        isChecked ? "bg-red-500/70" : "bg-black/30 opacity-0 group-hover:opacity-100"
+                      )}>
+                        <div className={cn(
+                          "w-5 h-5 rounded border-2 flex items-center justify-center",
+                          isChecked ? "bg-white border-white" : "border-white"
+                        )}>
+                          {isChecked && <Check className="w-3 h-3 text-red-600" />}
+                        </div>
+                      </div>
                     )}
                   </div>
-                </div>
-              </button>
-            ))}
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium italic text-[var(--text-base)] truncate leading-tight">{t.scientific_name}</p>
+                    {t.common_name && <p className="text-xs text-[var(--text-dim)] truncate mt-0.5">{t.common_name}</p>}
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {t.pending > 0 && (
+                        <span className="px-1.5 py-0.5 text-[10px] rounded bg-orange-500/15 text-orange-400 border border-orange-500/20">{t.pending} pending</span>
+                      )}
+                      {t.validated > 0 && (
+                        <span className="px-1.5 py-0.5 text-[10px] rounded bg-green-500/15 text-green-400 border border-green-500/20">{t.validated} ✓</span>
+                      )}
+                      {t.rejected > 0 && (
+                        <span className="px-1.5 py-0.5 text-[10px] rounded bg-red-500/15 text-red-400 border border-red-500/20">{t.rejected} ✗</span>
+                      )}
+                      {t.duplicate > 0 && (
+                        <span className="px-1.5 py-0.5 text-[10px] rounded bg-purple-500/15 text-purple-400 border border-purple-500/20">{t.duplicate} dup</span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
