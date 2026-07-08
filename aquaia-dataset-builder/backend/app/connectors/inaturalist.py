@@ -75,7 +75,7 @@ class INaturalistConnector(BaseConnector):
                                     source_page_url=f"https://www.inaturalist.org/observations/{obs.get('id')}",
                                     scientific_name=sci_name,
                                     author=user.get("login"),
-                                    license=photo.get("license_code", "").upper(),
+                                    license=(photo.get("license_code") or "").upper(),
                                     thumbnail_url=thumb,
                                     metadata={
                                         "observation_id": obs.get("id"),
