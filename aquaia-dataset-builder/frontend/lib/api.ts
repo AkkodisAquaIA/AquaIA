@@ -85,6 +85,9 @@ export const getImages = (
 export const clearImages = (userId: number, status?: string, taxonId?: number) =>
   api.delete("/images", { params: { user_id: userId, ...(status ? { status } : {}), ...(taxonId ? { taxon_id: taxonId } : {}) } });
 
+export const deleteImage = (userId: number, imageId: number) =>
+  api.delete(`/images/${imageId}`, { params: { user_id: userId } });
+
 export const getTaxonQueue = (userId: number) =>
   api.get<TaxonQueueItem[]>("/taxonomy/queue", { params: { user_id: userId } }).then((r) => r.data);
 

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getImages, getTaxons, getDatasets, createDataset, deleteDataset, addImageToDataset, getDatasetImages, removeImageFromDataset, getAssignedImages } from "@/lib/api";
+import { getImages, getTaxons, getDatasets, createDataset, deleteDataset, addImageToDataset, getDatasetImages, removeImageFromDataset, getAssignedImages, deleteImage, clearImages } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
 import type { ImageRecord, Taxon, Dataset } from "@/types";
 import { formatDate } from "@/lib/utils";
-import { Database, FolderOpen, Plus, Trash2, Images, Loader2, CheckSquare, Square, FolderPlus, ArrowLeft, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Database, FolderOpen, Plus, Trash2, Images, Loader2, CheckSquare, Square, FolderPlus, ArrowLeft, X, ChevronDown, ChevronRight, AlertTriangle, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const API_BASE_DS = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -285,11 +285,47 @@ function DatasetsTab({ userId, datasets, onRefresh }: { userId: number; datasets
 }
 
 
+// ── Confirm modal ─────────────────────────────────────────────────────────────
+
+function ConfirmModal({
+  title, body, onConfirm, onCancel, loading,
+}: {
+  title: string; body: string; onConfirm: () => void; onCancel: () => void; loading?: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-sm shadow-2xl mx-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 shrink-0">
+            <AlertTriangle className="w-5 h-5 text-red-400" />
+          </div>
+          <h3 className="text-base font-semibold text-[var(--text-base)]">{title}</h3>
+        </div>
+        <p className="text-sm text-[var(--text-dim)] mb-5">{body}</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel}
+            className="flex-1 px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg-input)] text-sm text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors">
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-sm font-medium transition-colors">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Images tab ───────────────────────────────────────────────────────────────
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 type TaxonGroup = { taxon: Taxon | null; taxonId: number | null; images: ImageRecord[] };
+type ConfirmTarget =
+  | { kind: "image"; id: number; label: string }
+  | { kind: "folder"; taxonId: number | null; label: string; count: number };
 
 function ImagesTab({
   userId, images, datasets, assignments, onRefresh,
@@ -300,11 +336,14 @@ function ImagesTab({
   assignments: AssignmentMap;
   onRefresh: () => void;
 }) {
+  const { isReadOnly } = useAppStore();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [targetDataset, setTargetDataset] = useState<number | "">("");
   const [adding, setAdding] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Group images by taxon, sorted alphabetically (uncategorised last)
   const groups = useMemo<TaxonGroup[]>(() => {
@@ -380,6 +419,27 @@ function ImagesTab({
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!confirmTarget) return;
+    setDeleting(true);
+    try {
+      if (confirmTarget.kind === "image") {
+        await deleteImage(userId, confirmTarget.id);
+      } else {
+        await clearImages(userId, "validated", confirmTarget.taxonId ?? undefined);
+      }
+      setSelected((prev) => {
+        const s = new Set(prev);
+        if (confirmTarget.kind === "image") s.delete(confirmTarget.id);
+        return s;
+      });
+      setConfirmTarget(null);
+      onRefresh();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (images.length === 0) return (
     <div className="flex flex-col items-center justify-center h-48 text-center">
       <Database className="w-12 h-12 text-[var(--text-ghost)] mb-3" />
@@ -389,7 +449,27 @@ function ImagesTab({
   );
 
   return (
+    <>
+    {confirmTarget && (
+      <ConfirmModal
+        title={confirmTarget.kind === "image" ? "Delete image?" : `Delete folder "${confirmTarget.label}"?`}
+        body={confirmTarget.kind === "image"
+          ? "This image will be permanently removed from your workspace."
+          : `All ${confirmTarget.count} validated images in this taxon folder will be permanently deleted.`}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmTarget(null)}
+        loading={deleting}
+      />
+    )}
     <div className="space-y-3">
+      {/* Read-only banner */}
+      {isReadOnly && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+          <EyeOff className="w-3.5 h-3.5 shrink-0" />
+          <span>Read-only — login to manage images</span>
+        </div>
+      )}
+
       {/* Warning banner */}
       {warning && (
         <div className="flex items-start gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
@@ -401,8 +481,8 @@ function ImagesTab({
         </div>
       )}
 
-      {/* Action bar */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Action bar — hidden in read-only mode */}
+      {!isReadOnly && <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <button onClick={selected.size === images.length ? clearAll : selectAll}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors">
@@ -439,7 +519,7 @@ function ImagesTab({
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Taxon groups */}
       <div className="space-y-4">
@@ -474,18 +554,30 @@ function ImagesTab({
                     {group.images.length}
                   </span>
                 </button>
-                {/* Select all in group */}
-                <button
-                  onClick={() => toggleGroup(key, group.images)}
-                  className="shrink-0 p-1 rounded hover:bg-[var(--bg-input)] transition-colors"
-                  title={allGroupSelected ? "Deselect folder" : "Select all in folder"}
-                >
-                  {allGroupSelected
-                    ? <CheckSquare className="w-3.5 h-3.5 text-green-400" />
-                    : someGroupSelected
-                    ? <Square className="w-3.5 h-3.5 text-green-400/50" />
-                    : <Square className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
-                </button>
+                {!isReadOnly && (
+                  <>
+                    {/* Select all in group */}
+                    <button
+                      onClick={() => toggleGroup(key, group.images)}
+                      className="shrink-0 p-1 rounded hover:bg-[var(--bg-input)] transition-colors"
+                      title={allGroupSelected ? "Deselect folder" : "Select all in folder"}
+                    >
+                      {allGroupSelected
+                        ? <CheckSquare className="w-3.5 h-3.5 text-green-400" />
+                        : someGroupSelected
+                        ? <Square className="w-3.5 h-3.5 text-green-400/50" />
+                        : <Square className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
+                    </button>
+                    {/* Delete folder */}
+                    <button
+                      onClick={() => setConfirmTarget({ kind: "folder", taxonId: group.taxonId, label: group.taxon?.scientific_name ?? "Uncategorised", count: group.images.length })}
+                      className="shrink-0 p-1 rounded hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400 transition-colors"
+                      title="Delete all images in this folder"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Images grid */}
@@ -498,9 +590,10 @@ function ImagesTab({
                     const isSelected = selected.has(img.id);
                     const assignment = assignments[img.id];
                     return (
-                      <button key={img.id} onClick={() => toggle(img.id)}
+                      <div key={img.id} className="relative group/img aspect-square">
+                      <button onClick={() => !isReadOnly && toggle(img.id)}
                         className={cn(
-                          "relative aspect-square rounded-lg overflow-hidden border transition-all",
+                          "absolute inset-0 rounded-lg overflow-hidden border transition-all w-full h-full",
                           isSelected
                             ? "border-green-500 ring-2 ring-green-500/30"
                             : assignment
@@ -523,6 +616,17 @@ function ImagesTab({
                           </div>
                         )}
                       </button>
+                      {/* Delete single image — visible on hover, hidden in read-only */}
+                      {!isReadOnly && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmTarget({ kind: "image", id: img.id, label: group.taxon?.scientific_name ?? "this image" }); }}
+                          className="absolute top-1 left-1 w-5 h-5 rounded bg-red-600/80 hover:bg-red-500 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10"
+                          title="Delete image"
+                        >
+                          <Trash2 className="w-3 h-3 text-white" />
+                        </button>
+                      )}
+                      </div>
                     );
                   })}
                 </div>
@@ -532,6 +636,7 @@ function ImagesTab({
         })}
       </div>
     </div>
+    </>
   );
 }
 

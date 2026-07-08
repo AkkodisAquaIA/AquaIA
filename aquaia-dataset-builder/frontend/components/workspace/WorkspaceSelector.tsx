@@ -8,8 +8,9 @@ import type { User } from "@/types";
 import { cn } from "@/lib/utils";
 
 export default function WorkspaceSelector() {
-  const { currentUserId, currentUserName, workspaces, setWorkspace, setWorkspaces, openLoginModal } = useAppStore();
+  const { currentUserId, currentUserName, workspaces, setWorkspace, setWorkspaces, openLoginModal, isReadOnly } = useAppStore();
   const [open, setOpen] = useState(false);
+  const [pendingWs, setPendingWs] = useState<User | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -106,6 +107,9 @@ export default function WorkspaceSelector() {
         <span className="text-[var(--text-base)] font-medium max-w-[140px] truncate">
           {currentUserName || "…"}
         </span>
+        {isReadOnly && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 shrink-0">read-only</span>
+        )}
         <ChevronDown className={cn("w-3.5 h-3.5 text-[var(--text-muted)] transition-transform", open && "rotate-180")} />
       </button>
 
@@ -138,11 +142,11 @@ export default function WorkspaceSelector() {
                 ) : (
                   <button
                     onClick={() => {
-                      if (ws.is_protected && typeof window !== "undefined" && !localStorage.getItem(`adiab-token-${ws.id}`)) {
-                        openLoginModal(ws.id, ws.display_name);
-                        setOpen(false);
+                      const hasToken = typeof window !== "undefined" && !!localStorage.getItem(`adiab-token-${ws.id}`);
+                      if (ws.is_protected && !hasToken) {
+                        setPendingWs(ws);
                       } else {
-                        setWorkspace(ws.id, ws.display_name);
+                        setWorkspace(ws.id, ws.display_name, false);
                         setOpen(false);
                       }
                     }}
@@ -155,7 +159,10 @@ export default function WorkspaceSelector() {
                     <span className={cn("text-sm truncate", ws.id === currentUserId ? "text-green-400 font-medium" : "text-[var(--text-base)]")}>
                       {ws.display_name}
                     </span>
-                    {ws.is_protected && (
+                    {ws.id === currentUserId && isReadOnly && (
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 shrink-0">read-only</span>
+                    )}
+                    {ws.is_protected && ws.id !== currentUserId && (
                       <Lock className="w-3 h-3 text-amber-400 shrink-0 ml-auto" />
                     )}
                   </button>
@@ -184,6 +191,40 @@ export default function WorkspaceSelector() {
               </div>
             ))}
           </div>
+
+          {/* Pending workspace: choose View or Login */}
+          {pendingWs && (
+            <div className="border-t border-[var(--border)] p-3 space-y-2">
+              <p className="text-xs text-[var(--text-dim)]">
+                Access <span className="italic font-medium text-[var(--text-base)]">{pendingWs.display_name}</span>:
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setWorkspace(pendingWs.id, pendingWs.display_name, true);
+                    setPendingWs(null);
+                    setOpen(false);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors"
+                >
+                  <Eye className="w-3.5 h-3.5" /> View only
+                </button>
+                <button
+                  onClick={() => {
+                    openLoginModal(pendingWs.id, pendingWs.display_name);
+                    setPendingWs(null);
+                    setOpen(false);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                >
+                  <Lock className="w-3.5 h-3.5" /> Login
+                </button>
+              </div>
+              <button onClick={() => setPendingWs(null)} className="w-full text-center text-[10px] text-[var(--text-muted)] hover:text-[var(--text-dim)] transition-colors">
+                Cancel
+              </button>
+            </div>
+          )}
 
           <div className="border-t border-[var(--border)] p-2">
             {creating ? (

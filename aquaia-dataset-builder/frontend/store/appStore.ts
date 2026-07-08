@@ -35,9 +35,11 @@ interface AppState {
   currentUserName: string;
   workspaces: User[];
   workspaceReady: boolean;
+  isReadOnly: boolean;
   initWorkspace: () => Promise<void>;
-  setWorkspace: (id: number, name: string) => void;
+  setWorkspace: (id: number, name: string, readOnly?: boolean) => void;
   setWorkspaces: (workspaces: User[]) => void;
+  setReadOnly: (v: boolean) => void;
 
   // Auth
   loginModal: LoginModal | null;
@@ -92,6 +94,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentUserName: "",
   workspaces: [],
   workspaceReady: false,
+  isReadOnly: false,
 
   initWorkspace: async () => {
     try {
@@ -119,14 +122,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  setWorkspace: (id, name) => {
+  setWorkspace: (id, name, readOnly = false) => {
     if (typeof window !== "undefined") {
       localStorage.setItem("adiab-workspace-id", String(id));
     }
-    set({ currentUserId: id, currentUserName: name });
+    const state = get();
+    const nextPanel =
+      readOnly && ["search", "validation", "settings"].includes(state.activePanel)
+        ? "dataset" as const
+        : state.activePanel;
+    set({ currentUserId: id, currentUserName: name, isReadOnly: readOnly, activePanel: nextPanel });
   },
 
   setWorkspaces: (workspaces) => set({ workspaces }),
+
+  setReadOnly: (v) => {
+    const state = get();
+    const nextPanel =
+      v && ["search", "validation", "settings"].includes(state.activePanel)
+        ? "dataset" as const
+        : state.activePanel;
+    set({ isReadOnly: v, activePanel: nextPanel });
+  },
 
   // Auth
   loginModal: null,

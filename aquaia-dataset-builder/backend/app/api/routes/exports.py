@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.api.deps import verify_workspace_access
+from app.api.deps import verify_workspace_access  # still used by POST /exports
 from app.db.database import get_db
 from app.models.models import Dataset, ExportJob, User
 from app.schemas.schemas import ExportRequest, ExportJobRead
@@ -20,10 +20,8 @@ router = APIRouter(prefix="/exports", tags=["exports"])
 async def list_exports(
     user_id: int = Query(..., ge=1),
     limit: int = Query(20, ge=1, le=100),
-    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
-    await verify_workspace_access(user_id, authorization, db)
     result = await db.execute(select(ExportJob).where(ExportJob.user_id == user_id).order_by(ExportJob.created_at.desc()).limit(limit))
     return result.scalars().all()
 
@@ -60,10 +58,8 @@ async def create_export(
 async def download_export(
     job_id: int,
     user_id: int = Query(..., ge=1),
-    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
-    await verify_workspace_access(user_id, authorization, db)
     job = await db.get(ExportJob, job_id)
     if not job or job.user_id != user_id:
         raise HTTPException(404, "Export not found")

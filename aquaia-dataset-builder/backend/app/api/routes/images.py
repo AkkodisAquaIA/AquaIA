@@ -409,6 +409,20 @@ async def serve_thumbnail(
     return FileResponse(path, media_type="image/jpeg")
 
 
+@router.delete("/{user_image_id}", status_code=204)
+async def delete_image(
+    user_image_id: int,
+    user_id: int = Query(..., ge=1),
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_workspace_access(user_id, authorization, db)
+    ui = await db.get(UserImage, user_image_id)
+    if not ui or ui.user_id != user_id:
+        raise HTTPException(404, "Image not found in this workspace")
+    await db.delete(ui)
+
+
 @router.get("/{user_image_id}", response_model=ImageRecordRead)
 async def get_image(
     user_image_id: int,

@@ -6,7 +6,7 @@ import { useAppStore } from "@/store/appStore";
 import { loginWorkspace } from "@/lib/api";
 
 export default function WorkspaceLoginModal() {
-  const { loginModal, closeLoginModal, setWorkspace, currentUserId } = useAppStore();
+  const { loginModal, closeLoginModal, setWorkspace, setReadOnly, currentUserId } = useAppStore();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -34,7 +34,9 @@ export default function WorkspaceLoginModal() {
       }
       // If logging into a different workspace (from selector), switch to it
       if (loginModal.userId !== currentUserId) {
-        setWorkspace(loginModal.userId, loginModal.displayName);
+        setWorkspace(loginModal.userId, loginModal.displayName, false);
+      } else {
+        setReadOnly(false);
       }
       closeLoginModal();
     } catch {

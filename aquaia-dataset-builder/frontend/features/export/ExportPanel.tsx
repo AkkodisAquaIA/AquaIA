@@ -15,7 +15,7 @@ const EXPORT_TYPES = [
 ];
 
 export default function ExportPanel() {
-  const { currentUserId } = useAppStore();
+  const { currentUserId, isReadOnly } = useAppStore();
   const [jobs, setJobs] = useState<ExportJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -54,8 +54,13 @@ export default function ExportPanel() {
         <p className="text-sm text-[var(--text-dim)] mt-1">Export validated images as AI-ready datasets</p>
       </div>
 
-      {/* Export format selector */}
-      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+      {/* Export format selector — hidden in read-only mode */}
+      {isReadOnly && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+          <span>Read-only — login to create exports</span>
+        </div>
+      )}
+      {!isReadOnly && <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
         <p className="text-sm font-medium text-[var(--text-base)]">Export format</p>
         <div className="grid grid-cols-2 gap-2">
           {EXPORT_TYPES.map((t) => (
@@ -77,7 +82,7 @@ export default function ExportPanel() {
           {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
           {creating ? "Creating…" : "Create export job"}
         </button>
-      </div>
+      </div>}
 
       {/* Jobs list */}
       <div>

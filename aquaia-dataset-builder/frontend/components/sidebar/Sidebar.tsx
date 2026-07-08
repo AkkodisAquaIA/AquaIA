@@ -17,8 +17,13 @@ const NAV_ITEMS: { id: PanelId; label: string; icon: React.ElementType }[] = [
   { id: "settings",   label: "Settings",          icon: Settings },
 ];
 
+const READONLY_HIDDEN: PanelId[] = ["search", "validation", "settings"];
+
 export default function Sidebar() {
-  const { activePanel, setActivePanel, theme, toggleTheme } = useAppStore();
+  const { activePanel, setActivePanel, theme, toggleTheme, isReadOnly } = useAppStore();
+  const visibleItems = isReadOnly
+    ? NAV_ITEMS.filter((item) => !READONLY_HIDDEN.includes(item.id))
+    : NAV_ITEMS;
 
   return (
     <aside
@@ -38,7 +43,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+        {visibleItems.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActivePanel(id)}
@@ -63,6 +68,14 @@ export default function Sidebar() {
           </button>
         ))}
       </nav>
+
+      {/* Read-only notice */}
+      {isReadOnly && (
+        <div className="mx-2 mb-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          <p className="text-[10px] text-amber-400 font-medium">Read-only mode</p>
+          <p className="text-[9px] text-amber-400/70 mt-0.5">Login to edit this workspace</p>
+        </div>
+      )}
 
       {/* Footer — theme toggle */}
       <div
