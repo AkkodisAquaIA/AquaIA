@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Plus, Check, Users, Loader2, Pencil, Trash2, Lock } from "lucide-react";
+import { ChevronDown, Plus, Check, Users, Loader2, Pencil, Trash2, Lock, Eye, EyeOff } from "lucide-react";
 import { useAppStore } from "@/store/appStore";
-import { createUser, deleteUser, updateUser, getUsers } from "@/lib/api";
+import { createUser, deleteUser, updateUser, getUsers, setWorkspacePassword, loginWorkspace } from "@/lib/api";
 import type { User } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,10 @@ export default function WorkspaceSelector() {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -36,15 +40,40 @@ export default function WorkspaceSelector() {
     return users;
   };
 
+  const resetCreateForm = () => {
+    setCreating(false);
+    setNewName("");
+    setNewPassword("");
+    setNewPasswordConfirm("");
+    setShowNewPwd(false);
+    setCreateError("");
+  };
+
   const handleCreate = async () => {
     if (!newName.trim()) return;
+    if (newPassword && newPassword.length < 4) {
+      setCreateError("Password must be at least 4 characters");
+      return;
+    }
+    if (newPassword && newPassword !== newPasswordConfirm) {
+      setCreateError("Passwords do not match");
+      return;
+    }
     setSaving(true);
     try {
       const user = await createUser(newName.trim());
+      if (newPassword) {
+        await setWorkspacePassword(user.id, newPassword);
+        const tokenData = await loginWorkspace(user.id, newPassword);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`adiab-token-${user.id}`, tokenData.access_token);
+        }
+      }
       await refreshWorkspaces();
       setWorkspace(user.id, user.display_name);
-      setNewName("");
-      setCreating(false);
+      resetCreateForm();
+    } catch {
+      setCreateError("Failed to create workspace");
     } finally {
       setSaving(false);
     }
@@ -164,22 +193,53 @@ export default function WorkspaceSelector() {
 
           <div className="border-t border-[var(--border)] p-2">
             {creating ? (
-              <div className="flex items-center gap-2">
+              <div className="space-y-2">
                 <input
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setCreating(false); }}
+                  onKeyDown={(e) => { if (e.key === "Escape") resetCreateForm(); }}
                   placeholder="Workspace name…"
-                  className="flex-1 bg-[var(--bg-input)] border border-green-500/40 rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none"
+                  className="w-full bg-[var(--bg-input)] border border-green-500/40 rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none"
                 />
-                <button
-                  onClick={handleCreate}
-                  disabled={saving || !newName.trim()}
-                  className="p-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/40 text-green-400 disabled:opacity-40 transition-colors"
-                >
-                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                </button>
+                <div className="relative">
+                  <input
+                    type={showNewPwd ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => { setNewPassword(e.target.value); setCreateError(""); }}
+                    placeholder="Password (optional)"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500/40 pr-7"
+                  />
+                  <button type="button" onClick={() => setShowNewPwd(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                    {showNewPwd ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  </button>
+                </div>
+                {newPassword && (
+                  <input
+                    type={showNewPwd ? "text" : "password"}
+                    value={newPasswordConfirm}
+                    onChange={(e) => { setNewPasswordConfirm(e.target.value); setCreateError(""); }}
+                    placeholder="Confirm password…"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500/40"
+                  />
+                )}
+                {createError && <p className="text-[10px] text-red-400 px-1">{createError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreate}
+                    disabled={saving || !newName.trim() || (!!newPassword && !newPasswordConfirm)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg bg-green-600/20 hover:bg-green-600/40 text-green-400 disabled:opacity-40 transition-colors"
+                  >
+                    {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                    Create
+                  </button>
+                  <button
+                    onClick={resetCreateForm}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : (
               <button
