@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getImages, getTaxons, getDatasets, createDataset, deleteDataset, addImageToDataset, getDatasetImages, removeImageFromDataset, getAssignedImages } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
 import type { ImageRecord, Taxon, Dataset } from "@/types";
 import { formatDate } from "@/lib/utils";
-import { Database, FolderOpen, Plus, Trash2, Images, Loader2, CheckSquare, Square, FolderPlus, ArrowLeft, X } from "lucide-react";
+import { Database, FolderOpen, Plus, Trash2, Images, Loader2, CheckSquare, Square, FolderPlus, ArrowLeft, X, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const API_BASE_DS = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -289,6 +289,8 @@ function DatasetsTab({ userId, datasets, onRefresh }: { userId: number; datasets
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
+type TaxonGroup = { taxon: Taxon | null; taxonId: number | null; images: ImageRecord[] };
+
 function ImagesTab({
   userId, images, datasets, assignments, onRefresh,
 }: {
@@ -302,45 +304,68 @@ function ImagesTab({
   const [targetDataset, setTargetDataset] = useState<number | "">("");
   const [adding, setAdding] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  // Group images by taxon, sorted alphabetically (uncategorised last)
+  const groups = useMemo<TaxonGroup[]>(() => {
+    const map = new Map<string, TaxonGroup>();
+    for (const img of images) {
+      const key = img.taxon_id ? String(img.taxon_id) : "__none__";
+      if (!map.has(key)) map.set(key, { taxon: img.taxon, taxonId: img.taxon_id, images: [] });
+      map.get(key)!.images.push(img);
+    }
+    return [...map.entries()]
+      .sort(([ka, a], [kb, b]) => {
+        if (ka === "__none__") return 1;
+        if (kb === "__none__") return -1;
+        return (a.taxon?.scientific_name ?? "").localeCompare(b.taxon?.scientific_name ?? "");
+      })
+      .map(([, v]) => v);
+  }, [images]);
 
   const toggle = (id: number) =>
     setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
+  const toggleGroup = (key: string, groupImages: ImageRecord[]) => {
+    const ids = groupImages.map((i) => i.id);
+    const allSelected = ids.every((id) => selected.has(id));
+    setSelected((prev) => {
+      const s = new Set(prev);
+      if (allSelected) ids.forEach((id) => s.delete(id));
+      else ids.forEach((id) => s.add(id));
+      return s;
+    });
+  };
+
   const selectAll = () => setSelected(new Set(images.map((i) => i.id)));
   const clearAll  = () => setSelected(new Set());
+
+  const toggleCollapse = (key: string) =>
+    setCollapsed((prev) => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
 
   const handleAddToDataset = async () => {
     if (!targetDataset || selected.size === 0) return;
     const targetId = Number(targetDataset);
     setWarning(null);
 
-    const alreadyHere: number[]  = [];
+    const alreadyHere: number[] = [];
     const alreadyElsewhere: { id: number; dsName: string }[] = [];
     const toAdd: number[] = [];
 
     for (const imgId of selected) {
       const a = assignments[imgId];
-      if (!a) {
-        toAdd.push(imgId);
-      } else if (a.dataset_id === targetId) {
-        alreadyHere.push(imgId);
-      } else {
-        alreadyElsewhere.push({ id: imgId, dsName: a.dataset_name });
-      }
+      if (!a) toAdd.push(imgId);
+      else if (a.dataset_id === targetId) alreadyHere.push(imgId);
+      else alreadyElsewhere.push({ id: imgId, dsName: a.dataset_name });
     }
 
     if (alreadyElsewhere.length > 0) {
       const names = [...new Set(alreadyElsewhere.map((e) => e.dsName))].join(", ");
-      const count = alreadyElsewhere.length;
-      setWarning(
-        `${count} image${count > 1 ? "s" : ""} already assigned to: ${names}. Only unassigned images were added.`
-      );
+      setWarning(`${alreadyElsewhere.length} image(s) already assigned to: ${names}. Only unassigned images were added.`);
     }
-
     if (toAdd.length === 0) {
-      if (alreadyHere.length > 0 && alreadyElsewhere.length === 0) {
+      if (alreadyHere.length > 0 && alreadyElsewhere.length === 0)
         setWarning("All selected images are already in this dataset.");
-      }
       return;
     }
 
@@ -416,40 +441,93 @@ function ImagesTab({
         )}
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-2">
-        {images.map((img) => {
-          const src = img.local_path
-            ? `${API_BASE}/images/${img.id}/thumbnail?user_id=${img.user_id}`
-            : img.source_image_url;
-          const isSelected = selected.has(img.id);
-          const assignment = assignments[img.id];
+      {/* Taxon groups */}
+      <div className="space-y-4">
+        {groups.map((group) => {
+          const key = group.taxonId ? String(group.taxonId) : "__none__";
+          const isCollapsed = collapsed.has(key);
+          const groupIds = group.images.map((i) => i.id);
+          const allGroupSelected = groupIds.every((id) => selected.has(id));
+          const someGroupSelected = groupIds.some((id) => selected.has(id));
+
           return (
-            <button key={img.id} onClick={() => toggle(img.id)}
-              className={cn(
-                "relative aspect-square rounded-lg overflow-hidden border transition-all",
-                isSelected
-                  ? "border-green-500 ring-2 ring-green-500/30"
-                  : assignment
-                  ? "border-indigo-400/50"
-                  : "border-[var(--border)] hover:border-[var(--border-hi)]"
-              )}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="" className="w-full h-full object-cover bg-[var(--bg-input)]" loading="lazy" />
-              {isSelected && (
-                <div className="absolute inset-0 bg-green-500/20 flex items-start justify-end p-1">
-                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
-                    <CheckSquare className="w-2.5 h-2.5 text-white" />
-                  </div>
+            <div key={key} className="rounded-xl border border-[var(--border)] overflow-hidden">
+              {/* Folder header */}
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-[var(--bg-card)] border-b border-[var(--border)]">
+                <button
+                  onClick={() => toggleCollapse(key)}
+                  className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                >
+                  {isCollapsed
+                    ? <ChevronRight className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
+                    : <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />}
+                  <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-sm italic text-[var(--text-base)] font-medium truncate">
+                    {group.taxon?.scientific_name ?? "Uncategorised"}
+                  </span>
+                  {group.taxon?.common_name && (
+                    <span className="text-xs text-[var(--text-muted)] truncate hidden sm:inline">
+                      — {group.taxon.common_name}
+                    </span>
+                  )}
+                  <span className="ml-auto shrink-0 px-1.5 py-0.5 text-[10px] rounded-full bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-muted)]">
+                    {group.images.length}
+                  </span>
+                </button>
+                {/* Select all in group */}
+                <button
+                  onClick={() => toggleGroup(key, group.images)}
+                  className="shrink-0 p-1 rounded hover:bg-[var(--bg-input)] transition-colors"
+                  title={allGroupSelected ? "Deselect folder" : "Select all in folder"}
+                >
+                  {allGroupSelected
+                    ? <CheckSquare className="w-3.5 h-3.5 text-green-400" />
+                    : someGroupSelected
+                    ? <Square className="w-3.5 h-3.5 text-green-400/50" />
+                    : <Square className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
+                </button>
+              </div>
+
+              {/* Images grid */}
+              {!isCollapsed && (
+                <div className="p-2 bg-[var(--bg-input)]/30 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 xl:grid-cols-10 gap-1.5">
+                  {group.images.map((img) => {
+                    const src = img.local_path
+                      ? `${API_BASE}/images/${img.id}/thumbnail?user_id=${img.user_id}`
+                      : img.source_image_url;
+                    const isSelected = selected.has(img.id);
+                    const assignment = assignments[img.id];
+                    return (
+                      <button key={img.id} onClick={() => toggle(img.id)}
+                        className={cn(
+                          "relative aspect-square rounded-lg overflow-hidden border transition-all",
+                          isSelected
+                            ? "border-green-500 ring-2 ring-green-500/30"
+                            : assignment
+                            ? "border-indigo-400/50"
+                            : "border-[var(--border)] hover:border-[var(--border-hi)]"
+                        )}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={src} alt="" className="w-full h-full object-cover bg-[var(--bg-input)]" loading="lazy" />
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-green-500/20 flex items-start justify-end p-1">
+                            <div className="w-3.5 h-3.5 rounded-full bg-green-500 flex items-center justify-center">
+                              <CheckSquare className="w-2 h-2 text-white" />
+                            </div>
+                          </div>
+                        )}
+                        {assignment && !isSelected && (
+                          <div className="absolute bottom-0 inset-x-0 bg-indigo-900/80 px-1 py-0.5 flex items-center gap-1">
+                            <FolderOpen className="w-2 h-2 text-indigo-300 shrink-0" />
+                            <span className="text-[8px] text-indigo-200 truncate leading-tight">{assignment.dataset_name}</span>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
-              {assignment && !isSelected && (
-                <div className="absolute bottom-0 inset-x-0 bg-indigo-900/80 px-1 py-0.5 flex items-center gap-1">
-                  <FolderOpen className="w-2.5 h-2.5 text-indigo-300 shrink-0" />
-                  <span className="text-[9px] text-indigo-200 truncate leading-tight">{assignment.dataset_name}</span>
-                </div>
-              )}
-            </button>
+            </div>
           );
         })}
       </div>
