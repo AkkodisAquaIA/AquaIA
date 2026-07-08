@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight, Maximize2, Crop, RotateCcw, BookImage, Star } from "lucide-react";
-import { getImages, updateImageStatus, cropImage, setTaxonReference } from "@/lib/api";
+import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight, Maximize2, Crop, RotateCcw, BookImage, Star, Trash2 } from "lucide-react";
+import { getImages, updateImageStatus, cropImage, setTaxonReference, clearImages } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
 import type { ImageRecord } from "@/types";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,8 @@ export default function ValidationPanel() {
   const [saving, setSaving] = useState(false);
   const [imgBust, setImgBust] = useState(0);
   const [settingRef, setSettingRef] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [refPanelHeight, setRefPanelHeight] = useState(160);
   const dragState = useRef<{ startY: number; startH: number } | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -116,21 +118,64 @@ export default function ValidationPanel() {
             <h1 className="text-xl font-semibold text-[var(--text-base)]">Validation Queue</h1>
             <p className="text-sm text-[var(--text-dim)] mt-0.5">{total} images</p>
           </div>
-          <div className="flex gap-1.5">
-            {FILTERS.map((f) => (
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1.5">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => { setValidationFilter(f.id); setConfirmClear(false); }}
+                  className={cn(
+                    "px-3 py-1.5 text-xs rounded-lg border transition-colors",
+                    validationFilter === f.id
+                      ? "bg-green-500/10 border-green-500/30 text-green-400"
+                      : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Clear button */}
+            {confirmClear ? (
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <span className="text-xs text-red-400">Clear {total} images?</span>
+                <button
+                  disabled={clearing}
+                  onClick={async () => {
+                    if (!currentUserId) return;
+                    setClearing(true);
+                    try {
+                      await clearImages(currentUserId, validationFilter);
+                      setImages([]);
+                      setTotal(0);
+                      setSelected(null);
+                      setConfirmClear(false);
+                    } finally {
+                      setClearing(false);
+                    }
+                  }}
+                  className="px-2 py-0.5 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-xs rounded transition-colors"
+                >
+                  {clearing ? "…" : "Confirm"}
+                </button>
+                <button
+                  onClick={() => setConfirmClear(false)}
+                  className="p-0.5 text-[var(--text-dim)] hover:text-[var(--text-base)] transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
               <button
-                key={f.id}
-                onClick={() => setValidationFilter(f.id)}
-                className={cn(
-                  "px-3 py-1.5 text-xs rounded-lg border transition-colors",
-                  validationFilter === f.id
-                    ? "bg-green-500/10 border-green-500/30 text-green-400"
-                    : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
-                )}
+                disabled={total === 0}
+                onClick={() => setConfirmClear(true)}
+                title="Clear all images in this filter"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:border-red-500/50 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
-                {f.label}
+                <Trash2 className="w-3.5 h-3.5" /> Clear
               </button>
-            ))}
+            )}
           </div>
         </div>
 

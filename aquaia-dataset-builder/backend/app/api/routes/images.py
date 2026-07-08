@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sql_delete
 from sqlalchemy.orm import selectinload
 
 from app.db.database import get_db
@@ -88,6 +88,24 @@ async def list_images(
         "size": size,
         "pages": max(1, -(-total // size)),
     }
+
+
+# ── Clear (bulk delete) ─────────────────────────────────────────────────────────
+
+
+@router.delete("", status_code=204)
+async def clear_images(
+    user_id: int = Query(..., ge=1),
+    status: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_user_or_404(db, user_id)
+    if status and status not in VALID_STATUSES:
+        raise HTTPException(400, f"Invalid status. Must be one of: {VALID_STATUSES}")
+    q = sql_delete(UserImage).where(UserImage.user_id == user_id)
+    if status:
+        q = q.where(UserImage.status == status)
+    await db.execute(q)
 
 
 # ── Import by URL ───────────────────────────────────────────────────────────────
