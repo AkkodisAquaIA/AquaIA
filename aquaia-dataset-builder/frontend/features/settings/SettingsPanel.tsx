@@ -50,7 +50,7 @@ export default function SettingsPanel() {
 
   const handleSetPassword = async () => {
     if (secNew !== secConfirm) { setSecError("Passwords do not match"); return; }
-    if (secNew.length < 4) { setSecError("Password must be at least 4 characters"); return; }
+    if (secNew.length < 6) { setSecError("Password must be at least 6 characters"); return; }
     setSecLoading(true); setSecError("");
     try {
       await setWorkspacePassword(currentUserId!, secNew, isProtected ? secOld : undefined);

@@ -52,7 +52,7 @@ export default function WorkspaceSelector() {
   const handleCreate = async () => {
     if (!newName.trim()) return;
     if (!newPassword) { setCreateError("Password is required"); return; }
-    if (newPassword.length < 4) { setCreateError("Password must be at least 4 characters"); return; }
+    if (newPassword.length < 6) { setCreateError("Password must be at least 6 characters"); return; }
     if (newPassword !== newPasswordConfirm) { setCreateError("Passwords do not match"); return; }
     setSaving(true);
     try {

@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
+import bcrypt
 from fastapi import APIRouter, Depends, HTTPException
 from jose import jwt
-from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +13,14 @@ from app.db.database import get_db
 from app.models.models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def _hash(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def _verify(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
 class LoginRequest(BaseModel):
@@ -48,7 +55,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = await db.get(User, body.user_id)
     if not user or not user.password_hash:
         raise HTTPException(401, "Invalid credentials")
-    if not _pwd.verify(body.password, user.password_hash):
+    if not _verify(body.password, user.password_hash):
         raise HTTPException(401, "Invalid credentials")
     return TokenResponse(access_token=_make_token(user.id), user_id=user.id)
 
@@ -59,11 +66,11 @@ async def set_password(body: SetPasswordRequest, db: AsyncSession = Depends(get_
     if not user:
         raise HTTPException(404, "Workspace not found")
     if user.password_hash:
-        if not body.old_password or not _pwd.verify(body.old_password, user.password_hash):
+        if not body.old_password or not _verify(body.old_password, user.password_hash):
             raise HTTPException(401, "Current password is incorrect")
     if not body.new_password:
         raise HTTPException(400, "New password cannot be empty")
-    user.password_hash = _pwd.hash(body.new_password)
+    user.password_hash = _hash(body.new_password)
     await db.flush()
 
 
@@ -74,7 +81,7 @@ async def remove_password(body: RemovePasswordRequest, db: AsyncSession = Depend
         raise HTTPException(404, "Workspace not found")
     if not user.password_hash:
         return
-    if not _pwd.verify(body.current_password, user.password_hash):
+    if not _verify(body.current_password, user.password_hash):
         raise HTTPException(401, "Current password is incorrect")
     user.password_hash = None
     await db.flush()
