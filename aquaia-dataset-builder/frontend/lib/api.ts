@@ -8,6 +8,7 @@ import type {
   Taxon,
   TaxonQueueItem,
   ExportJob,
+  User,
   UserWithToken,
 } from "@/types";
 
