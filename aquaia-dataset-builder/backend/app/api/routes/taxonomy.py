@@ -94,7 +94,13 @@ async def list_taxons(
 
 
 @router.post("", response_model=TaxonRead, status_code=201)
-async def create_taxon(body: TaxonCreate, db: AsyncSession = Depends(get_db)):
+async def create_taxon(
+    body: TaxonCreate,
+    user_id: int = Query(..., ge=1),
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_workspace_access(user_id, authorization, db)
     existing = await db.scalar(select(Taxon).where(Taxon.scientific_name == body.scientific_name))
     if existing:
         raise HTTPException(409, "Taxon already exists")
@@ -229,8 +235,12 @@ async def set_reference_image(taxon_id: int, body: ReferenceImageBody, authoriza
 
 
 @router.post("/enrich", response_model=list[TaxonRead])
-async def enrich_taxons(db: AsyncSession = Depends(get_db)):
-    """Fetch missing common_name / rank for all taxons that lack them."""
+async def enrich_taxons(
+    user_id: int = Query(..., ge=1),
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_workspace_access(user_id, authorization, db)
     from app.services.search_service import _fetch_taxon_meta
 
     result = await db.execute(select(Taxon).where((Taxon.common_name.is_(None)) | (Taxon.rank.is_(None))))
