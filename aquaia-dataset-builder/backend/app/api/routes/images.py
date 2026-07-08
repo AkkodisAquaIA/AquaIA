@@ -97,6 +97,7 @@ async def list_images(
 async def clear_images(
     user_id: int = Query(..., ge=1),
     status: str | None = Query(None),
+    taxon_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     await _get_user_or_404(db, user_id)
@@ -105,6 +106,8 @@ async def clear_images(
     q = sql_delete(UserImage).where(UserImage.user_id == user_id)
     if status:
         q = q.where(UserImage.status == status)
+    if taxon_id:
+        q = q.where(UserImage.taxon_id == taxon_id)
     await db.execute(q)
 
 

@@ -86,6 +86,19 @@ export interface DashboardStats {
   recent_searches: SearchHistory[];
 }
 
+export interface TaxonQueueItem {
+  taxon_id: number;
+  scientific_name: string;
+  common_name: string | null;
+  reference_image_id: number | null;
+  total: number;
+  pending: number;
+  validated: number;
+  rejected: number;
+  duplicate: number;
+  review_later: number;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;

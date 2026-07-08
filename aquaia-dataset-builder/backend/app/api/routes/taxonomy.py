@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, case
 
 from app.db.database import get_db
 from app.models.models import Taxon, UserImage, UserTaxonReference
@@ -101,6 +101,81 @@ async def create_taxon(body: TaxonCreate, db: AsyncSession = Depends(get_db)):
     db.add(taxon)
     await db.flush()
     return _taxon_read(taxon)
+
+
+class TaxonQueueItem(BaseModel):
+    taxon_id: int
+    scientific_name: str
+    common_name: Optional[str] = None
+    reference_image_id: Optional[int] = None
+    total: int
+    pending: int
+    validated: int
+    rejected: int
+    duplicate: int
+    review_later: int
+
+
+@router.get("/queue", response_model=list[TaxonQueueItem])
+async def taxon_queue(
+    user_id: int = Query(..., ge=1),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = await db.execute(
+        select(
+            UserImage.taxon_id,
+            func.count(UserImage.id).label("total"),
+            func.sum(case((UserImage.status == "pending", 1), else_=0)).label("pending"),
+            func.sum(case((UserImage.status == "validated", 1), else_=0)).label("validated"),
+            func.sum(case((UserImage.status == "rejected", 1), else_=0)).label("rejected"),
+            func.sum(case((UserImage.status == "duplicate", 1), else_=0)).label("duplicate"),
+            func.sum(case((UserImage.status == "review_later", 1), else_=0)).label("review_later"),
+        )
+        .where(UserImage.user_id == user_id, UserImage.taxon_id.isnot(None))
+        .group_by(UserImage.taxon_id)
+        .order_by(
+            func.sum(case((UserImage.status == "pending", 1), else_=0)).desc(),
+            func.count(UserImage.id).desc(),
+        )
+    )
+    taxon_rows = rows.all()
+    if not taxon_rows:
+        return []
+
+    taxon_ids = [r.taxon_id for r in taxon_rows]
+    taxon_map = {t.id: t for t in (await db.execute(select(Taxon).where(Taxon.id.in_(taxon_ids)))).scalars().all()}
+    ref_map = {
+        r.taxon_id: r.user_image_id
+        for r in (
+            await db.execute(
+                select(UserTaxonReference.taxon_id, UserTaxonReference.user_image_id).where(
+                    UserTaxonReference.user_id == user_id,
+                    UserTaxonReference.taxon_id.in_(taxon_ids),
+                )
+            )
+        ).all()
+    }
+
+    result = []
+    for row in taxon_rows:
+        taxon = taxon_map.get(row.taxon_id)
+        if not taxon:
+            continue
+        result.append(
+            TaxonQueueItem(
+                taxon_id=row.taxon_id,
+                scientific_name=taxon.scientific_name,
+                common_name=taxon.common_name,
+                reference_image_id=ref_map.get(row.taxon_id),
+                total=int(row.total),
+                pending=int(row.pending),
+                validated=int(row.validated),
+                rejected=int(row.rejected),
+                duplicate=int(row.duplicate),
+                review_later=int(row.review_later),
+            )
+        )
+    return result
 
 
 @router.get("/{taxon_id}", response_model=TaxonRead)

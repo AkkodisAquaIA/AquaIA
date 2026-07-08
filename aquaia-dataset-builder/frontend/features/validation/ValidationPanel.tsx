@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight, Maximize2, Crop, RotateCcw, BookImage, Star, Trash2 } from "lucide-react";
-import { getImages, updateImageStatus, cropImage, setTaxonReference, clearImages } from "@/lib/api";
+import { Check, X, Copy, Clock, ExternalLink, ChevronLeft, ChevronRight, Maximize2, Crop, RotateCcw, BookImage, Star, Trash2, FolderOpen } from "lucide-react";
+import { getImages, updateImageStatus, cropImage, setTaxonReference, clearImages, getTaxonQueue } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
-import type { ImageRecord } from "@/types";
+import type { ImageRecord, TaxonQueueItem } from "@/types";
 import { cn } from "@/lib/utils";
 import ReactCrop, { type Crop as CropType } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
@@ -27,6 +27,23 @@ function imgSrc(image: ImageRecord, bust?: number): string {
 
 export default function ValidationPanel() {
   const { validationFilter, setValidationFilter, cropWidth, cropHeight, currentUserId } = useAppStore();
+
+  // ── Taxon folder list ──────────────────────────────────────────────────────
+  const [taxons, setTaxons] = useState<TaxonQueueItem[]>([]);
+  const [loadingTaxons, setLoadingTaxons] = useState(true);
+  const [selectedTaxon, setSelectedTaxon] = useState<TaxonQueueItem | null>(null);
+
+  const loadTaxons = useCallback(async () => {
+    if (!currentUserId) return;
+    setLoadingTaxons(true);
+    try { setTaxons(await getTaxonQueue(currentUserId)); }
+    catch { /* fail silently */ }
+    finally { setLoadingTaxons(false); }
+  }, [currentUserId]);
+
+  useEffect(() => { if (!selectedTaxon) loadTaxons(); }, [loadTaxons, selectedTaxon]);
+
+  // ── Image grid ─────────────────────────────────────────────────────────────
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -63,10 +80,10 @@ export default function ValidationPanel() {
   };
 
   const load = useCallback(async () => {
-    if (!currentUserId) return;
+    if (!currentUserId || !selectedTaxon) return;
     setLoading(true);
     try {
-      const data = await getImages(currentUserId, { status: validationFilter, page, size: 48 });
+      const data = await getImages(currentUserId, { status: validationFilter, page, size: 48, taxon_id: selectedTaxon.taxon_id });
       setImages(data.items);
       setTotal(data.total);
       setPages(data.pages);
@@ -75,10 +92,10 @@ export default function ValidationPanel() {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, validationFilter, page]);
+  }, [currentUserId, validationFilter, page, selectedTaxon]);
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { setPage(1); }, [validationFilter]);
+  useEffect(() => { if (selectedTaxon) load(); }, [load, selectedTaxon]);
+  useEffect(() => { setPage(1); }, [validationFilter, selectedTaxon]);
 
   const handleStatus = async (id: number, status: string) => {
     if (!currentUserId) return;
@@ -109,14 +126,108 @@ export default function ValidationPanel() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, lightbox]);
 
+  // ── Taxon folder list view ─────────────────────────────────────────────────
+  if (!selectedTaxon) {
+    return (
+      <div className="panel-enter flex flex-col gap-4 h-full">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-[var(--text-base)]">Validation Queue</h1>
+            <p className="text-sm text-[var(--text-dim)] mt-0.5">{taxons.length} species</p>
+          </div>
+        </div>
+
+        {loadingTaxons ? (
+          <div className="flex items-center justify-center h-48">
+            <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : taxons.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-48 text-center">
+            <FolderOpen className="w-12 h-12 text-[var(--text-ghost)] mb-3" />
+            <p className="text-sm text-[var(--text-dim)]">No images yet — run a search first</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto">
+            {taxons.map((t) => (
+              <button
+                key={t.taxon_id}
+                onClick={() => { setSelectedTaxon(t); setSelected(null); setPage(1); }}
+                className="group flex items-center gap-3 p-3 bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--border-hi)] rounded-xl text-left transition-all"
+              >
+                {/* Thumbnail */}
+                <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-[var(--bg-input)] border border-[var(--border)]">
+                  {t.reference_image_id ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={`${API_BASE}/images/${t.reference_image_id}/thumbnail`}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[var(--text-ghost)]">
+                      <FolderOpen className="w-6 h-6" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium italic text-[var(--text-base)] truncate leading-tight">
+                    {t.scientific_name}
+                  </p>
+                  {t.common_name && (
+                    <p className="text-xs text-[var(--text-dim)] truncate mt-0.5">{t.common_name}</p>
+                  )}
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {t.pending > 0 && (
+                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-orange-500/15 text-orange-400 border border-orange-500/20">
+                        {t.pending} pending
+                      </span>
+                    )}
+                    {t.validated > 0 && (
+                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-green-500/15 text-green-400 border border-green-500/20">
+                        {t.validated} ✓
+                      </span>
+                    )}
+                    {t.rejected > 0 && (
+                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-red-500/15 text-red-400 border border-red-500/20">
+                        {t.rejected} ✗
+                      </span>
+                    )}
+                    {t.duplicate > 0 && (
+                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-purple-500/15 text-purple-400 border border-purple-500/20">
+                        {t.duplicate} dup
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Image grid view (inside a taxon) ──────────────────────────────────────
   return (
     <div className="panel-enter flex gap-4 h-full">
       {/* Left: grid */}
       <div className="flex-1 min-w-0 flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-[var(--text-base)]">Validation Queue</h1>
-            <p className="text-sm text-[var(--text-dim)] mt-0.5">{total} images</p>
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Breadcrumb back */}
+            <button
+              onClick={() => { setSelectedTaxon(null); setSelected(null); setConfirmClear(false); loadTaxons(); }}
+              className="flex items-center gap-1 text-xs text-[var(--text-dim)] hover:text-[var(--text-base)] transition-colors shrink-0"
+            >
+              <ChevronLeft className="w-4 h-4" /> All species
+            </button>
+            <span className="text-[var(--text-ghost)]">/</span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold italic text-[var(--text-base)] truncate">{selectedTaxon.scientific_name}</p>
+              <p className="text-xs text-[var(--text-dim)]">{total} images</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex gap-1.5">
@@ -136,7 +247,7 @@ export default function ValidationPanel() {
               ))}
             </div>
 
-            {/* Clear button */}
+            {/* Clear button — scoped to this taxon + filter */}
             {confirmClear ? (
               <div className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 border border-red-500/30 rounded-lg">
                 <span className="text-xs text-red-400">Clear {total} images?</span>
@@ -146,7 +257,7 @@ export default function ValidationPanel() {
                     if (!currentUserId) return;
                     setClearing(true);
                     try {
-                      await clearImages(currentUserId, validationFilter);
+                      await clearImages(currentUserId, validationFilter, selectedTaxon.taxon_id);
                       setImages([]);
                       setTotal(0);
                       setSelected(null);
@@ -159,10 +270,7 @@ export default function ValidationPanel() {
                 >
                   {clearing ? "…" : "Confirm"}
                 </button>
-                <button
-                  onClick={() => setConfirmClear(false)}
-                  className="p-0.5 text-[var(--text-dim)] hover:text-[var(--text-base)] transition-colors"
-                >
+                <button onClick={() => setConfirmClear(false)} className="p-0.5 text-[var(--text-dim)] hover:text-[var(--text-base)] transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>

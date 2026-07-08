@@ -6,6 +6,7 @@ import type {
   PaginatedResponse,
   SearchHistory,
   Taxon,
+  TaxonQueueItem,
   ExportJob,
   User,
 } from "@/types";
@@ -50,8 +51,11 @@ export const getImages = (
     .get<PaginatedResponse<ImageRecord>>("/images", { params: { user_id: userId, ...params } })
     .then((r) => r.data);
 
-export const clearImages = (userId: number, status?: string) =>
-  api.delete("/images", { params: { user_id: userId, ...(status ? { status } : {}) } });
+export const clearImages = (userId: number, status?: string, taxonId?: number) =>
+  api.delete("/images", { params: { user_id: userId, ...(status ? { status } : {}), ...(taxonId ? { taxon_id: taxonId } : {}) } });
+
+export const getTaxonQueue = (userId: number) =>
+  api.get<TaxonQueueItem[]>("/taxonomy/queue", { params: { user_id: userId } }).then((r) => r.data);
 
 export const updateImageStatus = (userId: number, id: number, status: string, notes?: string) =>
   api
