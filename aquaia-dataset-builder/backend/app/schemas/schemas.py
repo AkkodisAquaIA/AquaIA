@@ -20,6 +20,7 @@ class UserRead(BaseModel):
     id: int
     username: str
     display_name: str
+    is_protected: bool = False
     created_at: datetime
 
 

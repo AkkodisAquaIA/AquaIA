@@ -2,11 +2,12 @@ import logging
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case
 
+from app.api.deps import verify_workspace_access
 from app.db.database import get_db
 from app.models.models import Taxon, UserImage, UserTaxonReference
 from app.schemas.schemas import TaxonCreate, TaxonRead
@@ -197,7 +198,8 @@ class ReferenceImageBody(BaseModel):
 
 
 @router.patch("/{taxon_id}/reference", response_model=TaxonRead)
-async def set_reference_image(taxon_id: int, body: ReferenceImageBody, db: AsyncSession = Depends(get_db)):
+async def set_reference_image(taxon_id: int, body: ReferenceImageBody, authorization: Optional[str] = Header(None), db: AsyncSession = Depends(get_db)):
+    await verify_workspace_access(body.user_id, authorization, db)
     taxon = await db.get(Taxon, taxon_id)
     if not taxon:
         raise HTTPException(404, "Taxon not found")

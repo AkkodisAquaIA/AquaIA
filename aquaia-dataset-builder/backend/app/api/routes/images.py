@@ -1,14 +1,16 @@
 import hashlib
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from pydantic import BaseModel
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete as sql_delete
 from sqlalchemy.orm import selectinload
 
+from app.api.deps import verify_workspace_access
 from app.db.database import get_db
 from app.models.models import ImageAsset, UserImage, User
 from app.schemas.schemas import ImageRecordRead, ImageStatusUpdate, ImportUrlRequest, image_record_read
@@ -98,8 +100,10 @@ async def clear_images(
     user_id: int = Query(..., ge=1),
     status: str | None = Query(None),
     taxon_id: int | None = Query(None),
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(user_id, authorization, db)
     await _get_user_or_404(db, user_id)
     if status and status not in VALID_STATUSES:
         raise HTTPException(400, f"Invalid status. Must be one of: {VALID_STATUSES}")
@@ -118,8 +122,10 @@ async def clear_images(
 async def import_from_url(
     body: ImportUrlRequest,
     background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(body.user_id, authorization, db)
     await _get_user_or_404(db, body.user_id)
 
     taxon = None
@@ -165,8 +171,10 @@ async def upload_files(
     user_id: int = Form(...),
     files: list[UploadFile] = File(...),
     scientific_name: str | None = Form(None),
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(user_id, authorization, db)
     await _get_user_or_404(db, user_id)
 
     taxon = None
@@ -236,8 +244,10 @@ async def update_status(
     user_image_id: int,
     body: ImageStatusUpdate,
     user_id: int = Query(..., ge=1),
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(user_id, authorization, db)
     if body.status not in VALID_STATUSES:
         raise HTTPException(400, f"Invalid status. Must be one of: {VALID_STATUSES}")
     ui = await db.get(UserImage, user_image_id, options=_UI_LOAD)
@@ -267,8 +277,10 @@ async def crop_image(
     user_image_id: int,
     body: CropRequest,
     user_id: int = Query(..., ge=1),
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(user_id, authorization, db)
     from PIL import Image as PILImage
     import io as _io
 

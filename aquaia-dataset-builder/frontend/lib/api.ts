@@ -16,6 +16,35 @@ const api = axios.create({
   timeout: 30000,
 });
 
+// Attach stored token for the current workspace on every request
+api.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const { useAppStore } = require("@/store/appStore");
+    const { currentUserId } = useAppStore.getState();
+    if (currentUserId) {
+      const token = localStorage.getItem(`adiab-token-${currentUserId}`);
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
+// On 401 — clear stale token and open login modal
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401 && typeof window !== "undefined") {
+      const { useAppStore } = require("@/store/appStore");
+      const { currentUserId, currentUserName, openLoginModal } = useAppStore.getState();
+      if (currentUserId) {
+        localStorage.removeItem(`adiab-token-${currentUserId}`);
+        openLoginModal(currentUserId, currentUserName);
+      }
+    }
+    return Promise.reject(err);
+  }
+);
+
 // Users / Workspaces
 export const getUsers = () =>
   api.get<User[]>("/users").then((r) => r.data);
@@ -146,3 +175,16 @@ export const uploadFiles = (userId: number, files: File[], scientific_name?: str
     })
     .then((r) => r.data);
 };
+
+// Auth
+export const loginWorkspace = (userId: number, password: string) =>
+  api.post<{ access_token: string; token_type: string; user_id: number }>("/auth/login", { user_id: userId, password }).then((r) => r.data);
+
+export const setWorkspacePassword = (userId: number, newPassword: string, oldPassword?: string) =>
+  api.post("/auth/set-password", { user_id: userId, new_password: newPassword, old_password: oldPassword ?? null });
+
+export const removeWorkspacePassword = (userId: number, currentPassword: string) =>
+  api.delete("/auth/password", { data: { user_id: userId, current_password: currentPassword } });
+
+export const getWorkspaceAuthStatus = (userId: number) =>
+  api.get<{ user_id: number; is_protected: boolean }>(`/auth/status/${userId}`).then((r) => r.data);

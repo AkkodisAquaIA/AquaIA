@@ -10,6 +10,7 @@ export interface User {
   id: number;
   username: string;
   display_name: string;
+  is_protected: boolean;
   created_at: string;
 }
 

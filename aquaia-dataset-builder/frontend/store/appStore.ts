@@ -2,6 +2,11 @@ import { create } from "zustand";
 import type { PanelId, ImageRecord, User } from "@/types";
 import { getUsers, createUser } from "@/lib/api";
 
+export interface LoginModal {
+  userId: number;
+  displayName: string;
+}
+
 interface AppState {
   theme: "dark" | "light";
   toggleTheme: () => void;
@@ -33,6 +38,11 @@ interface AppState {
   initWorkspace: () => Promise<void>;
   setWorkspace: (id: number, name: string) => void;
   setWorkspaces: (workspaces: User[]) => void;
+
+  // Auth
+  loginModal: LoginModal | null;
+  openLoginModal: (userId: number, displayName: string) => void;
+  closeLoginModal: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -117,4 +127,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setWorkspaces: (workspaces) => set({ workspaces }),
+
+  // Auth
+  loginModal: null,
+  openLoginModal: (userId, displayName) => set({ loginModal: { userId, displayName } }),
+  closeLoginModal: () => set({ loginModal: null }),
 }));

@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
+from app.api.deps import verify_workspace_access
 from app.db.database import get_db
 from app.models.models import Dataset, DatasetImage, UserImage, User
 from app.schemas.schemas import DatasetCreate, DatasetRead, ImageRecordRead, image_record_read
@@ -36,7 +39,8 @@ async def list_datasets(user_id: int = Query(..., ge=1), db: AsyncSession = Depe
 
 
 @router.post("", response_model=DatasetRead, status_code=201)
-async def create_dataset(body: DatasetCreate, user_id: int = Query(..., ge=1), db: AsyncSession = Depends(get_db)):
+async def create_dataset(body: DatasetCreate, user_id: int = Query(..., ge=1), authorization: Optional[str] = Header(None), db: AsyncSession = Depends(get_db)):
+    await verify_workspace_access(user_id, authorization, db)
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(404, f"Workspace {user_id} not found")
@@ -81,8 +85,10 @@ async def add_image_to_dataset(
     dataset_id: int,
     user_image_id: int,
     user_id: int = Query(..., ge=1),
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(user_id, authorization, db)
     await _get_dataset_or_404(db, dataset_id, user_id)
     ui = await db.get(UserImage, user_image_id)
     if not ui or ui.user_id != user_id:
@@ -111,8 +117,10 @@ async def remove_image_from_dataset(
     dataset_id: int,
     user_image_id: int,
     user_id: int = Query(..., ge=1),
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(user_id, authorization, db)
     await _get_dataset_or_404(db, dataset_id, user_id)
     row = await db.scalar(select(DatasetImage).where(DatasetImage.dataset_id == dataset_id, DatasetImage.user_image_id == user_image_id))
     if row:
@@ -121,7 +129,8 @@ async def remove_image_from_dataset(
 
 
 @router.delete("/{dataset_id}", status_code=204)
-async def delete_dataset(dataset_id: int, user_id: int = Query(..., ge=1), db: AsyncSession = Depends(get_db)):
+async def delete_dataset(dataset_id: int, user_id: int = Query(..., ge=1), authorization: Optional[str] = Header(None), db: AsyncSession = Depends(get_db)):
+    await verify_workspace_access(user_id, authorization, db)
     ds = await _get_dataset_or_404(db, dataset_id, user_id)
     await db.delete(ds)
     await db.flush()

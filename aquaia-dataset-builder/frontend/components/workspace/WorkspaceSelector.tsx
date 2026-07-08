@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Plus, Check, Users, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Check, Users, Loader2, Pencil, Trash2, Lock } from "lucide-react";
 import { useAppStore } from "@/store/appStore";
 import { createUser, deleteUser, updateUser, getUsers } from "@/lib/api";
 import type { User } from "@/types";
 import { cn } from "@/lib/utils";
 
 export default function WorkspaceSelector() {
-  const { currentUserId, currentUserName, workspaces, setWorkspace, setWorkspaces } = useAppStore();
+  const { currentUserId, currentUserName, workspaces, setWorkspace, setWorkspaces, openLoginModal } = useAppStore();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -114,7 +114,15 @@ export default function WorkspaceSelector() {
                   </div>
                 ) : (
                   <button
-                    onClick={() => { setWorkspace(ws.id, ws.display_name); setOpen(false); }}
+                    onClick={() => {
+                      if (ws.is_protected && typeof window !== "undefined" && !localStorage.getItem(`adiab-token-${ws.id}`)) {
+                        openLoginModal(ws.id, ws.display_name);
+                        setOpen(false);
+                      } else {
+                        setWorkspace(ws.id, ws.display_name);
+                        setOpen(false);
+                      }
+                    }}
                     className="flex-1 min-w-0 flex items-center gap-2 text-left"
                   >
                     {ws.id === currentUserId
@@ -124,6 +132,9 @@ export default function WorkspaceSelector() {
                     <span className={cn("text-sm truncate", ws.id === currentUserId ? "text-green-400 font-medium" : "text-[var(--text-base)]")}>
                       {ws.display_name}
                     </span>
+                    {ws.is_protected && (
+                      <Lock className="w-3 h-3 text-amber-400 shrink-0 ml-auto" />
+                    )}
                   </button>
                 )}
 

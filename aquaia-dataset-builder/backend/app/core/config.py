@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     debug: bool = True
 
     database_url: str = f"sqlite+aiosqlite:///{BASE_DIR}/storage/adiab.db"
+    secret_key: str = "adiab-dev-secret-change-in-production"
 
     storage_raw: Path = BASE_DIR / "storage" / "raw"
     storage_validated: Path = BASE_DIR / "storage" / "validated"

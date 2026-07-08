@@ -1,11 +1,13 @@
 import json
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.api.deps import verify_workspace_access
 from app.db.database import get_db
 from app.models.models import ExportJob, User
 from app.schemas.schemas import ExportRequest, ExportJobRead
@@ -31,8 +33,10 @@ async def list_exports(
 async def create_export(
     body: ExportRequest,
     background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(body.user_id, authorization, db)
     user = await db.get(User, body.user_id)
     if not user:
         raise HTTPException(404, f"Workspace {body.user_id} not found")

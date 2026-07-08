@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useAppStore } from "@/store/appStore";
 import Sidebar from "@/components/sidebar/Sidebar";
 import WorkspaceSelector from "@/components/workspace/WorkspaceSelector";
+import WorkspaceLoginModal from "@/components/workspace/WorkspaceLoginModal";
 import DashboardPanel from "@/features/dashboard/DashboardPanel";
 import SearchPanel from "@/features/search/SearchPanel";
 import ValidationPanel from "@/features/validation/ValidationPanel";
@@ -33,6 +34,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--bg-base)]">
+      <WorkspaceLoginModal />
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
