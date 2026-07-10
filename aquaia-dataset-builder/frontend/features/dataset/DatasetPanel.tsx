@@ -704,7 +704,7 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
               >
                 <input ref={attrRef} type="file" accept=".txt" className="hidden"
                   onChange={(e) => loadAttrFile(e.target.files)} />
-                <p className="text-xs text-[var(--text-dim)]">Drop your <code className="text-amber-400">SL_*.txt</code> file here or click to select</p>
+                <p className="text-xs text-[var(--text-dim)]">Drop any <code className="text-amber-400">.txt</code> attribution file here or click to select</p>
                 <p className="text-[10px] text-[var(--text-muted)] mt-1 font-mono">
                   Format: source_url - author - license
                 </p>
