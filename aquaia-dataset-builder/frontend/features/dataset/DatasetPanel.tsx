@@ -511,8 +511,6 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
   const [attrDragging, setAttrDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const imgRef = useRef<HTMLInputElement>(null);
-  const folderRef = useRef<HTMLInputElement>(null);
   const attrRef = useRef<HTMLInputElement>(null);
 
   const sortedImages = useMemo(
@@ -542,38 +540,36 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
     });
   }, []);
 
-  const handleFolderFromFileList = useCallback((fl: FileList | null) => {
-    if (!fl) return;
-    const all = Array.from(fl);
-    const imgs = all.filter((f) => f.type.startsWith("image/"));
-    const txt = all.find((f) => f.name.toLowerCase().endsWith(".txt"));
-    if (imgs.length) addImageFiles(dataTransferFromArray(imgs));
-    if (txt) loadAttrFile(dataTransferFromArray([txt]));
-  }, [addImageFiles, loadAttrFile]);
+  const handleDropItems = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    setImgDragging(false);
+    const imgs: File[] = [];
+    let txtFile: File | null = null;
 
-  const handleFolderPicker = useCallback(async () => {
-    // showDirectoryPicker requires HTTPS — fall back to webkitdirectory on plain HTTP
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (typeof window !== "undefined" && "showDirectoryPicker" in window) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const dirHandle = await (window as any).showDirectoryPicker({ mode: "read" });
-        const imgs: File[] = [];
-        let txtFile: File | null = null;
-        for await (const entry of dirHandle.values()) {
-          if (entry.kind !== "file") continue;
-          const file: File = await entry.getFile();
-          if (file.type.startsWith("image/")) imgs.push(file);
-          else if (file.name.toLowerCase().endsWith(".txt") && !txtFile) txtFile = file;
-        }
-        if (imgs.length) addImageFiles(dataTransferFromArray(imgs));
-        if (txtFile) loadAttrFile(dataTransferFromArray([txtFile]));
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") console.error("Directory picker:", err);
+    const readDir = (dir: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> =>
+      new Promise((res, rej) => dir.createReader().readEntries(res, rej));
+
+    const processEntry = async (entry: FileSystemEntry) => {
+      if (entry.isFile) {
+        const file = await new Promise<File>((res, rej) =>
+          (entry as FileSystemFileEntry).file(res, rej)
+        );
+        if (file.type.startsWith("image/")) imgs.push(file);
+        else if (file.name.toLowerCase().endsWith(".txt") && !txtFile) txtFile = file;
+      } else if (entry.isDirectory) {
+        const children = await readDir(entry as FileSystemDirectoryEntry);
+        await Promise.all(children.map(processEntry));
       }
-    } else {
-      folderRef.current?.click();
-    }
+    };
+
+    const entries = Array.from(e.dataTransfer.items)
+      .filter((i) => i.kind === "file")
+      .map((i) => i.webkitGetAsEntry())
+      .filter(Boolean) as FileSystemEntry[];
+
+    await Promise.all(entries.map(processEntry));
+    if (imgs.length) addImageFiles(dataTransferFromArray(imgs));
+    if (txtFile) loadAttrFile(dataTransferFromArray([txtFile]));
   }, [addImageFiles, loadAttrFile]);
 
   // Validate count match
@@ -619,43 +615,26 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
 
           {/* ── Step 1 : Images ── */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-[var(--text-dim)]">
-                1. Images <span className="text-red-400">*</span>
-              </label>
-              <div className="flex gap-1.5">
-                <button onClick={() => imgRef.current?.click()}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-dim)] hover:border-green-500/40 hover:text-green-400 transition-colors">
-                  <ImageIcon className="w-3 h-3" /> Select files
-                </button>
-                <button onClick={handleFolderPicker}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-dim)] hover:border-indigo-400/50 hover:text-indigo-300 transition-colors">
-                  <FolderOpen className="w-3 h-3" /> Select folder
-                </button>
-                <input ref={imgRef} type="file" accept="image/*" multiple className="hidden"
-                  onChange={(e) => addImageFiles(e.target.files)} />
-                {/* @ts-expect-error webkitdirectory is non-standard — fallback when showDirectoryPicker unavailable (HTTP) */}
-                <input ref={folderRef} type="file" webkitdirectory="" className="hidden"
-                  onChange={(e) => handleFolderFromFileList(e.target.files)} />
-              </div>
-            </div>
+            <label className="text-xs font-medium text-[var(--text-dim)] mb-2 block">
+              1. Images <span className="text-red-400">*</span>
+            </label>
 
             <div
               onDragOver={(e) => { e.preventDefault(); setImgDragging(true); }}
               onDragLeave={() => setImgDragging(false)}
-              onDrop={(e) => { e.preventDefault(); setImgDragging(false); addImageFiles(e.dataTransfer.files); }}
-              onClick={() => sortedImages.length === 0 && imgRef.current?.click()}
+              onDrop={handleDropItems}
               className={cn(
                 "border-2 border-dashed rounded-xl transition-colors",
-                sortedImages.length === 0 ? "p-6 text-center cursor-pointer" : "p-0",
-                imgDragging ? "border-green-500/50 bg-green-500/5" : "border-[var(--border)] hover:border-[var(--border-hi)]"
+                sortedImages.length === 0 ? "p-6 text-center" : "p-0",
+                imgDragging ? "border-indigo-500/60 bg-indigo-500/5" : "border-[var(--border)] hover:border-[var(--border-hi)]"
               )}
             >
               {sortedImages.length === 0 ? (
                 <>
-                  <ImageIcon className="w-6 h-6 text-[var(--text-ghost)] mx-auto mb-2" />
-                  <p className="text-xs text-[var(--text-dim)]">Drop images here or use buttons above</p>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">JPG · PNG · WebP · GIF — sorted alphabetically on upload</p>
+                  <FolderOpen className="w-7 h-7 text-[var(--text-ghost)] mx-auto mb-2" />
+                  <p className="text-sm text-[var(--text-dim)]">Drag your folder here</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">Auto-detects images + attribution .txt in one drop</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Or drag individual image files (JPG · PNG · WebP)</p>
                 </>
               ) : (
                 <div>
