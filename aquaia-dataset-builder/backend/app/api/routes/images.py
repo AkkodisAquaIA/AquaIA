@@ -1,5 +1,6 @@
 import hashlib
 import ipaddress
+import json as _json
 import socket
 from datetime import datetime
 from pathlib import Path
@@ -217,6 +218,7 @@ async def upload_files(
     files: list[UploadFile] = File(...),
     scientific_name: str | None = Form(None),
     validated: bool = Form(False),
+    attributions_json: str | None = Form(None),
     authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -227,8 +229,16 @@ async def upload_files(
     if scientific_name:
         taxon = await get_or_create_taxon(db, scientific_name)
 
+    # Parse per-image attributions: [{source_url, author, license}]
+    attributions: list[dict] = []
+    if attributions_json:
+        try:
+            attributions = _json.loads(attributions_json)
+        except Exception:
+            raise HTTPException(400, "Invalid attributions_json")
+
     results: list[UserImage] = []
-    for upload in files:
+    for idx, upload in enumerate(files):
         content = await upload.read()
         if not content:
             continue
@@ -240,6 +250,11 @@ async def upload_files(
         if ext == "jpeg":
             ext = "jpg"
 
+        attr = attributions[idx] if idx < len(attributions) else {}
+        source_url = attr.get("source_url") or f"upload://{fname}"
+        author = attr.get("author") or None
+        license_ = attr.get("license") or None
+
         sha256 = hashlib.sha256(content).hexdigest()
 
         # Check for exact duplicate at asset level
@@ -248,7 +263,9 @@ async def upload_files(
             asset = ImageAsset(
                 taxon_id=taxon.id if taxon else None,
                 source_name="local_upload",
-                source_image_url=f"upload://{fname}",
+                source_image_url=source_url,
+                author=author,
+                license=license_,
             )
             db.add(asset)
             await db.flush()
@@ -258,6 +275,14 @@ async def upload_files(
                 setattr(asset, k, v)
             if fields.get("perceptual_hash"):
                 await _flag_near_duplicate(db, asset.id, fields["perceptual_hash"], sha256)
+        else:
+            # Update attribution if the existing asset has no useful metadata
+            if source_url and asset.source_image_url.startswith("upload://"):
+                asset.source_image_url = source_url
+            if author and not asset.author:
+                asset.author = author
+            if license_ and not asset.license:
+                asset.license = license_
 
         # Create UserImage if not already exists
         existing_ui = await db.scalar(select(UserImage).where(UserImage.user_id == user_id, UserImage.image_asset_id == asset.id))

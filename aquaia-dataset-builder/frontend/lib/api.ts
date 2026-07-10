@@ -172,12 +172,21 @@ export const importFromUrl = (userId: number, url: string, scientific_name?: str
     .post<ImageRecord>("/images/import-url", { user_id: userId, url, scientific_name })
     .then((r) => r.data);
 
-export const uploadFiles = (userId: number, files: File[], scientific_name?: string, validated = false) => {
+export type Attribution = { source_url: string; author: string; license: string };
+
+export const uploadFiles = (
+  userId: number,
+  files: File[],
+  scientific_name?: string,
+  validated = false,
+  attributions?: Attribution[],
+) => {
   const form = new FormData();
   form.append("user_id", String(userId));
   form.append("validated", String(validated));
   files.forEach((f) => form.append("files", f));
   if (scientific_name) form.append("scientific_name", scientific_name);
+  if (attributions) form.append("attributions_json", JSON.stringify(attributions));
   return api
     .post<ImageRecord[]>("/images/upload", form, {
       headers: { "Content-Type": "multipart/form-data" },

@@ -476,6 +476,22 @@ function DatasetsTab({ userId, datasets, images, assignments, onRefresh }: {
 
 // ── Upload modal ──────────────────────────────────────────────────────────────
 
+type Attribution = { source_url: string; author: string; license: string };
+
+function parseAttrTxt(text: string): Attribution[] {
+  return text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"))
+    .map((line) => {
+      const parts = line.split(" - ");
+      const source_url = parts[0]?.trim() ?? "";
+      const license = parts[parts.length - 1]?.trim() ?? "";
+      const author = parts.length > 2 ? parts.slice(1, -1).join(" - ").trim() : (parts[1]?.trim() ?? "");
+      return { source_url, author, license };
+    });
+}
+
 function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
   userId: number;
   taxons: Taxon[];
@@ -483,52 +499,73 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
   onDone: () => void;
   onClose: () => void;
 }) {
-  const [files, setFiles] = useState<File[]>([]);
+  const [images, setImages] = useState<File[]>([]);
+  const [attrFileName, setAttrFileName] = useState<string | null>(null);
+  const [attributions, setAttributions] = useState<Attribution[] | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
   const [taxonMode, setTaxonMode] = useState<"existing" | "new">("existing");
   const [selectedTaxon, setSelectedTaxon] = useState<string>("");
   const [newSpeciesName, setNewSpeciesName] = useState("");
   const [targetDataset, setTargetDataset] = useState<number | "none">("none");
-  const [dragging, setDragging] = useState(false);
+  const [imgDragging, setImgDragging] = useState(false);
+  const [attrDragging, setAttrDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [done, setDone] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const imgRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
+  const attrRef = useRef<HTMLInputElement>(null);
 
-  const addFiles = (fl: FileList | null) => {
+  const sortedImages = useMemo(
+    () => [...images].sort((a, b) => a.name.localeCompare(b.name)),
+    [images]
+  );
+
+  const addImageFiles = useCallback((fl: FileList | null) => {
     if (!fl) return;
     const imgs = Array.from(fl).filter((f) => f.type.startsWith("image/"));
-    setFiles((prev) => {
+    setImages((prev) => {
       const seen = new Set(prev.map((f) => f.name + f.size));
       return [...prev, ...imgs.filter((f) => !seen.has(f.name + f.size))];
     });
-  };
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    addFiles(e.dataTransfer.files);
   }, []);
 
-  const scientificName =
-    taxonMode === "existing" ? selectedTaxon : newSpeciesName.trim();
+  const loadAttrFile = useCallback((fl: FileList | null) => {
+    if (!fl) return;
+    // From a folder pick: look for .txt file if mixed
+    const txt = Array.from(fl).find((f) => f.name.toLowerCase().endsWith(".txt"));
+    if (!txt) return;
+    setAttrFileName(txt.name);
+    txt.text().then((text) => {
+      const parsed = parseAttrTxt(text);
+      setAttributions(parsed);
+      setParseError(null);
+    });
+  }, []);
+
+  const handleFolderSelect = useCallback((fl: FileList | null) => {
+    if (!fl) return;
+    const all = Array.from(fl);
+    const imgs = all.filter((f) => f.type.startsWith("image/"));
+    const txt = all.find((f) => f.name.toLowerCase().endsWith(".txt"));
+    if (imgs.length) addImageFiles(dataTransferFromArray(imgs));
+    if (txt) loadAttrFile(dataTransferFromArray([txt]));
+  }, [addImageFiles, loadAttrFile]);
+
+  // Validate count match
+  const countMismatch = attributions !== null && sortedImages.length > 0 && attributions.length !== sortedImages.length;
+  const countOk = attributions !== null && sortedImages.length > 0 && attributions.length === sortedImages.length;
+
+  const scientificName = taxonMode === "existing" ? selectedTaxon : newSpeciesName.trim();
+  const canUpload = sortedImages.length > 0 && countOk && !!scientificName && !uploading;
 
   const handleUpload = async () => {
-    if (!files.length) return;
+    if (!canUpload || !attributions) return;
     setUploading(true);
     setError(null);
-    setDone(0);
     try {
-      const uploaded = await uploadFiles(
-        userId,
-        files,
-        scientificName || undefined,
-        true,
-      );
-      setDone(uploaded.length);
+      const uploaded = await uploadFiles(userId, sortedImages, scientificName, true, attributions);
       if (targetDataset !== "none" && uploaded.length) {
-        await Promise.all(
-          uploaded.map((img) => addImageToDataset(userId, targetDataset as number, img.id))
-        );
+        await Promise.all(uploaded.map((img) => addImageToDataset(userId, targetDataset as number, img.id)));
       }
       onDone();
     } catch {
@@ -538,11 +575,10 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
     }
   };
 
-  const canUpload = files.length > 0 && (taxonMode === "new" ? !!newSpeciesName.trim() : !!selectedTaxon);
-
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[92vh]">
+
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] shrink-0">
           <div className="flex items-center gap-2">
@@ -555,53 +591,149 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
         </div>
 
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
-          {/* Drop zone */}
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            onClick={() => inputRef.current?.click()}
-            className={cn(
-              "border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors",
-              dragging ? "border-green-500/50 bg-green-500/5" : "border-[var(--border)] hover:border-[var(--border-hi)]"
-            )}
-          >
-            <input ref={inputRef} type="file" accept="image/*" multiple className="hidden"
-              onChange={(e) => addFiles(e.target.files)} />
-            <Upload className="w-7 h-7 text-[var(--text-ghost)] mx-auto mb-2" />
-            <p className="text-sm text-[var(--text-dim)]">Drop images here or click to browse</p>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">JPG · PNG · WebP · GIF</p>
-          </div>
 
-          {/* File list */}
-          {files.length > 0 && (
-            <div className="bg-[var(--bg-input)]/50 border border-[var(--border)] rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)]">
-                <span className="text-xs text-[var(--text-dim)]">{files.length} file{files.length > 1 ? "s" : ""} selected</span>
-                <button onClick={() => setFiles([])} className="text-xs text-[var(--text-muted)] hover:text-red-400 transition-colors">Clear all</button>
-              </div>
-              <div className="max-h-32 overflow-y-auto divide-y divide-[var(--border)]/40">
-                {files.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 px-3 py-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
-                    <span className="text-xs text-[var(--text-dim)] flex-1 truncate">{f.name}</span>
-                    <span className="text-[10px] text-[var(--text-muted)] shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
-                    <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
-                      className="text-[var(--text-muted)] hover:text-red-400 transition-colors">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+          {/* ── Step 1 : Images ── */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-[var(--text-dim)]">
+                1. Images <span className="text-red-400">*</span>
+              </label>
+              <div className="flex gap-1.5">
+                <button onClick={() => imgRef.current?.click()}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-dim)] hover:border-green-500/40 hover:text-green-400 transition-colors">
+                  <ImageIcon className="w-3 h-3" /> Select files
+                </button>
+                <button onClick={() => folderRef.current?.click()}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-dim)] hover:border-indigo-400/50 hover:text-indigo-300 transition-colors">
+                  <FolderOpen className="w-3 h-3" /> Select folder
+                </button>
+                <input ref={imgRef} type="file" accept="image/*" multiple className="hidden"
+                  onChange={(e) => addImageFiles(e.target.files)} />
+                {/* @ts-expect-error webkitdirectory is non-standard */}
+                <input ref={folderRef} type="file" webkitdirectory="" className="hidden"
+                  onChange={(e) => handleFolderSelect(e.target.files)} />
               </div>
             </div>
-          )}
 
-          {/* Species folder */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setImgDragging(true); }}
+              onDragLeave={() => setImgDragging(false)}
+              onDrop={(e) => { e.preventDefault(); setImgDragging(false); addImageFiles(e.dataTransfer.files); }}
+              onClick={() => sortedImages.length === 0 && imgRef.current?.click()}
+              className={cn(
+                "border-2 border-dashed rounded-xl transition-colors",
+                sortedImages.length === 0 ? "p-6 text-center cursor-pointer" : "p-0",
+                imgDragging ? "border-green-500/50 bg-green-500/5" : "border-[var(--border)] hover:border-[var(--border-hi)]"
+              )}
+            >
+              {sortedImages.length === 0 ? (
+                <>
+                  <ImageIcon className="w-6 h-6 text-[var(--text-ghost)] mx-auto mb-2" />
+                  <p className="text-xs text-[var(--text-dim)]">Drop images here or use buttons above</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">JPG · PNG · WebP · GIF — sorted alphabetically on upload</p>
+                </>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)]">
+                    <span className="text-xs text-[var(--text-dim)]">{sortedImages.length} image{sortedImages.length > 1 ? "s" : ""} (sorted alphabetically)</span>
+                    <button onClick={(e) => { e.stopPropagation(); setImages([]); }}
+                      className="text-[10px] text-[var(--text-muted)] hover:text-red-400 transition-colors">Clear</button>
+                  </div>
+                  <div className="max-h-28 overflow-y-auto divide-y divide-[var(--border)]/30">
+                    {sortedImages.map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 px-3 py-1">
+                        <span className="text-[10px] text-[var(--text-muted)] w-5 shrink-0 text-right">{i + 1}</span>
+                        <ImageIcon className="w-3 h-3 text-[var(--text-muted)] shrink-0" />
+                        <span className="text-xs text-[var(--text-dim)] flex-1 truncate">{f.name}</span>
+                        <span className="text-[10px] text-[var(--text-muted)] shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Step 2 : Attribution file ── */}
           <div>
-            <label className="text-xs font-medium text-[var(--text-dim)] mb-2 block">Species folder *</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-[var(--text-dim)]">
+                2. Attribution file (.txt) <span className="text-red-400">*</span>
+              </label>
+              {attrFileName && (
+                <button onClick={() => { setAttrFileName(null); setAttributions(null); }}
+                  className="text-[10px] text-[var(--text-muted)] hover:text-red-400 transition-colors">Remove</button>
+              )}
+            </div>
+
+            {!attrFileName ? (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setAttrDragging(true); }}
+                onDragLeave={() => setAttrDragging(false)}
+                onDrop={(e) => { e.preventDefault(); setAttrDragging(false); loadAttrFile(e.dataTransfer.files); }}
+                onClick={() => attrRef.current?.click()}
+                className={cn(
+                  "border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors",
+                  attrDragging ? "border-amber-500/50 bg-amber-500/5" : "border-[var(--border)] hover:border-[var(--border-hi)]"
+                )}
+              >
+                <input ref={attrRef} type="file" accept=".txt" className="hidden"
+                  onChange={(e) => loadAttrFile(e.target.files)} />
+                <p className="text-xs text-[var(--text-dim)]">Drop your <code className="text-amber-400">SL_*.txt</code> file here or click to select</p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-1 font-mono">
+                  Format: source_url - author - license
+                </p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5 font-mono">
+                  One line per image, in alphabetical order of filenames
+                </p>
+              </div>
+            ) : (
+              <div className={cn(
+                "rounded-xl border overflow-hidden",
+                countMismatch ? "border-red-500/40" : countOk ? "border-green-500/30" : "border-[var(--border)]"
+              )}>
+                <div className={cn(
+                  "flex items-center gap-2 px-3 py-2 border-b text-xs",
+                  countMismatch ? "bg-red-500/10 border-red-500/30 text-red-400"
+                    : countOk ? "bg-green-500/10 border-green-500/30 text-green-400"
+                    : "border-[var(--border)] text-[var(--text-dim)]"
+                )}>
+                  {countOk ? <Check className="w-3.5 h-3.5 shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+                  <span className="font-medium truncate">{attrFileName}</span>
+                  <span className="ml-auto shrink-0">
+                    {attributions?.length ?? 0} line{attributions?.length !== 1 ? "s" : ""}
+                    {sortedImages.length > 0 && ` / ${sortedImages.length} image${sortedImages.length !== 1 ? "s" : ""}`}
+                  </span>
+                </div>
+                {countMismatch && (
+                  <p className="px-3 py-2 text-[10px] text-red-400 bg-red-500/5">
+                    Mismatch: {attributions?.length} attribution lines but {sortedImages.length} images. Each image needs exactly one line.
+                  </p>
+                )}
+                {attributions && attributions.length > 0 && (
+                  <div className="max-h-36 overflow-y-auto divide-y divide-[var(--border)]/30">
+                    {attributions.map((a, i) => (
+                      <div key={i} className="grid grid-cols-[2rem_1fr_auto_auto] items-center gap-2 px-3 py-1.5">
+                        <span className="text-[10px] text-[var(--text-muted)] text-right">{i + 1}</span>
+                        <span className="text-[10px] text-[var(--text-dim)] truncate font-mono">{a.source_url}</span>
+                        <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[80px]">{a.author}</span>
+                        <span className="text-[10px] text-[var(--text-muted)] shrink-0">{a.license}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {parseError && <p className="text-[10px] text-red-400 mt-1">{parseError}</p>}
+          </div>
+
+          {/* ── Step 3 : Species folder ── */}
+          <div>
+            <label className="text-xs font-medium text-[var(--text-dim)] mb-2 block">
+              3. Species folder <span className="text-red-400">*</span>
+            </label>
             <div className="flex gap-2 mb-2">
-              <button
-                onClick={() => setTaxonMode("existing")}
+              <button onClick={() => setTaxonMode("existing")}
                 className={cn(
                   "flex-1 py-1.5 text-xs rounded-lg border transition-colors",
                   taxonMode === "existing"
@@ -610,8 +742,7 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
                 )}>
                 Existing folder
               </button>
-              <button
-                onClick={() => setTaxonMode("new")}
+              <button onClick={() => setTaxonMode("new")}
                 className={cn(
                   "flex-1 py-1.5 text-xs rounded-lg border transition-colors",
                   taxonMode === "new"
@@ -621,16 +752,12 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
                 New species
               </button>
             </div>
-
             {taxonMode === "existing" ? (
               taxons.length === 0 ? (
-                <p className="text-xs text-[var(--text-muted)] px-1">No species folders yet — create a new one instead.</p>
+                <p className="text-xs text-[var(--text-muted)] px-1">No species folders yet — switch to New species.</p>
               ) : (
-                <select
-                  value={selectedTaxon}
-                  onChange={(e) => setSelectedTaxon(e.target.value)}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] focus:outline-none focus:border-indigo-400/50 transition-colors"
-                >
+                <select value={selectedTaxon} onChange={(e) => setSelectedTaxon(e.target.value)}
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] focus:outline-none focus:border-indigo-400/50 transition-colors">
                   <option value="">— choose a species —</option>
                   {taxons.map((t) => (
                     <option key={t.id} value={t.scientific_name}>
@@ -640,24 +767,18 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
                 </select>
               )
             ) : (
-              <input
-                autoFocus
-                value={newSpeciesName}
-                onChange={(e) => setNewSpeciesName(e.target.value)}
+              <input autoFocus value={newSpeciesName} onChange={(e) => setNewSpeciesName(e.target.value)}
                 placeholder="e.g. Baetis rhodani"
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm italic text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-green-500/40 transition-colors"
-              />
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm italic text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-green-500/40 transition-colors" />
             )}
           </div>
 
-          {/* Dataset assignment (optional) */}
+          {/* ── Step 4 : Dataset (optional) ── */}
           <div>
-            <label className="text-xs font-medium text-[var(--text-dim)] mb-2 block">Add to dataset (optional)</label>
-            <select
-              value={targetDataset}
+            <label className="text-xs font-medium text-[var(--text-dim)] mb-2 block">4. Add to dataset (optional)</label>
+            <select value={targetDataset}
               onChange={(e) => setTargetDataset(e.target.value === "none" ? "none" : Number(e.target.value))}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] focus:outline-none focus:border-indigo-400/50 transition-colors"
-            >
+              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] focus:outline-none focus:border-indigo-400/50 transition-colors">
               <option value="none">No dataset — just add to Validated library</option>
               {datasets.map((ds) => (
                 <option key={ds.id} value={ds.id}>{ds.name}</option>
@@ -673,24 +794,31 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
         {/* Footer */}
         <div className="px-5 py-4 border-t border-[var(--border)] shrink-0 flex items-center justify-between gap-3">
           <p className="text-xs text-[var(--text-muted)]">
-            Images are added directly as <span className="text-green-400">validated</span> — no validation queue.
+            Added directly as <span className="text-green-400">validated</span> — no validation queue.
           </p>
           <div className="flex gap-2 shrink-0">
             <button onClick={onClose}
               className="px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors">
               Cancel
             </button>
-            <button onClick={handleUpload} disabled={!canUpload || uploading}
+            <button onClick={handleUpload} disabled={!canUpload}
               className="flex items-center gap-2 px-4 py-1.5 text-xs font-medium rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors">
               {uploading
                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…</>
-                : <><Upload className="w-3.5 h-3.5" /> Upload {files.length > 0 ? `${files.length} file${files.length > 1 ? "s" : ""}` : ""}</>}
+                : <><Upload className="w-3.5 h-3.5" /> Upload {sortedImages.length > 0 ? `${sortedImages.length} image${sortedImages.length > 1 ? "s" : ""}` : ""}</>}
             </button>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+// Helper: create a FileList-like object from an array of Files
+function dataTransferFromArray(files: File[]): FileList {
+  const dt = new DataTransfer();
+  files.forEach((f) => dt.items.add(f));
+  return dt.files;
 }
 
 // ── Images tab (Validated library) ────────────────────────────────────────────
