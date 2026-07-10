@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getImages, getTaxons, getDatasets, createDataset, deleteDataset, renameDataset,
   addImageToDataset, getDatasetImages, removeImageFromDataset,
-  getAssignedImages, deleteImage, clearImages,
+  getAssignedImages, deleteImage, clearImages, uploadFiles,
 } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
 import type { ImageRecord, Taxon, Dataset } from "@/types";
@@ -12,7 +12,7 @@ import { formatDate } from "@/lib/utils";
 import {
   Database, FolderOpen, Plus, Trash2, Images, Loader2,
   ArrowLeft, X, ChevronDown, ChevronRight, AlertTriangle,
-  EyeOff, FolderPlus, Check, Pencil,
+  EyeOff, FolderPlus, Check, Pencil, Upload, ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -87,7 +87,7 @@ export default function DatasetPanel() {
       ) : activeTab === "datasets" ? (
         <DatasetsTab userId={currentUserId!} datasets={datasets} images={images} assignments={assignments} onRefresh={reload} />
       ) : activeTab === "images" ? (
-        <ImagesTab userId={currentUserId!} images={images} datasets={datasets} assignments={assignments} onRefresh={reload} />
+        <ImagesTab userId={currentUserId!} images={images} taxons={taxons} datasets={datasets} assignments={assignments} onRefresh={reload} />
       ) : (
         <TaxonsTab taxons={taxons} />
       )}
@@ -474,6 +474,225 @@ function DatasetsTab({ userId, datasets, images, assignments, onRefresh }: {
   );
 }
 
+// ── Upload modal ──────────────────────────────────────────────────────────────
+
+function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
+  userId: number;
+  taxons: Taxon[];
+  datasets: Dataset[];
+  onDone: () => void;
+  onClose: () => void;
+}) {
+  const [files, setFiles] = useState<File[]>([]);
+  const [taxonMode, setTaxonMode] = useState<"existing" | "new">("existing");
+  const [selectedTaxon, setSelectedTaxon] = useState<string>("");
+  const [newSpeciesName, setNewSpeciesName] = useState("");
+  const [targetDataset, setTargetDataset] = useState<number | "none">("none");
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [done, setDone] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const addFiles = (fl: FileList | null) => {
+    if (!fl) return;
+    const imgs = Array.from(fl).filter((f) => f.type.startsWith("image/"));
+    setFiles((prev) => {
+      const seen = new Set(prev.map((f) => f.name + f.size));
+      return [...prev, ...imgs.filter((f) => !seen.has(f.name + f.size))];
+    });
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    addFiles(e.dataTransfer.files);
+  }, []);
+
+  const scientificName =
+    taxonMode === "existing" ? selectedTaxon : newSpeciesName.trim();
+
+  const handleUpload = async () => {
+    if (!files.length) return;
+    setUploading(true);
+    setError(null);
+    setDone(0);
+    try {
+      const uploaded = await uploadFiles(
+        userId,
+        files,
+        scientificName || undefined,
+        true,
+      );
+      setDone(uploaded.length);
+      if (targetDataset !== "none" && uploaded.length) {
+        await Promise.all(
+          uploaded.map((img) => addImageToDataset(userId, targetDataset as number, img.id))
+        );
+      }
+      onDone();
+    } catch {
+      setError("Upload failed — check the backend is running.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const canUpload = files.length > 0 && (taxonMode === "new" ? !!newSpeciesName.trim() : !!selectedTaxon);
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] shrink-0">
+          <div className="flex items-center gap-2">
+            <Upload className="w-4 h-4 text-green-400" />
+            <span className="text-sm font-semibold text-[var(--text-base)]">Upload images to Dataset Explorer</span>
+          </div>
+          <button onClick={onClose} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-base)] transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+          {/* Drop zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current?.click()}
+            className={cn(
+              "border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors",
+              dragging ? "border-green-500/50 bg-green-500/5" : "border-[var(--border)] hover:border-[var(--border-hi)]"
+            )}
+          >
+            <input ref={inputRef} type="file" accept="image/*" multiple className="hidden"
+              onChange={(e) => addFiles(e.target.files)} />
+            <Upload className="w-7 h-7 text-[var(--text-ghost)] mx-auto mb-2" />
+            <p className="text-sm text-[var(--text-dim)]">Drop images here or click to browse</p>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">JPG · PNG · WebP · GIF</p>
+          </div>
+
+          {/* File list */}
+          {files.length > 0 && (
+            <div className="bg-[var(--bg-input)]/50 border border-[var(--border)] rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)]">
+                <span className="text-xs text-[var(--text-dim)]">{files.length} file{files.length > 1 ? "s" : ""} selected</span>
+                <button onClick={() => setFiles([])} className="text-xs text-[var(--text-muted)] hover:text-red-400 transition-colors">Clear all</button>
+              </div>
+              <div className="max-h-32 overflow-y-auto divide-y divide-[var(--border)]/40">
+                {files.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 px-3 py-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
+                    <span className="text-xs text-[var(--text-dim)] flex-1 truncate">{f.name}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                    <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
+                      className="text-[var(--text-muted)] hover:text-red-400 transition-colors">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Species folder */}
+          <div>
+            <label className="text-xs font-medium text-[var(--text-dim)] mb-2 block">Species folder *</label>
+            <div className="flex gap-2 mb-2">
+              <button
+                onClick={() => setTaxonMode("existing")}
+                className={cn(
+                  "flex-1 py-1.5 text-xs rounded-lg border transition-colors",
+                  taxonMode === "existing"
+                    ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
+                    : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
+                )}>
+                Existing folder
+              </button>
+              <button
+                onClick={() => setTaxonMode("new")}
+                className={cn(
+                  "flex-1 py-1.5 text-xs rounded-lg border transition-colors",
+                  taxonMode === "new"
+                    ? "bg-green-500/10 border-green-500/30 text-green-400"
+                    : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
+                )}>
+                New species
+              </button>
+            </div>
+
+            {taxonMode === "existing" ? (
+              taxons.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)] px-1">No species folders yet — create a new one instead.</p>
+              ) : (
+                <select
+                  value={selectedTaxon}
+                  onChange={(e) => setSelectedTaxon(e.target.value)}
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] focus:outline-none focus:border-indigo-400/50 transition-colors"
+                >
+                  <option value="">— choose a species —</option>
+                  {taxons.map((t) => (
+                    <option key={t.id} value={t.scientific_name}>
+                      {t.scientific_name}{t.common_name ? ` — ${t.common_name}` : ""}
+                    </option>
+                  ))}
+                </select>
+              )
+            ) : (
+              <input
+                autoFocus
+                value={newSpeciesName}
+                onChange={(e) => setNewSpeciesName(e.target.value)}
+                placeholder="e.g. Baetis rhodani"
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm italic text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-green-500/40 transition-colors"
+              />
+            )}
+          </div>
+
+          {/* Dataset assignment (optional) */}
+          <div>
+            <label className="text-xs font-medium text-[var(--text-dim)] mb-2 block">Add to dataset (optional)</label>
+            <select
+              value={targetDataset}
+              onChange={(e) => setTargetDataset(e.target.value === "none" ? "none" : Number(e.target.value))}
+              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] focus:outline-none focus:border-indigo-400/50 transition-colors"
+            >
+              <option value="none">No dataset — just add to Validated library</option>
+              {datasets.map((ds) => (
+                <option key={ds.id} value={ds.id}>{ds.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-xs text-red-400">{error}</div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-[var(--border)] shrink-0 flex items-center justify-between gap-3">
+          <p className="text-xs text-[var(--text-muted)]">
+            Images are added directly as <span className="text-green-400">validated</span> — no validation queue.
+          </p>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={onClose}
+              className="px-3 py-1.5 text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleUpload} disabled={!canUpload || uploading}
+              className="flex items-center gap-2 px-4 py-1.5 text-xs font-medium rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors">
+              {uploading
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…</>
+                : <><Upload className="w-3.5 h-3.5" /> Upload {files.length > 0 ? `${files.length} file${files.length > 1 ? "s" : ""}` : ""}</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Images tab (Validated library) ────────────────────────────────────────────
 
 type ConfirmTarget =
@@ -611,9 +830,10 @@ function AddToDatasetMenu({ group, datasets, assignments, userId, onRefresh }: {
   );
 }
 
-function ImagesTab({ userId, images, datasets, assignments, onRefresh }: {
+function ImagesTab({ userId, images, taxons, datasets, assignments, onRefresh }: {
   userId: number;
   images: ImageRecord[];
+  taxons: Taxon[];
   datasets: Dataset[];
   assignments: AssignmentMap;
   onRefresh: () => void;
@@ -622,6 +842,7 @@ function ImagesTab({ userId, images, datasets, assignments, onRefresh }: {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
 
   const groups = useMemo(() => groupByTaxon(images), [images]);
 
@@ -642,16 +863,17 @@ function ImagesTab({ userId, images, datasets, assignments, onRefresh }: {
     } finally { setDeleting(false); }
   };
 
-  if (images.length === 0) return (
-    <div className="flex flex-col items-center justify-center h-48 text-center">
-      <Database className="w-12 h-12 text-[var(--text-ghost)] mb-3" />
-      <p className="text-sm text-[var(--text-dim)]">No validated images yet</p>
-      <p className="text-xs text-[var(--text-muted)] mt-1">Validate images in the Validation Queue first</p>
-    </div>
-  );
-
   return (
     <>
+      {showUpload && (
+        <UploadModal
+          userId={userId}
+          taxons={taxons}
+          datasets={datasets}
+          onDone={() => { setShowUpload(false); onRefresh(); }}
+          onClose={() => setShowUpload(false)}
+        />
+      )}
       {confirmTarget && (
         <ConfirmModal
           title={confirmTarget.kind === "image" ? "Delete image?" : `Delete folder "${confirmTarget.label}"?`}
@@ -665,6 +887,27 @@ function ImagesTab({ userId, images, datasets, assignments, onRefresh }: {
       )}
 
       <div className="space-y-3">
+        {/* Header bar */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-[var(--text-dim)]">
+            {images.length} validated image{images.length !== 1 ? "s" : ""} · {groups.length} species folder{groups.length !== 1 ? "s" : ""}
+          </p>
+          {!isReadOnly && (
+            <button onClick={() => setShowUpload(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-dim)] hover:border-green-500/40 hover:text-green-400 transition-colors">
+              <Upload className="w-3.5 h-3.5" /> Upload images
+            </button>
+          )}
+        </div>
+
+        {images.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-48 text-center">
+            <Database className="w-12 h-12 text-[var(--text-ghost)] mb-3" />
+            <p className="text-sm text-[var(--text-dim)]">No validated images yet</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Upload images above or validate them via the Validation Queue</p>
+          </div>
+        )}
+
         {isReadOnly && (
           <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
             <EyeOff className="w-3.5 h-3.5 shrink-0" />

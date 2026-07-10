@@ -172,9 +172,10 @@ export const importFromUrl = (userId: number, url: string, scientific_name?: str
     .post<ImageRecord>("/images/import-url", { user_id: userId, url, scientific_name })
     .then((r) => r.data);
 
-export const uploadFiles = (userId: number, files: File[], scientific_name?: string) => {
+export const uploadFiles = (userId: number, files: File[], scientific_name?: string, validated = false) => {
   const form = new FormData();
   form.append("user_id", String(userId));
+  form.append("validated", String(validated));
   files.forEach((f) => form.append("files", f));
   if (scientific_name) form.append("scientific_name", scientific_name);
   return api

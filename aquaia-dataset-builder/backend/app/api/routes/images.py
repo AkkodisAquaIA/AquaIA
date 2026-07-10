@@ -216,6 +216,7 @@ async def upload_files(
     user_id: int = Form(...),
     files: list[UploadFile] = File(...),
     scientific_name: str | None = Form(None),
+    validated: bool = Form(False),
     authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -267,7 +268,8 @@ async def upload_files(
             user_id=user_id,
             image_asset_id=asset.id,
             taxon_id=taxon.id if taxon else None,
-            status="pending",
+            status="validated" if validated else "pending",
+            validated_at=datetime.utcnow() if validated else None,
         )
         db.add(ui)
         results.append(ui)
