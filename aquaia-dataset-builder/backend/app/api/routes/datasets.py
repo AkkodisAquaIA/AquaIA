@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from app.api.deps import verify_workspace_access
 from app.db.database import get_db
 from app.models.models import Dataset, DatasetImage, UserImage, User
-from app.schemas.schemas import DatasetCreate, DatasetRead, ImageRecordRead, image_record_read
+from app.schemas.schemas import DatasetCreate, DatasetUpdate, DatasetRead, ImageRecordRead, image_record_read
 from app.api.routes.images import _ref_for_taxon, _UI_LOAD
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
@@ -126,6 +126,19 @@ async def remove_image_from_dataset(
     if row:
         await db.delete(row)
         await db.flush()
+
+
+@router.patch("/{dataset_id}", response_model=DatasetRead)
+async def update_dataset(dataset_id: int, body: DatasetUpdate, user_id: int = Query(..., ge=1), authorization: Optional[str] = Header(None), db: AsyncSession = Depends(get_db)):
+    await verify_workspace_access(user_id, authorization, db)
+    ds = await _get_dataset_or_404(db, dataset_id, user_id)
+    if body.name is not None:
+        ds.name = body.name
+    if body.description is not None:
+        ds.description = body.description
+    await db.flush()
+    count = await _dataset_count(db, dataset_id)
+    return DatasetRead(id=ds.id, user_id=ds.user_id, name=ds.name, description=ds.description, created_at=ds.created_at, image_count=count)
 
 
 @router.delete("/{dataset_id}", status_code=204)

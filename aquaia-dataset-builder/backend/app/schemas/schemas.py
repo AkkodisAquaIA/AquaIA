@@ -152,6 +152,11 @@ class DatasetCreate(BaseModel):
     description: Optional[str] = None
 
 
+class DatasetUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
 class DatasetRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

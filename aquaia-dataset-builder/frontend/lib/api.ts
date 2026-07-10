@@ -145,6 +145,9 @@ export const createDataset = (userId: number, name: string, description?: string
 export const deleteDataset = (userId: number, id: number) =>
   api.delete(`/datasets/${id}`, { params: { user_id: userId } });
 
+export const renameDataset = (userId: number, id: number, name: string, description?: string) =>
+  api.patch<Dataset>(`/datasets/${id}`, { name, description }, { params: { user_id: userId } }).then((r) => r.data);
+
 export const getDatasetImages = (userId: number, datasetId: number) =>
   api
     .get<ImageRecord[]>(`/datasets/${datasetId}/images`, { params: { user_id: userId } })

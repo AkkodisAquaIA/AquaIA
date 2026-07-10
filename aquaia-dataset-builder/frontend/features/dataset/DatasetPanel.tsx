@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  getImages, getTaxons, getDatasets, createDataset, deleteDataset,
+  getImages, getTaxons, getDatasets, createDataset, deleteDataset, renameDataset,
   addImageToDataset, getDatasetImages, removeImageFromDataset,
   getAssignedImages, deleteImage, clearImages,
 } from "@/lib/api";
@@ -12,7 +12,7 @@ import { formatDate } from "@/lib/utils";
 import {
   Database, FolderOpen, Plus, Trash2, Images, Loader2,
   ArrowLeft, X, ChevronDown, ChevronRight, AlertTriangle,
-  EyeOff, FolderPlus, Check,
+  EyeOff, FolderPlus, Check, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -164,6 +164,9 @@ function DatasetsTab({ userId, datasets, images, assignments, onRefresh }: {
   const [dsLoading, setDsLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [deletingDs, setDeletingDs] = useState(false);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
 
   // Per-dataset species list derived from assignment map
   const datasetSpecies = useMemo(() => {
@@ -212,6 +215,22 @@ function DatasetsTab({ userId, datasets, images, assignments, onRefresh }: {
     setDeletingDs(true);
     try { await deleteDataset(userId, confirmDelete); setConfirmDelete(null); onRefresh(); }
     finally { setDeletingDs(false); }
+  };
+
+  const startRename = (ds: Dataset, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenamingId(ds.id);
+    setRenameValue(ds.name);
+  };
+
+  const handleRename = async (dsId: number) => {
+    if (!renameValue.trim()) return;
+    setRenaming(true);
+    try {
+      await renameDataset(userId, dsId, renameValue.trim());
+      setRenamingId(null);
+      onRefresh();
+    } finally { setRenaming(false); }
   };
 
   // ── Dataset detail view ──────────────────────────────────────────────────────
@@ -362,21 +381,60 @@ function DatasetsTab({ userId, datasets, images, assignments, onRefresh }: {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {datasets.map((ds) => {
               const species = [...(datasetSpecies.get(ds.id)?.entries() ?? [])];
+              const isRenaming = renamingId === ds.id;
               return (
-                <div key={ds.id} onClick={() => openDetail(ds)}
-                  className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3 hover:border-indigo-400/50 cursor-pointer transition-colors">
+                <div key={ds.id} onClick={() => !isRenaming && openDetail(ds)}
+                  className={cn(
+                    "bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3 transition-colors",
+                    isRenaming ? "border-indigo-400/60" : "hover:border-indigo-400/50 cursor-pointer group/card"
+                  )}>
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="p-1.5 rounded-lg bg-indigo-500/10 shrink-0">
                         <FolderOpen className="w-4 h-4 text-indigo-400" />
                       </div>
-                      <p className="text-sm font-medium text-[var(--text-base)] truncate">{ds.name}</p>
+                      {isRenaming ? (
+                        <input
+                          autoFocus
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleRename(ds.id);
+                            if (e.key === "Escape") setRenamingId(null);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex-1 min-w-0 bg-[var(--bg-input)] border border-indigo-400/40 rounded-lg px-2 py-1 text-sm text-[var(--text-base)] focus:outline-none"
+                        />
+                      ) : (
+                        <p className="text-sm font-medium text-[var(--text-base)] truncate">{ds.name}</p>
+                      )}
                     </div>
                     {!isReadOnly && (
-                      <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(ds.id); }}
-                        className="p-1 text-[var(--text-muted)] hover:text-red-400 transition-colors shrink-0">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isRenaming ? (
+                          <>
+                            <button onClick={(e) => { e.stopPropagation(); handleRename(ds.id); }} disabled={renaming}
+                              className="p-1 text-green-400 hover:text-green-300 disabled:opacity-40 transition-colors">
+                              {renaming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setRenamingId(null); }}
+                              className="p-1 text-[var(--text-muted)] hover:text-[var(--text-dim)] transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={(e) => startRename(ds, e)}
+                              className="p-1 text-[var(--text-muted)] hover:text-indigo-400 transition-colors opacity-0 group-hover/card:opacity-100">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(ds.id); }}
+                              className="p-1 text-[var(--text-muted)] hover:text-red-400 transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                   {ds.description && (
