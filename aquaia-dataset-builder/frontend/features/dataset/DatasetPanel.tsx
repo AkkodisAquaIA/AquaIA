@@ -512,6 +512,7 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const imgRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
   const attrRef = useRef<HTMLInputElement>(null);
 
   const sortedImages = useMemo(
@@ -541,22 +542,37 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
     });
   }, []);
 
+  const handleFolderFromFileList = useCallback((fl: FileList | null) => {
+    if (!fl) return;
+    const all = Array.from(fl);
+    const imgs = all.filter((f) => f.type.startsWith("image/"));
+    const txt = all.find((f) => f.name.toLowerCase().endsWith(".txt"));
+    if (imgs.length) addImageFiles(dataTransferFromArray(imgs));
+    if (txt) loadAttrFile(dataTransferFromArray([txt]));
+  }, [addImageFiles, loadAttrFile]);
+
   const handleFolderPicker = useCallback(async () => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const dirHandle = await (window as any).showDirectoryPicker({ mode: "read" });
-      const imgs: File[] = [];
-      let txtFile: File | null = null;
-      for await (const entry of dirHandle.values()) {
-        if (entry.kind !== "file") continue;
-        const file: File = await entry.getFile();
-        if (file.type.startsWith("image/")) imgs.push(file);
-        else if (file.name.toLowerCase().endsWith(".txt") && !txtFile) txtFile = file;
+    // showDirectoryPicker requires HTTPS — fall back to webkitdirectory on plain HTTP
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (typeof window !== "undefined" && "showDirectoryPicker" in window) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dirHandle = await (window as any).showDirectoryPicker({ mode: "read" });
+        const imgs: File[] = [];
+        let txtFile: File | null = null;
+        for await (const entry of dirHandle.values()) {
+          if (entry.kind !== "file") continue;
+          const file: File = await entry.getFile();
+          if (file.type.startsWith("image/")) imgs.push(file);
+          else if (file.name.toLowerCase().endsWith(".txt") && !txtFile) txtFile = file;
+        }
+        if (imgs.length) addImageFiles(dataTransferFromArray(imgs));
+        if (txtFile) loadAttrFile(dataTransferFromArray([txtFile]));
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") console.error("Directory picker:", err);
       }
-      if (imgs.length) addImageFiles(dataTransferFromArray(imgs));
-      if (txtFile) loadAttrFile(dataTransferFromArray([txtFile]));
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") console.error("Directory picker:", err);
+    } else {
+      folderRef.current?.click();
     }
   }, [addImageFiles, loadAttrFile]);
 
@@ -618,6 +634,9 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
                 </button>
                 <input ref={imgRef} type="file" accept="image/*" multiple className="hidden"
                   onChange={(e) => addImageFiles(e.target.files)} />
+                {/* @ts-expect-error webkitdirectory is non-standard — fallback when showDirectoryPicker unavailable (HTTP) */}
+                <input ref={folderRef} type="file" webkitdirectory="" className="hidden"
+                  onChange={(e) => handleFolderFromFileList(e.target.files)} />
               </div>
             </div>
 
