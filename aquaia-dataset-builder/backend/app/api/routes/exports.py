@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -82,4 +83,12 @@ async def download_export(
     path = Path(job.output_path).resolve()
     if not path.exists():
         raise HTTPException(404, "Export file not found on disk")
-    return FileResponse(path, media_type="application/zip", filename=path.name)
+
+    if job.dataset_id:
+        ds = await db.get(Dataset, job.dataset_id)
+        ds_slug = re.sub(r"[^\w\-]", "_", ds.name).strip("_") if ds else "dataset"
+    else:
+        ds_slug = "all_validated"
+    filename = f"{ds_slug}_{job.export_type}.zip"
+
+    return FileResponse(path, media_type="application/zip", filename=filename)
