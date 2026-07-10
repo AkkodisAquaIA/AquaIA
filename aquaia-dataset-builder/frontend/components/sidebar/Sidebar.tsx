@@ -50,20 +50,11 @@ export default function Sidebar() {
             key={id}
             onClick={() => setActivePanel(id)}
             className={cn(
-              "flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all duration-150",
+              "flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all duration-150 border",
               activePanel === id
-                ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                : "border border-transparent"
+                ? "bg-green-500/10 text-green-400 border-green-500/20"
+                : "border-transparent text-[var(--text-dim)] hover:bg-[var(--bg-input)]"
             )}
-            style={activePanel !== id ? { color: "var(--text-dim)" } : undefined}
-            onMouseEnter={(e) => {
-              if (activePanel !== id)
-                (e.currentTarget as HTMLElement).style.background = "var(--bg-input)";
-            }}
-            onMouseLeave={(e) => {
-              if (activePanel !== id)
-                (e.currentTarget as HTMLElement).style.background = "";
-            }}
           >
             <Icon className="w-4 h-4 shrink-0" />
             <span className="font-medium">{label}</span>
