@@ -22,8 +22,16 @@ async def list_exports(
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(ExportJob).where(ExportJob.user_id == user_id).order_by(ExportJob.created_at.desc()).limit(limit))
-    return result.scalars().all()
+    result = await db.execute(
+        select(ExportJob, Dataset.name).outerjoin(Dataset, ExportJob.dataset_id == Dataset.id).where(ExportJob.user_id == user_id).order_by(ExportJob.created_at.desc()).limit(limit)
+    )
+    rows = result.all()
+    jobs = []
+    for job, ds_name in rows:
+        data = ExportJobRead.model_validate(job)
+        data.dataset_name = ds_name
+        jobs.append(data)
+    return jobs
 
 
 @router.post("", response_model=ExportJobRead, status_code=201)
@@ -37,10 +45,12 @@ async def create_export(
     user = await db.get(User, body.user_id)
     if not user:
         raise HTTPException(404, f"Workspace {body.user_id} not found")
+    ds_name: str | None = None
     if body.dataset_id is not None:
         ds = await db.get(Dataset, body.dataset_id)
         if not ds or ds.user_id != body.user_id:
             raise HTTPException(404, "Dataset not found in this workspace")
+        ds_name = ds.name
     job = ExportJob(
         user_id=body.user_id,
         dataset_id=body.dataset_id,
@@ -51,7 +61,9 @@ async def create_export(
     db.add(job)
     await db.flush()
     background_tasks.add_task(run_export, job.id)
-    return job
+    result = ExportJobRead.model_validate(job)
+    result.dataset_name = ds_name
+    return result
 
 
 @router.get("/{job_id}/download")

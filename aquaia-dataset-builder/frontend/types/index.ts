@@ -63,6 +63,7 @@ export interface ExportJob {
   id: number;
   user_id: number;
   dataset_id: number | null;
+  dataset_name: string | null;
   export_type: string;
   output_path: string | null;
   status: string;

@@ -214,6 +214,7 @@ class ExportJobRead(BaseModel):
     id: int
     user_id: int
     dataset_id: Optional[int] = None
+    dataset_name: Optional[str] = None
     export_type: str
     output_path: Optional[str] = None
     status: str
