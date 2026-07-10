@@ -15,10 +15,16 @@ async def verify_workspace_access(
     authorization: Optional[str],
     db: AsyncSession,
 ) -> None:
-    """Raise 401/403 if the caller does not hold a valid token for this workspace."""
+    """Raise 401/403 if the caller does not hold a valid token for this workspace.
+
+    Unprotected workspaces (no password) allow all callers.
+    Protected workspaces require a valid Bearer JWT.
+    """
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(404, "Workspace not found")
+    if not user.is_protected:
+        return
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Authentication required")
     token = authorization[7:]
