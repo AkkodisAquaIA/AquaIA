@@ -6,12 +6,14 @@ run:
 
 data:
   test_data_root: "datasets/coco_custom_match"
-  loader: "jpg"
-  split: "train"
+  split: "test"
 
 inference:
   batch: 8
   imgsz : 640
+  # Confidence threshold for mAP calculation
+  conf_thresh: 0.05
+  # Confidence threshold for bbox filtering
   conf: 0.3
   num_samples: 20
   seed: 0

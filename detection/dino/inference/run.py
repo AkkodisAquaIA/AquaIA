@@ -85,7 +85,7 @@ def test_dino(config):
         model=model,
         dataloaders=[test_loader],
         predict_fn=predict,
-        conf_thresh=inference_config.get("conf", 0.3),
+        conf_thresh=inference_config.get("conf_thresh", 0.05),
         device=device,
     )
     print(metrics)
