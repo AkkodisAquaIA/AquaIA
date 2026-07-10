@@ -114,14 +114,43 @@ def _read_bytes(row: _ExportRow) -> bytes | None:
     return None
 
 
+def _sl_filename(folder_name: str) -> str:
+    """Return the SL attribution filename for a given folder name.
+
+    Naming convention: SL_<FOLDER_NAME_UPPERCASE>.csv
+    (SL = Source / Licence)
+    """
+    return f"SL_{folder_name.upper()}.csv"
+
+
+def _sl_csv(rows: list[_ExportRow]) -> str:
+    """Build the CSV content for a source/licence attribution file."""
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["source_url", "author", "license"])
+    for row in rows:
+        w.writerow([row.source_image_url, row.author or "", row.license or ""])
+    return buf.getvalue()
+
+
+def _group_by_taxon(rows: list[_ExportRow]) -> dict[str, list[_ExportRow]]:
+    groups: dict[str, list[_ExportRow]] = {}
+    for row in rows:
+        label = _taxon_label(row)
+        groups.setdefault(label, []).append(row)
+    return groups
+
+
 def _build_classification(zip_path: Path, images: list[_ExportRow]) -> None:
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for row in images:
-            data = _read_bytes(row)
-            if data is None:
-                continue
-            ext = Path(row.local_path).suffix
-            zf.writestr(f"{_taxon_label(row)}/{row.id}{ext}", data)
+        for folder, rows in _group_by_taxon(images).items():
+            for row in rows:
+                data = _read_bytes(row)
+                if data is None:
+                    continue
+                ext = Path(row.local_path).suffix
+                zf.writestr(f"{folder}/{row.id}{ext}", data)
+            zf.writestr(f"{folder}/{_sl_filename(folder)}", _sl_csv(rows))
 
 
 def _build_yolo(zip_path: Path, images: list[_ExportRow]) -> None:
@@ -130,9 +159,14 @@ def _build_yolo(zip_path: Path, images: list[_ExportRow]) -> None:
     taxons = sorted({_taxon_label(row) for row, _ in valid})
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for row, data in valid:
-            ext = Path(row.local_path).suffix
-            zf.writestr(f"images/{_taxon_label(row)}/{row.id}{ext}", data)
+        for folder, rows in _group_by_taxon([row for row, _ in valid]).items():
+            for row in rows:
+                data = _read_bytes(row)
+                if data is None:
+                    continue
+                ext = Path(row.local_path).suffix
+                zf.writestr(f"images/{folder}/{row.id}{ext}", data)
+            zf.writestr(f"images/{folder}/{_sl_filename(folder)}", _sl_csv(rows))
         yaml = f"nc: {len(taxons)}\nnames:\n" + "".join(f"  - {t}\n" for t in taxons)
         zf.writestr("data.yaml", yaml)
 
@@ -174,6 +208,7 @@ def _build_coco(zip_path: Path, images: list[_ExportRow]) -> None:
                 continue
             zf.writestr(f"images/{row.id}{Path(row.local_path).suffix}", data)
         zf.writestr("instances_validated.json", json.dumps(manifest, indent=2))
+        zf.writestr("SL_SOURCES.csv", _sl_csv(images))
 
 
 def _build_csv(zip_path: Path, images: list[_ExportRow]) -> None:
@@ -196,3 +231,4 @@ def _build_csv(zip_path: Path, images: list[_ExportRow]) -> None:
         )
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("metadata.csv", buf.getvalue())
+        zf.writestr("SL_SOURCES.csv", _sl_csv(images))
