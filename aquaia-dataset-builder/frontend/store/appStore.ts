@@ -109,6 +109,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const savedId = typeof window !== "undefined"
         ? parseInt(localStorage.getItem("adiab-workspace-id") || "0")
         : 0;
+      const savedReadOnly = typeof window !== "undefined"
+        ? localStorage.getItem("adiab-readonly") === "true"
+        : false;
 
       const saved = users.find((u) => u.id === savedId);
       const target = saved ?? users[0];
@@ -116,7 +119,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (typeof window !== "undefined") {
         localStorage.setItem("adiab-workspace-id", String(target.id));
       }
-      set({ currentUserId: target.id, currentUserName: target.display_name, workspaceReady: true });
+      set({ currentUserId: target.id, currentUserName: target.display_name, isReadOnly: savedReadOnly, workspaceReady: true });
     } catch {
       set({ workspaceReady: true });
     }
@@ -125,6 +128,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setWorkspace: (id, name, readOnly = false) => {
     if (typeof window !== "undefined") {
       localStorage.setItem("adiab-workspace-id", String(id));
+      localStorage.setItem("adiab-readonly", readOnly ? "true" : "false");
     }
     const state = get();
     const nextPanel =
@@ -137,6 +141,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setWorkspaces: (workspaces) => set({ workspaces }),
 
   setReadOnly: (v) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("adiab-readonly", v ? "true" : "false");
+    }
     const state = get();
     const nextPanel =
       v && ["search", "validation", "settings"].includes(state.activePanel)
