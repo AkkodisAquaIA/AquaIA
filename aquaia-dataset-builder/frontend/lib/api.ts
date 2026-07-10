@@ -212,10 +212,15 @@ export const downloadExport = async (userId: number, jobId: number) => {
     params: { user_id: userId },
     responseType: "blob",
   });
+  // Read filename from Content-Disposition header set by the backend
+  const disposition: string = res.headers["content-disposition"] ?? "";
+  const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+  const filename = match?.[1]?.replace(/['"]/g, "") ?? `export-${jobId}.zip`;
+
   const url = URL.createObjectURL(new Blob([res.data]));
   const a = document.createElement("a");
   a.href = url;
-  a.download = `export-${jobId}.zip`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
