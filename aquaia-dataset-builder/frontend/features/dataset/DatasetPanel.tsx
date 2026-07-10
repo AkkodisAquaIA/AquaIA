@@ -512,7 +512,6 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const imgRef = useRef<HTMLInputElement>(null);
-  const folderRef = useRef<HTMLInputElement>(null);
   const attrRef = useRef<HTMLInputElement>(null);
 
   const sortedImages = useMemo(
@@ -542,13 +541,23 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
     });
   }, []);
 
-  const handleFolderSelect = useCallback((fl: FileList | null) => {
-    if (!fl) return;
-    const all = Array.from(fl);
-    const imgs = all.filter((f) => f.type.startsWith("image/"));
-    const txt = all.find((f) => f.name.toLowerCase().endsWith(".txt"));
-    if (imgs.length) addImageFiles(dataTransferFromArray(imgs));
-    if (txt) loadAttrFile(dataTransferFromArray([txt]));
+  const handleFolderPicker = useCallback(async () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dirHandle = await (window as any).showDirectoryPicker({ mode: "read" });
+      const imgs: File[] = [];
+      let txtFile: File | null = null;
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind !== "file") continue;
+        const file: File = await entry.getFile();
+        if (file.type.startsWith("image/")) imgs.push(file);
+        else if (file.name.toLowerCase().endsWith(".txt") && !txtFile) txtFile = file;
+      }
+      if (imgs.length) addImageFiles(dataTransferFromArray(imgs));
+      if (txtFile) loadAttrFile(dataTransferFromArray([txtFile]));
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") console.error("Directory picker:", err);
+    }
   }, [addImageFiles, loadAttrFile]);
 
   // Validate count match
@@ -603,15 +612,12 @@ function UploadModal({ userId, taxons, datasets, onDone, onClose }: {
                   className="flex items-center gap-1 px-2 py-1 text-[10px] rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-dim)] hover:border-green-500/40 hover:text-green-400 transition-colors">
                   <ImageIcon className="w-3 h-3" /> Select files
                 </button>
-                <button onClick={() => folderRef.current?.click()}
+                <button onClick={handleFolderPicker}
                   className="flex items-center gap-1 px-2 py-1 text-[10px] rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-dim)] hover:border-indigo-400/50 hover:text-indigo-300 transition-colors">
                   <FolderOpen className="w-3 h-3" /> Select folder
                 </button>
                 <input ref={imgRef} type="file" accept="image/*" multiple className="hidden"
                   onChange={(e) => addImageFiles(e.target.files)} />
-                {/* @ts-expect-error webkitdirectory is non-standard */}
-                <input ref={folderRef} type="file" webkitdirectory="" className="hidden"
-                  onChange={(e) => handleFolderSelect(e.target.files)} />
               </div>
             </div>
 
