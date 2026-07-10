@@ -11,6 +11,7 @@ import ValidationPanel from "@/features/validation/ValidationPanel";
 import DatasetPanel from "@/features/dataset/DatasetPanel";
 import ExportPanel from "@/features/export/ExportPanel";
 import SettingsPanel from "@/features/settings/SettingsPanel";
+import DocsPanel from "@/features/docs/DocsPanel";
 
 function ActivePanel() {
   const { activePanel } = useAppStore();
@@ -21,11 +22,12 @@ function ActivePanel() {
     case "dataset":     return <DatasetPanel />;
     case "export":      return <ExportPanel />;
     case "settings":    return <SettingsPanel />;
+    case "docs":        return <DocsPanel />;
   }
 }
 
 export default function Home() {
-  const { initWorkspace, workspaceReady, currentUserId } = useAppStore();
+  const { initWorkspace, workspaceReady, currentUserId, activePanel } = useAppStore();
 
   useEffect(() => {
     initWorkspace();
@@ -59,7 +61,7 @@ export default function Home() {
           <WorkspaceSelector />
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className={`flex-1 overflow-hidden ${activePanel === "docs" ? "" : "overflow-y-auto p-6"}`}>
           {!workspaceReady ? (
             <div className="flex items-center justify-center h-full">
               <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />

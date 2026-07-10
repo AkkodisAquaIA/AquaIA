@@ -4,7 +4,8 @@ export type PanelId =
   | "validation"
   | "dataset"
   | "export"
-  | "settings";
+  | "settings"
+  | "docs";
 
 export interface User {
   id: number;

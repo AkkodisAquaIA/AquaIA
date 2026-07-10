@@ -2,7 +2,7 @@
 
 import {
   LayoutDashboard, Search, CheckSquare, Database,
-  Download, Settings, Microscope, Sun, Moon,
+  Download, Settings, Microscope, Sun, Moon, BookOpen,
 } from "lucide-react";
 import { useAppStore } from "@/store/appStore";
 import type { PanelId } from "@/types";
@@ -15,14 +15,16 @@ const NAV_ITEMS: { id: PanelId; label: string; icon: React.ElementType }[] = [
   { id: "dataset",    label: "Dataset Explorer",  icon: Database },
   { id: "export",     label: "Export Center",     icon: Download },
   { id: "settings",   label: "Settings",          icon: Settings },
+  { id: "docs",       label: "Documentation",     icon: BookOpen },
 ];
 
 const READONLY_HIDDEN: PanelId[] = ["search", "validation", "settings"];
+const ALWAYS_VISIBLE: PanelId[] = ["docs"];
 
 export default function Sidebar() {
   const { activePanel, setActivePanel, theme, toggleTheme, isReadOnly } = useAppStore();
   const visibleItems = isReadOnly
-    ? NAV_ITEMS.filter((item) => !READONLY_HIDDEN.includes(item.id))
+    ? NAV_ITEMS.filter((item) => !READONLY_HIDDEN.includes(item.id) || ALWAYS_VISIBLE.includes(item.id))
     : NAV_ITEMS;
 
   return (
