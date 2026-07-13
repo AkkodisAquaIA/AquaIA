@@ -4,6 +4,8 @@
 
 This package provides object detection training, inference, evaluation, checkpointing, and prediction visualization. It supports DINO backbones with a DETR detection head and Ultralytics YOLO models through a shared command-line entry point.
 
+In this repository, the detection module covers the top-level `main.py` and `benchmark_train.py` files, as well as all files under `data_processing/`, `dataloading/`, and `detection/`. For a file-by-file description, see **Repository structure** at the end of this document.
+
 ## Current support
 
 | Backend | Training | Inference | Resume training | Data loading |
