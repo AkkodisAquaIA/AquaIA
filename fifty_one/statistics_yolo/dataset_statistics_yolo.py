@@ -23,6 +23,7 @@ from tools.display_color import DISPLAY_COLORS as colors
 from tools import utility as util
 from tools import rapport as rp
 from tools import menu as menu
+from tools import menu_color as menu_c
 from config import constants as ct
 from tools import graphe as gr
 
@@ -99,9 +100,7 @@ def save_anomalies_readable(
 
     except FileNotFoundError:
              display.print(f"Impossible de sauvegarder : {output_path}", colors['error'])
-
-           
-
+        
 def group_anomalies(anomalies):
     grouped = defaultdict(list)
     for a in anomalies:
@@ -474,7 +473,11 @@ def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dat
 
     # Création et affichage du menu principal 
     choice = 0
-    main_menu = menu.Menu('MAIN', style= "heavy")
+    main_menu = menu_c.Menu('MAIN',             # Nom du menu
+                        style= "double",        # Style du menu 
+                        theme = menu_c.AQUA_IA   # Theme du menu
+                        )
+    
     while True : 
 
         if mode_affichage == ct.ECRAN :

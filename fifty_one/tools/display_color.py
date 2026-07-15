@@ -88,11 +88,16 @@ class DisplayColor:
         print(f"{rgb_code}{bold_code}{prefix}{tag}{self.RESET}")
 
 
-    def colored(self, text: str, color_spec: ColorSpec, bold: bool = False) -> str:
+    def colored(self, text: str, color_spec: ColorSpec, bold: bool = False, pref: bool = True) -> str:
         """
         Renvoie le texte avec les codes ANSI pour couleur et bold (sans print).
         """
+
         r, g, b, prefix = color_spec
+
+        if not pref :
+            prefix =""
+
         rgb_code  = f"\033[38;2;{r};{g};{b}m"
         bold_code = self.BOLD if bold else ""
         return f"{rgb_code}{bold_code}{prefix}{text}{self.RESET}"        
@@ -111,6 +116,7 @@ DISPLAY_COLORS = {
     'info':    ( 51, 102, 255, "[I] "),    # Blue          → informational message : [I] Message
     'wait':    (255, 153,  51, "[...] "),  # Orange        → processing/wait       : [...] Message
     'goodbye': (255,  16, 240, "[<3] "),   # Purple        → exit message          : [<3] Message
+    'number':  (255,  16, 240, ""),        # Purple        → Affichage Nombre 
 
     # Custom prefixes for specific message types
     # Titre centrè
@@ -125,5 +131,4 @@ DISPLAY_COLORS = {
     'aqua':       (  0, 204, 153, "[~] "), # Standard teal
     'aqua_dark':  (  0, 102, 102, "[~] "), # Dark blue-green
 }
-
 

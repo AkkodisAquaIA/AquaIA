@@ -94,7 +94,7 @@ def afficher_info_general(mode_aff, stats, info_general, class_names, cfg):
 
     display = dc.DisplayColor()
 
-    mode_affichage = mode_aff[0]
+    mode_affichage = mode_aff[0] # Ecran, Fichier, ou les deux
     etat_dataset = mode_aff[1]
     nom_dataset = mode_aff[2]
 

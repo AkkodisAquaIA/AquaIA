@@ -23,6 +23,7 @@ from bboxes import bboxes as bb
 from statistics_yolo import dataset_statistics_yolo as ds
 
 from tools import menu as menu
+from tools import menu_color as menu_c
 from tools import utility as util
 import tools.display_color as dc
 from tools.display_color import DISPLAY_COLORS as colors
@@ -32,8 +33,6 @@ from tools import logo_win as lw
 from tools import logo_linux as ll
 
 display = dc.DisplayColor()
-
-
 
 #========================================================================================
 
@@ -126,8 +125,6 @@ def creation_file_yaml(DATASET_DIR ):
             colors['ok']
         )
         print()
-
-#==========================================================================
 
 def load_class_names(dataset_yaml_path):
 
@@ -270,7 +267,7 @@ def main():
         display.print(f"Erreur de chargement du fichier de configuration :\n   {e}", colors['error'])
         print()
         util.sortie_de_programme()
-        return
+        # return
     
     print()
     vc.controle(cfg) # type: ignore
@@ -312,8 +309,10 @@ def main():
 
     # Chargement du Répertoire du Dataset
     if ct.LOAD_DIR :
+        # Via le fichier de configuration
         DATASET_DIR : Path = Path(cfg["DATASET_DIR"]) # type: ignore
     else :
+        # Saisie manuel
         DATASET_DIR = util.get_path_color("Entrez le chemin du Dataset")
     
 
@@ -328,7 +327,6 @@ def main():
     display.print("Gestion des fichiers '.yaml'", colors['titre']) # type: ignore
 
     # Recherche des fichiers .yaml
-    # yaml_files = list(DATASET_DIR.glob("*.yaml")) + list(DATASET_DIR.glob("*.yml"))
     yaml_files = list(DATASET_DIR.glob("*.yaml"))
     dataset_yaml_ = ""
 
@@ -348,25 +346,29 @@ def main():
     elif len(yaml_files) == 1:
         dataset_yaml_ =  yaml_files[0]
 
-    # Sélection d'un fichier
+    # Sélection d'un fichier parmi une liste
     else:
 
-        file_name = [f.stem for f in yaml_files]  #  stem or name depending on your needs
+        file_name = [f.stem for f in yaml_files]  
         menu_items = ["'.YAML' disponible"] + file_name 
-        mm = menu.Menu("Dynamic", menu_items, style= 'rounds') # type: ignore
+        mm = menu_c.Menu("Dynamic",             # Menu créé dynamiquement
+                        menu_items,             # Liste des items du menu
+                        style= 'rounds',        # style du menu 
+                        theme = menu_c.AQUA_IA) # Theme du menu  
+     
         mm.display_menu()
         choice = mm.selection()
         dataset_yaml_ = yaml_files[choice - 1]
 
     # Chargement
-    nom = Path(dataset_yaml_).stem #  stem or name depending on your needs
+    nom = Path(dataset_yaml_).stem
 
     display.print(f"fichier '.yaml' utilisé : {nom}", colors['ok'])
     print()
     dataset_yaml =  DATASET_DIR / dataset_yaml_
 
     # Création d'un fichier de rapport
-    rapport = rp.create_file_report(DATASET_DIR, path_save, nom, cfg)
+    rapport = rp.create_file_report(DATASET_DIR, path_save, nom, cfg) # type: ignore
 
 
     # Validation du fichier .yaml
@@ -390,7 +392,7 @@ def main():
 
     # ---  Analyse du Dataset 
     ctrl_ok = False
-    erreur, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_save, rapport, cfg)
+    erreur, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_save, rapport, cfg) # type: ignore
  
     # --- Analyse des résultats ---------------------------------------------------------
     print()
@@ -432,6 +434,7 @@ def main():
     print()    
     # --- Calcul statistiques sur le Dataset ---------------------------------------------
     results = statistique(DATASET_DIR, cfg, class_names, path_save, rapport) # type: ignore
+    
     #--- Mise à Jour du Rapport de Sortie ------------------------------------------------
     rp.ecrire_sortie_dans_rapport(
         rapport,

@@ -77,9 +77,7 @@ def repport_def(texte, rapport):
     except FileNotFoundError:
             display.print(f"Impossible de sauvegarder : {rapport}", colors['error'])
 
-
 #----------------------------------------------------------------------------------------
-
 
 def afficher_bbox_erreurs_compact(
     bbox_erreurs: dict[str, list[str]],
