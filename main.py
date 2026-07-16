@@ -14,7 +14,7 @@ def build_parser():
     train_parser.add_argument("--resume", type=str, default=None, metavar="RUN_DIR", help="Resume training from an existing run directory (e.g. runs/20250615_142200)")
     train_parser.set_defaults(command_handler=handle_train)
 
-    test_parser = subparsers.add_parser("infer", help="Run inference on train and test samples")
+    test_parser = subparsers.add_parser("infer", help="Run inference on the specified dataset and split")
     test_parser.add_argument("--config", type=str, default=os.path.join("detection", "infer_config.yaml"))
     test_parser.set_defaults(command_handler=handle_test)
 
