@@ -33,7 +33,7 @@ def create_dataset(DATASET_DIR,  yaml_path=None, anomalies=None):
     print()
     if not anomalies :   
         display.print(" - Dataset Ok", colors['ok'])
-        display.print(f" - Création du dataset avec fichier '.yaml': {Path(yaml_path).stem}\n", colors['ok']) # stem or name depending on your needs
+        display.print(f" - Création du dataset avec fichier '.yaml': {Path(yaml_path).stem}\n", colors['ok']) # type: ignore # stem or name depending on your needs
     else:
         display.print(" - Dataset non valide", colors['warning'])
         display.print(" - Création d'un dataset d'anomalies\n",colors['warning'])
@@ -146,7 +146,7 @@ def is_valid_dataset(name):
     if not fo.dataset_exists(name):
         return False
     ds = fo.load_dataset(name)
-    return fo.dataset_exists(name) and len(ds) > 0
+    return fo.dataset_exists(name) and len(ds) > 0 # type: ignore
 
 def get_dataset(DATASET_DIR, dataset_yaml, anomalies):
 
@@ -229,7 +229,7 @@ def launch_fifty_one(mode_aff, data_fifty_one):
     etat_dataset = mode_aff[1]
     nom_dataset = mode_aff[2]
 
-    display.print("(7) Lancement de FiftyOne", colors[etat_dataset], nom_dataset) # type: ignore
+    display.header_title("(7) Lancement de FiftyOne", colors[etat_dataset], nom_dataset) # type: ignore
 
     # if mode_affichage == ct.ECRAN :
 

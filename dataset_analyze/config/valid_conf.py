@@ -3,7 +3,6 @@ from config import constants as ct
 import tools.display_color as dc
 from tools.display_color import DISPLAY_COLORS as colors
 
-
 #=======================================================================================================
 
 def bbox_min_max(warnings, min_val, max_val, name="bbox"):
@@ -86,10 +85,13 @@ def controle(cfg):
 
     if len(warnings) != 0 :
 
-        display.print('*------------ Erreur de saisies dans fichier de paramètres ------------', colors["warning"])
+        pls = "s" if len(warnings) > 1 else ""
+        trs = "—" if len(warnings) > 1 else ""
+
+        display.print(f'*———————————— Problème{pls} de saisies dans fichier de paramètres ————————————', colors["warning"])
         for w in warnings:            
             display.print(w, colors["warning"])
-        display.print('----------------------------------------------------------------------*', colors["warning"])
+        display.print(f'{trs}————————————————————————————————————————————————————————————————————————*', colors["warning"])
         print()
 
 

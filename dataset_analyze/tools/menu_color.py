@@ -41,10 +41,10 @@ DEFAULT_THEME = MenuTheme(
 
 
 AQUA_IA = MenuTheme(
-    frame=  (220,220,220,""),
-    title=  (102,255,204,""),    
-    number= (151,102,255,""),    
-    text=   (200,200,200,"")
+    frame=  (255, 255, 255,""), # Blanc
+    title=  (102, 255, 204,""), # Light turquoise   
+    number= ( 51, 102, 255,""), #  Bleu
+    text=   (200,200, 200,"")   # Blanc 
 )
 
 DARK_THEME = MenuTheme(

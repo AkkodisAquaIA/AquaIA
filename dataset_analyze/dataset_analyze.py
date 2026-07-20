@@ -22,7 +22,6 @@ from config import constants as ct
 from bboxes import bboxes as bb
 from statistics_yolo import dataset_statistics_yolo as ds
 
-from tools import menu as menu
 from tools import menu_color as menu_c
 from tools import utility as util
 import tools.display_color as dc
@@ -233,16 +232,16 @@ def sup_file_def(path_file):
             fichier.unlink()
 
 
-#------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------
 def main():
     # ================= CONFIG =================
-
     # Déactivation de la barre de progression de FiftyOne
     fo.config.show_progress_bars = False 
 
     # Efface l'écran avant de commencer
     syst.clear_screen()
 
+    # --- Affichage Logo et information générale ----------------------------------------
     try:
         # Choix aléatoire d'un logo
         logo = choix_logo()
@@ -254,10 +253,17 @@ def main():
             ll.splash_screen_circle(logo)
     except FileNotFoundError :
         print()
-        display.print("Le répertoire 'logo' est introuvable ou vide", colors['error'])
-        print()
+        display.print("************************************************", colors['error'])
+        display.print("* Le répertoire 'logo' est introuvable ou vide *", colors['error'])
+        display.print("************************************************", colors['error'])
 
-    display.print(ct.INFO_PROD, colors['aqua_light'])
+    tag = display.colored(ct.INFO_PROD,
+                        colors['aqua_light'],
+                        pref=False,
+                        bold=True
+                        )
+
+    print(tag)
 
 
     # Chargement & Vérification du fichier de Paramètrage
@@ -267,7 +273,7 @@ def main():
         display.print(f"Erreur de chargement du fichier de configuration :\n   {e}", colors['error'])
         print()
         util.sortie_de_programme()
-        # return
+
     
     print()
     vc.controle(cfg) # type: ignore
@@ -289,7 +295,7 @@ def main():
     else:
         color = colors["ok"]
 
-    display.print(f"Répertoire de sauvegarde : {path_save}", color)
+    display.print(f"Répertoire de sauvegarde utilisé : {path_save}", color)
 
 
     # Sauvegarde du fichier de configuration
@@ -302,10 +308,10 @@ def main():
     shutil.copy2(source, destination)
 
     # Affichage des états des modes de sauvegarde
-    print()
-  
     # Graphe mode handling
+    print()
     util.afficher_mode("Sauvegarde des Graphiques :", cfg["SAVE_PLOT"]) # type: ignore
+
 
     # Chargement du Répertoire du Dataset
     if ct.LOAD_DIR :
@@ -317,14 +323,18 @@ def main():
     
 
     #  ------------------------------------------------------------------------------------------
-    data = Path(DATASET_DIR.name)
-    display.print("Démarrage du traitement", colors['data_ok'], data) # type: ignore
+    # Démarrage du traitement 
+    display.header_title("Démarrage du traitement",
+                        colors['aqua_light'],
+                        Path(DATASET_DIR.name), # type: ignore
+                        bold=True,
+                        ) # type: ignore
 
     # Chargement des noms de classes pour les stats
     DATASET_DIR  = Path(DATASET_DIR )
 
     # Gestion des fichiers .yaml
-    display.print("Gestion des fichiers '.yaml'", colors['titre']) # type: ignore
+    display.titre("Gestion des fichiers '.yaml'", colors['aqua']) # type: ignore
 
     # Recherche des fichiers .yaml
     yaml_files = list(DATASET_DIR.glob("*.yaml"))
@@ -376,10 +386,12 @@ def main():
     try:
        class_names = load_class_names(dataset_yaml)
     except yaml.YAMLError as e:
+        print()
         tag = f"le fichier '.yaml' sélectionné  n'est pas conforme\n  {e} "
         display.print(tag, colors['error'])
         yaml_ok = False
     except FileNotFoundError as e:
+        print()
         tag = f" '{dataset_yaml}' est introuvable dans {DATASET_DIR}\n  {e} "
         display.print(tag, colors['error'])
         yaml_ok = False
@@ -434,7 +446,8 @@ def main():
     print()    
     # --- Calcul statistiques sur le Dataset ---------------------------------------------
     results = statistique(DATASET_DIR, cfg, class_names, path_save, rapport) # type: ignore
-    
+
+
     #--- Mise à Jour du Rapport de Sortie ------------------------------------------------
     rp.ecrire_sortie_dans_rapport(
         rapport,
@@ -442,7 +455,7 @@ def main():
         ct.FICHIER,
         DATASET_DIR, 
         results,
-        cfg, 
+        cfg,  # type: ignore
         dataset_yaml,
         class_names) # type: ignore
 
@@ -450,11 +463,14 @@ def main():
     # --- Finalisation du Rapport --------------------------------------------------------
     rp.finalisation_du_rapport(rapport, erreur, path_save)
 
+    # Attent validation de l'opérateur
+    print()
+    util.waiting_any_key("Appuyez sur 'Enter' pour continuer ... ")
 
     # --- Visualisation des résultats sur Ecran ------------------------------------------
     ds.afficher_dataset_statistics(ct.ECRAN,
                                    DATASET_DIR, 
-                                   results, cfg, 
+                                   results, cfg,  # type: ignore
                                    dataset_yaml,
                                    class_names) # type: ignore
 

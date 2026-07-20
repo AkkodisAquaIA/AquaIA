@@ -262,39 +262,44 @@ def dataset_statistics_yolo(DATASET_DIR, rapport, cfg):
 
         image_name = label_file.with_suffix(".jpg").name
 
-        with label_file.open("r", encoding="utf-8") as f:
+        try:
+            with label_file.open("r", encoding="utf-8") as f:
 
-            for line in f:
+                for line in f:
 
-                line = line.strip()
+                    line = line.strip()
 
-                if not line:
-                    continue
+                    if not line:
+                        continue
 
-                parts = split_pattern.split(line)
+                    parts = split_pattern.split(line)
 
-                if len(parts) != 5:
-                    continue
+                    if len(parts) != 5:
+                        continue
 
-                try:
-                    cls = int(parts[0])
-                    x, y, w, h = map(float, parts[1:])
-                except:
-                    continue
+                    try:
+                        cls = int(parts[0])
+                        x, y, w, h = map(float, parts[1:])
+                    except:
+                        continue
 
-                classes.append(cls)
-                class_to_images[cls].add(image_name)
+                    classes.append(cls)
+                    class_to_images[cls].add(image_name)
 
-                bbox_widths.append(w)
-                bbox_heights.append(h)
-                bbox_centers_x.append(x)
-                bbox_centers_y.append(y)
-                bbox_areas.append(w * h)
+                    bbox_widths.append(w)
+                    bbox_heights.append(h)
+                    bbox_centers_x.append(x)
+                    bbox_centers_y.append(y)
+                    bbox_areas.append(w * h)
 
-                image_paths.append(image_name)
+                    image_paths.append(image_name)
 
-                total_boxes += 1
+                    total_boxes += 1
 
+        except FileNotFoundError as e : 
+            print()
+            display.print(f"Fichier introuvable : {label_file.stem}",
+                           colors['error'])
 
     image_count = len([
         f for f in Path(images_dir).glob("*.*")
@@ -455,22 +460,28 @@ def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dat
     total_boxes = stats["bounding_boxes"]
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
+    color_print = 'warning' if anomalies else 'ok' 
+
     mode_aff =[
-        mode_affichage,                        # Ecran ou Fichier
-        'data_df' if anomalies else 'data_ok', # etat_dataset,
-        Path(DATASET_DIR.name)                 # non_du_dataset
+        mode_affichage,          # Ecran ou Fichier
+        color_print,             # etat_dataset,
+        Path(DATASET_DIR.name)   # non_du_dataset
     ]    
 
-        # --- Rapport de défauts de conformité
+    # --- Rapport de défauts de conformité
     if mode_affichage == ct.FICHIER :
         save_anomalies_readable(anomalies, "erreurs_dataset.txt", cfg)
 
+    if mode_affichage == ct.ECRAN :
+        syst.clear_screen()
 
     print()
-    display.print(f"Analyse statistique terminé {'avec' if anomalies else 'sans'} problème",
-                  colors["warning" if anomalies else "ok"]
+    tag = 'avec problèmes' if anomalies else 'sans problème'
+    display.print(f"Analyse statistique terminé {tag}",
+                  colors[color_print]
                   )
 
+    
     # Création et affichage du menu principal 
     choice = 0
     main_menu = menu_c.Menu('MAIN',             # Nom du menu
@@ -481,7 +492,7 @@ def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dat
     while True : 
 
         if mode_affichage == ct.ECRAN :
-            display.print("Menu", colors['titre'])
+            display.titre("Menu", colors['aqua'])
             main_menu.display_menu()
             choice = main_menu.selection()
         else:
@@ -489,51 +500,57 @@ def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dat
 
         if choice == 1:
             # ---- Information générales --------------------------------------------------
-            syst.clear_screen()
+            if mode_affichage == ct.ECRAN :
+                syst.clear_screen()
             info_general = (total_boxes, total_classes, class_distribution, class_to_images )
             ige.afficher_info_general(mode_aff, stats, info_general, class_names, cfg)
 
         elif choice == 2:
             # ---- Information sur les classes --------------------------------------------
-            syst.clear_screen()
+            if mode_affichage == ct.ECRAN :
+                syst.clear_screen()
             classes_info =(class_distribution, class_names)
             icl.info_classes(mode_aff, classes_info, cfg)
                      
         elif choice == 3:   
             # --- Images par classe -------------------------------------------------------
-            syst.clear_screen()
+            if mode_affichage == ct.ECRAN :
+                syst.clear_screen()
             data_info_img_cla = (class_to_images, class_names)
             iic.info_images_par_classe(mode_aff, data_info_img_cla)
 
         elif choice == 4:
             # --- histogramme des tailles de bbox -----------------------------------------
-            syst.clear_screen()
             if mode_affichage == ct.ECRAN :
+                syst.clear_screen()
                 itp.taille_bboxes(mode_aff, bbox_areas, cfg)
 
         elif choice == 5:
             # --- anomalies ---------------------------------------------------------------
-            syst.clear_screen()
+            if mode_affichage == ct.ECRAN :
+                syst.clear_screen()
             info_anomalie = (anomalies, resultats)
             ano.recherche_anomalie(mode_aff, stats, info_anomalie,cfg)
 
         elif choice == 6:
             # --- Affichage Métriques d'imbalance -----------------------------------------
-            syst.clear_screen()
+            if mode_affichage == ct.ECRAN :
+                syst.clear_screen()
             metrics = imb.imbalance_metrics(class_distribution, cfg)
             imb.afficher_imbalance_avance(mode_aff, metrics, display, cfg) 
  
         elif choice == 7:
             # --- Lancement de Fifty_One
-            syst.clear_screen()
+            # syst.clear_screen()
             if mode_affichage == ct.ECRAN :
+                syst.clear_screen()
                 data_fifty_one =(anomalies, DATASET_DIR, dataset_yaml)
                 lfo.launch_fifty_one(mode_aff, data_fifty_one)
 
         elif choice == 8:
             # --- Sortie ------------------------------------------------------------------
             if mode_affichage == ct.ECRAN :
-                display.print("(8) Sortie du programme", colors['titre'])
+                display.titre("(8) Sortie du programme", colors['aqua'])
             if mode_affichage == ct.FICHIER or util.answer_yes_or_no("Voulez-vous sortir"):
                 break
 

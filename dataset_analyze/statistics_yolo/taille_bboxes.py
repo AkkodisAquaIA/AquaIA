@@ -18,7 +18,7 @@ def taille_bboxes(mode_aff, bbox_areas, cfg):
     nom_dataset = mode_aff[2]
 
 
-    display.print("(4) Distribution de la taille des BBoxes", colors[etat_dataset], nom_dataset)
+    display.header_title("(4) Distribution de la taille des BBoxes", colors[etat_dataset], nom_dataset)
 
     nb_bins = ct.BINS
 

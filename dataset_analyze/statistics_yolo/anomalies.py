@@ -134,7 +134,7 @@ def recherche_anomalie(mode_aff, stats, info_anomalie, cfg):
     etat_dataset = mode_aff[1]
     nom_dataset = mode_aff[2]
 
-    display.print("(5) Anomalies", colors[etat_dataset], nom_dataset) 
+    display.header_title("(5) Anomalies", colors[etat_dataset], nom_dataset) 
 
     anomalies = info_anomalie[0]
     resultats = info_anomalie[1]
@@ -150,7 +150,7 @@ def recherche_anomalie(mode_aff, stats, info_anomalie, cfg):
 
     id_to_type = {v: k for k, v in type_to_id.items()}
 
-    display.print("Recherche d'anomalies", colors['titre'])
+    display.titre("Recherche d'anomalies", colors['aqua'])
 
     if not anomalies:
         display.print(" - Aucune anomalie trouvée !!", colors['ok'])

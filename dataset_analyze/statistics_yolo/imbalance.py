@@ -81,7 +81,7 @@ def afficher_imbalance_avance(mode_aff, metrics, display, cfg):
     etat_dataset = mode_aff[1]
     nom_dataset = mode_aff[2]
 
-    display.print("(6) Métriques d'imbalance", colors[etat_dataset], nom_dataset) 
+    display.header_title("(6) Métriques d'imbalance", colors[etat_dataset], nom_dataset) 
 
     print()
     display.print(f"Utilisation d'un profil {cfg['IMBALANCE'][2]}", colors['info'])

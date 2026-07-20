@@ -19,7 +19,7 @@ def info_images_par_classe(mode_aff, data_info_img_cla):
     class_to_images = data_info_img_cla[0]
     class_names = data_info_img_cla[1]
 
-    display.print("(3) Nombres d'images par classe", colors[etat_dataset], nom_dataset) # type: ignore
+    display.header_title("(3) Nombres d'images par classe", colors[etat_dataset], nom_dataset) # type: ignore
  
     MAX_IMAGES_DISPLAY = 30     # nombre max d'images par classe
     MAX_CLASSES_SELECT = 6      # max classes que l'utilisateur peut demander
@@ -88,7 +88,7 @@ def info_images_par_classe(mode_aff, data_info_img_cla):
     if mode_affichage == ct.ECRAN :
         # Affichage des noms des images par classe
         tag = f"Affichage des noms des images par classe"
-        display.print(tag, colors['titre'])
+        display.titre(tag, colors['aqua'])
         while True:
             tag = f"Entrez jusqu'à {MAX_CLASSES_SELECT} classes (ex: 1 3-5 8) ou 'Return' pour quitter : "
             display.print(tag, colors['input']) 

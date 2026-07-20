@@ -94,7 +94,7 @@ def afficher_info_general(mode_aff, stats, info_general, class_names, cfg):
 
     display = dc.DisplayColor()
 
-    mode_affichage = mode_aff[0] # Ecran, Fichier, ou les deux
+    mode_affichage = mode_aff[0] # Ecran, Fichier : pas utilisé ici
     etat_dataset = mode_aff[1]
     nom_dataset = mode_aff[2]
 
@@ -103,11 +103,11 @@ def afficher_info_general(mode_aff, stats, info_general, class_names, cfg):
     class_distribution = info_general[2] 
     class_to_images = info_general[3]
 
-    display.print("(1) Information générales", colors[etat_dataset], nom_dataset) # type: ignore
+    display.header_title("(1) Information générales", colors[etat_dataset], nom_dataset) # type: ignore
 
 
     # --- résumé général ---
-    display.print("Dataset Summary", colors["titre"])
+    display.titre("Dataset Summary", colors["aqua"])
     print(f"{'Images':18}: {util.format_nombre(stats['images'])}")
     print(f"{'Labels':18}: {util.format_nombre(stats['labels'])}")
     print(f"{'Bounding boxes':18}: {util.format_nombre(total_boxes)}") 
@@ -116,7 +116,7 @@ def afficher_info_general(mode_aff, stats, info_general, class_names, cfg):
     print()
 
     # --- statistiques BBOX ---
-    display.print("Statistiques des BBOX", colors["titre"])
+    display.titre("Statistiques des BBOX", colors["aqua"])
     afficher_stats_bbox(stats, cfg)
 
     # --- Vérification YAML ---

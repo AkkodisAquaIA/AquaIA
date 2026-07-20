@@ -5,6 +5,7 @@ from os import get_terminal_size
 # Logo
 INFO_PROD = r"""
    ┌────────────────────────────────────────────┐
+   │       Agence de l'Eau Adour Garonne        │
    │            Analyse d'un Dataset            │
    │                                            │    
    │                        by AKKODIS-Research │
@@ -23,6 +24,7 @@ BELL = "\a"
 DISPLAY_WIDTH = min(180, get_terminal_size().columns)
 
 
+TITLE_FILL = "—"   
 
 ECRAN = False
 FICHIER = True
@@ -41,7 +43,7 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 #-----------------------------------------------------------------------------------
 
 # Nombre maximal de classe
-NB_CLASSES = 100
+NB_CLASSES = 200
 
 
 # imbalance

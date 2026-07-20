@@ -30,7 +30,7 @@ def info_classes(mode_aff, info_classes, cfg):
         if mode_affichage == ct.ECRAN:
             syst.clear_screen()
 
-        display.print("(2) Information sur les classes", colors[etat_dataset], nom_dataset) # type: ignore
+        display.header_title("(2) Information sur les classes", colors[etat_dataset], nom_dataset) # type: ignore
         class_distribution = info_classes[0]
         class_names =  info_classes[1]
 
@@ -90,7 +90,7 @@ def info_classes(mode_aff, info_classes, cfg):
             blocs.append(bloc)
 
         tag = f"Répartition des classes par fréquences ({rary + moy + dom})"
-        display.print(tag , colors['titre'])
+        display.titre(tag , colors['aqua'])
         legend_colored = (
             f'{Fore.GREEN}■ ({dom}) ≥ {cfg["DOMINANT"]}% Dominant{Style.RESET_ALL}   '
             f'│ {Fore.YELLOW}■ ({moy}) {cfg["RARE"]}–{cfg["DOMINANT"]}% Moyen{Style.RESET_ALL}   '
@@ -124,7 +124,7 @@ def info_classes(mode_aff, info_classes, cfg):
     if  mode_affichage == ct.ECRAN and ( util.answer_yes_or_no("Voulez-vous voir les classes rares") ):
 
         syst.clear_screen()
-        display.print("(2) Information sur les classes rares", colors[etat_dataset], data) # type: ignore
+        display.header_title("(2) Information sur les classes rares", colors[etat_dataset], nom_dataset)  # type: ignore
         
         if cfg["RARE"] is not None:
             classes_faibles = []
@@ -139,7 +139,7 @@ def info_classes(mode_aff, info_classes, cfg):
                 display.print(f'Aucune classe sous {cfg["RARE"]}% ', colors['ok'])
             else:
                 message = f'Classes Rares ({rary}) < {cfg["RARE"]}%'
-                display.print(message, colors['titre'])
+                display.titre(message, colors['aqua'])
                 # tri optionnel (du pire au moins pire)
                 classes_faibles.sort(key=lambda x: x[3])  # tri par %
 
