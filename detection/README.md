@@ -11,11 +11,9 @@ In this repository, the detection module covers the top-level `main.py` and `ben
 | Backend | Training | Inference | Resume training | Data loading |
 |---|---:|---:|---:|---|
 | DINOv2 / DINOv3 + DETR | Yes | Yes | Yes | PIL or NVIDIA DALI |
-| Ultralytics YOLO | Yes | Partial | No | Ultralytics / PIL |
+| Ultralytics YOLO | Yes | Yes | No | Ultralytics for training / PIL for inference |
 
 The DINO pipeline supports `small`, `base`, and `large` DINOv2 backbones, and `small`, `plus`, `base`, and `large` DINOv3 backbones. NVIDIA DALI is optional; the DINO pipeline falls back to the PIL-based loader when DALI is unavailable.
-
-YOLO inference is implemented but still has a known dataset loader integration issue.
 
 ## Dataset format
 
@@ -161,7 +159,17 @@ The Detection part contains the following folders and files.
 │   │   ├── plot_utils.py         # Functions to annotate images, save some visualizations and plot metric curves.
 │   │   └── profiling.py          # A pytorch profiler factory function, for execution performance monitoring.
 │   │
-│   ├── yolo/                     # YOLO pipeline.
+│   ├── yolo/
+│   │   ├── inference/
+│   │   │   └── run.py            # Main inference process, loads the best YOLO checkpoint and evaluates it on the test dataset.
+│   │   │
+│   │   ├── training/
+│   │   │   └── run.py            # Main training process, resolves the Ultralytics model identifier and launches training.
+│   │   │
+│   │   ├── batch_eval.py         # Evaluates multiple YOLO runs with yolo_run_diagnostics.py and generates CSV and Markdown reports.
+│   │   ├── plot_metrics.py       # Plots training metrics for one YOLO run or compares metrics across multiple runs.
+│   │   ├── predict.py            # Adapts Ultralytics YOLO predictions to the common detection prediction format.
+│   │   └── yolo_run_diagnostics.py # Evaluates one YOLO run, analyzes prediction errors and IoU, and writes TensorBoard diagnostics.
 │   │
 │   ├── checkpoint.py             # Checkpoint tools, save model checkpoint, load model checkpoint.
 │   ├── config_printer.py         # Prints config when training.

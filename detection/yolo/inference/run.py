@@ -37,12 +37,11 @@ def test_yolo(config):
     model = load_model(run_dir, device)
     test_dataset = JpgDetectionDataset(
         dataset_root=test_data_root,
-        data_split="test",
+        data_split=data_cfg.get("split", "test"),
         img_size=normalize_imgsz(config, "inference"),
-        batch_size=inference_config["batch"],
         device=device,
     )
-    test_loader = DataLoader(test_dataset, batch_size=test_dataset.batch_size, shuffle=False, num_workers=3, collate_fn=detection_collate_fn)
+    test_loader = DataLoader(test_dataset, batch_size=inference_config["batch"], shuffle=False, num_workers=3, collate_fn=detection_collate_fn)
 
     save_sample_predictions(
         model=model,
