@@ -227,13 +227,13 @@ def train_dino(config, resume_dir=None):
                 with torch.set_grad_enabled(training):
                     for batch_idx, batch in enumerate(progress):
                         targets = loader.dataset.get_targets(batch)
-                        images, _ = parse_batch(batch)
+                        inputs, _ = parse_batch(batch)
 
                         if not DALI_AVAILABLE:
-                            images = images.to(device, non_blocking=True)
+                            inputs = inputs.to(device, non_blocking=True)
 
                         with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
-                            outputs = model(images)
+                            outputs = model(inputs)
                             loss_dict = criterion(outputs, targets)
                         total_loss = sum(loss_dict[key] * loss_weight_dict[key] for key in loss_dict if key in loss_weight_dict)
 
