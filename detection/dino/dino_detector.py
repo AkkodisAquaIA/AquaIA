@@ -53,18 +53,18 @@ class DINODetector(nn.Module):
         else:
             raise NotImplementedError("LoRA fine-tuning not implemented yet, set lora_ft to False for now")
 
-    def _forward_backbone(self, images):
+    def _forward_backbone(self, inputs):
         # Feed input to backbone and extract features
         with torch.set_grad_enabled(self.lora_ft):
-            features = self.backbone(images, is_training=True)["x_norm_patchtokens"]  # (B, H*W, C)
+            features = self.backbone(inputs, is_training=True)["x_norm_patchtokens"]  # (B, H*W, C)
         return features, self.pe.unsqueeze(0).expand(features.shape[0], -1, -1)  # (B, H*W, 2*num_pos_feats) add batch dimension with broadcasting
 
-    def forward(self, images):
-        if images.device.type == "cuda":
+    def forward(self, inputs):
+        if inputs.device.type == "cuda":
             backends = [attn.SDPBackend.FLASH_ATTENTION, attn.SDPBackend.EFFICIENT_ATTENTION]
         else:
             backends = [attn.SDPBackend.MATH]
         with torch.nn.attention.sdpa_kernel(backends=backends):
-            embeddings, pe = self._forward_backbone(images)
+            embeddings, pe = self._forward_backbone(inputs)
             out = self.detector(embeddings, pe)
         return out
