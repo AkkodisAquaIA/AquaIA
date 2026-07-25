@@ -143,8 +143,7 @@ The Detection part contains the following folders and files.
 │   │   ├── dino_detector.py      # Combines DINO and DETR to a complet model.
 │   │   ├── loss.py               # Loss for DETR after backbone (class loss modified to FocalLoss).
 │   │   ├── position_encoding.py  # 2D positional encoding for DETR.
-│   │   ├── predict.py            # One function to round image size, one function to infer on a batch of samples (for evaluation or visualization) and return predictions.
-│   │   └── train_config.yaml     # Actual yaml not used.
+│   │   └── predict.py            # One function to round image size, one function to infer on a batch of samples (for evaluation or visualization) and return predictions.
 │   │
 │   ├── logging/
 │   │   ├── __init__.py           # Declares logging package.
@@ -184,6 +183,5 @@ The Detection part contains the following folders and files.
 │   ├── train.py                  # Initialize training with config, detection/dino/training/run.py/train_dino or detection/yolo/training/run.py/train_yolo.
 │   └── TRAINING_LOGS.md          # Explication of logging mechanism and how to use.
 │
-├── benchmark_train.py            # Obsolete experiences launcher.
 └── main.py                       # Entry point, train (train.py/train_from_config) or infer (infer.py/infer_from_config).
 ```

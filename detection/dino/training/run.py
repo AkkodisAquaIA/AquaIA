@@ -27,8 +27,7 @@ def get_datasets(
     device,
     img_size=640,
 ):
-    # TODO : currently GPU only because of DALI, but should be possible to support CPU-only training)
-    # Compute random split for train and eval set
+    # Create datasets from the existing train and val splits
     if DALI_AVAILABLE:
         train_dataset = JpgDALIDataset(
             dataset_root=data_yaml_path,
@@ -226,8 +225,7 @@ def train_dino(config, resume_dir=None):
 
                 with torch.set_grad_enabled(training):
                     for batch_idx, batch in enumerate(progress):
-                        targets = loader.dataset.get_targets(batch)
-                        inputs, _ = parse_batch(batch)
+                        inputs, targets = parse_batch(batch, device=device)
 
                         if not DALI_AVAILABLE:
                             inputs = inputs.to(device, non_blocking=True)

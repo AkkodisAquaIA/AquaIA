@@ -20,12 +20,13 @@ from detection.utils.config_utils import load_class_names
 # TODO : AutoAugment: Learning Augmentation Strategies from Data
 @pipeline_def
 def create_detection_pipeline(dataset_src, stats, img_size=640, device="gpu"):
-    encoded, idx = fn.external_source(
+    encoded, labels, boxes, idx = fn.external_source(
         source=dataset_src,
-        num_outputs=2,
+        num_outputs=4,
         batch=False,
         parallel=True,
-        dtype=[types.UINT8, types.INT64],
+        dtype=[types.UINT8, types.INT64, types.FLOAT, types.INT64],
+        ndim=[1, 1, 2, 1],
     )
     decoding_device = "mixed" if device == "gpu" else device
     # TODO : add cache/padding to the decoding part to avoid memory re-allocation
@@ -44,17 +45,26 @@ def create_detection_pipeline(dataset_src, stats, img_size=640, device="gpu"):
         mean=stats["mean"],
         std=stats["std"],
     )
-    return inputs, idx
+    if device == "gpu":
+        labels = labels.gpu()
+        boxes = boxes.gpu()
+    return inputs, labels, boxes, idx
 
 
 class BaseDetectionDataset:
     """
-    Base class shared by NPY / PIL / RAM datasets.
+    Base class shared by non-DALI and DALI dataset implementations.
+    This class handles dataset metadata and target loading:
+    - loads normalization statistics from stats.npy and scales them from [0, 1] to [0, 255] pixel units
+    - loads class names and number of classes
+    - builds a sorted list of label files
+    - parses YOLO-format label files into class labels and bounding boxes
+    - stores targets as torch tensors rather than DALI tensors
+    - returns cloned targets to avoid modifying the cached source targets
 
-    Handles:
-    - label loading
-    - statistics (mean/std)
-    - normalization
+    For the non-DALI path, it also provides helpers to:
+    - convert numpy images to torch tensors
+    - normalize image tensors using dataset statistics
     """
 
     def __init__(
@@ -71,8 +81,6 @@ class BaseDetectionDataset:
         self.load_stats()
         self.class_names, self.num_classes = load_class_names(dataset_root)
         self.device = device
-        # Load targets to device directly to avoid repeated memcpy
-        # We do not need to think about targets device at all after this11
         self.load_targets()
 
         # if not (self.dataset_root / self.data_split).exists():
@@ -129,8 +137,8 @@ class BaseDetectionDataset:
                     boxes.append(bbox)
         # TODO : clean up, dict struct is not longer necessary
         return {
-            "labels": torch.tensor(labels, dtype=torch.int64).to(self.device),
-            "boxes": torch.tensor(boxes, dtype=torch.float32).reshape(-1, 4).to(self.device),
+            "labels": torch.tensor(labels, dtype=torch.int64),
+            "boxes": torch.tensor(boxes, dtype=torch.float32).reshape(-1, 4),
         }
 
     def load_targets(self) -> None:
@@ -139,10 +147,8 @@ class BaseDetectionDataset:
             raise FileNotFoundError(f"No label files found under {self.dataset_root / 'labels' / self.data_split}")
         self.targets = [self.read_target(path) for path in self.target_files]
 
-    def get_targets(self, batch) -> List[dict]:
-        if isinstance(batch, list):
-            batch = batch[0]
-        return [self.targets[idx] for idx in batch["targets_idx"]]
+    def copy_target(self, idx: int) -> dict:
+        return {key: value.clone() for key, value in self.targets[idx].items()}
 
     def normalize_img(self, img: torch.Tensor) -> torch.Tensor:
         mean = torch.from_numpy(self.stats["mean"]).to(dtype=img.dtype).view(-1, 1, 1)
@@ -205,7 +211,13 @@ class JpgDALIDataset(BaseDetectionDataset):
         img_path = self.img_dir / f"{img_id}.{self.img_format}"
         # Encoded image bytes. DALI will decode this on the GPU.
         encoded_img = np.frombuffer(img_path.read_bytes(), dtype=np.uint8)
-        return encoded_img, np.array([idx])
+        target = self.targets[idx]
+        return (
+            encoded_img,
+            target["labels"].numpy(),
+            target["boxes"].numpy(),
+            np.array([idx], dtype=np.int64),
+        )
 
     def __getitem__(self, key):
         # Slow but useful for sampling a few images for visualization / testing
@@ -240,6 +252,7 @@ class JpgDALIDataset(BaseDetectionDataset):
         sample = {
             "image": img,
             "input": norm_img,
+            "target": self.copy_target(idx),
             "target_idx": idx,
             "img_path": str(img_path),
         }
@@ -268,10 +281,10 @@ class JpgDetectionDataset(BaseDetectionDataset):
         img = np.array(img, dtype=np.float32)
         img = self.to_tensor(img)
         norm_img = self.normalize_img(img)
-        # tgt = self.targets[idx]
         sample = {
             "image": img,
             "input": norm_img,
+            "target": self.copy_target(idx),
             "target_idx": idx,
             "img_path": str(img_path),
         }
@@ -302,9 +315,11 @@ class DALIDetectionDataLoader:
         self.pipeline.build()
         self.loader = DALIRaggedIterator(
             pipelines=[self.pipeline],
-            output_map=["inputs", "targets_idx"],
+            output_map=["inputs", "labels", "boxes", "targets_idx"],
             output_types=[
                 DALIRaggedIterator.DENSE_TAG,
+                DALIRaggedIterator.SPARSE_LIST_TAG,
+                DALIRaggedIterator.SPARSE_LIST_TAG,
                 DALIRaggedIterator.DENSE_TAG,
             ],
             size=self.dataset.full_iterations * self.dataset.batch_size,
@@ -316,16 +331,45 @@ class DALIDetectionDataLoader:
         return self.dataset.full_iterations
 
     def __iter__(self):
-        return iter(self.loader)
+        for batch in self.loader:
+            if isinstance(batch, list):
+                batch = batch[0]
+            labels_batch = batch.pop("labels")
+            boxes_batch = batch.pop("boxes")
+            batch["targets"] = [
+                {"labels": labels, "boxes": boxes}
+                for labels, boxes in zip(labels_batch, boxes_batch)
+            ]
+            yield batch
 
 
-def parse_batch(batch):
+def parse_batch(batch, device=None):
     if isinstance(batch, list):
         batch = batch[0]
     inputs = batch["inputs"]
-    # TODO : ugly but currently required. Need to modify downstream code to avoid this conversion
-    # targets = [{"labels": labels, "boxes": boxes} for labels, boxes in zip(batch["labels"], batch["bboxes"])]
-    return inputs, batch.get("img_paths", None)
+    targets = batch["targets"]
+
+    if isinstance(targets, dict):
+        labels = targets["labels"]
+        boxes = targets["boxes"]
+        if device is not None:
+            labels = labels.to(device, non_blocking=True)
+            boxes = boxes.to(device, non_blocking=True)
+        labels_per_image = labels.split(targets["counts"])
+        boxes_per_image = boxes.split(targets["counts"])
+        targets = [
+            {"labels": image_labels, "boxes": image_boxes}
+            for image_labels, image_boxes in zip(labels_per_image, boxes_per_image)
+        ]
+    elif device is not None:
+        targets = [
+            {
+                key: value.to(device, non_blocking=True) if torch.is_tensor(value) else value
+                for key, value in target.items()
+            }
+            for target in targets
+        ]
+    return inputs, targets
 
 
 def sample_indices(dataset_size, num_samples, seed):
@@ -335,9 +379,15 @@ def sample_indices(dataset_size, num_samples, seed):
 
 
 def detection_collate_fn(batch):
+    target_counts = [len(item["target"]["labels"]) for item in batch]
     collated_batch = {
         "images": torch.stack([item["image"] for item in batch], dim=0),
         "inputs": torch.stack([item["input"] for item in batch], dim=0),
+        "targets": {
+            "labels": torch.cat([item["target"]["labels"] for item in batch], dim=0),
+            "boxes": torch.cat([item["target"]["boxes"] for item in batch], dim=0),
+            "counts": target_counts,
+        },
         "targets_idx": [item["target_idx"] for item in batch],
         "img_paths": [item["img_path"] for item in batch],
     }

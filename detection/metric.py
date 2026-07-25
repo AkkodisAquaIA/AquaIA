@@ -3,6 +3,7 @@ import yaml
 from pathlib import Path
 import csv
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
+from dataloading.datasets import parse_batch
 from detection.utils.box_ops import box_cxcywh_to_xyxy
 
 
@@ -131,9 +132,9 @@ def compute_metrics(model, dataloaders, predict_fn, device, conf_thresh):
         predictions = []
         targets = []
         for batch in loader:
-            batch_targets = loader.dataset.get_targets(batch)
             if isinstance(batch, list):
                 batch = batch[0]
+            _, batch_targets = parse_batch(batch, device=device)
             batch_preds = predict_fn(
                 model=model,
                 samples=batch,
