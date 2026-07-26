@@ -77,6 +77,7 @@ training:
   # dfl: 1.5            # distribution focal loss gain
 
   # ---------- DATA AUGMENTATION ----------
+  # Only for DINO, set all zero to disable training augmentation for YOLO
   augment: true
 
   # Color jitter in HSV space.
