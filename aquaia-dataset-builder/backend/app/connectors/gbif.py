@@ -29,7 +29,6 @@ class GBIFConnector(BaseConnector):
                         "q": query,
                         "mediaType": "StillImage",
                         "limit": min(limit, 300),
-                        "license": ",".join(CC_LICENSES.keys()),
                     },
                 )
                 resp.raise_for_status()
