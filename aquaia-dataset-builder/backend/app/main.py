@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.api.routes import datasets, exports, images, search, stats, taxonomy
+from app.api.routes import auth, datasets, exports, images, search, stats, taxonomy
 from app.api.routes import users
 from app.core.config import settings
 from app.db.database import Base, engine
@@ -139,6 +139,13 @@ async def lifespan(app: FastAPI):
             await conn.execute(text("INSERT INTO users (username, display_name, created_at, updated_at) VALUES ('default_admin', 'Admin', datetime('now'), datetime('now'))"))
             logger.info("[startup] Created default_admin workspace")
 
+        # Security column — safe to run every startup (fails silently if already present)
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN password_hash TEXT"))
+            logger.info("[migration] Added users.password_hash column")
+        except Exception:
+            pass
+
     for path in [
         settings.storage_raw,
         settings.storage_thumbnails,
@@ -157,8 +164,10 @@ app.add_middleware(
     allow_origins=settings.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
+app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(search.router, prefix="/api")

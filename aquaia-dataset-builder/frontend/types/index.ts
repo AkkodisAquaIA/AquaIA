@@ -4,13 +4,19 @@ export type PanelId =
   | "validation"
   | "dataset"
   | "export"
-  | "settings";
+  | "settings"
+  | "docs";
 
 export interface User {
   id: number;
   username: string;
   display_name: string;
+  is_protected: boolean;
   created_at: string;
+}
+
+export interface UserWithToken extends User {
+  access_token: string;
 }
 
 export interface Taxon {
@@ -58,6 +64,7 @@ export interface ExportJob {
   id: number;
   user_id: number;
   dataset_id: number | null;
+  dataset_name: string | null;
   export_type: string;
   output_path: string | null;
   status: string;
