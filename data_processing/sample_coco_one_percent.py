@@ -42,13 +42,9 @@ def read_classes(label_path):
             try:
                 class_id = int(parts[0])
             except ValueError as error:
-                raise ValueError(
-                    f"Invalid class ID in {label_path}, line {line_number}: {parts[0]}"
-                ) from error
+                raise ValueError(f"Invalid class ID in {label_path}, line {line_number}: {parts[0]}") from error
             if not 0 <= class_id < NUM_CLASSES:
-                raise ValueError(
-                    f"Class ID {class_id} in {label_path} is outside 0-{NUM_CLASSES - 1}"
-                )
+                raise ValueError(f"Class ID {class_id} in {label_path} is outside 0-{NUM_CLASSES - 1}")
             classes.add(class_id)
     return classes
 
@@ -73,16 +69,10 @@ def records_from_cache(cache_path, label_dir, image_index):
         image_path = image_index.get(stem)
         if image_path is None or not label_path.is_file():
             continue
-        classes = {
-            int(class_id)
-            for class_id in np.asarray(cached_label["cls"]).reshape(-1).tolist()
-        }
+        classes = {int(class_id) for class_id in np.asarray(cached_label["cls"]).reshape(-1).tolist()}
         invalid_classes = classes - set(range(NUM_CLASSES))
         if invalid_classes:
-            raise ValueError(
-                f"Classes outside 0-{NUM_CLASSES - 1} in {label_path}: "
-                f"{sorted(invalid_classes)}"
-            )
+            raise ValueError(f"Classes outside 0-{NUM_CLASSES - 1} in {label_path}: {sorted(invalid_classes)}")
         records.append((image_path, label_path, classes))
     return records
 
@@ -117,10 +107,7 @@ def load_records(source_root, split):
         records = records_from_txt(label_dir, image_index)
 
     if len(records) != len(image_index):
-        raise ValueError(
-            f"[{split}] Image/label count mismatch: "
-            f"{len(image_index)} images, {len(records)} matched labels"
-        )
+        raise ValueError(f"[{split}] Image/label count mismatch: {len(image_index)} images, {len(records)} matched labels")
     return records
 
 
@@ -129,10 +116,7 @@ def select_records(records, fraction, seed, split):
     all_classes = set().union(*(record[2] for record in records))
     missing_from_source = set(range(NUM_CLASSES)) - all_classes
     if missing_from_source:
-        raise ValueError(
-            f"[{split}] Source split does not contain all {NUM_CLASSES} classes; "
-            f"missing: {sorted(missing_from_source)}"
-        )
+        raise ValueError(f"[{split}] Source split does not contain all {NUM_CLASSES} classes; missing: {sorted(missing_from_source)}")
 
     rng = random.Random(f"{seed}:{split}")
     candidate_indices = list(range(len(records)))
@@ -148,26 +132,16 @@ def select_records(records, fraction, seed, split):
         )
         newly_covered = records[best_index][2] & uncovered
         if not newly_covered:
-            raise RuntimeError(
-                f"[{split}] Could not cover classes: {sorted(uncovered)}"
-            )
+            raise RuntimeError(f"[{split}] Could not cover classes: {sorted(uncovered)}")
         selected_indices.append(best_index)
         selected_set.add(best_index)
         uncovered -= newly_covered
 
     if len(selected_indices) > target_count:
-        raise ValueError(
-            f"[{split}] Covering all {NUM_CLASSES} classes requires at least "
-            f"{len(selected_indices)} images, which exceeds the 1% target "
-            f"of {target_count} images"
-        )
+        raise ValueError(f"[{split}] Covering all {NUM_CLASSES} classes requires at least {len(selected_indices)} images, which exceeds the 1% target of {target_count} images")
 
-    remaining_indices = [
-        index for index in candidate_indices if index not in selected_set
-    ]
-    selected_indices.extend(
-        remaining_indices[: target_count - len(selected_indices)]
-    )
+    remaining_indices = [index for index in candidate_indices if index not in selected_set]
+    selected_indices.extend(remaining_indices[: target_count - len(selected_indices)])
     selected = [records[index] for index in selected_indices]
     return sorted(selected, key=lambda record: numeric_sort_key(record[0]))
 
@@ -193,46 +167,28 @@ def copy_split(selected, destination_root, split):
 def validate_split(destination_root, split, expected_count):
     image_dir = destination_root / "images" / split
     label_dir = destination_root / "labels" / split
-    image_stems = {
-        path.stem
-        for path in image_dir.iterdir()
-        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
-    }
+    image_stems = {path.stem for path in image_dir.iterdir() if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES}
     label_paths = sorted(label_dir.glob("*.txt"), key=numeric_sort_key)
     label_stems = {path.stem for path in label_paths}
 
     if image_stems != label_stems:
         raise ValueError(
-            f"[{split}] Output image/label pairs do not match. "
-            f"Images without labels: {sorted(image_stems - label_stems)[:10]}; "
-            f"labels without images: {sorted(label_stems - image_stems)[:10]}"
+            f"[{split}] Output image/label pairs do not match. Images without labels: {sorted(image_stems - label_stems)[:10]}; labels without images: {sorted(label_stems - image_stems)[:10]}"
         )
     if len(image_stems) != expected_count:
-        raise ValueError(
-            f"[{split}] Expected {expected_count} pairs, found {len(image_stems)}"
-        )
+        raise ValueError(f"[{split}] Expected {expected_count} pairs, found {len(image_stems)}")
 
     covered_classes = set()
     for label_path in label_paths:
         covered_classes.update(read_classes(label_path))
     missing_classes = set(range(NUM_CLASSES)) - covered_classes
     if missing_classes:
-        raise ValueError(
-            f"[{split}] Output is missing classes: {sorted(missing_classes)}"
-        )
-    print(
-        f"[{split}] VERIFIED: {len(image_stems)} image/label pairs, "
-        f"all {NUM_CLASSES} classes covered"
-    )
+        raise ValueError(f"[{split}] Output is missing classes: {sorted(missing_classes)}")
+    print(f"[{split}] VERIFIED: {len(image_stems)} image/label pairs, all {NUM_CLASSES} classes covered")
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Sample approximately 1% of each YOLO-format COCO split while "
-            "ensuring that every split contains all 80 classes."
-        )
-    )
+    parser = argparse.ArgumentParser(description=("Sample approximately 1% of each YOLO-format COCO split while ensuring that every split contains all 80 classes."))
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--destination", type=Path, default=DEFAULT_DESTINATION)
     parser.add_argument("--fraction", type=float, default=0.01)
@@ -250,10 +206,7 @@ def main():
     if source_root == destination_root:
         raise ValueError("Source and destination must be different directories")
     if destination_root.exists() and any(destination_root.iterdir()):
-        raise FileExistsError(
-            f"Destination is not empty: {destination_root}. "
-            "Remove it or choose another destination."
-        )
+        raise FileExistsError(f"Destination is not empty: {destination_root}. Remove it or choose another destination.")
 
     print(f"Source:      {source_root}")
     print(f"Destination: {destination_root}")
@@ -269,10 +222,7 @@ def main():
             split=split,
         )
         actual_fraction = len(selected) / len(records)
-        print(
-            f"[{split}] Selected {len(selected)}/{len(records)} "
-            f"({actual_fraction:.3%}); copying..."
-        )
+        print(f"[{split}] Selected {len(selected)}/{len(records)} ({actual_fraction:.3%}); copying...")
         copy_split(selected, destination_root, split)
         validate_split(destination_root, split, len(selected))
 

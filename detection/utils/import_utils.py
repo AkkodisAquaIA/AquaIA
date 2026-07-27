@@ -26,4 +26,4 @@ except ImportError:
     LastBatchPolicy = None
 
 # Temporary benchmark override: force the PyTorch/PIL data-loading path on VM
-#DALI_AVAILABLE = False
+# DALI_AVAILABLE = False

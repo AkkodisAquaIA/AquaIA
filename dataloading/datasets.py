@@ -336,10 +336,7 @@ class DALIDetectionDataLoader:
                 batch = batch[0]
             labels_batch = batch.pop("labels")
             boxes_batch = batch.pop("boxes")
-            batch["targets"] = [
-                {"labels": labels, "boxes": boxes}
-                for labels, boxes in zip(labels_batch, boxes_batch)
-            ]
+            batch["targets"] = [{"labels": labels, "boxes": boxes} for labels, boxes in zip(labels_batch, boxes_batch)]
             yield batch
 
 
@@ -357,18 +354,9 @@ def parse_batch(batch, device=None):
             boxes = boxes.to(device, non_blocking=True)
         labels_per_image = labels.split(targets["counts"])
         boxes_per_image = boxes.split(targets["counts"])
-        targets = [
-            {"labels": image_labels, "boxes": image_boxes}
-            for image_labels, image_boxes in zip(labels_per_image, boxes_per_image)
-        ]
+        targets = [{"labels": image_labels, "boxes": image_boxes} for image_labels, image_boxes in zip(labels_per_image, boxes_per_image)]
     elif device is not None:
-        targets = [
-            {
-                key: value.to(device, non_blocking=True) if torch.is_tensor(value) else value
-                for key, value in target.items()
-            }
-            for target in targets
-        ]
+        targets = [{key: value.to(device, non_blocking=True) if torch.is_tensor(value) else value for key, value in target.items()} for target in targets]
     return inputs, targets
 
 
