@@ -1,4 +1,4 @@
-# Author : GPT 5.6 Sol High
+# Author : GPT 5.6 Sol High. Exactitude à vérifier!
 # Samples approximately 1% of the images and labels from each dataset split.
 # Keeps image/label pairs matched through their shared file stem.
 # Ensures that 'train', 'val', and 'test' each contain all 80 COCO classes.
