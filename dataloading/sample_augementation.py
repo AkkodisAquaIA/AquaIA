@@ -1,4 +1,6 @@
 # Author : GPT 5.6 Sol High. Exactitude à vérifier!
+# ruff: noqa: E402
+
 # Samples two training images with random seed 42.
 # Reads augmentation settings from detection/train_config.yaml.
 # Applies each supported detection augmentation independently.
