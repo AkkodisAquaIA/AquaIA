@@ -23,6 +23,9 @@ from tools.display_color import DISPLAY_COLORS as colors
 # Initialize colorama
 init(autoreset=True)
 
+display = dc.DisplayColor()
+
+
 #============================================================================
 @dataclass(frozen=True)
 class MenuTheme:
@@ -98,6 +101,7 @@ PATTERN ={
 
 # Menu class
 class Menu :
+
     """
     This class allows creating a menu and managing the input choice based on the selection.
     You can choose the frame format of the menu.
@@ -266,3 +270,29 @@ class Menu :
                         f"Essayez encore! {ct.BELL}"
                     )
                 self.display.print(text, colors['error'])
+
+
+def print_box(text: str, color) -> None:
+    """
+    Prints a text string inside a decorative box.
+
+    The box is created with a width that is determined by the length of the input text,
+    with additional padding on both sides. The box is framed with special characters
+    to enhance its appearance.
+
+    Parameters:
+    text (str): The text to be displayed inside the box.
+
+    """
+    # Determine the width of the box based on the string length
+    box_width = len(text) + 2  # Add padding for the box
+
+    # Create the box
+    tag = display.colored( f"╔{'═' * (box_width)}╗\n" + f"║{text.center(box_width)}║\n" + f"╚{'═' * (box_width)}╝",
+                        colors[color],
+                        pref=False,
+                        bold=True
+                        )  
+       
+    print(tag)       
+

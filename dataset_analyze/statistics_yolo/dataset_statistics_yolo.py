@@ -460,12 +460,10 @@ def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dat
     total_boxes = stats["bounding_boxes"]
     total_classes = len(class_names) if class_names else max(class_distribution.keys()) + 1
 
-    color_print = 'warning' if anomalies else 'ok' 
-
     mode_aff =[
-        mode_affichage,          # Ecran ou Fichier
-        color_print,             # etat_dataset,
-        Path(DATASET_DIR.name)   # non_du_dataset
+        mode_affichage,                     # Ecran ou Fichier
+        'warning' if anomalies else 'ok' ,  # etat_dataset,
+        Path(DATASET_DIR.name)              # non_du_dataset
     ]    
 
     # --- Rapport de défauts de conformité
@@ -474,13 +472,6 @@ def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dat
 
     if mode_affichage == ct.ECRAN :
         syst.clear_screen()
-
-    print()
-    tag = 'avec problèmes' if anomalies else 'sans problème'
-    display.print(f"Analyse statistique terminé {tag}",
-                  colors[color_print]
-                  )
-
     
     # Création et affichage du menu principal 
     choice = 0
@@ -554,4 +545,4 @@ def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dat
             if mode_affichage == ct.FICHIER or util.answer_yes_or_no("Voulez-vous sortir"):
                 break
 
-    return   # anomalies
+    return

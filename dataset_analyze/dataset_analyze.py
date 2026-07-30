@@ -3,8 +3,8 @@ import os
 import re
 import random
 from tqdm import tqdm
-from tools import system as syst
 
+from tools import system as syst
 if syst.est_linux():
     os.environ.setdefault("FIFTYONE_DATABASE_URI", "mongodb://127.0.0.1:27017")
 
@@ -253,9 +253,8 @@ def main():
             ll.splash_screen_circle(logo)
     except FileNotFoundError :
         print()
-        display.print("************************************************", colors['error'])
-        display.print("* Le répertoire 'logo' est introuvable ou vide *", colors['error'])
-        display.print("************************************************", colors['error'])
+        tag = "Le répertoire 'logo' est introuvable ou vide"
+        display.print(tag, colors['warning'])   
 
     tag = display.colored(ct.INFO_PROD,
                         colors['aqua_light'],
@@ -446,6 +445,13 @@ def main():
     print()    
     # --- Calcul statistiques sur le Dataset ---------------------------------------------
     results = statistique(DATASET_DIR, cfg, class_names, path_save, rapport) # type: ignore
+
+    anomalies = results["anomalies"]
+    print()
+    tag = 'avec problèmes' if anomalies else 'sans problème'
+    display.print(f"Analyse statistique terminé {tag}",
+                  colors['warning' if anomalies else 'ok' ]
+                  )
 
 
     #--- Mise à Jour du Rapport de Sortie ------------------------------------------------

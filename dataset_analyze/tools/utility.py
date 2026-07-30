@@ -516,6 +516,7 @@ def draw_bar(value, vmin, vmax, length=50):
     return scale
 
 
+
 def sortie_de_programme():
 
     display = dc.DisplayColor()
