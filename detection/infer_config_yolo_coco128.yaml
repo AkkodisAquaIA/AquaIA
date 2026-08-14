@@ -1,0 +1,18 @@
+run:
+  runs_root: "results/detect/yolo11_n_random"
+  run_dir: null
+
+data:
+  test_data_root: "datasets/coco128"
+  split: "train2017"
+
+inference:
+  batch: 8
+  imgsz: 320
+  conf_thresh: 0.05
+  conf: 0.3
+  num_samples: 20 # 10 
+  seed: 0
+
+output:
+  output_dir: null
