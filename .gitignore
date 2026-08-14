@@ -1,5 +1,9 @@
 # OS / editor
 .DS_Store
+*.docx
+*.txt
+
+.vscode/
 
 # Python
 __pycache__/

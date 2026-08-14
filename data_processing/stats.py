@@ -19,7 +19,6 @@ def _get_sorted_jpg_files(dataset_dir):
         stem = Path(path).stem
         return (0, int(stem)) if stem.isdigit() else (1, stem)
 
-    # For train, val, test subdirs
     jpg_files = []
     sub_dirs = ["train", "val", "test"]
     for sub_dir in sub_dirs:
@@ -27,6 +26,11 @@ def _get_sorted_jpg_files(dataset_dir):
         if os.path.exists(img_dir):
             # Only jpg in img_dir not deeper
             files = [str(p) for p in Path(img_dir).glob("*.jpg")]
+            jpg_files.extend(files)
+    if not jpg_files:
+        images_dir = Path(dataset_dir) / "images"
+        for img_dir in sorted(path for path in images_dir.iterdir() if path.is_dir()):
+            files = [str(p) for p in img_dir.glob("*.jpg")]
             jpg_files.extend(files)
     return sorted(jpg_files, key=_numeric_sort_key)
 
