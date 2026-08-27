@@ -42,7 +42,7 @@ def titre_dataset_centre(
     largeur = ct.DISPLAY_WIDTH
 
     remplissage = (remplissage or ct.TITLE_FILL)[0]
-    dataset = f"{remplissage} {dataset} "
+    dataset = f"├{remplissage} {dataset} "
     titre = f" {titre} "
 
     # Starting position of the centered title

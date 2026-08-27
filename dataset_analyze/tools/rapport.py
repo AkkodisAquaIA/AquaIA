@@ -26,7 +26,7 @@ def titre_rapport(file, texte):
 
 def suivi(texte, rapport, type=""):
 
-    tag = "Commencé" if type == "D" else "Terminé" 
+    tag = "Commencée" if type == "D" else "Terminée " 
     # Récupération de l'heure de la fin de l'analyse
     timestamp = datetime.now().strftime("%Y-%m-%d à %H:%M:%S")
 
@@ -55,7 +55,7 @@ def temps_de_traitement(debut, fin, rapport):
 
     try:
         with open(rapport, "a", encoding="utf-8") as f:
-            f.write(f"  - Durée de l'analyse : {heures:02d}:{minutes:02d}:{secondes:02d}\n")
+            f.write(f"  -  : {heures:02d}:{minutes:02d}:{secondes:02d}\n")
             
     except FileNotFoundError:
             display.print(f"Impossible de sauvegarder : {rapport}", colors['error'])

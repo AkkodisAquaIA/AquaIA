@@ -25,7 +25,7 @@ def taille_bboxes(mode_aff, bbox_areas, cfg):
     counts, edges = np.histogram(bbox_areas, bins=nb_bins)
     y_max = counts.max()
 
-    print(f" - Nombre maximum d'occurrences : {util.format_nombre(y_max)}")
+    print(f"\n - Nombre maximum d'occurrences : {util.format_nombre(y_max)}")
     print()
 
     y_max_affichage = y_max

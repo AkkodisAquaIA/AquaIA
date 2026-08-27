@@ -20,7 +20,8 @@ def info_images_par_classe(mode_aff, data_info_img_cla):
     class_names = data_info_img_cla[1]
 
     display.header_title("(3) Nombres d'images par classe", colors[etat_dataset], nom_dataset) # type: ignore
- 
+    print()
+
     MAX_IMAGES_DISPLAY = 30     # nombre max d'images par classe
     MAX_CLASSES_SELECT = 6      # max classes que l'utilisateur peut demander
 

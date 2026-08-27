@@ -475,9 +475,9 @@ def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dat
     
     # Création et affichage du menu principal 
     choice = 0
-    main_menu = menu_c.Menu('MAIN',             # Nom du menu
-                        style= "double",        # Style du menu 
-                        theme = menu_c.AQUA_IA   # Theme du menu
+    main_menu = menu_c.Menu('MAIN',               # Nom du menu
+                        style= "double",          # Style du menu 
+                        theme = menu_c.AQUA_IA    # Theme du menu
                         )
     
     while True : 

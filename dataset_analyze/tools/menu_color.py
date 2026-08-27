@@ -36,25 +36,25 @@ class MenuTheme:
 
 
 DEFAULT_THEME = MenuTheme(
-    frame=  (250,250,250,""),
-    title=  (255,153, 51,""),
-    number= (255, 16,240,""),
-    text=   (204,204,  0,"")
+    frame=  (250,250,250,""), # Gris 98
+    title=  (255,153, 51,""), # Orange
+    number= (255, 16,240,""), # Violet
+    text=   (204,204,  0,"")  # Jaune
 )
 
 
 AQUA_IA = MenuTheme(
     frame=  (255, 255, 255,""), # Blanc
     title=  (102, 255, 204,""), # Light turquoise   
-    number= ( 51, 102, 255,""), #  Bleu
-    text=   (200,200, 200,"")   # Blanc 
+    number= ( 51, 102, 255,""), # blue
+    text=   (200,200, 200,"")   # Gris 80
 )
 
 DARK_THEME = MenuTheme(
-    frame=  (100,100,100,""),
-    title=  (100,100,100,""),
-    number= (100,100,100,""),
-    text=   (100,100,100,"")
+    frame=  (100,100,100,""), # Gris 40
+    title=  (100,100,100,""), # Gris 40
+    number= (100,100,100,""), # Gris 40
+    text=   (100,100,100,"")   # Gris 40
 )
 
 

@@ -231,8 +231,6 @@ def launch_fifty_one(mode_aff, data_fifty_one):
 
     display.header_title("(7) Lancement de FiftyOne", colors[etat_dataset], nom_dataset) # type: ignore
 
-    # if mode_affichage == ct.ECRAN :
-
     anomalies    = data_fifty_one[0]
     DATASET_DIR  = data_fifty_one[1]
     dataset_yaml = data_fifty_one[2]

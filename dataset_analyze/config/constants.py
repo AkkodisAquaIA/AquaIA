@@ -4,12 +4,12 @@ from os import get_terminal_size
 #==========================================================================================
 # Logo
 INFO_PROD = r"""
-   ┌────────────────────────────────────────────┐
-   │       Agence de l'Eau Adour Garonne        │
-   │            Analyse d'un Dataset            │
-   │                                            │    
-   │                        by AKKODIS-Research │
-   └────────────────────────────────────────────┘
+   ┌────────────────────────────────────┐
+   │    Agence de l'Eau Adour Garonne   │
+   │        Analyse d'un Dataset        │
+   │                                    │
+   │                by AKKODIS-Research │
+   └────────────────────────────────────┘
 """
 
 # Chargement du dataset
