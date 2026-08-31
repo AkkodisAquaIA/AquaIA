@@ -2,7 +2,7 @@
 
 import {
   LayoutDashboard, Search, CheckSquare, Database,
-  Download, Settings, Microscope, Sun, Moon,
+  Download, Settings, Microscope, Sun, Moon, BookOpen,
 } from "lucide-react";
 import { useAppStore } from "@/store/appStore";
 import type { PanelId } from "@/types";
@@ -15,10 +15,17 @@ const NAV_ITEMS: { id: PanelId; label: string; icon: React.ElementType }[] = [
   { id: "dataset",    label: "Dataset Explorer",  icon: Database },
   { id: "export",     label: "Export Center",     icon: Download },
   { id: "settings",   label: "Settings",          icon: Settings },
+  { id: "docs",       label: "Documentation",     icon: BookOpen },
 ];
 
+const READONLY_HIDDEN: PanelId[] = ["search", "validation", "settings"];
+const ALWAYS_VISIBLE: PanelId[] = ["docs"];
+
 export default function Sidebar() {
-  const { activePanel, setActivePanel, theme, toggleTheme } = useAppStore();
+  const { activePanel, setActivePanel, theme, toggleTheme, isReadOnly } = useAppStore();
+  const visibleItems = isReadOnly
+    ? NAV_ITEMS.filter((item) => !READONLY_HIDDEN.includes(item.id) || ALWAYS_VISIBLE.includes(item.id))
+    : NAV_ITEMS;
 
   return (
     <aside
@@ -38,31 +45,30 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+        {visibleItems.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActivePanel(id)}
             className={cn(
-              "flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all duration-150",
+              "flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-all duration-150 border",
               activePanel === id
-                ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                : "border border-transparent"
+                ? "bg-green-500/10 text-green-400 border-green-500/20"
+                : "border-transparent text-[var(--text-dim)] hover:bg-[var(--bg-input)]"
             )}
-            style={activePanel !== id ? { color: "var(--text-dim)" } : undefined}
-            onMouseEnter={(e) => {
-              if (activePanel !== id)
-                (e.currentTarget as HTMLElement).style.background = "var(--bg-input)";
-            }}
-            onMouseLeave={(e) => {
-              if (activePanel !== id)
-                (e.currentTarget as HTMLElement).style.background = "";
-            }}
           >
             <Icon className="w-4 h-4 shrink-0" />
             <span className="font-medium">{label}</span>
           </button>
         ))}
       </nav>
+
+      {/* Read-only notice */}
+      {isReadOnly && (
+        <div className="mx-2 mb-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          <p className="text-[10px] text-amber-400 font-medium">Read-only mode</p>
+          <p className="text-[9px] text-amber-400/70 mt-0.5">Login to edit this workspace</p>
+        </div>
+      )}
 
       {/* Footer — theme toggle */}
       <div

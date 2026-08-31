@@ -14,7 +14,7 @@ class WikimediaConnector(BaseConnector):
     async def search(self, query: str, limit: int = 50) -> list[ImageResult]:
         results: list[ImageResult] = []
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=30, headers={"User-Agent": "AquaIA-ADIAB/1.0 (dataset builder; contact@akkodis.com)"}) as client:
                 params = {
                     "action": "query",
                     "generator": "search",

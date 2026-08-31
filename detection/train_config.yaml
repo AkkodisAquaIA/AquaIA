@@ -80,28 +80,29 @@ training:
   augment: true
 
   # Color jitter in HSV space.
-  hsv_h: 0.015
-  hsv_s: 0.7
-  hsv_v: 0.4
+  hsv_h: 0.005
+  hsv_s: 0.1
+  hsv_v: 0.1
 
   # Geometric transforms.
-  degrees: 10.0
-  translate: 0.10
-  scale: 0.50
-  shear: 2.0
+  degrees: 180.0
+  translate: 0.1
+  scale: 0.2
+  shear: 1.0
   perspective: 0.0005
 
   # Flips.
-  flipud: 0.0
+  flipud: 0.5
   fliplr: 0.5
 
   # Advanced augmentations.
-  mosaic: 0.80
+  #bgr: 0.0
+  mosaic: 0.1
   mixup: 0.05
-  copy_paste: 0.0     # mainly for segmentation, harmless here
+  cutmix: 0.05
 
   # Disable mosaic in the last N epochs to stabilize training.
-  close_mosaic: 40
+  close_mosaic: 20
 
   # ---------- INFERENCE / EVAL-RELATED ----------
   # Confidence threshold for mAP calculation

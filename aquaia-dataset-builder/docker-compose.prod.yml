@@ -13,7 +13,8 @@ services:
     environment:
       - DATABASE_URL=sqlite+aiosqlite:////storage/adiab.db
       - DEBUG=false
-      - CORS_ORIGINS=["*"]
+      - CORS_ORIGINS=["http://20.19.81.220"]
+      - SECRET_KEY=${SECRET_KEY}
     command: >
       uvicorn app.main:app
       --host 0.0.0.0
