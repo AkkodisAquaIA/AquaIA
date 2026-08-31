@@ -21,7 +21,11 @@ training:
   workers: 2
   cache: false
 
+<<<<<<< HEAD
   epochs: 30 # 300
+=======
+  epochs: 10 # 300
+>>>>>>> origin/yolo_dev_op
   patience: 20
   resume: false
 
