@@ -1,7 +1,7 @@
 model:
   family: "yolo11"
   size: "n"
-  init: "pretrained" #"random" 
+  init: "pretrained" # "pretrained" #"random" 
 
 data:
   dataset_yaml: "datasets/coco128"
@@ -21,7 +21,7 @@ training:
   workers: 2
   cache: false
 
-  epochs: 10 # 300
+  epochs: 30 # 300
   patience: 20
   resume: false
 
