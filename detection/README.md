@@ -118,7 +118,9 @@ The Detection part contains the following folders and files.
 ├── data_processing/
 │   ├── coco_custom_split.py      # Splits the 2017 Train into train and test sets.
 │   ├── preprocess_to_npy.py      # Creates npy_images.npy and stats.npy for datasets.py, images normalized to [0,1]. Windows doesn’t support dali package. Obsolete.
-│   └── stats.py                  # Computes mean and std matching the original DALI pipeline  stats.npy.
+│   ├── sample_augementation.py   # Visualizes sample images and bounding boxes before and after applying detection augmentations.
+│   ├── sample_coco_one_percent.py # Creates a reproducible 1% subset of each COCO split while preserving image-label pairs and ensuring coverage of all 80 classes.
+│   └── stats.py                  # Computes mean and std matching the original DALI pipeline --> stats.npy.
 │
 ├── dataloading/
 │   └─ datasets.py                # For dataset loading, JpgDALIDataset, JpgDetectionDataset, DALIDetectionDataLoader.
@@ -143,8 +145,7 @@ The Detection part contains the following folders and files.
 │   │   ├── dino_detector.py      # Combines DINO and DETR to a complet model.
 │   │   ├── loss.py               # Loss for DETR after backbone (class loss modified to FocalLoss).
 │   │   ├── position_encoding.py  # 2D positional encoding for DETR.
-│   │   ├── predict.py            # One function to round image size, one function to infer on a batch of samples (for evaluation or visualization) and return predictions.
-│   │   └── train_config.yaml     # Actual yaml not used.
+│   │   └── predict.py            # One function to round image size, one function to infer on a batch of samples (for evaluation or visualization) and return predictions.
 │   │
 │   ├── logging/
 │   │   ├── __init__.py           # Declares logging package.
@@ -177,13 +178,12 @@ The Detection part contains the following folders and files.
 │   ├── infer.py                  # Initializes test with config, detection/dino/inference/run.py/test_dino or detection/yolo/inference/run.py/test_yolo.
 │   ├── JOURNAL_TRAINING_LOGS.md  # Explication of logging mechanism’s implementation.
 │   ├── list_runs.py              # Reads the training run registry and displays all valid runs in a sorted, color-coded table. python -m detection.list_runs
-│   ├── metric.py                 # Metrics’ update, print, save, calculate funcitons.
+│   ├── metric.py                 # Metrics’ update, print, save, calculate functions.
 │   ├── run_utils.py              # Context and metric tools for inference.
 │   ├── test_training_logs.py     # Test script for the training logs system — no GPU, no dataset, no torch required.
 │   ├── train_config.yaml         # Training config.
 │   ├── train.py                  # Initialize training with config, detection/dino/training/run.py/train_dino or detection/yolo/training/run.py/train_yolo.
 │   └── TRAINING_LOGS.md          # Explication of logging mechanism and how to use.
 │
-├── benchmark_train.py            # Obsolete experiences launcher.
 └── main.py                       # Entry point, train (train.py/train_from_config) or infer (infer.py/infer_from_config).
 ```

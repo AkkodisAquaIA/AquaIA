@@ -47,11 +47,11 @@ training:
 
   # ---------- DATA INPUT / LOADING ----------
   imgsz: 640
-  batch: 30
+  batch: 32
   workers: 0
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 2
+  epochs: 10
   warmup_ratio: 0.05
 
   # ---------- OPTIMIZER & LR ----------
@@ -77,6 +77,7 @@ training:
   # dfl: 1.5            # distribution focal loss gain
 
   # ---------- DATA AUGMENTATION ----------
+  # Only for DINO, set all zero to disable training augmentation for YOLO
   augment: true
 
   # Color jitter in HSV space.
