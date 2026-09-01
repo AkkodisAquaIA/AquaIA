@@ -32,7 +32,7 @@ from ultralytics.data.augment import (
     RandomPerspective,
 )
 
-from dataloading.augmentation import DetectionAugmentation
+from dataloading.det_augmentation import DetectionAugmentation
 from dataloading.datasets import JpgDetectionDataset
 
 
