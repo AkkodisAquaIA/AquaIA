@@ -1,3 +1,4 @@
+# Z: https://github.com/facebookresearch/detr/blob/main/models/detr.py
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
 DETR model and criterion classes.
@@ -11,8 +12,10 @@ from .transformer import Transformer
 """
 Samuel Beaussant : Taken from DETR official repo. Modified and simplified for the current project:
     * Removed support for masks and padding masks for simplicity (operate on square images)
+        Z: remove masks (attention mask for local attention) and padding masks (for padding small images to square)
     * Default dropout is 0 (plain detr removed it completely)
     * Replaced conv2d with linear for better efficiency (backbone already produces patch embeddings)
+        Z: Originally uses ResNet so conv2d, but here DINO
     * Added fp16 for flash attention support
 """
 
@@ -33,10 +36,16 @@ class DETR(nn.Module):
         super().__init__()
         self.num_queries = num_queries
         self.transformer = Transformer(d_model=d_model)  # .to(dtype=dtype)
+        # Z: class head maps decoder-updated object queries to object-class logits; no-object is represented by all-zero focal targets
         self.class_embed = nn.Linear(d_model, num_classes)  # .to(dtype=dtype)
+        # Z: bbox head maps decoder-updated object queries to bbox coord (cx, cy, w, h)
         self.bbox_embed = MLP(d_model, d_model, 4, 3)  # .to(dtype=dtype)
+        # Z: query_embed = initial object queries
+        # Z: n.Embedding() creates a learnable embedding matrix of shape (num_queries, d_model)
         self.query_embed = nn.Embedding(num_queries, d_model)  # .to(dtype=dtype)
+        # Z: input_proj maps backbone output features to the dimension expected by the transformer
         self.input_proj = nn.Linear(num_input_channels, d_model)  # .to(dtype=dtype)
+        # Z: aux_loss = losses (class loss box loss) at each decoder layer when training
         self.aux_loss = aux_loss
 
     def forward(self, features, pos):
@@ -47,6 +56,8 @@ class DETR(nn.Module):
          It returns a dict with the following elements:
             - "pred_logits": the classification logits (including no-object) for all queries.
                              Shape= [batch_size x num_queries x (num_classes)]
+            - Z: "pred_logits": classification logits for object classes only, shape [batch_size, num_queries, num_classes].
+            - Z: Unmatched/no-object queries are trained as all-zero targets in the sigmoid focal loss.
             - "pred_boxes": The normalized boxes coordinates for all queries, represented as
                             (center_x, center_y, height, width). These values are normalized in [0, 1],
                             relative to the size of each individual image (disregarding possible padding).
@@ -55,20 +66,29 @@ class DETR(nn.Module):
                              dictionnaries containing the two above keys for each decoder layer.
         """
 
+        # Z: hs = output hidden states from decoder
+        # Z: query_embed = object queries, only need weights, in transformer.py expanded with batch size
+        # Z: pos_embed = positional encoding
         hs = self.transformer(src=self.input_proj(features), query_embed=self.query_embed.weight, pos_embed=pos)  # [0]
 
+        # Z: Class head output; Linear applies to the last dimension of hs
+        # Z: so it processes all decoder layers, queries, and images at once
         outputs_class = self.class_embed(hs)
+        # Z: bbox head output
         outputs_coord = self.bbox_embed(hs).sigmoid()
+        # Z: only the last layer output
         out = {"pred_logits": outputs_class[-1], "pred_boxes": outputs_coord[-1]}
         if self.aux_loss:
             out["aux_outputs"] = self._set_aux_loss(outputs_class, outputs_coord)
         return out
 
+    # Z: decorator to indicate TorchScript should ignore this method, compatibility issues
     @torch.jit.unused
     def _set_aux_loss(self, outputs_class, outputs_coord):
         # this is a workaround to make torchscript happy, as torchscript
         # doesn't support dictionary with non-homogeneous values, such
         # as a dict having both a Tensor and a list.
+        # Z: results for all decoder layers except the last layer
         return [{"pred_logits": a, "pred_boxes": b} for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
 
 
@@ -78,10 +98,13 @@ class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
         super().__init__()
         self.num_layers = num_layers
+        # Z: a list of hidden layer dimensions
         h = [hidden_dim] * (num_layers - 1)
+        # Z: [input_dim] + h is input dim list, h + [output_dim] is output dim list
         self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
 
     def forward(self, x):
         for i, layer in enumerate(self.layers):
+            # Z: relu for all layers except the last layer
             x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x

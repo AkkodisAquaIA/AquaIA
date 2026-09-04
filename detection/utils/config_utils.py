@@ -4,6 +4,7 @@ import yaml
 
 
 def infer_output_project(config):
+    """Z: infer an output directory path based on config. ex. 'results/task/family_size_init'."""
     task = str(config["training"]["task"]).strip().lower()
     model_config = config["model"]
     family = str(model_config["family"]).strip().lower()
@@ -20,19 +21,26 @@ def infer_output_project(config):
 
 
 def load_train_config(config_path):
+    """Z: load train_config.yaml, complete with output dir in 'output.project', for training."""
+    # Z: return an absolute path
     config_path = Path(config_path).resolve()
+    # Z: load YAML config, transform to a python dict
     with config_path.open("r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     resolved_config = copy.deepcopy(config)
+    # Z: ensure "output" in config, if not, create one with empty dict
     resolved_config.setdefault("output", {})
+    # Z: infer an output dir and save to "project"
     resolved_config["output"]["project"] = infer_output_project(resolved_config)
     return resolved_config
 
 
 def save_resolved_config(path, config, device, use_amp, run_dir):
+    """Z: save training config as YAML with added device, use_amp, run_dir."""
     resolved_config = copy.deepcopy(config)
     resolved_config["training"]["device"] = device
     resolved_config["training"]["amp_enabled"] = use_amp
+    # Z: ex. run_dir: results/detect/dinov3_small_pretrained/20260623_143012
     resolved_config["output"]["run_dir"] = run_dir
 
     with open(path, "w", encoding="utf-8") as f:
@@ -40,12 +48,15 @@ def save_resolved_config(path, config, device, use_amp, run_dir):
 
 
 def load_infer_config(config_path):
+    """Z: load infer_config.yaml."""
     config_path = Path(config_path).resolve()
     with config_path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def find_latest_run_dir(runs_root):
+    """Z: return lastest run_dir with saved best checkpoint."""
+    # Z: gather all dirs (not files) below runs_root
     run_dirs = [path for path in Path(runs_root).iterdir() if path.is_dir()]
     if not run_dirs:
         raise FileNotFoundError(f"No run directories found under {runs_root}")
@@ -56,6 +67,7 @@ def find_latest_run_dir(runs_root):
 
 
 def load_class_names(dataset_path):
+    """Z: read class names and class nb from dataset YAML."""
     dataset_path = Path(dataset_path)
 
     if dataset_path.is_dir():
@@ -77,6 +89,7 @@ def load_class_names(dataset_path):
 
 
 def load_run_config(run_dir):
+    """Z: load a resolved_config.yaml (with added output.project, device, use_amp, run_dir) file, for inference."""
     config_path = run_dir / "resolved_config.yaml"
     if not config_path.exists():
         return None

@@ -1,6 +1,7 @@
 import os
 
 
+# Z: expanduser for expand "~" to the user home directory
 default_dir = os.path.expanduser("~/.cache")
 ROOT_DIR = os.environ.get("AQUAIA_MODEL_ROOT_DIR", default_dir)
 DINOV2_LOCAL_REPO = os.path.join(ROOT_DIR + "/torch/hub", "facebookresearch_dinov2_main")

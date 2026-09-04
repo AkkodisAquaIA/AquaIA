@@ -28,6 +28,7 @@ def main() -> None:
     runs = []
     for line in lines:
         try:
+            # Z: parse json line into python object and append
             runs.append(json.loads(line))
         except json.JSONDecodeError:
             continue

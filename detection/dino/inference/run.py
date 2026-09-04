@@ -14,6 +14,7 @@ from detection.utils.import_utils import DALI_AVAILABLE
 
 
 def load_model(run_dir, backbone_id, img_size, num_classes, device):
+    """Z: load best model weights, initialize model, load weights to model, set to eval mode."""
     checkpoint = torch.load(Path(run_dir) / "weights" / "best.pt", map_location=device)
     model = DINODetector(
         backbone_id=backbone_id,
@@ -27,6 +28,9 @@ def load_model(run_dir, backbone_id, img_size, num_classes, device):
 
 
 def test_dino(config):
+    """Z: Read inference parameters from configuration, load best trained model,
+    create test dataset and dataloader, run prediction and metric evaluation,
+    save inference visualizations and metrics."""
     inference_config = config["inference"]
     run_cfg = config["run"]
     output_cfg = config["output"]
@@ -34,13 +38,17 @@ def test_dino(config):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    # Z: "results/detect/dinov3_small_pretrained/20260709_101500
     run_dir = Path(run_cfg["run_dir"]) if run_cfg.get("run_dir") else find_latest_run_dir(run_cfg["runs_root"])
     run_config = load_run_config(run_dir)
     if run_config is None:
         raise ValueError("resolved_config.yaml is required to run inference.")
 
+    # Z: "datasets/coco_custom_match"
     test_data_root = data_cfg["test_data_root"]
+    # Z: "results/detect/dinov3_small_pretrained/20260709_101500/inference"
     output_root = Path(output_cfg["output_dir"]) if output_cfg.get("output_dir") else run_dir / "inference"
+    # Z: "results/detect/dinov3_small_pretrained/20260709_101500/inference/coco_custom_match_20260709_153000"
     output_dir = output_root / f"{Path(test_data_root).name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
