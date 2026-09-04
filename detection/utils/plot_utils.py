@@ -67,7 +67,7 @@ def _flatten_metrics(entry):
 
 def _group_metrics_by_name(flattened_history):
     """Z: group by metric name, recording which splits each metric appears in.
-    grouped = { "loss": {"train", "val"}, "loss_ce": {"train", "val"}, "map_50": {"map_50"}, ... }. """
+    grouped = { "loss": {"train", "val"}, "loss_ce": {"train", "val"}, "map_50": {"map_50"}, ... }."""
     grouped = {}
     # Z: flattened_history = [ { "train/loss": 1.23, "train/loss_ce": 0.45,...}, { "val/loss": 1.56, "val/loss_ce": 0.52,...}, ... ]
     for entry in flattened_history:
@@ -95,7 +95,7 @@ def _ordered_metric_names(metric_names):
 
 
 def annotate_images_with_predictions(images, predictions, class_names, output_dir, image_files):
-    """Z: Draw model-predicted boxes onto image and save. For training and inference. """
+    """Z: Draw model-predicted boxes onto image and save. For training and inference."""
     images = images.detach().cpu().float()
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -145,7 +145,7 @@ def annotate_images_with_predictions(images, predictions, class_names, output_di
 @torch.no_grad()
 def save_sample_predictions(model, subset, output_dir, predict_fn, num_samples=20, conf=0.3, seed=0, device="cuda"):
     """Z: Sample a subset of images from dataset, run model predictions, and save annotated images.
-    For training and inference. """
+    For training and inference."""
     samples = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
     print(f"Sampled {len(samples['img_paths'])} images from {subset.dataset_root}")
     model.eval()

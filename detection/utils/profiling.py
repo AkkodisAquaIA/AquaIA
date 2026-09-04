@@ -1,4 +1,4 @@
-# Z: PyTorch Profiler is a tool that allows the collection of execution performance 
+# Z: PyTorch Profiler is a tool that allows the collection of execution performance
 # during training and inference
 from torch.profiler import profile, ProfilerActivity, schedule
 

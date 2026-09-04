@@ -30,10 +30,11 @@ class HungarianMatcher(nn.Module):
     there are more predictions than targets. In this case, we do a 1-to-1 matching of the best predictions,
     while the others are un-matched (and thus treated as non-objects).
     """
-    # Z: Original DETR: class cost uses a linear approximation of probability, 
-    # Z: considering only the score of the predicted Query on the target class. 
-    # Z: Current DETR: class cost uses Focal Loss, considering the cost difference 
-    # Z: between the predicted Query being matched as a target versus being treated as background. 
+
+    # Z: Original DETR: class cost uses a linear approximation of probability,
+    # Z: considering only the score of the predicted Query on the target class.
+    # Z: Current DETR: class cost uses Focal Loss, considering the cost difference
+    # Z: between the predicted Query being matched as a target versus being treated as background.
     # Z: L1 and GIoU costs calculate the distance between predicted boxes and all GT boxes.
 
     def __init__(

@@ -3,6 +3,7 @@ import torch.nn as nn
 from .position_encoding import build_position_encoding
 from .DETR import DETR
 from .backbone_id_map import resolve_backbone_id
+
 # Z: torch.nn.attention tool box to control/expand attention mechanisms
 import torch.nn.attention as attn
 

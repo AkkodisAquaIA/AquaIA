@@ -22,6 +22,7 @@ from torchvision.ops.boxes import box_area
 
 # Z: In image referential, x increases to the right, y increases downwards.
 
+
 def box_cxcywh_to_xyxy(x):
     x_c, y_c, w, h = x.unbind(-1)
     b = [(x_c - 0.5 * w), (y_c - 0.5 * h), (x_c + 0.5 * w), (y_c + 0.5 * h)]
@@ -124,7 +125,6 @@ def masks_to_boxes(masks):
 
 
 def delta2bbox(proposals, deltas, max_shape=None, wh_ratio_clip=16 / 1000, clip_border=True, add_ctr_clamp=False, ctr_clamp=32):
-
     """Z: Not used. From dx dy dw dh via gx=pw*dx+px, gy=ph*dy+py, gw=pw*exp(dw), gh=ph*exp(dh) to xyxy.
     proposals = candidate boxes px py pw ph
     deltas = predicted offsets dx dy dw dh

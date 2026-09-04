@@ -263,7 +263,7 @@ def train_dino(config, resume_dir=None):
                 and close_mosaic > 0
                 and not multi_image_augmentations_closed
                 and epoch >= close_mosaic_epoch
-            ):
+            ):  # fmt: skip
                 train_set.close_mosaic()
                 if DALI_AVAILABLE:
                     train_dataloader = DALIDetectionDataLoader(train_set, device="gpu")

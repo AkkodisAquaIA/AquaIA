@@ -195,7 +195,7 @@ class SetCriterion(nn.Module):
         return losses
 
     def _get_src_permutation_idx(self, indices):
-        """Z: returns 
+        """Z: returns
         batch_idx : which image in the batch each matched prediction belongs to.
         src_idx : query index of each matched prediction within its image."""
         # permute predictions following indices
@@ -215,7 +215,7 @@ class SetCriterion(nn.Module):
         return batch_idx, src_idx
 
     def _get_tgt_permutation_idx(self, indices):
-        """Z: returns 
+        """Z: returns
         batch_idx : which image in the batch each matched target belongs to.
         tgt_idx : target index of each matched target within its image."""
         # permute targets following indices

@@ -281,6 +281,7 @@ class JpgDALIDataset(BaseDetectionDataset):
     Train (__call__) with augmentation: PIL decode and CPU augmentation first; normalization will be done in DALI pipeline.
     Direct access (__getitem__): PIL decode, resize, CHW PyTorch tensor (sample["image"]),
     then mean/std normalize (sample["input"])."""
+
     # TODO : only JPEG, need to think about TIFF handling
 
     def __init__(
@@ -377,6 +378,7 @@ class JpgDetectionDataset(BaseDetectionDataset):
     """This class is used for non-DALI situations, where images are loaded and processed using PIL and NumPy.
     One image. JPG bytes, PIL decode, optional augmentation, resize, CHW pytorch tensor (sample["image"]),
     mean/std normalize (sample["input"]). No CPU/CUDA/GPU transfer in this class."""
+
     def __init__(
         self,
         dataset_root: str,
@@ -407,6 +409,7 @@ class JpgDetectionDataset(BaseDetectionDataset):
 
 class DALIDetectionDataLoader:
     """Wrap JpgDALIDataset into a DALI dataloader for training loop as `for batch in loader`"""
+
     def __init__(
         self,
         dataset,

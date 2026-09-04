@@ -2,8 +2,10 @@
 
 # Z: for define DALI data processing pipeline
 from nvidia.dali import pipeline_def
+
 # Z: support operation fct (load, resize, transpose...)
 import nvidia.dali.fn as fn
+
 # Z: some types, enumerations and parameter options for DALI
 import nvidia.dali.types as types
 import os
@@ -17,6 +19,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 def _get_sorted_jpg_files(root_dir):
     """Z: get all jpg files in root_dir/images, sort them by numeric order if possible, otherwise by name."""
+
     def _numeric_sort_key(path):
         stem = Path(path).stem
         return (0, int(stem)) if stem.isdigit() else (1, stem)

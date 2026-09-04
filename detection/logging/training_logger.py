@@ -81,7 +81,7 @@ class TrainingLogger:
 
         model_str = f"{model_cfg.get('family', '')}_{model_cfg.get('size', '')} ({model_cfg.get('init', '')})"
         action = "RESUMED" if resume else "started"
-        # Z: log an INFO level message into train.log + console 
+        # Z: log an INFO level message into train.log + console
         self._logger.info(f"Run {action} — run_id={run_id} | pid={os.getpid()}")
         self._logger.info(f"Run dir: {run_dir}")
         self._logger.info(f"Model: {model_str} | epochs={training_cfg.get('epochs')} | batch={training_cfg.get('batch')} | lr={training_cfg.get('lr0')}")

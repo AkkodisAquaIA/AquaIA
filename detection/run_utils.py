@@ -10,7 +10,7 @@ from detection.utils.config_utils import find_latest_run_dir, load_run_config
 
 def get_run_context(config):
     """Z: gather info from infer_config.yaml, with resolved_config.yaml to build a context dict for inference."""
-	# Z: runs_root, run_dir
+    # Z: runs_root, run_dir
     run_cfg = config["run"]
     # Z: output_dir
     output_cfg = config["output"]

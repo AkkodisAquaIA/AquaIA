@@ -6,8 +6,10 @@ try:
     # commonly used to decode resize normalize images on the GPU
     # reducing the pressure on CPU DataLoader
     import nvidia.dali as dali
+
     # ndd non pipeline style but similar functionnality
     import nvidia.dali.experimental.dynamic as ndd  # noqa: F401
+
     # DALIRaggedIterator: Wrap the output of DALI pipeline into a batch that PyTorch can iterate through
     # LastBatchPolicy: Control how the last batch is handled
     from nvidia.dali.plugin.pytorch import DALIRaggedIterator, LastBatchPolicy  # noqa: F401
@@ -24,7 +26,6 @@ try:
     else:
         DALI_AVAILABLE = True
 except ImportError:
-
     # Define a dummy function to avoid import errors when DALI is not available
     # the decorator pipeline_def will return the function decorated itself
     def pipeline_def(func):

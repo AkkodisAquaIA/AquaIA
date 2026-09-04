@@ -64,6 +64,7 @@ class Transformer(nn.Module):
 
 class TransformerEncoder(nn.Module):
     """Z: stacks encoder layer N times, each with its own parameters."""
+
     def __init__(self, encoder_layer, num_layers):
         super().__init__()
         self.layers = _get_clones(encoder_layer, num_layers)
@@ -83,6 +84,7 @@ class TransformerEncoder(nn.Module):
 class TransformerDecoder(nn.Module):
     """Z: stacks decoder layer N times, each with its own parameters.
     Optionally returns intermediate outputs from each layer."""
+
     def __init__(self, decoder_layer, num_layers, return_intermediate=False):
         super().__init__()
         self.layers = _get_clones(decoder_layer, num_layers)
