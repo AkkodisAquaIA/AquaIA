@@ -123,7 +123,8 @@ The Detection part contains the following folders and files.
 │   └── stats.py                  # Computes mean and std matching the original DALI pipeline --> stats.npy.
 │
 ├── dataloading/
-│   └─ datasets.py                # For dataset loading, JpgDALIDataset, JpgDetectionDataset, DALIDetectionDataLoader.
+│   ├── det_augmentation.py.py    # Builds Ultralytics-based detection augmentations and converts dataset samples to the label format required by those transforms.
+│   └── datasets.py               # For dataset loading, JpgDALIDataset, JpgDetectionDataset, DALIDetectionDataLoader.
 │
 ├── detection/
 │   ├── dino/

@@ -14,6 +14,7 @@ def train(config, resume_dir=None):
 
 
 def train_from_config(config_path, resume_dir=None):
+    """Z: main.py calls this function for training."""
     config = load_train_config(config_path)
     print_train_config(config)
     return train(config, resume_dir=resume_dir)

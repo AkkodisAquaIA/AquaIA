@@ -4,6 +4,7 @@
 model:
   family: "dinov3"
   size : "small"
+  # DINO uses it to create output dir, YOLO uses it to load .pt or .yaml
   init: "pretrained"   # "pretrained" or "random"
 
 # ----------------------------------------------------------------------
@@ -18,9 +19,13 @@ data:
 # ----------------------------------------------------------------------
 output:
   # Root directory for run folders. Each run creates output/{YYYYMMDD_HHMMSS}/.
+  # !Warning! not used, overided by load_train_config()
   project: "runs"
+  # Only for YOLO
   exist_ok: true
+  # Only for YOLO
   save_period: 0
+  # Only for YOLO
   plots: true
 
 # ----------------------------------------------------------------------
@@ -28,10 +33,13 @@ output:
 # ----------------------------------------------------------------------
 logging:
   # Save last.pt + last_training_state.pt every N epochs (0 = only at end).
+  # Only for DINO
   save_period: 5
   # Update the heartbeat file every N batches.
+  # Only for DINO
   heartbeat_every_n_batches: 10
   # Path to the global run registry (one JSON line per run).
+  # Only for DINO
   registry_path: "runs/registry.jsonl"
 
 # ----------------------------------------------------------------------
@@ -39,7 +47,9 @@ logging:
 # ----------------------------------------------------------------------
 training:
   # ---------- CORE TASK / MODE ----------
+  # Both use it to create output dir, YOLO uses it to specify the training task
   task: "detect"
+  # Only for YOLO
   mode: "train"
 
   # ---------- DEVICE ----------
@@ -48,26 +58,38 @@ training:
   # ---------- DATA INPUT / LOADING ----------
   imgsz: 640
   batch: 32
-  workers: 0
+  # Number of PyTorch DataLoader workers used by DINO and YOLO
+  workers: 3
 
   # ---------- TRAINING SCHEDULE ----------
   epochs: 10
+  # If cos_lr, warmup steps = epochs * warmup_ratio 
+  # Only for DINO
   warmup_ratio: 0.05
 
   # ---------- OPTIMIZER & LR ----------
   optimizer: "AdamW"
   lr0: 0.0005
+  # Min lr for cosine scheduler = lrf * lr0
   lrf: 0.05
   cos_lr: true
+  # Weight decay for optimizer
   weight_decay: 0.00005
 
   # ---------- LOSS / MATCHER HYPERPARAMETERS ----------
+  # Weights for class, bbox, giou in matching cost
+  # Only for DINO
   cost_class: 2.0
+  # Only for DINO
   cost_bbox: 5.0
+  # Only for DINO
   cost_giou: 2.0
+  # Only for DINO
   cost_bbox_type: "l1"
+  # Weights for class, bbox, giou in loss
   cls: 4.0
   box: 5.0
+  # Only for DINO
   giou: 2.0
 
   # ---------- LOSS / BOX / CLS HYPERPARAMETERS ----------
@@ -80,38 +102,33 @@ training:
   # Only for DINO, set all zero to disable training augmentation for YOLO
   augment: true
 
-  # Color jitter in HSV space.
   hsv_h: 0.005
   hsv_s: 0.1
   hsv_v: 0.1
-
-  # Geometric transforms.
   degrees: 180.0
   translate: 0.1
   scale: 0.2
-  shear: 1.0
-  perspective: 0.0005
-
-  # Flips.
   flipud: 0.5
   fliplr: 0.5
-
-  # Advanced augmentations.
-  #bgr: 0.0
   mosaic: 0.1
-  mixup: 0.05
   cutmix: 0.05
-
-  # Disable mosaic in the last N epochs to stabilize training.
-  close_mosaic: 20
+  # Disable Mosaic and CutMix in the last N epochs
+  # Values greater than or equal to epochs disable them from the first epoch
+  close_mosaic: 5
 
   # ---------- INFERENCE / EVAL-RELATED ----------
   # Confidence threshold for mAP calculation
   conf_thresh: 0.05
   # Confidence threshold for bbox filtering
+  # DINO uses it to filter training-set visualization predictions
+  # YOLO uses it as the confidence threshold during validation
   conf: 0.3
+  # Only for YOLO
   iou: 0.5
+  # Only for YOLO
   val: true
 
   # ---------- PERFORMANCE / MISC ----------
+  # torch.compile() attempts to optimize the model's forward computation graph
+  # to make training or inference faster
   compile: true

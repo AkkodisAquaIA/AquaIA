@@ -6,6 +6,7 @@ from detection.yolo.inference.run import test_yolo
 
 
 def test(config):
+    # Z: runs_root, run_dir
     run_cfg = config["run"]
     run_dir = Path(run_cfg["run_dir"]) if run_cfg.get("run_dir") else find_latest_run_dir(run_cfg["runs_root"])
     run_config = load_run_config(run_dir)
@@ -22,6 +23,7 @@ def test(config):
 
 
 def test_from_config(config_path):
+    """Z: main.py calls this function for inference."""
     config = load_infer_config(config_path)
     output_dir = test(config)
     return output_dir
