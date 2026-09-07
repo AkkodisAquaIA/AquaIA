@@ -26,15 +26,18 @@ def test_yolo(config, ctx):
         dataset_root=test_data_root,
         data_split=data_cfg.get("split", "test"),
         img_size=normalize_imgsz(config, "inference"),
-        device=device,
     )
     test_loader = DataLoader(test_dataset, batch_size=inference_config["batch"], shuffle=False, num_workers=3, collate_fn=detection_collate_fn)
 
+    num_samples = int(inference_config.get("num_samples", 20))
+    if num_samples <= 0:
+        raise ValueError("inference.num_samples must be greater than 0")
     save_sample_predictions(
         model=model,
         subset=test_dataset,
         predict_fn=predict,
         output_dir=output_dir / "inference_predictions",
+        num_samples=num_samples,
         conf=inference_config.get("conf", 0.3),
         seed=inference_config["seed"],
         device=device,

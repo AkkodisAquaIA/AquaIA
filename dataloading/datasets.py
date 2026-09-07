@@ -29,7 +29,6 @@ class BaseDetectionDataset:
         dataset_root: str,
         data_split: str = "train",
         stats_file: str = "stats.npy",
-        device: str = "cpu",
         img_size: int = 640,
         img_format: str = "jpg",
         augment: bool = False,
@@ -44,7 +43,6 @@ class BaseDetectionDataset:
         self.augment = bool(augment and self.data_split == "train")
         self.load_stats()
         self.class_names, self.num_classes = load_class_names(dataset_root)
-        self.device = device
         self.load_targets()
         # Ultralytics Mosaic samples the full dataset when cache is set to "ram"
         # Images remain loaded on demand; this flag only selects its index-sampling path
@@ -217,7 +215,6 @@ class JpgDetectionDataset(BaseDetectionDataset):
         dataset_root: str,
         img_size: int = 640,
         stats_file: str = "stats.npy",
-        device: str = "cpu",
         data_split: str = "train",
         augment: bool = False,
         augmentation_config=None,
@@ -226,7 +223,6 @@ class JpgDetectionDataset(BaseDetectionDataset):
             dataset_root=dataset_root,
             stats_file=stats_file,
             data_split=data_split,
-            device=device,
             img_size=img_size,
             augment=augment,
             augmentation_config=augmentation_config,

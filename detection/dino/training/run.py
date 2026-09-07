@@ -22,7 +22,6 @@ from detection.logging import TrainingLogger, CheckpointManager, register_run, u
 
 def get_datasets(
     data_yaml_path,
-    device,
     img_size=640,
     augmentation_config=None,
 ):
@@ -32,7 +31,6 @@ def get_datasets(
         dataset_root=data_yaml_path,
         data_split="train",
         img_size=img_size,
-        device=device,
         augment=augmentation_config.get("augment", False),
         augmentation_config=augmentation_config,
     )
@@ -40,7 +38,6 @@ def get_datasets(
         dataset_root=data_yaml_path,
         data_split="val",
         img_size=img_size,
-        device=device,
     )
     num_classes = train_dataset.num_classes
     return train_dataset, val_dataset, num_classes
@@ -85,7 +82,6 @@ def train_dino(config, resume_dir=None):
     imgsz = normalize_imgsz(config, "training")
     train_set, val_set, num_classes = get_datasets(
         config["data"]["dataset_yaml"],
-        device=device,
         img_size=imgsz,
         augmentation_config=training_config,
     )

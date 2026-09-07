@@ -7,27 +7,13 @@ from dataloading.datasets import parse_batch
 from detection.utils.box_ops import box_cxcywh_to_xyxy
 
 # Z: internal names --> display names
-# Z: !Warning! avg not used
 LOSS_DISPLAY_NAMES = {
-    "avg": "loss",
     "loss_ce": "cls",
     "loss_bbox": "bbox",
     "loss_giou": "giou",
     "class_error": "class_err",
     "cardinality_error": "count_err",
 }
-
-# Z: display order for metrics
-# Z: !Warning! not used
-METRIC_ORDER = (
-    "avg",
-    "loss_ce",
-    "loss_bbox",
-    "loss_giou",
-    "class_error",
-    "cardinality_error",
-)
-
 
 def update_metric_dict(log_dict, loss_dict, batch_loss, split, num_batches):
     """Z: accumulate per-batch losses into epoch-average metrics for this split, for training.

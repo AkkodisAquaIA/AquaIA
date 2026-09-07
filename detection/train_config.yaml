@@ -18,9 +18,10 @@ data:
 # Output section: training artifact handling
 # ----------------------------------------------------------------------
 output:
-  # Root directory for run folders. Each run creates output/{YYYYMMDD_HHMMSS}/.
-  # !Warning! not used, overided by load_train_config()
-  project: "runs"
+  # Root directory for run folders. Each run creates project/{YYYYMMDD_HHMMSS}/
+  # null automatically uses results/<task>/<family>_<size>_<init>
+  # Set a path string to override the automatically generated project directory
+  project: null
   # Only for YOLO
   exist_ok: true
   # Only for YOLO
