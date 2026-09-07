@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 import tqdm
 from transformers import get_scheduler
 
-from dataloading.datasets import JpgDALIDataset, DALIDetectionDataLoader, JpgDetectionDataset, parse_batch, detection_collate_fn
+from dataloading.datasets import JpgDetectionDataset, parse_batch, detection_collate_fn
 from detection.dino.dino_detector import DINODetector
 from detection.dino.loss import SetCriterion
 from detection.metric import compute_metrics, print_metrics, update_metric_dict
@@ -17,54 +17,28 @@ from detection.dino.utils.matcher import HungarianMatcher
 from detection.utils.config_utils import save_resolved_config
 from detection.utils.plot_utils import plot_metrics, save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
-from detection.utils.import_utils import DALI_AVAILABLE
 from detection.logging import TrainingLogger, CheckpointManager, register_run, update_run_status
 
 
 def get_datasets(
     data_yaml_path,
-    batch_size,
-    device,
     img_size=640,
     augmentation_config=None,
 ):
-    """Create the training and validation datasets, return train_dataset, val_dataset, num_classes.
-    It chooses different dataset implementations depending on whether the current environment supports DALI."""
+    """Create the training and validation datasets, return train_dataset, val_dataset, num_classes."""
     augmentation_config = augmentation_config or {}
-    # Create datasets from the existing train and val splits
-    if DALI_AVAILABLE:
-        train_dataset = JpgDALIDataset(
-            dataset_root=data_yaml_path,
-            data_split="train",
-            img_size=img_size,
-            batch_size=batch_size,
-            device=device,
-            augment=augmentation_config.get("augment", False),
-            augmentation_config=augmentation_config,
-        )
-        val_dataset = JpgDALIDataset(
-            dataset_root=data_yaml_path,
-            data_split="val",
-            img_size=img_size,
-            batch_size=batch_size,
-            device=device,
-            augment=False,
-        )
-    else:
-        train_dataset = JpgDetectionDataset(
-            dataset_root=data_yaml_path,
-            data_split="train",
-            img_size=img_size,
-            device=device,
-            augment=augmentation_config.get("augment", False),
-            augmentation_config=augmentation_config,
-        )
-        val_dataset = JpgDetectionDataset(
-            dataset_root=data_yaml_path,
-            data_split="val",
-            img_size=img_size,
-            device=device,
-        )
+    train_dataset = JpgDetectionDataset(
+        dataset_root=data_yaml_path,
+        data_split="train",
+        img_size=img_size,
+        augment=augmentation_config.get("augment", False),
+        augmentation_config=augmentation_config,
+    )
+    val_dataset = JpgDetectionDataset(
+        dataset_root=data_yaml_path,
+        data_split="val",
+        img_size=img_size,
+    )
     num_classes = train_dataset.num_classes
     return train_dataset, val_dataset, num_classes
 
@@ -108,8 +82,6 @@ def train_dino(config, resume_dir=None):
     imgsz = normalize_imgsz(config, "training")
     train_set, val_set, num_classes = get_datasets(
         config["data"]["dataset_yaml"],
-        training_config["batch"],
-        device=device,
         img_size=imgsz,
         augmentation_config=training_config,
     )
@@ -121,14 +93,23 @@ def train_dino(config, resume_dir=None):
         multi_image_augmentations_closed = True
 
     # === Setup dataloaders ===
-    if DALI_AVAILABLE:
-        train_dataloader = DALIDetectionDataLoader(train_set, device="gpu")
-        val_dataloader = DALIDetectionDataLoader(val_set, device="gpu")
-    else:
-        num_workers = max(int(training_config.get("workers", 0)), 0)
-        # pin_memory=True + non_blocking=True accelerates data transfer from CPU to GPU
-        train_dataloader = DataLoader(train_set, batch_size=training_config["batch"], shuffle=True, num_workers=num_workers, pin_memory=True, collate_fn=detection_collate_fn)
-        val_dataloader = DataLoader(val_set, batch_size=training_config["batch"], shuffle=False, num_workers=num_workers, collate_fn=detection_collate_fn)
+    num_workers = max(int(training_config.get("workers", 0)), 0)
+    # pin_memory=True + non_blocking=True accelerates data transfer from CPU to GPU
+    train_dataloader = DataLoader(
+        train_set,
+        batch_size=training_config["batch"],
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True,
+        collate_fn=detection_collate_fn,
+    )
+    val_dataloader = DataLoader(
+        val_set,
+        batch_size=training_config["batch"],
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=detection_collate_fn,
+    )
 
     # === Run directory ===
     if resume_dir:
@@ -265,8 +246,6 @@ def train_dino(config, resume_dir=None):
                 and epoch >= close_mosaic_epoch
             ):  # fmt: skip
                 train_set.close_mosaic()
-                if DALI_AVAILABLE:
-                    train_dataloader = DALIDetectionDataLoader(train_set, device="gpu")
                 multi_image_augmentations_closed = True
                 logger.info("[AUGMENTATION] Mosaic and CutMix disabled")
 
@@ -290,25 +269,15 @@ def train_dino(config, resume_dir=None):
                 with torch.set_grad_enabled(training):
                     # START for batch loop
                     for batch_idx, batch in enumerate(progress):
-                        # before parse_batch():
-                        # non-DALI batch = {
-                        #     "images": Tensor[B, 3, H, W],
+                        # Before parse_batch(), batch = {
                         #     "inputs": Tensor[B, 3, H, W],
                         #     "targets": {"labels": Tensor[N], "boxes": Tensor[N, 4], "counts": list[int]},
-                        #     "targets_idx": list[int],
                         #     "img_paths": list[str],
-                        # }
-                        # DALI batch = {
-                        #     "inputs": Tensor[B, 3, H, W],
-                        #     "targets": list[{"labels": Tensor[N_i], "boxes": Tensor[N_i, 4]}],
-                        #     "targets_idx": Tensor,
                         # }
                         inputs, targets = parse_batch(batch, device=device)
                         # After parse_batch(), targets is a per-image list of dictionaries
-                        # Non-DALI inputs are still on CPU and must be moved to the training device
-
-                        if not DALI_AVAILABLE:
-                            inputs = inputs.to(device, non_blocking=True)
+                        # inputs are still on CPU and must be moved to the training device
+                        inputs = inputs.to(device, non_blocking=True)
 
                         with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
                             # outputs = { "pred_logits": tensor(...), "pred_boxes": tensor(...), }
@@ -398,8 +367,6 @@ def train_dino(config, resume_dir=None):
 
     if train_set.augment:
         train_set.disable_augmentation()
-        if DALI_AVAILABLE:
-            train_dataloader = DALIDetectionDataLoader(train_set, device="gpu")
 
     save_resolved_config(
         path=os.path.join(run_dir, "resolved_config.yaml"),

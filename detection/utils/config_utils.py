@@ -30,8 +30,9 @@ def load_train_config(config_path):
     resolved_config = copy.deepcopy(config)
     # Z: ensure "output" in config, if not, create one with empty dict
     resolved_config.setdefault("output", {})
-    # Z: infer an output dir and save to "project"
-    resolved_config["output"]["project"] = infer_output_project(resolved_config)
+    # Z: infer an output dir only when "project" is not explicitly configured
+    if not resolved_config["output"].get("project"):
+        resolved_config["output"]["project"] = infer_output_project(resolved_config)
     return resolved_config
 
 

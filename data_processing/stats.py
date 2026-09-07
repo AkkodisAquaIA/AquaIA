@@ -1,7 +1,7 @@
-# Computes mean and std matching the original DALI pipeline.
+# Computes dataset channel mean and standard deviation for the PyTorch image pipeline.
 # Streamlines 1 image at a time to prevent OOM (no batch_size).
 # Aggregates 'train', 'val', and 'test' under 'images'.
-# Matches DALI RGB, Bilinear resize, (C, H, W), and 1/255.0 scaling.
+# Uses RGB, bilinear resize, (C, H, W), and 1/255.0 scaling.
 # Saves 'stats.npy' in the <dataset_name> folder.
 
 import os
@@ -51,7 +51,7 @@ def compute_and_save_stats(dataset_name="coco_custom_match", image_size=640):
         try:
             # Read image, transform to RGB, resize and normalize
             with Image.open(file_path).convert("RGB") as img:
-                # Image.BILINEAR similar to DALI's TRIANGULAR filter
+                # Use bilinear interpolation while computing dataset statistics
                 img_resized = img.resize((image_size, image_size), Image.BILINEAR)
                 # Convert to numpy array (H, W, C) and normalize to [0, 1]
                 arr = np.array(img_resized, dtype=np.float32) / 255.0
