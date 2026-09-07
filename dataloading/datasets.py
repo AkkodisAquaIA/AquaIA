@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import List
 from dataloading.det_augmentation import DetectionAugmentation, build_ultralytics_labels
 from PIL import Image
 
@@ -15,7 +14,11 @@ from detection.utils.config_utils import load_class_names
 
 class BaseDetectionDataset:
     """
-    Base class for detection datasets. It handles dataset metadata and target loading:
+    Load and process detection images using PIL, NumPy, and PyTorch.
+    One image. Image bytes, PIL decode, optional augmentation, resize, CHW pytorch tensor (sample["image"]),
+    mean/std normalize (sample["input"]). No CPU/CUDA transfer in this class.
+
+    It handles dataset metadata and target loading:
     - loads normalization statistics from stats.npy and scales them from [0, 1] to [0, 255] pixel units
     - loads class names and number of classes
     - builds a sorted list of label files
@@ -27,12 +30,12 @@ class BaseDetectionDataset:
     def __init__(
         self,
         dataset_root: str,
-        data_split: str = "train",
-        stats_file: str = "stats.npy",
         img_size: int = 640,
-        img_format: str = "jpg",
+        stats_file: str = "stats.npy",
+        data_split: str = "train",
         augment: bool = False,
         augmentation_config=None,
+        img_format: str = "jpg",
     ):
         self.dataset_root = Path(dataset_root)
         self.data_split = data_split
@@ -57,13 +60,13 @@ class BaseDetectionDataset:
             else None
         )
 
-    def __len__(self):
+    def __len__(self) -> int:
         # self.target_files apprears after load_targets() is called
         return len(self.target_files)
 
     def load_stats(self) -> None:
         """Load dataset mean/std statistics and scale them from [0, 1] to [0, 255]
-        for normalization of decoded JPG pixels."""
+        for normalization of decoded RGB pixels."""
         stats_path = self.dataset_root / self.stats_file
         if stats_path.exists():
             # allow_pickle=True allows loading Python objects like dict, .npy file may be a dict
@@ -75,6 +78,9 @@ class BaseDetectionDataset:
             }
         else:
             raise FileNotFoundError(f"Stats file not found: {stats_path}")
+        # Transform mean and std to torch tensors and reshape to [C, 1, 1] for broadcasting
+        self.mean = torch.from_numpy(self.stats["mean"]).to(dtype=torch.float32).view(-1, 1, 1)
+        self.std = torch.from_numpy(self.stats["std"]).to(dtype=torch.float32).view(-1, 1, 1)
 
     @staticmethod
     # Static method don't need class param
@@ -86,10 +92,9 @@ class BaseDetectionDataset:
         stem = path.stem
         return (0, int(stem)) if stem.isdigit() else (1, stem)
 
-    def get_sorted_target_files(self) -> List[str]:
+    def get_sorted_target_files(self) -> list[Path]:
         target_dir = self.dataset_root / "labels" / self.data_split
-        target_files = [path for path in target_dir.glob("*.txt")]
-        return sorted(target_files, key=self._numeric_sort_key)
+        return sorted(target_dir.glob("*.txt"), key=self._numeric_sort_key)
 
     def parse_target_line(self, line: str):
         class_id, x_center, y_center, width, height = line.split()
@@ -108,7 +113,6 @@ class BaseDetectionDataset:
                     class_id, bbox = self.parse_target_line(line)
                     labels.append(class_id)
                     boxes.append(bbox)
-        # TODO : clean up, dict struct is not longer necessary
         return {
             "labels": torch.tensor(labels, dtype=torch.int64),
             "boxes": torch.tensor(boxes, dtype=torch.float32).reshape(-1, 4),
@@ -170,18 +174,16 @@ class BaseDetectionDataset:
                 img = torch.from_numpy(np.asarray(image, dtype=np.uint8).copy()).permute(2, 0, 1)
             # Clone labels and boxes to avoid modifying cached source targets
             target = self.copy_target(idx)
-        # target: {"label":..., "boxes":...}
+        # target: {"labels":..., "boxes":...}
         return img, target, img_path
 
     def normalize_img(self, img: torch.Tensor) -> torch.Tensor:
         """Mean/std normalize image tensor."""
-        # Transform mean and std to torch tensors and reshape to [C, 1, 1] for broadcasting
-        mean = torch.from_numpy(self.stats["mean"]).to(dtype=img.dtype).view(-1, 1, 1)
-        std = torch.from_numpy(self.stats["std"]).to(dtype=img.dtype).view(-1, 1, 1)
-        return (img - mean) / std
+        return (img - self.mean) / self.std
 
-    def build_sample(self, idx: int):
-        """Build one sample dictionary for the PyTorch DataLoader."""
+    def __getitem__(self, idx: int):
+        """Build one sample dictionary for the PyTorch DataLoader.
+        Load one sample and return image, input, target and image path."""
         img, target, img_path = self.load_sample(idx)
         # sample["image"] is float CHW for visualization; sample["input"] is mean/std normalized
         img = img.float()
@@ -190,7 +192,6 @@ class BaseDetectionDataset:
             "image": img,
             "input": norm_img,
             "target": target,
-            "target_idx": idx,
             "img_path": str(img_path),
         }
 
@@ -206,34 +207,7 @@ class BaseDetectionDataset:
 
 
 class JpgDetectionDataset(BaseDetectionDataset):
-    """Load and process detection images using PIL, NumPy, and PyTorch.
-    One image. JPG bytes, PIL decode, optional augmentation, resize, CHW pytorch tensor (sample["image"]),
-    mean/std normalize (sample["input"]). No CPU/CUDA transfer in this class."""
-
-    def __init__(
-        self,
-        dataset_root: str,
-        img_size: int = 640,
-        stats_file: str = "stats.npy",
-        data_split: str = "train",
-        augment: bool = False,
-        augmentation_config=None,
-    ):
-        super().__init__(
-            dataset_root=dataset_root,
-            stats_file=stats_file,
-            data_split=data_split,
-            img_size=img_size,
-            augment=augment,
-            augmentation_config=augmentation_config,
-        )
-
-    def __len__(self) -> int:
-        return len(self.target_files)
-
-    def __getitem__(self, idx: int):
-        """Load one sample and return image, input, target, target index and image path."""
-        return self.build_sample(idx)
+    """JPG dataset using the base class's default image format and loading pipeline."""
 
 
 def parse_batch(batch, device=None):
@@ -270,9 +244,8 @@ def detection_collate_fn(batch):
     """Stack single sample into batch. No CPU/CUDA transfer."""
     # Nb targets per image may vary, later use target_counts to re-split concatenated labels and boxes.
     target_counts = [len(item["target"]["labels"]) for item in batch]
-    collated_batch = {
+    return {
         # [B, 3, H, W]
-        "images": torch.stack([item["image"] for item in batch], dim=0),
         "inputs": torch.stack([item["input"] for item in batch], dim=0),
         "targets": {
             # Concatenate the class labels of all images in the batch into a 1D tensor, [Nb targets of the batch]
@@ -282,12 +255,9 @@ def detection_collate_fn(batch):
             # List of nb targets per image, [B]
             "counts": target_counts,
         },
-        # [indices]
-        "targets_idx": [item["target_idx"] for item in batch],
         # [paths]
         "img_paths": [item["img_path"] for item in batch],
     }
-    return collated_batch
 
 
 def sample_dataset(dataset, num_samples, seed, device):
@@ -308,6 +278,6 @@ def sample_dataset(dataset, num_samples, seed, device):
 Output information
 ==================
 
-JpgDetectionDataset.__getitem__ -> image, input, target (labels, boxes), target_idx, img_path
-detection_collate_fn -> images, inputs, targets (labels, boxes, counts), targets_idx, img_paths in batch
+JpgDetectionDataset.__getitem__ -> image, input, target (labels, boxes), img_path
+detection_collate_fn -> inputs, targets (labels, boxes, counts), img_paths in batch
 """

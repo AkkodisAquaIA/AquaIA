@@ -270,10 +270,8 @@ def train_dino(config, resume_dir=None):
                     # START for batch loop
                     for batch_idx, batch in enumerate(progress):
                         # Before parse_batch(), batch = {
-                        #     "images": Tensor[B, 3, H, W],
                         #     "inputs": Tensor[B, 3, H, W],
                         #     "targets": {"labels": Tensor[N], "boxes": Tensor[N, 4], "counts": list[int]},
-                        #     "targets_idx": list[int],
                         #     "img_paths": list[str],
                         # }
                         inputs, targets = parse_batch(batch, device=device)
