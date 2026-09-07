@@ -10,10 +10,10 @@ In this repository, the detection module covers the top-level `main.py` and `ben
 
 | Backend | Training | Inference | Resume training | Data loading |
 |---|---:|---:|---:|---|
-| DINOv2 / DINOv3 + DETR | Yes | Yes | Yes | PIL or NVIDIA DALI |
+| DINOv2 / DINOv3 + DETR | Yes | Yes | Yes | PIL + PyTorch DataLoader |
 | Ultralytics YOLO | Yes | Yes | No | Ultralytics for training / PIL for inference |
 
-The DINO pipeline supports `small`, `base`, and `large` DINOv2 backbones, and `small`, `plus`, `base`, and `large` DINOv3 backbones. NVIDIA DALI is optional; the DINO pipeline falls back to the PIL-based loader when DALI is unavailable.
+The DINO pipeline supports `small`, `base`, and `large` DINOv2 backbones, and `small`, `plus`, `base`, and `large` DINOv3 backbones.
 
 ## Dataset format
 
@@ -117,14 +117,13 @@ The Detection part contains the following folders and files.
 ```text
 ├── data_processing/
 │   ├── coco_custom_split.py      # Splits the 2017 Train into train and test sets.
-│   ├── preprocess_to_npy.py      # Creates npy_images.npy and stats.npy for datasets.py, images normalized to [0,1]. Windows doesn’t support dali package. Obsolete.
 │   ├── sample_augementation.py   # Visualizes sample images and bounding boxes before and after applying detection augmentations.
 │   ├── sample_coco_one_percent.py # Creates a reproducible 1% subset of each COCO split while preserving image-label pairs and ensuring coverage of all 80 classes.
-│   └── stats.py                  # Computes mean and std matching the original DALI pipeline --> stats.npy.
+│   └── stats.py                  # Computes image channel mean and standard deviation --> stats.npy.
 │
 ├── dataloading/
 │   ├── det_augmentation.py.py    # Builds Ultralytics-based detection augmentations and converts dataset samples to the label format required by those transforms.
-│   └── datasets.py               # For dataset loading, JpgDALIDataset, JpgDetectionDataset, DALIDetectionDataLoader.
+│   └── datasets.py               # Detection dataset, batch collation, and batch parsing helpers.
 │
 ├── detection/
 │   ├── dino/
@@ -157,7 +156,6 @@ The Detection part contains the following folders and files.
 │   ├── utils/
 │   │   ├── box_ops.py            # Bbox operations.
 │   │   ├── config_utils.py       # Functions for saving model params and various states for training resume.
-│   │   ├── import_utils.py       # Centralizes DALI imports, determines whether DALI can be used in current env.
 │   │   ├── plot_utils.py         # Functions to annotate images, save some visualizations and plot metric curves.
 │   │   └── profiling.py          # A pytorch profiler factory function, for execution performance monitoring.
 │   │

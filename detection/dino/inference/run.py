@@ -3,14 +3,13 @@ from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
-from dataloading.datasets import JpgDALIDataset, DALIDetectionDataLoader, JpgDetectionDataset, detection_collate_fn
+from dataloading.datasets import JpgDetectionDataset, detection_collate_fn
 
 from detection.dino.dino_detector import DINODetector
 from detection.metric import compute_metrics, save_metrics
 from detection.utils.config_utils import find_latest_run_dir, load_run_config, load_class_names
 from detection.utils.plot_utils import save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
-from detection.utils.import_utils import DALI_AVAILABLE
 
 
 def load_model(run_dir, backbone_id, img_size, num_classes, device):
@@ -62,23 +61,19 @@ def test_dino(config):
     )
     imgsz = normalize_imgsz(config, "inference")
     data_split = data_cfg.get("split", "test")
-    if DALI_AVAILABLE:
-        test_dataset = JpgDALIDataset(
-            dataset_root=test_data_root,
-            data_split=data_split,
-            img_size=imgsz,
-            batch_size=inference_config["batch"],
-            device=device,
-        )
-        test_loader = DALIDetectionDataLoader(test_dataset, device="gpu")
-    else:
-        test_dataset = JpgDetectionDataset(
-            dataset_root=test_data_root,
-            data_split=data_split,
-            img_size=imgsz,
-            device=device,
-        )
-        test_loader = DataLoader(test_dataset, batch_size=inference_config["batch"], shuffle=False, num_workers=3, collate_fn=detection_collate_fn)
+    test_dataset = JpgDetectionDataset(
+        dataset_root=test_data_root,
+        data_split=data_split,
+        img_size=imgsz,
+        device=device,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=inference_config["batch"],
+        shuffle=False,
+        num_workers=3,
+        collate_fn=detection_collate_fn,
+    )
     save_sample_predictions(
         model=model,
         subset=test_dataset,

@@ -57,12 +57,12 @@ training:
 
   # ---------- DATA INPUT / LOADING ----------
   imgsz: 640
-  batch: 32
+  batch: 30
   # Number of PyTorch DataLoader workers used by DINO and YOLO
   workers: 3
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 10
+  epochs: 100
   # If cos_lr, warmup steps = epochs * warmup_ratio 
   # Only for DINO
   warmup_ratio: 0.05
@@ -114,7 +114,7 @@ training:
   cutmix: 0.05
   # Disable Mosaic and CutMix in the last N epochs
   # Values greater than or equal to epochs disable them from the first epoch
-  close_mosaic: 5
+  close_mosaic: 40
 
   # ---------- INFERENCE / EVAL-RELATED ----------
   # Confidence threshold for mAP calculation
