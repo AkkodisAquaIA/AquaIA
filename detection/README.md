@@ -178,7 +178,7 @@ The Detection part contains the following folders and files.
 │   ├── JOURNAL_TRAINING_LOGS.md  # Explication of logging mechanism’s implementation.
 │   ├── list_runs.py              # Reads the training run registry and displays all valid runs in a sorted, color-coded table. python -m detection.list_runs
 │   ├── metric.py                 # Metrics’ update, print, save, calculate functions.
-│   ├── run_utils.py              # Context and metric tools for inference.
+│   ├── inference_context.py      # Shared run context and header tools for inference.
 │   ├── test_training_logs.py     # Test script for the training logs system — no GPU, no dataset, no torch required.
 │   ├── train_config.yaml         # Training config.
 │   ├── train.py                  # Initialize training with config, detection/dino/training/run.py/train_dino or detection/yolo/training/run.py/train_yolo.

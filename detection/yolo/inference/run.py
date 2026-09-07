@@ -1,12 +1,7 @@
-from datetime import datetime
 from pathlib import Path
-
 from torch.utils.data import DataLoader
 from ultralytics import YOLO
-import torch
-
 from dataloading.datasets import JpgDetectionDataset, detection_collate_fn
-from detection.utils.config_utils import find_latest_run_dir, load_run_config
 from detection.metric import compute_metrics, save_metrics
 from detection.utils.plot_utils import save_sample_predictions
 from detection.yolo.predict import predict, normalize_imgsz
@@ -16,23 +11,15 @@ def load_model(run_dir, device):
     return YOLO(str(Path(run_dir) / "weights" / "best.pt")).to(device)
 
 
-def test_yolo(config):
+def test_yolo(config, ctx):
+    # config from infer_config.yaml, ctx derived from resolved_config.yaml
     inference_config = dict(config["inference"])
-    run_cfg = config["run"]
-    output_cfg = config["output"]
     data_cfg = config["data"]
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    run_dir = Path(run_cfg["run_dir"]) if run_cfg.get("run_dir") else find_latest_run_dir(run_cfg["runs_root"])
-    run_config = load_run_config(run_dir)
-    if run_config is None:
-        raise ValueError("resolved_config.yaml is required to run inference.")
-
-    test_data_root = str(Path(data_cfg["test_data_root"]))
-    output_root = Path(output_cfg["output_dir"]) if output_cfg.get("output_dir") else run_dir / "inference"
-    output_dir = output_root / f"{Path(test_data_root).name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    device = ctx["device"]
+    run_dir = ctx["run_dir"]
+    test_data_root = ctx["test_data_root"]
+    output_dir = ctx["output_dir"]
 
     model = load_model(run_dir, device)
     test_dataset = JpgDetectionDataset(
