@@ -15,6 +15,7 @@ LOSS_DISPLAY_NAMES = {
     "cardinality_error": "count_err",
 }
 
+
 def update_metric_dict(log_dict, loss_dict, batch_loss, split, num_batches):
     """Z: accumulate per-batch losses into epoch-average metrics for this split, for training.
     Args:
