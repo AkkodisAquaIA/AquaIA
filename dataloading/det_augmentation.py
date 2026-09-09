@@ -16,9 +16,8 @@ from ultralytics.utils.instance import Instances
 
 
 class DetectionAugmentation:
-    """Ultralytics detection augmentations adapted to the AquaIA dataset format.
-    Supports hsv, degrees, translate, scale, flipud, fliplr, mosaic, cutmix.
-    Augmentations like shear, perspective, bgr, mixup are discussed to be not useful."""
+    """Supports hsv, degrees, translate, scale, flipud, fliplr, mosaic, cutmix.
+    Augmentations like shear, perspective, bgr, mixup are discussed to be ignored."""
 
     def __init__(self, dataset, img_size, config):
         # dataset is an instance of BaseDetectionDataset
@@ -107,7 +106,7 @@ class DetectionAugmentation:
             self.transforms = self._build_transforms()
 
 
-def build_ultralytics_labels(img, labels, boxes, img_path):
+def build_ultralytics_labels(img, classes, boxes, img_path):
     """Build the label dictionary expected by Ultralytics detection transforms."""
     height, width = img.shape[:2]
     # Placeholder
@@ -120,7 +119,7 @@ def build_ultralytics_labels(img, labels, boxes, img_path):
     )
     return {
         "img": img,
-        "cls": labels.astype(np.float32, copy=True).reshape(-1, 1),
+        "cls": classes.astype(np.float32, copy=True).reshape(-1, 1),
         "instances": instances,
         "im_file": str(img_path),
         "ori_shape": (height, width),

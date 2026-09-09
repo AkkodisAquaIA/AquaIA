@@ -119,7 +119,7 @@ The Detection part contains the following folders and files.
 │   ├── coco_custom_split.py      # Splits the 2017 Train into train and test sets.
 │   ├── sample_augementation.py   # Visualizes sample images and bounding boxes before and after applying detection augmentations.
 │   ├── sample_coco_one_percent.py # Creates a reproducible 1% subset of each COCO split while preserving image-label pairs and ensuring coverage of all 80 classes.
-│   └── stats.py                  # Computes image channel mean and standard deviation --> stats.npy.
+│   └── stats.py                  # Computes image channel mean and standard deviation --> stats_<image_size>.npy.
 │
 ├── dataloading/
 │   ├── det_augmentation.py.py    # Builds Ultralytics-based detection augmentations and converts dataset samples to the label format required by those transforms.
