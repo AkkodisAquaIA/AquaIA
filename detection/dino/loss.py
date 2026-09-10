@@ -98,7 +98,7 @@ class SetCriterion(nn.Module):
             device=src_logits.device,
         )  # (B, N)
 
-        # Z:fill matched positions with their corresponding GT class labels
+        # Z: fill matched positions with their corresponding GT class labels
         # Z: shape [batch_size, num_queries]
         target_classes[idx] = target_classes_o
 
@@ -170,8 +170,6 @@ class SetCriterion(nn.Module):
         target_boxes = torch.cat([t["boxes"][i] for t, (_, i) in zip(targets, indices)], dim=0)
 
         if self.loss_bbox_type == "l1":
-            # print(src_boxes.shape)
-            # print(target_boxes.shape)
             loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction="none")
         elif self.loss_bbox_type == "reparam":
             src_deltas = outputs["pred_deltas"][idx]

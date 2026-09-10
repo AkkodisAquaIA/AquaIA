@@ -84,13 +84,13 @@ class HungarianMatcher(nn.Module):
 
             # We flatten to compute the cost matrices in a batch
             # Z: get pred prob and bbox coords via fusion of dim 0 and 1
-            out_prob = outputs["pred_logits"].flatten(0, 1).sigmoid()  # B*N, Nc
-            out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
+            out_prob = outputs["pred_logits"].flatten(0, 1).sigmoid()  # Z: [batch_size * num_queries, num_classes]
+            out_bbox = outputs["pred_boxes"].flatten(0, 1)  # Z: [batch_size * num_queries, 4]
 
             # Also concat the target labels and boxes
             # Z: get GT labels (number) and bbox coords
-            tgt_ids = torch.cat([v["labels"] for v in targets])
-            tgt_bbox = torch.cat([v["boxes"] for v in targets])
+            tgt_ids = torch.cat([v["labels"] for v in targets]) # Z: [nb GT boxes]
+            tgt_bbox = torch.cat([v["boxes"] for v in targets]) # Z: [nb GT boxes, 4]
 
             # Compute the classification cost.
             alpha = 0.25
@@ -101,12 +101,12 @@ class HungarianMatcher(nn.Module):
             pos_cost_class = alpha * ((1 - out_prob) ** gamma) * (-(out_prob + 1e-8).log())
             # Z: How much does the cost increase if this prediction is assigned
             # Z: to this target (positive) versus being unassigned (as a negative)
-            cost_class = pos_cost_class[:, tgt_ids] - neg_cost_class[:, tgt_ids]
+            cost_class = pos_cost_class[:, tgt_ids] - neg_cost_class[:, tgt_ids]    # Z: [batch_size * num_queries, nb GT boxes]
 
             # Compute the L1 cost between boxes
             if self.cost_bbox_type == "l1":
-                cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
-            # Z: !Warning! reparam not fonctional
+                cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)    # Z: [batch_size * num_queries, nb GT boxes] 
+            # Z: !Warning! reparam is not functional because model does not output pred_deltas or pred_boxes_old
             elif self.cost_bbox_type == "reparam":
                 # Z: get pred dx dy dw dh
                 out_delta = outputs["pred_deltas"].flatten(0, 1)
@@ -122,19 +122,15 @@ class HungarianMatcher(nn.Module):
 
             # Compute the giou cost betwen boxes
             # Z: negative -> 2 bboxes match -> GIoU high -> cost low
+            # Z: [batch_size * num_queries, nb GT boxes]
             cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
 
             # Final cost matrix
             C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
             # Z: reshape C to [batch_size, num_queries, sum of GT boxes in batch]
             C = C.view(bs, num_queries, -1).cpu()
-            # print(C.shape)
-
             # Z: count how many GT boxses there are for each image in the current batch, ex. [2,3]
             sizes = [len(v["boxes"]) for v in targets]
-            # print(sizes)
-            # print(C.split(sizes, dim=-1)[0].shape)
-            # print(len(C.split(sizes, -1)))
             # Z: split C by last dim according to sizes, c of shape [batch_size, num_queries, num_target_boxes_i] for each image in the batch
             # Z: c[i] get the cost matrix for the i-th image in the batch, of shape [num_queries, num_target_boxes_i]
             indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]

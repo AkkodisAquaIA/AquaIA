@@ -1,7 +1,7 @@
 # Z: https://github.com/facebookresearch/detr/blob/main/models/detr.py
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
-DETR model and criterion classes.
+DETR model and class.
 """
 
 import torch
@@ -11,12 +11,12 @@ from .transformer import Transformer
 
 """
 Samuel Beaussant : Taken from DETR official repo. Modified and simplified for the current project:
-    * Removed support for masks and padding masks for simplicity (operate on square images)
+    * Remove support for masks and padding masks for simplicity (operate on square images)
         Z: remove masks (attention mask for local attention) and padding masks (for padding small images to square)
     * Default dropout is 0 (plain detr removed it completely)
-    * Replaced conv2d with linear for better efficiency (backbone already produces patch embeddings)
+    * Replace conv2d with linear for better efficiency (backbone already produces patch embeddings)
         Z: Originally uses ResNet so conv2d, but here DINO
-    * Added fp16 for flash attention support
+    * Add fp16 for flash attention support
 """
 
 
@@ -26,8 +26,6 @@ class DETR(nn.Module):
     def __init__(self, num_input_channels, num_classes, num_queries, d_model=256, aux_loss=False):
         """Initializes the model.
         Parameters:
-            backbone: torch module of the backbone to be used. See backbone.py
-            transformer: torch module of the transformer architecture. See transformer.py
             num_classes: number of object classes
             num_queries: number of object queries, ie detection slot. This is the maximal number of objects
                          DETR can detect in a single image. For COCO, we recommend 100 queries.
@@ -49,19 +47,14 @@ class DETR(nn.Module):
         self.aux_loss = aux_loss
 
     def forward(self, features, pos):
-        """The forward expects a NestedTensor, which consists of:
-        - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
-        - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
-
-         It returns a dict with the following elements:
-            - "pred_logits": the classification logits (including no-object) for all queries.
+        """Returns a dict with the following elements:
+            - "pred_logits": the classification logits for all queries.
                              Shape= [batch_size x num_queries x (num_classes)]
             - Z: "pred_logits": classification logits for object classes only, shape [batch_size, num_queries, num_classes].
             - Z: Unmatched/no-object queries are trained as all-zero targets in the sigmoid focal loss.
             - "pred_boxes": The normalized boxes coordinates for all queries, represented as
-                            (center_x, center_y, height, width). These values are normalized in [0, 1],
+                            (center_x, center_y, width, height). These values are normalized in [0, 1],
                             relative to the size of each individual image (disregarding possible padding).
-                            See PostProcess for information on how to retrieve the unnormalized bounding box.
             - "aux_outputs": Optional, only returned when auxilary losses are activated. It is a list of
                              dictionnaries containing the two above keys for each decoder layer.
         """

@@ -37,7 +37,8 @@ def box_xyxy_to_cxcywh(x):
 
 # modified from torchvision to also return the union
 def box_iou(boxes1, boxes2):
-    """Z: default input xyxy, boxes1 can be multiple so as boxes2"""
+    """Z: return iou and union area, default input xyxy.
+    boxes1 can be multiple so as boxes2"""
     area1 = box_area(boxes1)
     area2 = box_area(boxes2)
 
@@ -48,10 +49,10 @@ def box_iou(boxes1, boxes2):
 
     # Z: rb - lt = [inter_width, inter_height], clamp to 0 to prevent negatives
     wh = (rb - lt).clamp(min=0)  # [N,M,2]
-    # Z: calculate intersection = w*h
+    # Z: calculate intersection area = w*h
     inter = wh[:, :, 0] * wh[:, :, 1]  # [N,M]
 
-    # Z: calculate union, [N,M]
+    # Z: calculate union area, [N,M]
     union = area1[:, None] + area2 - inter
 
     iou = inter / union
@@ -90,6 +91,7 @@ def generalized_box_iou(boxes1, boxes2):
 
     # Z: w and h of enclosing boxes, [N,M,2]
     wh = (rb - lt).clamp(min=0)  # [N,M,2]
+    # Z: calculate area of enclosing boxes, [N,M]
     area = wh[:, :, 0] * wh[:, :, 1]
 
     # Z: GIoU = IoU - (C - union) / C

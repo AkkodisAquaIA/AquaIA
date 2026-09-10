@@ -142,7 +142,7 @@ The Detection part contains the following folders and files.
 │   │   │   └── misc.py           # Only accuracy, is_dist_avail_and_initialized, get_world_size used.
 │   │   │
 │   │   ├── backbone_id_map.py    # DINO model registration, where to find model weights.
-│   │   ├── dino_detector.py      # Combines DINO and DETR to a complet model.
+│   │   ├── dino_detector.py      # Combines DINO and DETR, using only the final DETR decoder layer output for training / inference, without intermediate auxiliary outputs.
 │   │   ├── loss.py               # Loss for DETR after backbone (class loss modified to FocalLoss).
 │   │   ├── position_encoding.py  # 2D positional encoding for DETR.
 │   │   └── predict.py            # One function to round image size, one function to infer on a batch of samples (for evaluation or visualization) and return predictions.

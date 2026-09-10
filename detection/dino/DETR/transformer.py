@@ -9,14 +9,13 @@ Copy-paste from torch.nn.Transformer with modifications:
     * decoder returns a stack of activations from all decoding layers
 
 Samuel Beaussant : Taken from DETR official repo. Modified and simplified for the current project:
-    * Removed Type Hints for less verbosity (mostly tensors anyway)
+    * Remove Type Hints for less verbosity (mostly tensors anyway)
     * Only supports post normalization
         Z: aka no pre-norm = x + Sublayer(Norm(x))
-    * Removed support for masks and padding masks for simplicity (operate on square images)
+    * Remove support for masks and padding masks for simplicity (operate on square images)
         Z: remove masks (attention mask for local attention) and padding masks (for padding small images to square)
-    * Added batch first, need_weight=False and fp16 for flash attention support
-        Z: FlashAttention speeds up attention, requires batch first and no need for attention weights
-    * Removed useless copies and permute for better efficiency
+    * Add batch first, need_weight=False and fp16 for flash attention support
+    * Remove useless copies and permute for better efficiency
     * Default dropout is 0 (plain detr removed it completely)
 """
 
@@ -49,7 +48,6 @@ class Transformer(nn.Module):
     def forward(self, src, query_embed, pos_embed):
         # Z: query_embed = object queries
         # Z: pos_embed = positional encoding
-
         bs = src.shape[0]
         # Z: [num_queries, d_model] -> [batch_size, num_queries, d_model]
         query_embed = query_embed.unsqueeze(0).expand(bs, -1, -1)  # no copy
@@ -203,4 +201,4 @@ def _get_activation_fn(activation):
         return F.gelu
     if activation == "glu":
         return F.glu
-    raise RuntimeError(f"activation should be relu/gelu, not {activation}.")
+    raise RuntimeError(f"Activation should be relu/gelu/glu, not {activation}.")
