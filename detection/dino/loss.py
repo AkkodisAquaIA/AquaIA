@@ -28,7 +28,7 @@ def sigmoid_focal_loss(inputs, targets, num_boxes, alpha: float = 0.25, gamma: f
     """
     # Z: get probability when predicted as positive
     prob = inputs.sigmoid()
-    # Z: compute the loss for positives and negatives
+    # Z: compute the loss for positives and negatives, aka -log(p_t)
     ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
     # Z: if targets is 1, p_t = prob, else p_t = 1 - prob
     p_t = prob * targets + (1 - prob) * (1 - targets)
@@ -73,14 +73,15 @@ class SetCriterion(nn.Module):
     def loss_labels(self, outputs, targets, indices, num_boxes):
         """Classification loss (NLL)
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
+        Z: Compute the sigmoid focal classification loss.
         """
         assert "pred_logits" in outputs
         # Z: src_logits [batch_size, num_queries, num_classes]
         src_logits = outputs["pred_logits"]
 
         # Z: get batch_idx and src_idx for matched predictions
-        # batch_idx : which image in the batch each matched prediction belongs to.
-        # src_idx : query index of each matched prediction within its image.
+        # Z: batch_idx : which image in the batch each matched prediction belongs to
+        # Z: src_idx : query index of each matched prediction within its image
         idx = self._get_src_permutation_idx(indices)  # gets (batch_idx, i)
 
         # Z: t -> targets dict, indices -> (src, tgt), J -> tgt
@@ -130,7 +131,7 @@ class SetCriterion(nn.Module):
             # Z: so multiply by num_queries to get the sum, avoid tiny loss value
             * src_logits.shape[1]
         )
-        # Z: register loss value
+        # Z: register loss value, a scalar tensor
         losses = {"loss_ce": loss_ce}
 
         # TODO this should probably be a separate loss, not hacked in this one here
@@ -147,7 +148,7 @@ class SetCriterion(nn.Module):
         device = pred_logits.device
         # Z: count the number of target boxes for each batch element
         tgt_lengths = torch.as_tensor([len(v["labels"]) for v in targets], device=device)
-        # Count the number of predictions that are NOT "no-object" (which is the last class)
+        # Z: count queries number of queries whose maximum object-class probability is at least 0.5
         card_pred = (pred_logits.sigmoid().max(-1).values >= 0.5).sum(1)
         # Z: compute the L1 loss between nb predicted boxes and nb GT boxes
         card_err = F.l1_loss(card_pred.float(), tgt_lengths.float())
@@ -170,6 +171,8 @@ class SetCriterion(nn.Module):
         target_boxes = torch.cat([t["boxes"][i] for t, (_, i) in zip(targets, indices)], dim=0)
 
         if self.loss_bbox_type == "l1":
+            # print(src_boxes.shape)
+            # print(target_boxes.shape)
             loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction="none")
         elif self.loss_bbox_type == "reparam":
             src_deltas = outputs["pred_deltas"][idx]
@@ -213,7 +216,7 @@ class SetCriterion(nn.Module):
         return batch_idx, src_idx
 
     def _get_tgt_permutation_idx(self, indices):
-        """Z: returns
+        """Z: Not used. Returns
         batch_idx : which image in the batch each matched target belongs to.
         tgt_idx : target index of each matched target within its image."""
         # permute targets following indices
