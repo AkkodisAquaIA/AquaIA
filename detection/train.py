@@ -1,5 +1,4 @@
-from detection.utils.config_utils import load_train_config
-from detection.config_printer import print_train_config
+from detection.utils.config_utils import load_train_config, print_train_config
 from detection.dino.training.run import train_dino
 from detection.yolo.training.run import train_yolo
 

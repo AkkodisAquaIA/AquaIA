@@ -135,6 +135,7 @@ class SetCriterion(nn.Module):
         losses = {"loss_ce": loss_ce}
 
         # TODO this should probably be a separate loss, not hacked in this one here
+        # Z: percentage of incorrectly classified predictions among those matched by the Hungarian algorithm
         # Z: compute top1 accuracy then subtract from 100 to get error rate
         losses["class_error"] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
         return losses
@@ -143,6 +144,7 @@ class SetCriterion(nn.Module):
     def loss_cardinality(self, outputs, targets, indices, num_boxes):
         """Compute the cardinality error, ie the absolute error in the number of predicted non-empty boxes
         This is not really a loss, it is intended for logging purposes only. It doesn't propagate gradients
+        Z: The absolute difference between the predicted and ground-truth object counts.
         """
         pred_logits = outputs["pred_logits"]
         device = pred_logits.device
@@ -171,8 +173,6 @@ class SetCriterion(nn.Module):
         target_boxes = torch.cat([t["boxes"][i] for t, (_, i) in zip(targets, indices)], dim=0)
 
         if self.loss_bbox_type == "l1":
-            # print(src_boxes.shape)
-            # print(target_boxes.shape)
             loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction="none")
         elif self.loss_bbox_type == "reparam":
             src_deltas = outputs["pred_deltas"][idx]

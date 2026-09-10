@@ -76,6 +76,7 @@ The active configuration files are:
 
 - `detection/train_config.yaml` for training.
 - `detection/infer_config.yaml` for inference and evaluation.
+- `num_queries` in [dino/dino_detector.py](dino/dino_detector.py) sets the maximum number of objects the DINO / DETR model can predict per image; remember to adjust it for your dataset before training.
 
 ## Output directories
 
@@ -155,7 +156,7 @@ The Detection part contains the following folders and files.
 │   │
 │   ├── utils/
 │   │   ├── box_ops.py            # Bbox operations.
-│   │   ├── config_utils.py       # Functions for saving model params and various states for training resume.
+│   │   ├── config_utils.py       # Loads, prints, and saves configurations; resolves output directories and loads class names.
 │   │   ├── plot_utils.py         # Functions to annotate images, save some visualizations and plot metric curves.
 │   │   └── profiling.py          # A pytorch profiler factory function, for execution performance monitoring.
 │   │
@@ -172,7 +173,6 @@ The Detection part contains the following folders and files.
 │   │   └── yolo_run_diagnostics.py # Evaluates one YOLO run, analyzes prediction errors and IoU, and writes TensorBoard diagnostics.
 │   │
 │   ├── checkpoint.py             # Checkpoint tools, save model checkpoint, load model checkpoint.
-│   ├── config_printer.py         # Prints config when training.
 │   ├── infer_config.yaml         # Inference config.
 │   ├── infer.py                  # Initializes test with config, detection/dino/inference/run.py/test_dino or detection/yolo/inference/run.py/test_yolo.
 │   ├── JOURNAL_TRAINING_LOGS.md  # Explication of logging mechanism’s implementation.

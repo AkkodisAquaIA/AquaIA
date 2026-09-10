@@ -39,7 +39,7 @@ class PositionEmbeddingSine(nn.Module):
 
     def __init__(self, num_pos_feats=64, temperature=10000, normalize=False, scale=None):
         super().__init__()
-        # Z: num_pos_feats = number of positional features (sin or cos) for each axis (x/y)
+        # Z: num_pos_feats = number of positional features (sin or cos total) for each axis (x/y)
         # Z: 1 feature is a value of sin or cos. num_pos_feats = d_model // 2 (x/y)
         self.num_pos_feats = num_pos_feats
         # Z: temperature controls the scale of different frequencies of sin or cos
@@ -95,7 +95,6 @@ class PositionEmbeddingSine(nn.Module):
         # Z: done along the dimension of num_pos_feats, final shape (H, W, num_pos_feats)
         # Z: flatten(-2) = flatten the last two dimensions (sin and cos) into one dimension
         pos_y = torch.stack((pos_y[..., 0::2].sin(), pos_y[..., 1::2].cos()), dim=-1).flatten(-2)
-
         pos_x = torch.stack((pos_x[..., 0::2].sin(), pos_x[..., 1::2].cos()), dim=-1).flatten(-2)
 
         # Concatenate and reshape
@@ -111,9 +110,6 @@ def build_position_encoding(pe_type, h_dim=256):
     if pe_type == "sine":  # also called v2
         # TODO find a better way of exposing other arguments
         position_embedding = PositionEmbeddingSine(N_steps, normalize=True)
-    elif pe_type == "learned":  # also called v3
-        # Z: !Warnign! leared PE is not implemented
-        position_embedding = PositionEmbeddingLearned(N_steps)  # noqa: F821
     elif pe_type == "sine_unnorm":  # also called v4
         position_embedding = PositionEmbeddingSine(N_steps, normalize=False)
     else:
