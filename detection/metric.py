@@ -161,7 +161,6 @@ def compute_metrics(model, dataloaders, predict_fn, device, conf_thresh):
                 samples=batch,
                 device=device,
                 conf_thres=conf_thresh,
-                imgsz=imgsz,
             )
             predictions.extend(batch_preds)
             targets.extend(batch_targets)
