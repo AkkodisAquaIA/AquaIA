@@ -7,12 +7,12 @@ from pathlib import Path
 REGISTRY_PATH = Path("runs/registry.jsonl")
 
 _COLOR = {
-    "running": "\033[33m",
-    "done": "\033[32m",
-    "error": "\033[31m",
-    "interrupted": "\033[35m",
+    "running": "\033[33m",  # Yello
+    "done": "\033[32m", # Green
+    "error": "\033[31m",    # Red
+    "interrupted": "\033[35m",  # Magenta
 }
-_RESET = "\033[0m"
+_RESET = "\033[0m"  # Reset terminal color
 
 
 def main() -> None:
@@ -28,7 +28,7 @@ def main() -> None:
     runs = []
     for line in lines:
         try:
-            # Z: parse json line into python object and append
+            # Parse json line into python object and append
             runs.append(json.loads(line))
         except json.JSONDecodeError:
             continue
