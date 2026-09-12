@@ -109,7 +109,8 @@ By default, inference results are stored inside the selected training run:
 
 ## Logging
 
-For logging files, checkpoints, run status, resume behavior, and usage, see [TRAINING_LOGS.md](TRAINING_LOGS.md). For implementation details and design history, see [JOURNAL_TRAINING_LOGS.md](JOURNAL_TRAINING_LOGS.md).
+For the DINO text log, run metadata, checkpoints, resume behavior, CLI
+commands, and tmux usage, see [logging/LOGGING.md](logging/LOGGING.md).
 
 ## Repository structure
 
@@ -151,8 +152,8 @@ The Detection part contains the following folders and files.
 │   ├── logging/
 │   │   ├── __init__.py           # Declares logging package.
 │   │   ├── checkpoint_manager.py # Saves best.pt on improvement; last.pt + last_training_state.pt every save_period epochs and at the end of training.
-│   │   ├── run_registry.py       # Registers a new run or update a record in registry.jsonl file.
-│   │   └── training_logger.py    # TrainingLogger (train.jsonl, train.log, heartbeat, run_meta.json).
+│   │   ├── LOGGING.md            # Current logging behavior, usage, limitations, and planned work.
+│   │   └── training_logger.py    # TrainingLogger (train.log and run_meta.json).
 │   │
 │   ├── utils/
 │   │   ├── box_ops.py            # Bbox operations.
@@ -176,13 +177,10 @@ The Detection part contains the following folders and files.
 │   ├── config_printer.py         # Prints config when training.
 │   ├── infer_config.yaml         # Inference config.
 │   ├── infer.py                  # Initializes test with config, detection/dino/inference/run.py/test_dino or detection/yolo/inference/run.py/test_yolo.
-│   ├── JOURNAL_TRAINING_LOGS.md  # Explication of logging mechanism’s implementation.
-│   ├── list_runs.py              # Reads the training run registry and displays all valid runs in a sorted, color-coded table. python -m detection.list_runs
 │   ├── metric.py                 # Metrics’ update, print, save, calculate functions.
 │   ├── inference_context.py      # Shared run context and header tools for inference.
 │   ├── train_config.yaml         # Training config.
-│   ├── train.py                  # Initialize training with config, detection/dino/training/run.py/train_dino or detection/yolo/training/run.py/train_yolo.
-│   └── TRAINING_LOGS.md          # Explication of logging mechanism and how to use.
+│   └── train.py                  # Initialize training with config, detection/dino/training/run.py/train_dino or detection/yolo/training/run.py/train_yolo.
 │
 └── main.py                       # Entry point, train (train.py/train_from_config) or infer (infer.py/infer_from_config).
 ```

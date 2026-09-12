@@ -17,7 +17,7 @@ from detection.dino.utils.matcher import HungarianMatcher
 from detection.utils.config_utils import save_resolved_config
 from detection.utils.plot_utils import plot_metrics, save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
-from detection.logging import TrainingLogger, CheckpointManager, register_run, update_run_status
+from detection.logging import TrainingLogger, CheckpointManager
 
 
 def get_datasets(
@@ -131,9 +131,6 @@ def train_dino(config, resume_dir=None):
         run_dir=run_dir,
         save_period=log_config.get("save_period", 0),
     )
-    # If new training run
-    if not resume_dir:
-        register_run(config=config, run_id=run_id, run_dir=run_dir, pid=os.getpid())
     logger.log_device(
         device=device,
         use_amp=use_amp,
@@ -306,10 +303,6 @@ def train_dino(config, resume_dir=None):
                         # loss_dict, batch_loss are batch level, metric_dict is epoch level, progress.total = nb batches
                         update_metric_dict(metric_dict, loss_dict, batch_loss, loader.dataset.data_split, progress.total)
 
-                        # Heartbeat — updated every N batches
-                        # +1 because epoch and batch_idx are 0-indexed but we want to log 1-indexed values
-                        logger.heartbeat(epoch + 1, batch_idx + 1, progress.total)
-
                     # END for batch loop
 
                     if training and scheduler is not None:
@@ -340,12 +333,10 @@ def train_dino(config, resume_dir=None):
         # === Training ended normally ===
         checkpoint_mgr.save_final(training_config["epochs"], model, optimizer, scaler, scheduler)
         logger.finish()
-        update_run_status(config, run_id, "done")
 
     # Like Ctrl + C
     except KeyboardInterrupt:
         logger.interrupted()
-        update_run_status(config, run_id, "interrupted")
         # Save partial metrics so the run isn't a total loss
         if metrics_history:
             np.save(os.path.join(run_dir, "metrics.npy"), metrics_history, allow_pickle=True)
@@ -354,7 +345,6 @@ def train_dino(config, resume_dir=None):
 
     except Exception as exc:
         logger.crash(str(exc))
-        update_run_status(config, run_id, "error")
         if metrics_history:
             np.save(os.path.join(run_dir, "metrics.npy"), metrics_history, allow_pickle=True)
         raise

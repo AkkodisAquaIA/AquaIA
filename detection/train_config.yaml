@@ -36,12 +36,6 @@ logging:
   # Save last.pt + last_training_state.pt every N epochs (0 = only at end).
   # Only for DINO
   save_period: 5
-  # Update the heartbeat file every N batches.
-  # Only for DINO
-  heartbeat_every_n_batches: 10
-  # Path to the global run registry (one JSON line per run).
-  # Only for DINO
-  registry_path: "runs/registry.jsonl"
 
 # ----------------------------------------------------------------------
 # Training section: arguments used by the DINO trainer

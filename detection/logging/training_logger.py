@@ -8,18 +8,14 @@ from typing import Optional
 
 
 class TrainingLogger:
-    """Persistent training logger: JSONL per epoch, text log, heartbeat, run_meta.json."""
+    """Persistent training logger: human-readable text train.log and run metadata run_meta.json."""
 
     def __init__(self, run_dir: str, run_id: str, config: dict, resume: bool = False):
         self.run_dir = Path(run_dir)
         self.run_id = run_id
         self.start_time = time.time()
-        self._batch_counter = 0
-        self._heartbeat_every = config.get("logging", {}).get("heartbeat_every_n_batches", 10)
 
-        self._jsonl_path = self.run_dir / "train.jsonl"
         self._log_path = self.run_dir / "train.log"
-        self._heartbeat_path = self.run_dir / "heartbeat"
         self._meta_path = self.run_dir / "run_meta.json"
 
         # Python logger — clear any handlers from a previous run with the same run_id
@@ -37,7 +33,7 @@ class TrainingLogger:
             "[%(asctime)s] [%(levelname)-5s] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
-        # Create a file handler to append logs to a file
+        # Create a file handler to append logs to train.log
         fh = logging.FileHandler(self._log_path, mode="a", encoding="utf-8")
         fh.setFormatter(fmt)
         # Add the file handler to the logger, now logs will be appended to the file
@@ -74,7 +70,6 @@ class TrainingLogger:
                 "best_epoch": None,
                 "best_val_loss": None,
                 "current_epoch": 0,
-                "total_epochs": training_cfg.get("epochs", 0),
             }
         # Write the meta information to the run_meta.json file
         self._write_meta()
@@ -86,7 +81,11 @@ class TrainingLogger:
         self._logger.info(f"Run dir: {run_dir}")
         self._logger.info(f"Model: {model_str} | epochs={training_cfg.get('epochs')} | batch={training_cfg.get('batch')} | lr={training_cfg.get('lr0')}")
 
-    # ── Public API ──────────────────────────────────────────────────────────
+    def _write_meta(self) -> None:
+        """Write the current meta information to the run_meta.json file."""
+        with self._meta_path.open("w", encoding="utf-8") as f:
+            json.dump(self._meta, f, indent=2)
+            f.flush()
 
     def info(self, msg: str) -> None:
         """Simple encapsulation of internal Python logger to log an INFO level message into train.log + console."""
@@ -103,26 +102,10 @@ class TrainingLogger:
             self._logger.info(f"Dataset: {dataset_info}")
 
     def log_epoch(self, epoch: int, total_epochs: int, metric_dict: dict, lr: float) -> None:
-        """Log epoch metrics into train.jsonl, train.log + console and update meta information."""
+        """Log epoch metrics to train.log + console and update meta information."""
         elapsed = time.time() - self.start_time
         train_loss = metric_dict.get("train", {}).get("loss", 0.0)
         val_loss = metric_dict.get("val", {}).get("loss", 0.0)
-
-        # JSONL — flush immediately so it survives a crash
-        entry = {
-            "epoch": epoch,
-            # Round the train and val losses to 6 decimal places
-            "train_loss": round(float(train_loss), 6),
-            "val_loss": round(float(val_loss), 6),
-            "lr": lr,
-            "timestamp": datetime.utcnow().isoformat(),
-            "elapsed_s": round(elapsed),
-        }
-        with self._jsonl_path.open("a", encoding="utf-8") as f:
-            # json.dumps converts the entry dictionary to a JSON string
-            f.write(json.dumps(entry) + "\n")
-            # Flush the file buffer to ensure the data is written to disk immediately
-            f.flush()
 
         elapsed_str = f"{int(elapsed // 60)}m{int(elapsed % 60)}s"
         self._logger.info(f"[EPOCH {epoch:>3}/{total_epochs}] train_loss={train_loss:.4f} | val_loss={val_loss:.4f} | lr={lr:.2e} | {elapsed_str}")
@@ -137,15 +120,6 @@ class TrainingLogger:
         self._meta["best_epoch"] = epoch
         self._meta["best_val_loss"] = round(float(val_loss), 6)
         self._write_meta()
-
-    def heartbeat(self, epoch: int, batch_idx: int, total_batches: int) -> None:
-        """Write current timestamp, epoch, batch index every N batches into heartbeat file."""
-        self._batch_counter += 1
-        # % operator returns the remainder of the division
-        if self._batch_counter % self._heartbeat_every != 0:
-            return
-        ts = datetime.utcnow().isoformat()
-        self._heartbeat_path.write_text(f"{ts} epoch={epoch} batch={batch_idx}/{total_batches}\n")
 
     def finish(self) -> None:
         """Log training completion, total elapsed time into train.log + console and update meta information."""
@@ -170,11 +144,3 @@ class TrainingLogger:
         self._meta["status"] = "interrupted"
         self._meta["last_updated"] = datetime.utcnow().isoformat()
         self._write_meta()
-
-    # ── Internal ─────────────────────────────────────────────────────────────
-
-    def _write_meta(self) -> None:
-        """Write the current meta information to the run_meta.json file."""
-        with self._meta_path.open("w", encoding="utf-8") as f:
-            json.dump(self._meta, f, indent=2)
-            f.flush()
