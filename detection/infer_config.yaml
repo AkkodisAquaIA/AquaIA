@@ -1,24 +1,32 @@
-# AquaIA - DETR+DINO inference config
+# "Only for <model>" applies only to the parameter on the immediately following line
+# If a parameter is preceded by "# Only for <model>", that parameter is used only by the specified model
+# Only the exact wording "Only for <model>" indicates that a parameter is model-specific;
+# no other wording carries this meaning
 
 run:
-  # Z: root directory where all training runs are saved
+  # Root directory where all training runs are saved
   runs_root: "results/detect/dinov3_small_pretrained"
-  # Z: one specific training run directory
+  # One specific training run directory
   run_dir: null
 
 data:
   test_data_root: "datasets/coco_custom_match"
-  # Z: only for DINO, YOLO uses test
+  # Dataset split used for inference
   split: "test"
 
 inference:
   batch: 8
   imgsz : 640
-  # Confidence threshold for mAP calculation
+  # Confidence threshold used to filter bbox predictions before mAP calculation
+  # Only for DINO
   conf_thresh: 0.05
-  # Confidence threshold for bbox filtering
+  # Confidence threshold for bbox prediction filtering
+  # DINO uses it to filter saved prediction visualizations
+  # YOLO uses it to filter saved inference visualizations
+  # and predictions passed to the custom compute_metrics()
+  # thereby affecting the custom mAP
   conf: 0.3
-  # Z: number of samples used for prediction visualization, must be greater than 0
+  # Number of samples used for prediction visualization, must be greater than 0
   num_samples: 20
   seed: 0
 

@@ -4,7 +4,7 @@
 
 This package provides object detection training, inference, evaluation, checkpointing, and prediction visualization. It supports DINO backbones with a DETR detection head and Ultralytics YOLO models through a shared command-line entry point.
 
-In this repository, the detection module covers the top-level `main.py` and `benchmark_train.py` files, as well as all files under `data_processing/`, `dataloading/`, and `detection/`. For a file-by-file description, see **Repository structure** at the end of this document.
+In this repository, the detection module covers the top-level `main.py` file, as well as all files under `data_processing/`, `dataloading/`, and `detection/`. For a file-by-file description, see **Repository structure** at the end of this document.
 
 ## Current support
 
@@ -30,7 +30,7 @@ datasets/<dataset_name>/
 │   ├── val/
 │   └── test/
 ├── <dataset_name>.yaml
-└── stats.npy
+└── stats_<image_size>.npy
 ```
 
 Each label line must follow the normalized YOLO format:
@@ -39,7 +39,7 @@ Each label line must follow the normalized YOLO format:
 class_id x_center y_center width height
 ```
 
-The dataset YAML defines the dataset paths and class names. `stats.npy` contains the channel mean and standard deviation used by the custom data loaders and can be generated with `data_processing/stats.py`.
+The dataset YAML defines the dataset paths and class names. `stats_<image_size>.npy` contains the channel mean and standard deviation used by the custom data loaders and can be generated with `data_processing/stats.py`.
 
 ## Quick start
 
@@ -119,17 +119,18 @@ The Detection part contains the following folders and files.
 ```text
 ├── data_processing/
 │   ├── coco_custom_split.py      # Splits the 2017 Train into train and test sets.
-│   ├── sample_augementation.py   # Visualizes sample images and bounding boxes before and after applying detection augmentations.
+│   ├── sample_augmentation.py    # Visualizes sample images and bounding boxes before and after applying detection augmentations.
 │   ├── sample_coco_one_percent.py # Creates a reproducible 1% subset of each COCO split while preserving image-label pairs and ensuring coverage of all 80 classes.
 │   └── stats.py                  # Computes image channel mean and standard deviation --> stats_<image_size>.npy.
 │
 ├── dataloading/
-│   ├── det_augmentation.py.py    # Builds Ultralytics-based detection augmentations and converts dataset samples to the label format required by those transforms.
+│   ├── det_augmentation.py       # Builds Ultralytics-based detection augmentations and converts dataset samples to the label format required by those transforms.
 │   └── datasets.py               # Detection dataset, batch collation, and batch parsing helpers.
 │
 ├── detection/
 │   ├── dino/
 │   │   ├── DETR/
+│   │   │   ├── __init__.py       # Exposes the DETR class.
 │   │   │   ├── detr.py           # DETR, prediction heads, aux_loss controls multioutput.
 │   │   │   └── transformer.py    # Encoder, decoder, transformer for DETR. return_intermediate_dec controls multioutput.
 │   │   │
@@ -157,13 +158,13 @@ The Detection part contains the following folders and files.
 │   │
 │   ├── utils/
 │   │   ├── box_ops.py            # Bbox operations.
-│   │   ├── config_utils.py       # Loads, prints, and saves configurations; resolves output directories and loads class names.
+│   │   ├── config_utils.py       # Loads and saves configurations; resolves output directories and loads class names.
 │   │   ├── plot_utils.py         # Functions to annotate images, save some visualizations and plot metric curves.
 │   │   └── profiling.py          # A pytorch profiler factory function, for execution performance monitoring.
 │   │
 │   ├── yolo/
 │   │   ├── inference/
-│   │   │   └── run.py            # Main inference process, loads the best YOLO checkpoint and evaluates it on the test dataset.
+│   │   │   └── run.py            # Main inference process, loads the best YOLO checkpoint and evaluates it on the configured dataset split.
 │   │   │
 │   │   ├── training/
 │   │   │   └── run.py            # Main training process, resolves the Ultralytics model identifier and launches training.
@@ -173,7 +174,7 @@ The Detection part contains the following folders and files.
 │   │   ├── predict.py            # Adapts Ultralytics YOLO predictions to the common detection prediction format.
 │   │   └── yolo_run_diagnostics.py # Evaluates one YOLO run, analyzes prediction errors and IoU, and writes TensorBoard diagnostics.
 │   │
-│   ├── checkpoint.py             # Checkpoint tools, save model checkpoint, load model checkpoint.
+│   ├── checkpoint.py             # Saves model weights and saves/loads optimizer, scaler, scheduler, and epoch state.
 │   ├── config_printer.py         # Prints config when training.
 │   ├── infer_config.yaml         # Inference config.
 │   ├── infer.py                  # Initializes test with config, detection/dino/inference/run.py/test_dino or detection/yolo/inference/run.py/test_yolo.
@@ -182,5 +183,5 @@ The Detection part contains the following folders and files.
 │   ├── train_config.yaml         # Training config.
 │   └── train.py                  # Initialize training with config, detection/dino/training/run.py/train_dino or detection/yolo/training/run.py/train_yolo.
 │
-└── main.py                       # Entry point, train (train.py/train_from_config) or infer (infer.py/infer_from_config).
+└── main.py                       # Entry point, train (train.py/train_from_config) or infer (infer.py/test_from_config).
 ```

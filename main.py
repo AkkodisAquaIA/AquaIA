@@ -1,6 +1,5 @@
 import argparse
 import os
-
 from detection.infer import test_from_config
 from detection.train import train_from_config
 
