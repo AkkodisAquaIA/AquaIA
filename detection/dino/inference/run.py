@@ -23,9 +23,9 @@ def load_model(run_dir, backbone_id, img_size, num_classes, device):
     return model
 
 
-def test_dino(config, ctx):
+def infer_dino(config, ctx):
     """Z: Read inference parameters from configuration, load best trained model,
-    create test dataset and dataloader, run prediction and metric evaluation,
+    create inference dataset and dataloader, run prediction and metric evaluation,
     save inference visualizations and metrics."""
     # config from infer_config.yaml, ctx derived from resolved_config.yaml
     inference_config = config["inference"]
@@ -34,10 +34,10 @@ def test_dino(config, ctx):
     device = ctx["device"]
     run_dir = ctx["run_dir"]
     run_config = ctx["run_config"]
-    test_data_root = ctx["test_data_root"]
+    infer_data_root = ctx["infer_data_root"]
     output_dir = ctx["output_dir"]
 
-    _, num_classes = load_class_names(test_data_root)
+    _, num_classes = load_class_names(infer_data_root)
     model = load_model(
         run_dir=run_dir,
         backbone_id=f"{run_config['model']['family']}_{run_config['model']['size']}",
@@ -47,13 +47,13 @@ def test_dino(config, ctx):
     )
     imgsz = normalize_imgsz(config, "inference")
     data_split = data_cfg.get("split", "test")
-    test_dataset = JpgDetectionDataset(
-        dataset_root=test_data_root,
+    infer_dataset = JpgDetectionDataset(
+        dataset_root=infer_data_root,
         data_split=data_split,
         img_size=imgsz,
     )
-    test_loader = DataLoader(
-        test_dataset,
+    infer_loader = DataLoader(
+        infer_dataset,
         batch_size=inference_config["batch"],
         shuffle=False,
         num_workers=3,
@@ -64,7 +64,7 @@ def test_dino(config, ctx):
         raise ValueError("inference.num_samples must be greater than 0")
     save_sample_predictions(
         model=model,
-        subset=test_dataset,
+        subset=infer_dataset,
         predict_fn=predict,
         output_dir=output_dir / "inference_predictions",
         num_samples=num_samples,
@@ -75,7 +75,7 @@ def test_dino(config, ctx):
     model.eval()
     metrics = compute_metrics(
         model=model,
-        dataloaders=[test_loader],
+        dataloaders=[infer_loader],
         predict_fn=predict,
         conf_thresh=inference_config.get("conf_thresh", 0.05),
         device=device,

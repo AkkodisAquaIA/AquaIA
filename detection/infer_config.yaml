@@ -10,7 +10,7 @@ run:
   run_dir: null
 
 data:
-  test_data_root: "datasets/coco_custom_match"
+  infer_data_root: "datasets/coco_custom_match"
   # Dataset split used for inference
   split: "test"
 

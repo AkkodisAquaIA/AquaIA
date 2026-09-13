@@ -124,8 +124,8 @@ The Detection part contains the following folders and files.
 │   └── stats.py                  # Computes image channel mean and standard deviation --> stats_<image_size>.npy.
 │
 ├── dataloading/
-│   ├── det_augmentation.py       # Builds Ultralytics-based detection augmentations and converts dataset samples to the label format required by those transforms.
-│   └── datasets.py               # Detection dataset, batch collation, and batch parsing helpers.
+│   ├── datasets.py               # Detection dataset, batch collation, and batch parsing helpers.
+│   └── det_augmentation.py       # Builds Ultralytics-based detection augmentations and converts dataset samples to the label format required by those transforms.
 │
 ├── detection/
 │   ├── dino/
@@ -177,11 +177,10 @@ The Detection part contains the following folders and files.
 │   ├── checkpoint.py             # Saves model weights and saves/loads optimizer, scaler, scheduler, and epoch state.
 │   ├── config_printer.py         # Prints config when training.
 │   ├── infer_config.yaml         # Inference config.
-│   ├── infer.py                  # Initializes test with config, detection/dino/inference/run.py/test_dino or detection/yolo/inference/run.py/test_yolo.
-│   ├── metric.py                 # Metrics’ update, print, save, calculate functions.
 │   ├── inference_context.py      # Shared run context and header tools for inference.
-│   ├── train_config.yaml         # Training config.
-│   └── train.py                  # Initialize training with config, detection/dino/training/run.py/train_dino or detection/yolo/training/run.py/train_yolo.
+│   ├── metric.py                 # Metrics’ update, print, save, calculate functions.
+│   ├── runner.py                 # Loads configs and dispatches training (detection/<model>/training/run.py/train_<model>) or inference (detection/<model>/inference/run.py/infer_<model>).
+│   └── train_config.yaml         # Training config.
 │
-└── main.py                       # Entry point, train (train.py/train_from_config) or infer (infer.py/test_from_config).
+└── main.py                       # Entry point, dispatches train or infer commands through detection/runner.py/train_from_config or infer_from_config.
 ```
