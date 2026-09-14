@@ -4,7 +4,7 @@
 
 This package provides object detection training, inference, evaluation, checkpointing, and prediction visualization. It supports DINO backbones with a DETR detection head and Ultralytics YOLO models through a shared command-line entry point.
 
-In this repository, the detection module covers the top-level `main.py` and `benchmark_train.py` files, as well as all files under `data_processing/`, `dataloading/`, and `detection/`. For a file-by-file description, see **Repository structure** at the end of this document.
+In this repository, the detection module covers the top-level `main.py` file, as well as all files under `data_processing/`, `dataloading/`, and `detection/`. For a file-by-file description, see **Repository structure** at the end of this document.
 
 ## Current support
 
@@ -30,7 +30,7 @@ datasets/<dataset_name>/
 │   ├── val/
 │   └── test/
 ├── <dataset_name>.yaml
-└── stats.npy
+└── stats_<image_size>.npy
 ```
 
 Each label line must follow the normalized YOLO format:
@@ -39,7 +39,7 @@ Each label line must follow the normalized YOLO format:
 class_id x_center y_center width height
 ```
 
-The dataset YAML defines the dataset paths and class names. `stats.npy` contains the channel mean and standard deviation used by the custom data loaders and can be generated with `data_processing/stats.py`.
+The dataset YAML defines the dataset paths and class names. `stats_<image_size>.npy` contains the channel mean and standard deviation used by the custom data loaders and can be generated with `data_processing/stats.py`.
 
 ## Quick start
 
@@ -76,6 +76,7 @@ The active configuration files are:
 
 - `detection/train_config.yaml` for training.
 - `detection/infer_config.yaml` for inference and evaluation.
+- `num_queries` in [dino/dino_detector.py](dino/dino_detector.py) sets the maximum number of objects the DINO / DETR model can predict per image; remember to adjust it for your dataset before training.
 
 ## Output directories
 
@@ -108,7 +109,8 @@ By default, inference results are stored inside the selected training run:
 
 ## Logging
 
-For logging files, checkpoints, run status, resume behavior, and usage, see [TRAINING_LOGS.md](TRAINING_LOGS.md). For implementation details and design history, see [JOURNAL_TRAINING_LOGS.md](JOURNAL_TRAINING_LOGS.md).
+For the DINO text log, run metadata, checkpoints, resume behavior, CLI
+commands, and tmux usage, see [logging/LOGGING.md](logging/LOGGING.md).
 
 ## Repository structure
 
@@ -117,17 +119,18 @@ The Detection part contains the following folders and files.
 ```text
 ├── data_processing/
 │   ├── coco_custom_split.py      # Splits the 2017 Train into train and test sets.
-│   ├── sample_augementation.py   # Visualizes sample images and bounding boxes before and after applying detection augmentations.
+│   ├── sample_augmentation.py    # Visualizes sample images and bounding boxes before and after applying detection augmentations.
 │   ├── sample_coco_one_percent.py # Creates a reproducible 1% subset of each COCO split while preserving image-label pairs and ensuring coverage of all 80 classes.
-│   └── stats.py                  # Computes image channel mean and standard deviation --> stats.npy.
+│   └── stats.py                  # Computes image channel mean and standard deviation --> stats_<image_size>.npy.
 │
 ├── dataloading/
-│   ├── det_augmentation.py.py    # Builds Ultralytics-based detection augmentations and converts dataset samples to the label format required by those transforms.
-│   └── datasets.py               # Detection dataset, batch collation, and batch parsing helpers.
+│   ├── datasets.py               # Detection dataset, batch collation, and batch parsing helpers.
+│   └── det_augmentation.py       # Builds Ultralytics-based detection augmentations and converts dataset samples to the label format required by those transforms.
 │
 ├── detection/
 │   ├── dino/
 │   │   ├── DETR/
+│   │   │   ├── __init__.py       # Exposes the DETR class.
 │   │   │   ├── detr.py           # DETR, prediction heads, aux_loss controls multioutput.
 │   │   │   └── transformer.py    # Encoder, decoder, transformer for DETR. return_intermediate_dec controls multioutput.
 │   │   │
@@ -142,7 +145,7 @@ The Detection part contains the following folders and files.
 │   │   │   └── misc.py           # Only accuracy, is_dist_avail_and_initialized, get_world_size used.
 │   │   │
 │   │   ├── backbone_id_map.py    # DINO model registration, where to find model weights.
-│   │   ├── dino_detector.py      # Combines DINO and DETR to a complet model.
+│   │   ├── dino_detector.py      # Combines DINO and DETR, using only the final DETR decoder layer output for training / inference, without intermediate auxiliary outputs.
 │   │   ├── loss.py               # Loss for DETR after backbone (class loss modified to FocalLoss).
 │   │   ├── position_encoding.py  # 2D positional encoding for DETR.
 │   │   └── predict.py            # One function to round image size, one function to infer on a batch of samples (for evaluation or visualization) and return predictions.
@@ -150,18 +153,18 @@ The Detection part contains the following folders and files.
 │   ├── logging/
 │   │   ├── __init__.py           # Declares logging package.
 │   │   ├── checkpoint_manager.py # Saves best.pt on improvement; last.pt + last_training_state.pt every save_period epochs and at the end of training.
-│   │   ├── run_registry.py       # Registers a new run or update a record in registry.jsonl file.
-│   │   └── training_logger.py    # TrainingLogger (train.jsonl, train.log, heartbeat, run_meta.json).
+│   │   ├── LOGGING.md            # Current logging behavior, usage, limitations, and planned work.
+│   │   └── training_logger.py    # TrainingLogger (train.log and run_meta.json).
 │   │
 │   ├── utils/
 │   │   ├── box_ops.py            # Bbox operations.
-│   │   ├── config_utils.py       # Functions for saving model params and various states for training resume.
+│   │   ├── config_utils.py       # Loads and saves configurations; resolves output directories and loads class names.
 │   │   ├── plot_utils.py         # Functions to annotate images, save some visualizations and plot metric curves.
 │   │   └── profiling.py          # A pytorch profiler factory function, for execution performance monitoring.
 │   │
 │   ├── yolo/
 │   │   ├── inference/
-│   │   │   └── run.py            # Main inference process, loads the best YOLO checkpoint and evaluates it on the test dataset.
+│   │   │   └── run.py            # Main inference process, loads the best YOLO checkpoint and evaluates it on the configured dataset split.
 │   │   │
 │   │   ├── training/
 │   │   │   └── run.py            # Main training process, resolves the Ultralytics model identifier and launches training.
@@ -171,18 +174,13 @@ The Detection part contains the following folders and files.
 │   │   ├── predict.py            # Adapts Ultralytics YOLO predictions to the common detection prediction format.
 │   │   └── yolo_run_diagnostics.py # Evaluates one YOLO run, analyzes prediction errors and IoU, and writes TensorBoard diagnostics.
 │   │
-│   ├── checkpoint.py             # Checkpoint tools, save model checkpoint, load model checkpoint.
+│   ├── checkpoint.py             # Saves model weights and saves/loads optimizer, scaler, scheduler, and epoch state.
 │   ├── config_printer.py         # Prints config when training.
 │   ├── infer_config.yaml         # Inference config.
-│   ├── infer.py                  # Initializes test with config, detection/dino/inference/run.py/test_dino or detection/yolo/inference/run.py/test_yolo.
-│   ├── JOURNAL_TRAINING_LOGS.md  # Explication of logging mechanism’s implementation.
-│   ├── list_runs.py              # Reads the training run registry and displays all valid runs in a sorted, color-coded table. python -m detection.list_runs
-│   ├── metric.py                 # Metrics’ update, print, save, calculate functions.
 │   ├── inference_context.py      # Shared run context and header tools for inference.
-│   ├── test_training_logs.py     # Test script for the training logs system — no GPU, no dataset, no torch required.
-│   ├── train_config.yaml         # Training config.
-│   ├── train.py                  # Initialize training with config, detection/dino/training/run.py/train_dino or detection/yolo/training/run.py/train_yolo.
-│   └── TRAINING_LOGS.md          # Explication of logging mechanism and how to use.
+│   ├── metric.py                 # Metrics’ update, print, save, calculate functions.
+│   ├── runner.py                 # Loads configs and dispatches training (detection/<model>/training/run.py/train_<model>) or inference (detection/<model>/inference/run.py/infer_<model>).
+│   └── train_config.yaml         # Training config.
 │
-└── main.py                       # Entry point, train (train.py/train_from_config) or infer (infer.py/infer_from_config).
+└── main.py                       # Entry point, dispatches train or infer commands through detection/runner.py/train_from_config or infer_from_config.
 ```

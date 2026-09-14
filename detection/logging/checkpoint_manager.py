@@ -2,8 +2,7 @@ from pathlib import Path
 
 
 class CheckpointManager:
-    """Saves best.pt on improvement and last.pt every save_period epochs.
-    Z: saves best.pt on improvement; last.pt + last_training_state.pt (optimizer, scaler, scheduler states)
+    """Saves best.pt on improvement; last.pt + last_training_state.pt (optimizer, scaler, scheduler states)
     every save_period epochs and at the end of training."""
 
     def __init__(self, run_dir: str, save_period: int = 0):
@@ -12,8 +11,21 @@ class CheckpointManager:
         # 0 = only best, N = also save last every N epochs
         self.save_period = save_period
 
+    def _save_last(self, epoch: int, model, optimizer, scaler, scheduler) -> None:
+        """Save last.pt and last_training_state.pt (optimizer, scaler, scheduler states)."""
+        from detection.checkpoint import save_model_checkpoint, save_training_state_checkpoint
+
+        save_model_checkpoint(path=str(self.weights_dir / "last.pt"), model=model)
+        save_training_state_checkpoint(
+            path=str(self.run_dir / "last_training_state.pt"),
+            epoch=epoch,
+            optimizer_state_dict=optimizer.state_dict(),
+            scaler_state_dict=scaler.state_dict(),
+            scheduler_state_dict=scheduler.state_dict() if scheduler is not None else None,
+        )
+
     def step(self, epoch: int, model, optimizer, scaler, scheduler, is_best: bool) -> None:
-        """Z: saves best.pt on improvement; last.pt + last_training_state.pt (optimizer, scaler, scheduler states)
+        """Saves best.pt on improvement; last.pt + last_training_state.pt (optimizer, scaler, scheduler states)
         every save_period epochs."""
         if is_best:
             from detection.checkpoint import save_model_checkpoint
@@ -25,18 +37,5 @@ class CheckpointManager:
 
     def save_final(self, epoch: int, model, optimizer, scaler, scheduler) -> None:
         """Always called at end of training (normal completion).
-        Z: save last.pt and last_training_state.pt (optimizer, scaler, scheduler states)."""
+        Save last.pt and last_training_state.pt (optimizer, scaler, scheduler states)."""
         self._save_last(epoch, model, optimizer, scaler, scheduler)
-
-    def _save_last(self, epoch: int, model, optimizer, scaler, scheduler) -> None:
-        """Z: save last.pt and last_training_state.pt (optimizer, scaler, scheduler states)."""
-        from detection.checkpoint import save_model_checkpoint, save_training_state_checkpoint
-
-        save_model_checkpoint(path=str(self.weights_dir / "last.pt"), model=model)
-        save_training_state_checkpoint(
-            path=str(self.run_dir / "last_training_state.pt"),
-            epoch=epoch,
-            optimizer_state_dict=optimizer.state_dict(),
-            scaler_state_dict=scaler.state_dict(),
-            scheduler_state_dict=scheduler.state_dict() if scheduler is not None else None,
-        )

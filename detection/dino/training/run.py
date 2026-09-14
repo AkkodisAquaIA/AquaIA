@@ -17,7 +17,7 @@ from detection.dino.utils.matcher import HungarianMatcher
 from detection.utils.config_utils import save_resolved_config
 from detection.utils.plot_utils import plot_metrics, save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
-from detection.logging import TrainingLogger, CheckpointManager, register_run, update_run_status
+from detection.logging import TrainingLogger, CheckpointManager
 
 
 def get_datasets(
@@ -44,11 +44,10 @@ def get_datasets(
 
 
 def build_scheduler(training_config, optimizer):
-    """Create lr scheduler, warmup + cosine decay + min lr constraint."""
+    """Create epoch level lr scheduler, warmup + cosine decay + min lr constraint."""
     if not training_config.get("cos_lr", False):
         return None
     warmup_ratio = float(training_config.get("warmup_ratio", 0.0))
-    # Epoch level scheduler, not batch level
     warmup_steps = int(training_config["epochs"] * warmup_ratio)
     if warmup_ratio > 0.0:
         warmup_steps = max(warmup_steps, 1)
@@ -64,8 +63,8 @@ def build_scheduler(training_config, optimizer):
 
 
 def train_dino(config, resume_dir=None):
-    """Read training parameters from the configuration, create the dataset and model,
-    execute the training and validation loop, and save checkpoints, logs, metrics, and prediction results."""
+    """Read training params from config, create dataset and model, execute training and validation,
+    save checkpoints, logs, metrics, prediction results."""
     training_config = config["training"]
     output_config = config["output"]
     log_config = config.get("logging", {})
@@ -86,8 +85,11 @@ def train_dino(config, resume_dir=None):
         augmentation_config=training_config,
     )
     close_mosaic = max(int(training_config.get("close_mosaic", 0)), 0)
+    # When to close
     close_mosaic_epoch = max(training_config["epochs"] - close_mosaic, 0)
     multi_image_augmentations_closed = False
+    # When augmentation, and close_mosaic defined, but greater than or equal to epochs
+    # disable from the first epoch
     if training_config.get("augment", False) and close_mosaic > 0 and close_mosaic_epoch == 0:
         train_set.close_mosaic()
         multi_image_augmentations_closed = True
@@ -118,10 +120,10 @@ def train_dino(config, resume_dir=None):
     else:
         # "20260705_143208"
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-        # "runs/20260705_143208"
-        run_dir = os.path.join(output_config.get("project", "runs"), run_id)
+        # "...dinov3_small_pretrained/20260705_143208"
+        run_dir = os.path.join(output_config["project"], run_id)
     os.makedirs(run_dir, exist_ok=True)
-    # "runs/20260705_143208/weights"
+    # "...dinov3_small_pretrained/20260705_143208/weights"
     weights_dir = os.path.join(run_dir, "weights")
     os.makedirs(weights_dir, exist_ok=True)
 
@@ -131,9 +133,6 @@ def train_dino(config, resume_dir=None):
         run_dir=run_dir,
         save_period=log_config.get("save_period", 0),
     )
-    # If new training run
-    if not resume_dir:
-        register_run(config=config, run_id=run_id, run_dir=run_dir, pid=os.getpid())
     logger.log_device(
         device=device,
         use_amp=use_amp,
@@ -160,8 +159,7 @@ def train_dino(config, resume_dir=None):
         cost_giou=training_config["cost_giou"],
         cost_bbox_type=training_config["cost_bbox_type"],
     )
-    # SetCriterion computes various losses
-    # then training loop combines through this dictionary into the total loss.
+
     loss_weight_dict = {
         "loss_ce": training_config["cls"],
         "loss_bbox": training_config["box"],
@@ -205,11 +203,8 @@ def train_dino(config, resume_dir=None):
         if os.path.exists(last_weights):
             # Load the checkpoint from disk and move tensors to device
             ckpt = torch.load(last_weights, map_location=device)
-            # Find the model that actually need to receive weights
-            # Model compilation may add some additional attributes, take original model
-            base_model = model._orig_mod if hasattr(model, "_orig_mod") else model
             # Load the model state dict from the checkpoint into the model
-            base_model.load_state_dict(ckpt["model_state_dict"])
+            model.load_state_dict(ckpt["model_state_dict"])
             logger.info(f"[RESUME] Loaded model weights from {last_weights}")
 
         if os.path.exists(last_state):
@@ -231,7 +226,7 @@ def train_dino(config, resume_dir=None):
     model.train()
     criterion.train()
     if training_config.get("compile", False):
-        # Ztorch.compile() attempts to optimize the model's forward computation graph
+        # torch.compile() attempts to optimize the model's forward computation graph
         # to make training or inference faster
         model = torch.compile(model)
 
@@ -306,10 +301,6 @@ def train_dino(config, resume_dir=None):
                         # loss_dict, batch_loss are batch level, metric_dict is epoch level, progress.total = nb batches
                         update_metric_dict(metric_dict, loss_dict, batch_loss, loader.dataset.data_split, progress.total)
 
-                        # Heartbeat — updated every N batches
-                        # +1 because epoch and batch_idx are 0-indexed but we want to log 1-indexed values
-                        logger.heartbeat(epoch + 1, batch_idx + 1, progress.total)
-
                     # END for batch loop
 
                     if training and scheduler is not None:
@@ -317,6 +308,9 @@ def train_dino(config, resume_dir=None):
 
             # END for each train val dataloader
 
+            # { "train": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
+            #      "val": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
+            #      "epoch": ... }
             metric_dict["epoch"] = epoch + 1
             # save epoch-level metrics to history and print them
             metrics_history.append(metric_dict)
@@ -337,15 +331,13 @@ def train_dino(config, resume_dir=None):
 
         # END for epoch loop
 
-        # === Training ended normally ===
+        # Training ended normally
         checkpoint_mgr.save_final(training_config["epochs"], model, optimizer, scaler, scheduler)
         logger.finish()
-        update_run_status(config, run_id, "done")
 
     # Like Ctrl + C
     except KeyboardInterrupt:
         logger.interrupted()
-        update_run_status(config, run_id, "interrupted")
         # Save partial metrics so the run isn't a total loss
         if metrics_history:
             np.save(os.path.join(run_dir, "metrics.npy"), metrics_history, allow_pickle=True)
@@ -354,14 +346,16 @@ def train_dino(config, resume_dir=None):
 
     except Exception as exc:
         logger.crash(str(exc))
-        update_run_status(config, run_id, "error")
         if metrics_history:
             np.save(os.path.join(run_dir, "metrics.npy"), metrics_history, allow_pickle=True)
         raise
 
     # === Post-training: metrics, config, eval ===
-    # metrics_history = [ { "train": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ..., "class_error":..., "cardinality_error":... },
-    # "val": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ..., "class_error":..., "cardinality_error":... }, "epoch": 1 },... ]
+    # metrics_history =
+    # [ { "train": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ..., "class_error":..., "cardinality_error":... },
+    # "val": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ..., "class_error":..., "cardinality_error":... },
+    # "epoch": ... },
+    # ... ]
     np.save(os.path.join(run_dir, "metrics.npy"), metrics_history, allow_pickle=True)
     plot_metrics(run_dir)
 
@@ -390,7 +384,6 @@ def train_dino(config, resume_dir=None):
         dataloaders=[train_dataloader, val_dataloader],
         predict_fn=predict,
         device=device,
-        # Prediction conf !Warining! no "conf_thresh" in train_config.yaml
         conf_thresh=training_config.get("conf_thresh", 0.05),
     )
     logger.info(str(metrics))
@@ -415,4 +408,5 @@ def train_dino(config, resume_dir=None):
         device=device,
     )
 
+    logger.info("Post-training complete")
     return best_model

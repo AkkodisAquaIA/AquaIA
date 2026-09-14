@@ -395,7 +395,9 @@ def init_distributed_mode(args):
 
 @torch.no_grad()
 def accuracy(output, target, topk=(1,)):
-    """Computes the precision@k for the specified values of k"""
+    """Computes the precision@k for the specified values of k.
+    Z: Top-k accuracy is the percentage of samples whose true class
+    appears among the model’s k highest-scoring predictions."""
     # Z: if no element in target, return scalar 0
     if target.numel() == 0:
         return [torch.zeros([], device=output.device)]
@@ -403,10 +405,10 @@ def accuracy(output, target, topk=(1,)):
     batch_size = target.size(0)
 
     # Z: output.topk(k=maxk, dim=1, largest=True, sorted=True)
-    # Z: taking the top maxk classes with the highest scores for each sample
-    # Z: along the 1st dimension (the category dimension)
+    # Z: for each sample select the maxk classes with highest scores along class dim
+    # Z: pred = tensor([ [2,4],[1,3],...]) sample 0 class 2 4, sample 1 class 1 3, ...
     _, pred = output.topk(maxk, 1, True, True)
-    # Z: transpose
+    # Z: transpose, tensor([ [2,1,...],[4,3,...]]) 1st for all samples, 2nd for all samples, ...
     pred = pred.t()
     # Z: compare the predicted classes with the true classes
     correct = pred.eq(target.view(1, -1).expand_as(pred))

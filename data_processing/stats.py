@@ -1,14 +1,20 @@
-# Computes dataset channel mean and standard deviation for the PyTorch image pipeline.
-# Streamlines 1 image at a time to prevent OOM (no batch_size).
-# Aggregates 'train', 'val', and 'test' under 'images'.
-# Uses RGB, bilinear resize, (C, H, W), and 1/255.0 scaling.
-# Saves 'stats.npy' in the <dataset_name> folder.
+# Computes dataset channel mean and standard deviation for the PyTorch image pipeline
+# Streamlines 1 image at a time to prevent OOM (no batch_size)
+# Aggregates 'train', 'val', and 'test' under 'images'
+# Uses RGB, bilinear resize, (C, H, W), and 1/255.0 scaling
+# Saves 'stats_<image_size>.npy' in the <dataset_name> folder
 
 import os
 import numpy as np
 from PIL import Image
 from pathlib import Path
 
+# Constants
+DATASET_NAME = "coco_custom_match"
+IMAGE_SIZE = 640
+
+
+# Return base directory, two levels up from this file's location
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -31,7 +37,7 @@ def _get_sorted_jpg_files(dataset_dir):
     return sorted(jpg_files, key=_numeric_sort_key)
 
 
-def compute_and_save_stats(dataset_name="coco_custom_match", image_size=640):
+def compute_and_save_stats(dataset_name=DATASET_NAME, image_size=IMAGE_SIZE):
     dataset_dir = os.path.join(BASE_DIR, "datasets", dataset_name)
     sorted_files = _get_sorted_jpg_files(dataset_dir)
     n = len(sorted_files)
@@ -58,6 +64,7 @@ def compute_and_save_stats(dataset_name="coco_custom_match", image_size=640):
                 # Transform to (C, H, W)
                 arr = np.transpose(arr, (2, 0, 1))
                 # Accumulate the sum and sum of squares for each channel
+                # sum_ and sum_sq_ are of shape (3,) for RGB channels
                 sum_ += np.sum(arr, axis=(1, 2))
                 sum_sq_ += np.sum(arr**2, axis=(1, 2))
 
@@ -65,6 +72,7 @@ def compute_and_save_stats(dataset_name="coco_custom_match", image_size=640):
             print(f"Failed to read image {file_path}: {e}")
             continue
 
+        # Print progress every 500 images or at the end
         if (idx + 1) % 500 == 0 or (idx + 1) == n:
             print(f"Processed: {idx + 1}/{n}")
 
@@ -76,10 +84,11 @@ def compute_and_save_stats(dataset_name="coco_custom_match", image_size=640):
     # Ensure no small negative values due to floating point errors
     var = np.clip(var, a_min=0, a_max=None)
     std = np.sqrt(var)
+    # mean and std are of shape (3,) for RGB channels
     stats = {"mean": mean.astype(np.float32), "std": std.astype(np.float32)}
 
-    # Save stats.npy
-    output_path = os.path.join(dataset_dir, "stats.npy")
+    # Keep statistics for different input sizes in separate files
+    output_path = os.path.join(dataset_dir, f"stats_{image_size}.npy")
     np.save(output_path, stats)
     print(f"Statistics computation completed! Saved to: {output_path}")
     print(f"Mean: {stats['mean']}, Std: {stats['std']}")
@@ -88,8 +97,8 @@ def compute_and_save_stats(dataset_name="coco_custom_match", image_size=640):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Compute dataset stats.npy for mean and std")
-    parser.add_argument("--dataset", type=str, default="coco_custom_match", help="Name of the dataset")
-    parser.add_argument("--image-size", type=int, default=640, help="Output image size")
+    parser = argparse.ArgumentParser(description="Compute dataset stats_<image_size>.npy for mean and std")
+    parser.add_argument("--dataset", type=str, default=DATASET_NAME, help="Name of the dataset")
+    parser.add_argument("--image-size", type=int, default=IMAGE_SIZE, help="Output image size")
     args = parser.parse_args()
     compute_and_save_stats(dataset_name=args.dataset, image_size=args.image_size)
