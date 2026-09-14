@@ -308,7 +308,7 @@ def train_dino(config, resume_dir=None):
 
             # END for each train val dataloader
 
-            #{ "train": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
+            # { "train": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
             #      "val": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
             #      "epoch": ... }
             metric_dict["epoch"] = epoch + 1

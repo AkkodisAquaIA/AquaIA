@@ -48,15 +48,15 @@ class DETR(nn.Module):
 
     def forward(self, features, pos):
         """Returns a dict with the following elements:
-            - "pred_logits": the classification logits for all queries.
-                             Shape= [batch_size x num_queries x (num_classes)]
-            - Z: "pred_logits": classification logits for object classes only, shape [batch_size, num_queries, num_classes].
-            - Z: Unmatched/no-object queries are trained as all-zero targets in the sigmoid focal loss.
-            - "pred_boxes": The normalized boxes coordinates for all queries, represented as
-                            (center_x, center_y, width, height). These values are normalized in [0, 1],
-                            relative to the size of each individual image (disregarding possible padding).
-            - "aux_outputs": Optional, only returned when auxilary losses are activated. It is a list of
-                             dictionnaries containing the two above keys for each decoder layer.
+        - "pred_logits": the classification logits for all queries.
+                         Shape= [batch_size x num_queries x (num_classes)]
+        - Z: "pred_logits": classification logits for object classes only, shape [batch_size, num_queries, num_classes].
+        - Z: Unmatched/no-object queries are trained as all-zero targets in the sigmoid focal loss.
+        - "pred_boxes": The normalized boxes coordinates for all queries, represented as
+                        (center_x, center_y, width, height). These values are normalized in [0, 1],
+                        relative to the size of each individual image (disregarding possible padding).
+        - "aux_outputs": Optional, only returned when auxilary losses are activated. It is a list of
+                         dictionnaries containing the two above keys for each decoder layer.
         """
 
         # Z: hs = output hidden states from decoder

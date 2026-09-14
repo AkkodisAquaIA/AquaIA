@@ -23,7 +23,7 @@ class BaseDetectionDataset:
     - builds a sorted list of label files
     - parses YOLO-format label files into class labels and bounding boxes
     - stores targets as torch tensors
-    - some functions for augmentation 
+    - some functions for augmentation
     """
 
     def __init__(
