@@ -15,8 +15,10 @@ data:
   split: "test"
 
 inference:
-  batch: 8
   imgsz : 640
+  batch: 8
+  # Number of PyTorch DataLoader workers
+  workers: 3
   # Confidence threshold used to filter bbox predictions before mAP calculation
   # Only for DINO
   conf_thresh: 0.05

@@ -39,7 +39,7 @@ def print_metrics(metrics):
     """Print epoch summary metrics. For training and inference, metrics looks like
     { "train": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
       "val": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
-      "epoch": 1 }"""
+      "epoch": ... }"""
     print("-" * 5 + " Epoch summary " + "-" * 5)
     for split, loss_dict in metrics.items():
         # Skip items like "epoch" that are not loss dicts

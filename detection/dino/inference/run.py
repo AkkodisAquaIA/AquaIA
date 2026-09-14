@@ -10,7 +10,7 @@ from detection.dino.predict import predict, normalize_imgsz
 
 
 def load_model(run_dir, backbone_id, img_size, num_classes, device):
-    """Z: load best model weights, initialize model, load weights to model, set to eval mode."""
+    """Load best model weights, initialize model, load weights to model, set to eval mode."""
     checkpoint = torch.load(Path(run_dir) / "weights" / "best.pt", map_location=device)
     model = DINODetector(
         backbone_id=backbone_id,
@@ -23,19 +23,19 @@ def load_model(run_dir, backbone_id, img_size, num_classes, device):
     return model
 
 
-def infer_dino(config, ctx):
-    """Z: Read inference parameters from configuration, load best trained model,
+def infer_dino(config, context):
+    """Read inference params from config, load best trained model,
     create inference dataset and dataloader, run prediction and metric evaluation,
     save inference visualizations and metrics."""
-    # config from infer_config.yaml, ctx derived from resolved_config.yaml
+    # config from infer_config.yaml, context derived from resolved_config.yaml
     inference_config = config["inference"]
     data_cfg = config["data"]
 
-    device = ctx["device"]
-    run_dir = ctx["run_dir"]
-    run_config = ctx["run_config"]
-    infer_data_root = ctx["infer_data_root"]
-    output_dir = ctx["output_dir"]
+    device = context["device"]
+    run_dir = context["run_dir"]
+    run_config = context["run_config"]
+    infer_data_root = context["infer_data_root"]
+    output_dir = context["output_dir"]
 
     _, num_classes = load_class_names(infer_data_root)
     model = load_model(
@@ -52,16 +52,19 @@ def infer_dino(config, ctx):
         data_split=data_split,
         img_size=imgsz,
     )
+    num_workers = max(int(inference_config.get("workers", 0)), 0)
     infer_loader = DataLoader(
         infer_dataset,
         batch_size=inference_config["batch"],
         shuffle=False,
-        num_workers=3,
+        num_workers=num_workers,
         collate_fn=detection_collate_fn,
     )
     num_samples = int(inference_config.get("num_samples", 20))
     if num_samples <= 0:
         raise ValueError("inference.num_samples must be greater than 0")
+
+    # num_samples visualization
     save_sample_predictions(
         model=model,
         subset=infer_dataset,
@@ -72,7 +75,8 @@ def infer_dino(config, ctx):
         seed=inference_config["seed"],
         device=device,
     )
-    model.eval()
+
+    # Inference full size
     metrics = compute_metrics(
         model=model,
         dataloaders=[infer_loader],
@@ -82,5 +86,6 @@ def infer_dino(config, ctx):
     )
     print(metrics)
     save_metrics(metrics, output_dir)
+    print("Inference complete!")
 
     return output_dir

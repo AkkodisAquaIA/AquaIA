@@ -27,7 +27,14 @@ def infer_yolo(config, ctx):
         data_split=data_cfg.get("split", "test"),
         img_size=normalize_imgsz(config, "inference"),
     )
-    infer_loader = DataLoader(infer_dataset, batch_size=inference_config["batch"], shuffle=False, num_workers=3, collate_fn=detection_collate_fn)
+    num_workers = max(int(inference_config.get("workers", 0)), 0)
+    infer_loader = DataLoader(
+        infer_dataset,
+        batch_size=inference_config["batch"],
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=detection_collate_fn,
+    )
 
     num_samples = int(inference_config.get("num_samples", 20))
     if num_samples <= 0:

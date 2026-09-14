@@ -116,7 +116,7 @@ class TrainingLogger:
 
     def log_best(self, epoch: int, val_loss: float) -> None:
         """Log when a new best validation loss is achieved into train.log + console and update meta information."""
-        self._logger.info(f"[BEST ] New best at epoch {epoch} — val_loss={val_loss:.4f}")
+        self._logger.info(f"[BEST] New best at epoch {epoch} — val_loss={val_loss:.4f}")
         self._meta["best_epoch"] = epoch
         self._meta["best_val_loss"] = round(float(val_loss), 6)
         self._write_meta()

@@ -130,7 +130,7 @@ def save_sample_predictions(model, subset, output_dir, predict_fn, num_samples=2
     """Sample a subset of images from dataset, run model predictions, and save annotated images.
     For training and inference."""
     samples = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
-    print(f"Sampled {len(samples['img_paths'])} images from {subset.dataset_root}")
+    print(f"Sampled {len(samples['img_paths'])} images from {subset.dataset_root} (split={subset.data_split})")
     model.eval()
     predictions = predict_fn(model=model, samples=samples, device=device, conf_thres=conf)
 
