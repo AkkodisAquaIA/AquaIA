@@ -43,9 +43,9 @@ The dataset YAML defines the dataset paths and class names. `stats_<image_size>.
 
 ## Quick start
 
-Run commands from the repository root.
+Run commands from the repository root. By default, `python main.py train` and `python main.py infer` use the DINO configuration files: `detection/train_config_dino.yaml` and `detection/infer_config_dino.yaml`, respectively.
 
-Train a model:
+Train a DINO model:
 
 ```bash
 python main.py train
@@ -57,10 +57,17 @@ Resume a DINO training run:
 python main.py train --resume <run_directory>
 ```
 
-Run inference on the dataset and split selected in the inference configuration:
+Run DINO inference on the dataset and split selected in the inference configuration:
 
 ```bash
 python main.py infer
+```
+
+For YOLO training and inference, explicitly select the corresponding YOLO configuration file:
+
+```bash
+python main.py train --config detection/train_config_yolo.yaml
+python main.py infer --config detection/infer_config_yolo.yaml
 ```
 
 Use a custom configuration file:
@@ -74,8 +81,10 @@ python main.py infer --config <infer_config_path>
 
 The active configuration files are:
 
-- `detection/train_config.yaml` for training.
-- `detection/infer_config.yaml` for inference and evaluation.
+- `detection/train_config_dino.yaml` for DINO training (default).
+- `detection/infer_config_dino.yaml` for DINO inference and evaluation (default).
+- `detection/train_config_yolo.yaml` for YOLO training.
+- `detection/infer_config_yolo.yaml` for YOLO inference and evaluation.
 - `num_queries` in [dino/dino_detector.py](dino/dino_detector.py) sets the maximum number of objects the DINO / DETR model can predict per image; remember to adjust it for your dataset before training.
 
 ## Output directories
@@ -176,11 +185,13 @@ The Detection part contains the following folders and files.
 │   │
 │   ├── checkpoint.py             # Saves model weights and saves/loads optimizer, scaler, scheduler, and epoch state.
 │   ├── config_printer.py         # Prints config when training.
-│   ├── infer_config.yaml         # Inference config.
+│   ├── infer_config_dino.yaml    # Inference config for DINO (default).
+│   ├── infer_config_yolo.yaml    # Inference config for YOLO.
 │   ├── inference_context.py      # Shared run context and header tools for inference.
 │   ├── metric.py                 # Metrics’ update, print, save, calculate functions.
 │   ├── runner.py                 # Loads configs and dispatches training (detection/<model>/training/run.py/train_<model>) or inference (detection/<model>/inference/run.py/infer_<model>).
-│   └── train_config.yaml         # Training config.
+│   ├── train_config_dino.yaml    # Training config for DINO (default).
+│   └── train_config_yolo.yaml    # Training config for YOLO.
 │
 └── main.py                       # Entry point, dispatches train or infer commands through detection/runner.py/train_from_config or infer_from_config.
 ```

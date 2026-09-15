@@ -1,8 +1,3 @@
-# "Only for <model>" applies only to the parameter on the immediately following line
-# If a parameter is preceded by "# Only for <model>", that parameter is used only by the specified model
-# Only the exact wording "Only for <model>" indicates that a parameter is model-specific;
-# no other wording carries this meaning
-
 run:
   # Root directory where all training runs are saved
   runs_root: "results/detect/dinov3_small_pretrained"
@@ -20,7 +15,6 @@ inference:
   # Number of PyTorch DataLoader workers
   workers: 3
   # Confidence threshold used to filter bbox predictions before mAP calculation
-  # Only for DINO
   conf_thresh: 0.05
   # Confidence threshold for bbox prediction filtering
   # DINO uses it to filter saved prediction visualizations
