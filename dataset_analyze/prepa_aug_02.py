@@ -31,7 +31,7 @@ REPERTOIRE_SORTIE = Path(
 # Seuil : les sous-répertoires contenant moins que cette
 # valeur seront listés
 
-SEUIL = 2
+SEUIL = 10 # Voir Ici le test
 
 # Nombre de noms affichés par ligne
 
@@ -219,8 +219,6 @@ def augmentation_bruit():
     ])
 
 
-
-
 def augmentation_luminosite_contraste_bruit():
     """
     Modification de la luminosité/contraste suivie
@@ -239,7 +237,6 @@ def augmentation_luminosite_contraste_bruit():
             p=1.0
         )
     ])
-
 
 
 def augmentation_zoom(fond):
@@ -265,11 +262,6 @@ def augmentation_zoom(fond):
             p=1.0
         )
     ])
-
-
-
-
-
 
 
 
@@ -1366,7 +1358,7 @@ def main():
     sous_seuil = [
         (nom, nombre)
         for nom, nombre in statistiques
-        if nombre <= SEUIL
+        if nombre <= SEUIL   # Voir Ici le test
     ]
 
     # --------------------------------------------------------

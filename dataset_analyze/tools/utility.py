@@ -400,7 +400,7 @@ def waiting_any_key(message: str, color_key: str = 'wait') :
     input_color = rgb_to_ansi(color) # type: ignore
 
     # Displays the prompt in color
-    colored_prompt = f"{input_color}[wait...] {message}{Style.RESET_ALL}"
+    colored_prompt = f"{input_color}[Wait...] {message}{Style.RESET_ALL}"
 
     _ = input(colored_prompt).strip().lower()
 
