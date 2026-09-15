@@ -1,8 +1,3 @@
-# "Only for <model>" applies only to the parameter on the immediately following line
-# If a parameter is preceded by "# Only for <model>", that parameter is used only by the specified model
-# Only the exact wording "Only for <model>" indicates that a parameter is model-specific;
-# no other wording carries this meaning
-
 model:
   family: "dinov3"
   size : "small"
@@ -18,24 +13,15 @@ output:
   # null automatically uses results/<task>/<family>_<size>_<init>
   # Set a path string to override the automatically generated project directory
   project: null
-  # Only for YOLO
-  exist_ok: true
-  # Only for YOLO
-  save_period: 0
-  # Only for YOLO
-  plots: true
 
 logging:
   # Save last.pt + last_training_state.pt every N epochs (0 = only at end)
-  # Only for DINO
   save_period: 5
 
 training:
   # ---------- CORE TASK / MODE ----------
   # Both use it to create output dir, YOLO uses it to specify the training task
   task: "detect"
-  # Only for YOLO
-  mode: "train"
 
   # ---------- DEVICE ----------
   device: "auto"
@@ -49,7 +35,6 @@ training:
   # ---------- TRAINING SCHEDULE ----------
   epochs: 100
   # If cos_lr, warmup steps = epochs * warmup_ratio 
-  # Only for DINO
   warmup_ratio: 0.05
 
   # ---------- OPTIMIZER & LR ----------
@@ -63,56 +48,38 @@ training:
 
   # ---------- LOSS / MATCHER HYPERPARAMETERS ----------
   # Weights for class, bbox, giou in matching cost
-  # Only for DINO
   cost_class: 2.0
-  # Only for DINO
   cost_bbox: 5.0
-  # Only for DINO
   cost_giou: 2.0
-  # Only for DINO
   cost_bbox_type: "l1"
   # Weights for class, bbox, giou in loss
   cls: 4.0
   box: 5.0
-  # Only for DINO
   giou: 2.0
 
-  # ---------- LOSS / BOX / CLS HYPERPARAMETERS ----------
-  # See Ultralytics default.yaml for the latest recommended defaults
-  # box: 7.5            # box loss gain
-  # cls: 0.5            # classification loss gain
-  # dfl: 1.5            # distribution focal loss gain
-
   # ---------- DATA AUGMENTATION ----------
-  # Set all zero to disable training augmentation for YOLO
-  # Only for DINO
   augment: true
   hsv_h: 0.005
   hsv_s: 0.1
   hsv_v: 0.1
-  degrees: 180.0
-  translate: 0.1
-  scale: 0.2
-  flipud: 0.5
+  degrees: 5
+  translate: 0.05
+  scale: 0.1
+  flipud: 0.1
   fliplr: 0.5
-  mosaic: 0.1
-  cutmix: 0.05
+  mosaic: 0.01
+  cutmix: 0.01
   # Disable Mosaic and CutMix in the last N epochs
-  # DINO: values greater than or equal to epochs disable them from the first epoch
+  # Make sure close_mosaic <= epochs
   close_mosaic: 40
 
   # ---------- INFERENCE / EVAL-RELATED ----------
   # Confidence threshold used to filter bbox predictions before mAP calculation
-  # Only for DINO
   conf_thresh: 0.05
   # Confidence threshold for bbox prediction filtering
   # DINO uses it to filter saved prediction visualizations
   # YOLO uses it as the confidence threshold during validation
   conf: 0.3
-  # Only for YOLO
-  iou: 0.5
-  # Only for YOLO
-  val: true
 
   # ---------- PERFORMANCE / MISC ----------
   # torch.compile() attempts to optimize the model's forward computation graph
