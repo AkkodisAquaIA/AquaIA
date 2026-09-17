@@ -1,0 +1,11 @@
+# Données publiques téléchargées et caches Hugging Face.
+data/*
+!data/.gitkeep
+
+# Rapports générés localement par le notebook.
+reports/*
+!reports/.gitkeep
+
+# État local de Jupyter.
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/

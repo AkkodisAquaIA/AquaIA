@@ -1,0 +1,8 @@
+# Dépendances réservées à l'exploration AquaMonitor.
+jupyterlab>=4.0
+ipykernel>=6.0
+datasets>=2.19
+pyarrow>=15.0
+pandas>=2.2
+openpyxl>=3.1
+seaborn>=0.13

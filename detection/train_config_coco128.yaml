@@ -1,0 +1,21 @@
+model:
+  family: "yolo26"
+  size: "s"
+  init: "pretrained"
+
+data:
+  dataset_yaml: "datasets/coco128"
+
+output:
+  exist_ok: true
+  save_period: 0
+  plots: true
+
+training:
+  task: "detect"
+  mode: "train"
+  device: "mps"
+  imgsz: 640
+  batch: 16
+  workers: 2
+  epochs: 10
