@@ -70,8 +70,8 @@ Notes:
 - Missing label files are reported as warnings and skipped.
 
 Output:
-- A summary file `results_statistics_detection.csv` is saved inside the selected result folder's `docs_run/` folder.
-- Format includes per-subfolder counts with columns `Subfolder, No detection, Total, Crop boxes`, plus a `TOTAL` line.
+- A summary file `results_statistics_detection.csv` is saved inside the selected result folder's `docs_run/` folder. Format includes per-subfolder counts with columns `Subfolder, No detection, Total, Crop boxes`, plus a `TOTAL` line.
+- `docs_run/no_detection_images.csv` lists each no-detection image in a `Relative image path` column, relative to `IMAGES_FOLDER` in the selected run's `docs_run/model_cfg.yaml`. Missing label files are excluded. If no images qualify, only the header is written.
 
 ## 6. Count predicted classes (count_class.py)
 `count_class.py` counts how many times each predicted class appears across all label files under a result folder.

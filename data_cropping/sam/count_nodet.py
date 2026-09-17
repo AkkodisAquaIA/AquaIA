@@ -1,7 +1,7 @@
 import csv
 from pathlib import Path
 from collections import defaultdict
-from utils import select_or_latest, load_yaml_from_result, collect_image_files, load_label_txt
+from utils import select_or_latest, load_yaml_from_result, collect_image_files, load_label_txt, to_long_path
 
 PARENT_FOLDER = Path(__file__).resolve().parent  # Folder containing this script
 
@@ -19,6 +19,7 @@ if __name__ == "__main__":
     subfolder_nodet_counts = defaultdict(int)
     subfolder_total_counts = defaultdict(int)
     subfolder_box_counts = defaultdict(int)
+    nodet_image_paths = []
 
     # For each image
     for img_path in image_files:
@@ -34,7 +35,7 @@ if __name__ == "__main__":
         label_path = label_dir / f"{img_path.stem}.txt"
 
         # Skip if label file does not exist
-        if not label_path.exists():
+        if not Path(to_long_path(label_path)).exists():
             print(f"Warning: Label file not found for image {img_path}")
             continue
 
@@ -45,6 +46,7 @@ if __name__ == "__main__":
         # File is empty or contains only whitespace = no detections
         if labels.shape[0] == 0:
             subfolder_nodet_counts[subfolder_name] += 1
+            nodet_image_paths.append(img_path.relative_to(Path(images_folder)).as_posix())
 
     # Write the results to a CSV file
     output_dir = det_dir / "docs_run" / "results_statistics_detection.csv"
@@ -68,5 +70,13 @@ if __name__ == "__main__":
 
         writer.writerow(["TOTAL", total_all_nodets, total_all_images, total_all_boxes])
 
+    # List no-detection images relative to IMAGES_FOLDER from the saved run config.
+    nodet_csv_path = det_dir / "docs_run" / "no_detection_images.csv"
+    with nodet_csv_path.open("w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Relative image path"])
+        writer.writerows([image_path] for image_path in nodet_image_paths)
+
     print(f"\nNo detection images: {total_all_nodets}, Total images: {total_all_images}, Total crop boxes: {total_all_boxes}")
     print(f"\nDone! Saved summary to: {output_dir}")
+    print(f"\nSaved no detection image list to: {nodet_csv_path}")
