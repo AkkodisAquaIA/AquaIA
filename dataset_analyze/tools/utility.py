@@ -319,7 +319,7 @@ def get_path_color(prompt: str, color_key: str = 'input') -> Path:
 
     while True:
         input_color: str = rgb_to_ansi(color)
-        colored_prompt: str = f"{input_color}[?] {prompt}: {Style.RESET_ALL}"
+        colored_prompt: str = f"{input_color}[?] {prompt} : {Style.RESET_ALL}"
 
         path_input: str = input(colored_prompt).strip()
 
@@ -515,6 +515,30 @@ def draw_bar(value, vmin, vmax, length=50):
     
     return scale
 
+def afficher_liste_alignee(liste, nb_colonnes=4, separateur=" | "):
+    # Conversion en chaînes
+    items = [str(x) for x in liste]
+
+    # Découpage en lignes
+    lignes = [
+        items[i:i + nb_colonnes]
+        for i in range(0, len(items), nb_colonnes)
+    ]
+
+    # Largeur maximale de chaque colonne
+    largeurs = [0] * nb_colonnes
+    for ligne in lignes:
+        for col, valeur in enumerate(ligne):
+            largeurs[col] = max(largeurs[col], len(valeur))
+
+    # Affichage
+    for ligne in lignes:
+        print(
+            separateur.join(
+                valeur.ljust(largeurs[col])
+                for col, valeur in enumerate(ligne)
+            )
+        )
 
 
 def sortie_de_programme():

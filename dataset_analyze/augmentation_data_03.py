@@ -14,6 +14,7 @@ import numpy as np
 import csv
 from datetime import datetime
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 import cv2
 
@@ -59,8 +60,8 @@ class InfoOccupationBestiole:
 
 
 REPERTOIRE_TRAVAIL = Path(
-    "C:/Users/pierre.fancelli/Documents/_Dev/Aqua-IA/"
-    "Data/Data_Perla_Thibaud"
+    "C:/Users/pierre.fancelli/Documents/_Dev/Aqua-IA/Data/"
+    "Data_Perla_Thibaud"
 )
 
 MODE_TEST = False
@@ -82,6 +83,36 @@ SEUIL_DETECTION =  35  # seuil_detection(image)
 
 
 #==================================================================================================
+
+
+def create_file_fault(file):
+
+    with open(
+        REPERTOIRE_TRAVAIL / "rapport_defauts.csv",
+        "w",
+        newline="",
+        encoding="utf-8"
+    ) as f:
+
+        writer = csv.writer(f, delimiter=";")
+
+        writer.writerow([
+            "Date",
+            "Répertoire",
+            "Image",
+            "Erreur"
+        ])
+
+        for defaut in liste_defauts:
+
+            writer.writerow([
+                defaut["date"],
+                defaut["repertoire"],
+                defaut["image"],
+                defaut["erreur"]
+            ])
+
+
 # ============================================================
 # COULEUR DU FOND
 # ============================================================
@@ -1067,23 +1098,18 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         )
 
         if image is None:
-            print(f"[ERREUR] Impossible de lire : {img.name}")
-
             liste_defauts.append({
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "repertoire": str(repertoire),
                 "image": img.name,
-                "erreur": "Impossible de lire l'image"
+                "erreur": "Lecture Impossible"
             })
 
             defaut += 1
             return 0, defaut
         
-
-
         dossier_sortie = img.parent
             
-
         # ------------------------------------------------------------
         # Détection de la couleur du fond
         # ------------------------------------------------------------
@@ -1378,8 +1404,6 @@ def transf_image(img, repertoire, defaut, liste_defauts):
 
     except Exception as e:
 
-        print(f"[ERREUR] {img.name} : {e}")
-
         liste_defauts.append({
             "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "repertoire": str(repertoire),
@@ -1411,16 +1435,14 @@ if not REPERTOIRE_TRAVAIL.exists():
 
     print()
     display.print(f"le répertoire '{REPERTOIRE_TRAVAIL}' n'existe pas", colors['error'])
-    exit()
+    REPERTOIRE_TRAVAIL = util.get_path_color("Répertoire à utiliser")
     
 
 if not REPERTOIRE_TRAVAIL.is_dir():
+
     print()
     display.print(f"le chemin indiqué '{REPERTOIRE_TRAVAIL}' n'est pas un répertoire", colors['error'])
-    # print("\nERREUR : le chemin indiqué n'est pas un répertoire :")
-    # print(REPERTOIRE_TRAVAIL)
-    exit()
-    
+    REPERTOIRE_TRAVAIL = util.get_path_color("Répertoire à utiliser")
 
 # --------------------------------------------------------
 # Recherche des sous-répertoires
@@ -1442,7 +1464,8 @@ if nombre_sous_repertoires == 0:
     print("\nAucun sous-répertoire trouvé.")
     exit()
 else:
-    print(f"\n  Il y a {nombre_sous_repertoires} sous répertoires à traiter")    
+    pls = "s" if nombre_sous_repertoires != 1 else ""
+    print(f"\n  Il y a {nombre_sous_repertoires} sous répertoire{pls} à traiter")    
 
 
 
@@ -1450,7 +1473,8 @@ else:
 nombre_total_images_creees = 0
 df = 0
 liste_defauts = []
-
+liste_rep_vide = []
+total_image = 0
 
 # --------------------------------------------------------
 # Parcours des sous-répertoires
@@ -1461,14 +1485,10 @@ for indice_rep, repertoire in enumerate(
     start=1
 ):
 
+
     print()
-    print("-" * 80)
-    print(
-        f"Répertoire "
-        f"{indice_rep}/{nombre_sous_repertoires} : "
-        f"{repertoire.name}"
-    )
-    print("-" * 80)
+    tt = f"{indice_rep}/{nombre_sous_repertoires}"
+    display.header_title(f"{repertoire.name}", colors['aqua_light'], tt)
 
     # Recherche des images
     images = sorted(
@@ -1482,27 +1502,31 @@ for indice_rep, repertoire in enumerate(
     )
 
     nombre_images = len(images)
+    total_image += nombre_images
 
     if nombre_images == 0:
         print("  Aucune image trouvée.")
+        liste_rep_vide.append(repertoire.name)
         continue
 
-    print(f"  {nombre_images} image(s) trouvée(s).")
+    pls = "s" if nombre_images != 1 else ""    
+    print(f"  {nombre_images} image{pls} trouvée{pls}.")
     print()
 
-    # Traitement des images
+
     for indice_img, image in enumerate(
-        images,
+        tqdm(
+            images,
+            desc="Images",
+            unit="img",
+            ncols=120,
+            position=0
+            ),
         start=1
-    ):
-
-        print(
-            f"    [{indice_img:4d}/{nombre_images:4d}] "
-            f"{image.name}"
-        )
-
+        ):
+    
         # ------------------------------------------------
-        # Appel de votre fonction d'augmentation
+        # Appel la fonction d'augmentation
         # ------------------------------------------------
  
         nombre_images_creees, df = transf_image(
@@ -1522,49 +1546,43 @@ for indice_rep, repertoire in enumerate(
 # ============================================================
 
 print()
-print("-" * 80)
-print(
-    f"Nombre total d'images créées : "
-    f"{nombre_total_images_creees}"
+display.titre(
+        "Résumait d’exécution",
+        colors['aqua']
+    )
+
+nb_i = util.format_nombre(total_image)
+display.print(
+    f"- {nombre_sous_repertoires} Répertoires traités comprenant "
+    f"{nb_i} images ",
+    colors['ok']
+    )  
+
+if len(liste_rep_vide) != 0:
+    display.print(
+        f"- Nombre de répertoires vides : "
+        f"{len(liste_rep_vide) :}",
+        colors['warning']
+        )  
+    util.afficher_liste_alignee(liste_rep_vide)
+    print()
+
+
+nb_t = util.format_nombre(nombre_total_images_creees)
+
+display.print(
+    f"- Nombre total d'images créées : "
+    f"{nb_t} ",
+    colors['info']
 )
+if df != 0 :
+    display.print(f"- Nombre de défaut : {df}", colors['error'])
+    print(
+    f" - Rapport des défauts enregistré dans :\n"
+    f"  {REPERTOIRE_TRAVAIL}"
+    )
+    create_file_fault(liste_defauts)
+
 print("-" * 80)
-print()
-
-
-display.print(f"nombre de défaut : {df}", colors['error'])
-
-with open(
-    REPERTOIRE_TRAVAIL / "rapport_defauts.csv",
-    "w",
-    newline="",
-    encoding="utf-8"
-) as f:
-
-    writer = csv.writer(f, delimiter=";")
-
-    writer.writerow([
-        "Date",
-        "Répertoire",
-        "Image",
-        "Erreur"
-    ])
-
-    for defaut in liste_defauts:
-
-        writer.writerow([
-            defaut["date"],
-            defaut["repertoire"],
-            defaut["image"],
-            defaut["erreur"]
-        ])
-
-print()
-print(
-f"Rapport des défauts enregistré dans :\n"
-f"{REPERTOIRE_TRAVAIL}"
-
-)
-
-
 print("\nFin du traitement !!!")
 
