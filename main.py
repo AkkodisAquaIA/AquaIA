@@ -13,8 +13,8 @@ def build_parser():
 
     # Create train subparser supporting "train" subcommand
     train_parser = subparsers.add_parser("train", help="Train a model")
-    # Add --config argument to train subparser, defaulting to detection/train_config.yaml
-    train_parser.add_argument("--config", type=str, default=os.path.join("detection", "train_config.yaml"))
+    # Add --config argument to train subparser, defaulting to detection/train_config_dino.yaml
+    train_parser.add_argument("--config", type=str, default=os.path.join("detection", "train_config_dino.yaml"))
     # Add --resume argument to train subparser, allowing user to specify a run directory to resume training from
     # !Warning! Only for DINO
     train_parser.add_argument("--resume", type=str, default=None, metavar="RUN_DIR", help="Resume training from an existing run directory (e.g. runs/20250615_142200)")
@@ -22,7 +22,7 @@ def build_parser():
     train_parser.set_defaults(command_handler=handle_train)
 
     infer_parser = subparsers.add_parser("infer", help="Run inference on the specified dataset and split")
-    infer_parser.add_argument("--config", type=str, default=os.path.join("detection", "infer_config.yaml"))
+    infer_parser.add_argument("--config", type=str, default=os.path.join("detection", "infer_config_dino.yaml"))
     infer_parser.set_defaults(command_handler=handle_infer)
 
     return parser
@@ -41,13 +41,13 @@ def handle_infer(args):
 def main(args=None):
     """When args=None, parse_args reads parameters from terminal.
     Run "python main.py train"
-    -> train_from_config("detection/train_config.yaml", resume_dir=None)
+    -> train_from_config("detection/train_config_dino.yaml", resume_dir=None)
 
     Run "python main.py train --resume runs/<run_id>"
-    -> train_from_config("detection/train_config.yaml", resume_dir="runs/<run_id>")
+    -> train_from_config("detection/train_config_dino.yaml", resume_dir="runs/<run_id>")
 
     Run "python main.py infer"
-    -> infer_from_config("detection/infer_config.yaml")
+    -> infer_from_config("detection/infer_config_dino.yaml")
     """
     parser = build_parser()
     # Parse command line arguments
@@ -55,12 +55,12 @@ def main(args=None):
     # If resume training, receive args = ["train", "--resume", "runs/<run_id>"]
     # Based on the rules registered previously, parse to get an object similar to:
     # parsed_args.command = "train"
-    # parsed_args.config = "detection/train_config.yaml"
+    # parsed_args.config = "detection/train_config_dino.yaml"
     # parsed_args.resume = None, or "runs/<run_id>" if --resume is specified
     # parsed_args.command_handler = handle_train
     parsed_args = parser.parse_args(args=args)
     # Call the appropriate handler: handle_train(parsed_args)
-    # -> train_from_config("detection/train_config.yaml", resume_dir=parsed_args.resume)
+    # -> train_from_config("detection/train_config_dino.yaml", resume_dir=parsed_args.resume)
     return parsed_args.command_handler(parsed_args)
 
 

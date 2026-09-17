@@ -1,0 +1,28 @@
+run:
+  # Root directory where all training runs are saved
+  runs_root: "results/detect/yolo11_n_pretrained"
+  # One specific training run directory
+  run_dir: null
+
+data:
+  infer_data_root: "datasets/coco_custom_match"
+  # Dataset split used for inference
+  split: "test"
+
+inference:
+  imgsz : 640
+  batch: 8
+  # Number of PyTorch DataLoader workers
+  workers: 3
+  # Confidence threshold for bbox prediction filtering
+  # DINO uses it to filter saved prediction visualizations
+  # YOLO uses it to filter saved inference visualizations
+  # and predictions passed to the custom compute_metrics()
+  # thereby affecting the custom mAP
+  conf: 0.3
+  # Number of samples used for prediction visualization, must be greater than 0
+  num_samples: 20
+  seed: 0
+
+output:
+  output_dir: null
