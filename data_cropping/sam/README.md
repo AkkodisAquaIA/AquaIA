@@ -1,6 +1,6 @@
 ﻿## sam
 This folder provides a promptable detection workflow:
-1. Define the classes you want to detect in `dataset_dict.yaml` (COCO128 is provided as an example).
+1. Define the textuel prompts you want to detect in `dataset_dict.yaml` (COCO128 is provided as an example).
 2. Configure the model and inference settings in `model_cfg.yaml`.
 3. Run detection with `detection.py`. Custom non-native per-class and global NMS can be optionally applied.
 4. Crop detected boxes with `crop.py`.
@@ -9,7 +9,7 @@ This folder provides a promptable detection workflow:
 7. Compare crop outputs with `check_image.py`.
 8. Evaluate results with `metric.py`.
 
-## 1. Configure classes (dataset_dict.yaml)
+## 1. Configure textuel prompts (dataset_dict.yaml)
 Maps class IDs to class names. The keys are the class IDs used in labels.
 - Example: COCO128 uses IDs 0-79.
 - Add or remove classes.
@@ -24,10 +24,10 @@ Key settings:
 - `yoloe26`: `CONF`, `PATH`, `HALF`, `SAVE`, `IMGSZ`, `BATCH`, `NMS_CLS`, `NMS_GLB`, `UNIC`.
 
 Notes:
-- `NMS_CLS` is **not** the native model NMS. It is a custom per-class NMS applied after inference:
+- `NMS_CLS` is **not** the native model NMS. It is a custom per-class NMS applied after inference. When boxes of the same class overlap beyond the threshold, suppress boxes with lower confidence:
 - Set `NMS_CLS` to a float IoU threshold (e.g., `0.7`) to enable.
 - Set `NMS_CLS` to `False` to disable.
-- `NMS_GLB` is **not** the native model NMS. It is a custom global NMS applied after inference, regardless of class:
+- `NMS_GLB` is **not** the native model NMS. It is a custom global NMS applied after inference. Regardless of class, any overlap exceeding the threshold triggers suppression:
 - Set `NMS_GLB` to a float IoU threshold (e.g., `0.7`) to enable.
 - Set `NMS_GLB` to `False` to disable.
 - `UNIC` keeps only one bbox per image after all other post-processing:
