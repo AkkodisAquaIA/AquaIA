@@ -326,8 +326,34 @@ def get_path_color(prompt: str, color_key: str = 'input') -> Path:
         if os.path.exists(path_input):
             return Path(path_input)
 
+        if os.path.isdir(path_input):
+            return Path(path_input)
+
         error_text: str = f"Chemin invalide: {path_input}. Veuillez réessayer."
         display.print(error_text, colors['error'])
+
+def get_directory_color(prompt: str, color_key: str = "input") -> Path:
+    display = dc.DisplayColor()
+    color = get_color(color_key)
+
+    while True:
+        input_color = rgb_to_ansi(color)
+        colored_prompt = (
+            f"{input_color}[?] {prompt} : {Style.RESET_ALL}"
+        )
+
+        path = Path(input(colored_prompt).strip())
+
+        if path.is_dir():
+            return path
+
+        display.print(
+            f"Le chemin '{path}' n'est pas un répertoire valide.",
+            colors['error']
+        )
+
+
+        
 
 def selection(maxi) -> int:
   

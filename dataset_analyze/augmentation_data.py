@@ -1,10 +1,4 @@
-"""
-  !!!!!!!!
-Dans le programme, les parties de code en commentaire, ne sont pas à suprimer.
-Elles sont mises en veille pour ne tester que'une partie du code 
-  
-   !!!!!!!!
-"""
+
 
 from tools import system as syst
 from pathlib import Path
@@ -15,7 +9,6 @@ import csv
 from datetime import datetime
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
 import cv2
 
 
@@ -59,14 +52,6 @@ class InfoOccupationBestiole:
     # y_max: int
 
 
-REPERTOIRE_TRAVAIL = Path(
-    "C:/Users/pierre.fancelli/Documents/_Dev/Aqua-IA/Data/"
-    "Data_Perla_Thibaud"
-)
-
-MODE_TEST = False
-
-
 # ------------------------------------------------------------
 # Nombre de modifications par type
 # ------------------------------------------------------------
@@ -78,17 +63,15 @@ NB_UNITAIRE =1
 NB_MULTI = 1
 #
 
-
 SEUIL_DETECTION =  35  # seuil_detection(image)
 
 
 #==================================================================================================
-
-
+# Création d'un fichier d'erreurs pour les images
 def create_file_fault(file):
 
     with open(
-        REPERTOIRE_TRAVAIL / "rapport_defauts.csv",
+        repertoire_de_travail / "rapport_defauts.csv",
         "w",
         newline="",
         encoding="utf-8"
@@ -310,7 +293,6 @@ def ajouter_marge_bbox(
         y_max
     )
 
-
 def selectionner_composante_principale(
     masque,
     surface_min_pct=0.001
@@ -448,7 +430,6 @@ def creer_masque_par_saturation(
     )
 
     return masque_bestiole
-
 
 def creer_masque_bestiole(
     image,
@@ -671,20 +652,12 @@ def creer_masque_bestiole(
             seuil_saturation=25
         )
 
-        methode_detection = "saturation HSV"
-    if MODE_TEST :
-        print(
-            "Méthode de détection :",
-            methode_detection
-        )
 
     return (
         masque_bestiole,
         fond,
         difference
     )
-
-
 
 def diagnostiquer_detection_bestiole(image, seuil=SEUIL_DETECTION):
     """
@@ -703,58 +676,12 @@ def diagnostiquer_detection_bestiole(image, seuil=SEUIL_DETECTION):
         )
     )
 
-    if MODE_TEST :
-    # --------------------------------------------------------
-    # Affichage du masque final
-    # --------------------------------------------------------
-
-
-        plt.figure(
-            figsize=(12, 8)
-        )
-
-        plt.imshow(
-            masque_bestiole,
-            cmap="gray"
-        )
-
-        plt.title(
-            "Masque nettoyé de la bestiole"
-        )
-
-        plt.axis("off")
-        plt.tight_layout()
-        plt.show()
-
-        # --------------------------------------------------------
-        # Affichage facultatif de la carte des distances
-        # Cette partie peut rester en commentaire après les tests.
-        # --------------------------------------------------------
-        # TODO : à commenter après les tests
-        plt.figure(figsize=(12, 8))
-        
-        plt.imshow(
-            difference,
-            cmap="hot"
-        )
-        
-        plt.colorbar()
-        
-        plt.title(
-            "Distance à la couleur du fond"
-        )
-        
-        plt.axis("off")
-        plt.tight_layout()
-        plt.show()
-
+    
     # --------------------------------------------------------
     # Recherche de la bounding box
     # --------------------------------------------------------
 
-    positions = np.where(
-        masque_bestiole > 0
-    )
+    positions = np.where(masque_bestiole > 0)
 
     if len(positions[0]) == 0:
 
@@ -765,21 +692,13 @@ def diagnostiquer_detection_bestiole(image, seuil=SEUIL_DETECTION):
 
         return
 
-    y_min = int(
-        positions[0].min()
-    )
+    y_min = int(positions[0].min())
 
-    y_max = int(
-        positions[0].max()
-    )
+    y_max = int(positions[0].max())
 
-    x_min = int(
-        positions[1].min()
-    )
+    x_min = int(positions[1].min())
 
-    x_max = int(
-        positions[1].max()
-    )
+    x_max = int(positions[1].max())
 
     # --------------------------------------------------------
     # Dimensions de l'image
@@ -808,77 +727,10 @@ def diagnostiquer_detection_bestiole(image, seuil=SEUIL_DETECTION):
     # Calcul des marges en pourcentage
     # --------------------------------------------------------
 
-    marge_gauche_pct = (
-        marge_gauche / largeur * 100
-    )
-
-    marge_droite_pct = (
-        marge_droite / largeur * 100
-    )
-
-    marge_haut_pct = (
-        marge_haut / hauteur * 100
-    )
-
-    marge_bas_pct = (
-        marge_bas / hauteur * 100
-    )
-
-
-
-    if MODE_TEST : 
-        # --------------------------------------------------------
-        # Affichage des informations
-        # --------------------------------------------------------
-
-        print()
-        print("-" * 60)
-        print("DIAGNOSTIC DE LA DÉTECTION")
-        print("-" * 60)
-
-        print(
-            f"Couleur du fond estimée : {fond}"
-        )
-
-        print(
-            f"Seuil de détection      : {seuil}"
-        )
-
-        print()
-        print("Zone détectée :")
-        print(f"  Gauche : {x_min} px")
-        print(f"  Haut   : {y_min} px")
-        print(f"  Droite : {x_max} px")
-        print(f"  Bas    : {y_max} px")
-
-        print()
-        print("Marges :")
-
-        print(
-            f"  Gauche : {marge_gauche:4d} px "
-            f"({marge_gauche_pct:.2f} %)"
-        )
-
-        print(
-            f"  Droite : {marge_droite:4d} px "
-            f"({marge_droite_pct:.2f} %)"
-        )
-
-        print(
-            f"  Haut   : {marge_haut:4d} px "
-            f"({marge_haut_pct:.2f} %)"
-        )
-
-        print(
-            f"  Bas    : {marge_bas:4d} px "
-            f"({marge_bas_pct:.2f} %)"
-        )
-
-        print()
-        print(
-            f"Marge minimale : {marge_min} px"
-        )
-
+    marge_gauche_pct = (marge_gauche / largeur * 100)
+    marge_droite_pct = (marge_droite / largeur * 100)
+    marge_haut_pct = (marge_haut / hauteur * 100)
+    marge_bas_pct = (marge_bas / hauteur * 100)
 
 def detecter_zone_bestiole(image, seuil=SEUIL_DETECTION):
     """
@@ -904,21 +756,10 @@ def detecter_zone_bestiole(image, seuil=SEUIL_DETECTION):
     if len(positions[0]) == 0:
         return None
 
-    y_min = int(
-        positions[0].min()
-    )
-
-    y_max = int(
-        positions[0].max()
-    )
-
-    x_min = int(
-        positions[1].min()
-    )
-
-    x_max = int(
-        positions[1].max()
-    )
+    y_min = int(positions[0].min())
+    y_max = int(positions[0].max())
+    x_min = int(positions[1].min())
+    x_max = int(positions[1].max())
 
     return (
         x_min,
@@ -926,7 +767,6 @@ def detecter_zone_bestiole(image, seuil=SEUIL_DETECTION):
         x_max,
         y_max
     )
-
 
 def calculer_zoom_max(image, bbox):
     """
@@ -974,7 +814,6 @@ def calculer_zoom_max(image, bbox):
         return 1.0
 
     return min(limites)
-
 
 def calculer_occupation(image, seuil=SEUIL_DETECTION):
     """
@@ -1072,13 +911,6 @@ def appliquer_augmentation(
             buffer.tofile(str(chemin_sortie))
 
 
-        if MODE_TEST :
-            print(
-                f"{numero:02d} : "
-                f"{nom_augmentation:25s} → "
-                f"{chemin_sortie.name}"
-            )
-
         numero += 1
 
     return numero
@@ -1091,12 +923,12 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         # ------------------------------------------------------------
         # Lecture de l'image
         # ------------------------------------------------------------
-
         image = cv2.imdecode(
             np.fromfile(str(img), dtype=np.uint8),
             cv2.IMREAD_COLOR
         )
 
+        # Ce n'est pas un format d'image valide
         if image is None:
             liste_defauts.append({
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -1114,9 +946,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         # Détection de la couleur du fond
         # ------------------------------------------------------------
         fond = couleur_fond(image)
-        if MODE_TEST :
-            print(f"Couleur de fond détectée : {fond}")
-
+        
 
         # ------------------------------------------------------------
         # Détermination du zoom maxi
@@ -1135,14 +965,6 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         info_occ = calculer_occupation(image)
         info_image_bboxe = calculer_occupation_bbox(image, bestiole)
 
-        if MODE_TEST :
-            print()
-            print()
-            print(f"Surface image     : {info_occ.surface_image:,.0f} px")
-            print(f"Surface bestiole  : {info_occ.surface_bestiole:,.0f} px")
-            print(f"Occupation réelle : {info_occ.occupation:.3f} soit {info_occ.occupation_pct:.1f} %")
-            print(f"Occupation Bboxe  : {info_image_bboxe:.3f}")
-            print()
 
         occupation_pct = info_occ.occupation_pct
 
@@ -1178,11 +1000,6 @@ def transf_image(img, repertoire, defaut, liste_defauts):
             zoom_limite
         )
 
-        if MODE_TEST :
-            print()
-            print('-' * 80)
-            print(f" - Zoom maxi possible/retenu : {zoom_max_possible:.2f} / {zoom_max:.2f}")
-            print()
 
         # ------------------------------------------------------------
         # Détermination du contraste et de la luminosité
@@ -1196,26 +1013,6 @@ def transf_image(img, repertoire, defaut, liste_defauts):
 
         noise_range = parametres_bruit(image)
 
-
-        if MODE_TEST :
-            print(f" - Luminosité : {moyenne:.3f}")
-            print(f" - Écart-type : {ecart_type:.3f}")
-            print()
-
-            print(f" - Paramètres luminosité/contraste : {brightness:.3f} / {contrast:.3f}")
-            print()
-
-            print(f' - plage réglage gamma : {gamma}')
-            print(  )
-
-
-            print(f' - plage réglage bruit : {noise_range}')
-            print(  )
-
-            print('-' * 80)
-            print(  )
-
-
         light_data = LightParameters(
             brightness=brightness,
             contrast=contrast,
@@ -1224,6 +1021,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         )
 
 
+        # Début des blocs d'augmentations
         # ------------------------------------------------------------
         # Initialisation du compteur
         # ------------------------------------------------------------
@@ -1415,7 +1213,6 @@ def transf_image(img, repertoire, defaut, liste_defauts):
 
         return 0, defaut
 
-
 ################################################################################################################
 
 
@@ -1425,24 +1222,18 @@ def transf_image(img, repertoire, defaut, liste_defauts):
 
 # Efface l'écran avant de commencer
 syst.clear_screen()
-
+print()
+display.titre(
+        "Lancement de l'Augmentation de Données",
+        colors['aqua']
+    )
+print()
 
 # --------------------------------------------------------
-# Vérification du répertoire
+# Récupération du Répertoire à utiliser
 # --------------------------------------------------------
+repertoire_de_travail = util.get_directory_color("Répertoire à utiliser")
 
-if not REPERTOIRE_TRAVAIL.exists():
-
-    print()
-    display.print(f"le répertoire '{REPERTOIRE_TRAVAIL}' n'existe pas", colors['error'])
-    REPERTOIRE_TRAVAIL = util.get_path_color("Répertoire à utiliser")
-    
-
-if not REPERTOIRE_TRAVAIL.is_dir():
-
-    print()
-    display.print(f"le chemin indiqué '{REPERTOIRE_TRAVAIL}' n'est pas un répertoire", colors['error'])
-    REPERTOIRE_TRAVAIL = util.get_path_color("Répertoire à utiliser")
 
 # --------------------------------------------------------
 # Recherche des sous-répertoires
@@ -1451,7 +1242,7 @@ if not REPERTOIRE_TRAVAIL.is_dir():
 sous_repertoires = sorted(
     [
         repertoire
-        for repertoire in REPERTOIRE_TRAVAIL.iterdir()
+        for repertoire in repertoire_de_travail.iterdir()
         if repertoire.is_dir()
     ],
     key=lambda p: p.name.lower()
@@ -1464,8 +1255,9 @@ if nombre_sous_repertoires == 0:
     print("\nAucun sous-répertoire trouvé.")
     exit()
 else:
+    nb_spret =  util.format_nombre(nombre_sous_repertoires)
     pls = "s" if nombre_sous_repertoires != 1 else ""
-    print(f"\n  Il y a {nombre_sous_repertoires} sous répertoire{pls} à traiter")    
+    print(f"\n  Il y a {nb_spret} sous répertoire{pls} à traiter\n\n")    
 
 
 
@@ -1480,15 +1272,18 @@ total_image = 0
 # Parcours des sous-répertoires
 # --------------------------------------------------------
 
+# Boucle principale sur Répétoire
 for indice_rep, repertoire in enumerate(
-    sous_repertoires,
+    tqdm(
+        sous_repertoires,
+        desc="Répertoires",
+        unit="rep",
+        ncols=120,
+        position=0
+    ),
     start=1
-):
+    ):
 
-
-    print()
-    tt = f"{indice_rep}/{nombre_sous_repertoires}"
-    display.header_title(f"{repertoire.name}", colors['aqua_light'], tt)
 
     # Recherche des images
     images = sorted(
@@ -1505,22 +1300,19 @@ for indice_rep, repertoire in enumerate(
     total_image += nombre_images
 
     if nombre_images == 0:
-        print("  Aucune image trouvée.")
         liste_rep_vide.append(repertoire.name)
         continue
 
-    pls = "s" if nombre_images != 1 else ""    
-    print(f"  {nombre_images} image{pls} trouvée{pls}.")
-    print()
 
-
+    # Boucle secondaire pour les Images
     for indice_img, image in enumerate(
         tqdm(
             images,
             desc="Images",
             unit="img",
             ncols=120,
-            position=0
+            position=1,
+            leave=False
             ),
         start=1
         ):
@@ -1544,20 +1336,24 @@ for indice_rep, repertoire in enumerate(
 # ============================================================
 # RÉSULTAT
 # ============================================================
-
 print()
 display.titre(
         "Résumait d’exécution",
         colors['aqua']
     )
 
+# Nombres de répertoire & d'images
+
+
+rep_traited = nombre_sous_repertoires - len(liste_rep_vide) 
 nb_i = util.format_nombre(total_image)
 display.print(
-    f"- {nombre_sous_repertoires} Répertoires traités comprenant "
+    f"- {rep_traited}/{nombre_sous_repertoires} Répertoires traités comprenant "
     f"{nb_i} images ",
     colors['ok']
     )  
 
+# Nombre de répertoire vide & liste de ceux-ci
 if len(liste_rep_vide) != 0:
     display.print(
         f"- Nombre de répertoires vides : "
@@ -1567,22 +1363,23 @@ if len(liste_rep_vide) != 0:
     util.afficher_liste_alignee(liste_rep_vide)
     print()
 
-
+# Nombre d'images crées
 nb_t = util.format_nombre(nombre_total_images_creees)
-
 display.print(
     f"- Nombre total d'images créées : "
     f"{nb_t} ",
     colors['info']
 )
+
+# Nombres images en défaut
 if df != 0 :
     display.print(f"- Nombre de défaut : {df}", colors['error'])
     print(
     f" - Rapport des défauts enregistré dans :\n"
-    f"  {REPERTOIRE_TRAVAIL}"
+    f"  {repertoire_de_travail}"
     )
     create_file_fault(liste_defauts)
 
-print("-" * 80)
+
 print("\nFin du traitement !!!")
 
