@@ -74,6 +74,10 @@ training:
   close_mosaic: 40
 
   # ---------- INFERENCE / EVAL-RELATED ----------
+  # !Temporary! Seed used to sample training set for post-training mAP evaluation
+  train_subset_seed: 42
+  # !Temporary! Fraction of sampling
+  train_subset_ratio: 0.5
   # Confidence threshold used to filter bbox predictions before mAP calculation
   conf_thresh: 0.05
   # Confidence threshold for bbox prediction filtering

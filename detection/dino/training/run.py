@@ -19,6 +19,39 @@ from detection.utils.plot_utils import plot_metrics, save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
 from detection.logging import TrainingLogger, CheckpointManager
 
+# !Temporary! 
+# ------ START ------
+import random
+from torch.utils.data import Subset
+
+
+class DetectionDatasetSubset(Subset):
+    """!Temporary! Dataset subset exposing the metadata required by detection metrics."""
+
+    def __init__(self, dataset, indices, data_split):
+        super().__init__(dataset, indices)
+        self.img_size = dataset.img_size
+        self.data_split = data_split
+
+
+def build_train_subset_dataloader(train_dataset, batch_size, num_workers, seed, ratio):
+    """!Temporary! Build an evaluation loader containing a part of training set."""
+    dataset_size = len(train_dataset)
+    subset_size = int(dataset_size * ratio)
+    rng = random.Random(seed)
+    indices = sorted(rng.sample(range(dataset_size), subset_size))
+    subset = DetectionDatasetSubset(train_dataset, indices, data_split="train_subset")
+    loader = DataLoader(
+        subset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True,
+        collate_fn=detection_collate_fn,
+    )
+    return loader
+# ------ End ------
+
 
 def get_datasets(
     data_yaml_path,
@@ -379,9 +412,29 @@ def train_dino(config, resume_dir=None):
 
     best_model.eval()
     # Compute metrics on train and val sets using the best model
+    # !Temporary! 
+    # ------ START ------
+    train_subset_seed = int(training_config.get("train_subset_seed", 42))
+    train_subset_ratio = float(training_config.get("train_subset_ratio", 0.5))
+    train_subset_dataloader = build_train_subset_dataloader(
+        train_dataset=train_set,
+        batch_size=training_config["batch"],
+        num_workers=num_workers,
+        seed=train_subset_seed,
+        ratio=train_subset_ratio,
+    )
+    if train_subset_dataloader:
+        logger.info(
+            f"[EVALUATION] Training subset: {len(train_subset_dataloader.dataset)}/{len(train_set)} "
+            f"images (ratio={train_subset_ratio}, seed={train_subset_seed})"
+        )
+    # ------ END ------
+
     metrics = compute_metrics(
         model=best_model,
-        dataloaders=[train_dataloader, val_dataloader],
+        # dataloaders=[train_dataloader, val_dataloader],
+        # !Temporary! The line above is the original
+        dataloaders=[train_subset_dataloader, val_dataloader],
         predict_fn=predict,
         device=device,
         conf_thresh=training_config.get("conf_thresh", 0.05),
