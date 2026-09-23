@@ -1,195 +1,914 @@
-"""
-  !!!!!!!!
-Dans le programme, les parties de code en commentaire, ne sont pas à suprimer.
-Elles sont mises en veille pour ne tester que'une partie du code 
-  
-   !!!!!!!!
-"""
-
 from tools import system as syst
 from pathlib import Path
+from dataclasses import dataclass
 
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-import albumentations as A
-from dataclasses import dataclass
-
 
 from tools import utility as util
 
 
-#**************************************************************************************************
-
-# ============================================================
+# ==================================================================================================
 # PARAMÈTRES
-# ============================================================
+# ==================================================================================================
+
+SEUIL_DETECTION = None
+pas_seuil = 5
+TAILLE_BORD = 20
+SURFACE_MIN_PCT = 0.001
+
+MARGE_BBOX_PCT = 0.03
+MARGE_BBOX_MIN_PX = 5
+
+
+# ==================================================================================================
+# STRUCTURES DE DONNÉES
+# ==================================================================================================
 
 @dataclass
 class InfoOccupationBestiole:
-
-    occupation : float
-    occupation_pct : float
-
-    surface_bestiole : float
-    surface_image : float
+    occupation: float
+    occupation_pct: float
+    surface_bestiole: float
+    surface_image: float
 
 
-SEUIL_DETECTION = 35  # seuil_detection(image)
-
-
-#==================================================================================================
-# ============================================================
-# COULEUR DU FOND
-# ============================================================
-def couleur_fond(image):
+def afficher_histogramme_difference(
+    difference,
+    seuil
+):
     """
-    Estime la couleur du fond à partir des quatre coins
-    de l'image.
+    Affiche l'histogramme des distances à la couleur du fond.
     """
 
-    hauteur, largeur = image.shape[:2]
+    plt.figure(
+        figsize=(12, 6)
+    )
 
-    taille = 20
+    plt.hist(
+        difference.ravel(),
+        bins=100,
+        color="steelblue",
+        alpha=0.7
+    )
 
-    coins = np.concatenate([
-        image[
-            0:taille,
-            0:taille
-        ].reshape(-1, 3),
+    plt.axvline(
+        seuil,
+        color="red",
+        linewidth=2,
+        label=f"Seuil = {seuil:.1f}"
+    )
 
-        image[
-            0:taille,
-            largeur - taille:largeur
-        ].reshape(-1, 3),
+    plt.xlabel(
+        "Distance à la couleur du fond"
+    )
 
-        image[
-            hauteur - taille:hauteur,
-            0:taille
-        ].reshape(-1, 3),
+    plt.ylabel(
+        "Nombre de pixels"
+    )
 
-        image[
-            hauteur - taille:hauteur,
-            largeur - taille:largeur
-        ].reshape(-1, 3)
-    ])
+    plt.title(
+        "Histogramme des distances au fond"
+    )
 
-    fond = np.median(coins, axis=0)
+    plt.legend()
 
-    return tuple(int(x) for x in fond)
+    plt.grid(
+        alpha=0.3
+    )
 
-# ============================================================
-# Analyse de la luminosité et du contraste
-# ============================================================
+    p90 = np.percentile(difference, 90)
+    p95 = np.percentile(difference, 95)
+    p99 = np.percentile(difference, 99)
+
+    plt.axvline(p90, color="green", linestyle="--", label=f"P90={p90:.1f}")
+    plt.axvline(p95, color="orange", linestyle="--", label=f"P95={p95:.1f}")
+    plt.axvline(p99, color="purple", linestyle="--", label=f"P99={p99:.1f}")
+
+
+
+
+
+    plt.tight_layout()
+
+    plt.show()
+
+
+
+
+
+# ==================================================================================================
+# LECTURE D'IMAGE
+# ==================================================================================================
+
+def lire_image(chemin_image):
+    """
+    Lit une image en prenant en charge les chemins comportant
+    des caractères accentués ou Unicode.
+
+    Parameters
+    ----------
+    chemin_image : str | Path
+        Chemin de l'image.
+
+    Returns
+    -------
+    np.ndarray
+        Image OpenCV au format BGR.
+
+    Raises
+    ------
+    FileNotFoundError
+        Si le fichier n'existe pas ou ne peut pas être lu.
+    """
+
+    chemin_image = Path(chemin_image)
+
+    if not chemin_image.is_file():
+        raise FileNotFoundError(
+            f"Le fichier n'existe pas : {chemin_image}"
+        )
+
+    try:
+        donnees = np.fromfile(
+            str(chemin_image),
+            dtype=np.uint8
+        )
+
+        image = cv2.imdecode(
+            donnees,
+            cv2.IMREAD_COLOR
+        )
+
+    except Exception as erreur:
+        raise FileNotFoundError(
+            f"Impossible de lire l'image : {chemin_image}"
+        ) from erreur
+
+    if image is None:
+        raise FileNotFoundError(
+            f"Impossible de décoder l'image : {chemin_image}"
+        )
+
+    return image
+
+
+# ==================================================================================================
+# ANALYSE DE LA LUMINOSITÉ ET DU CONTRASTE
+# ==================================================================================================
+
 def analyser_luminosite(image):
+    """
+    Calcule la luminosité moyenne et l'écart-type
+    de l'image en niveaux de gris.
+    """
 
-    gray = cv2.cvtColor(
+    image_grise = cv2.cvtColor(
         image,
         cv2.COLOR_BGR2GRAY
     )
 
-    moyenne = np.mean(gray)
+    moyenne = float(
+        np.mean(image_grise)
+    )
 
-    ecart_type = np.std(gray)
+    ecart_type = float(
+        np.std(image_grise)
+    )
 
     return moyenne, ecart_type
 
+
 def parametres_lum_contraste(image):
+    """
+    Détermine les paramètres de luminosité et de contraste
+    en fonction de l'écart-type de l'image.
+    """
 
     _, sigma = analyser_luminosite(image)
 
     if sigma < 25:
         return 0.10, 0.10
 
-    elif sigma < 50:
+    if sigma < 50:
         return 0.15, 0.15
 
-    else:
-        return 0.25, 0.25
+    return 0.25, 0.25
+
 
 def parametres_gamma(image):
-
-    gray = cv2.cvtColor(
-        image,
-        cv2.COLOR_BGR2GRAY
-    )
-
-    sigma = np.std(gray)
-
-    if sigma < 25:
-        return (85, 115)
-
-    elif sigma < 50:
-        return (90, 110)
-
-    else:
-        return (95, 105)
-
-def parametres_bruit(image):
+    """
+    Détermine une plage de gamma en fonction
+    de l'écart-type de l'image.
+    """
 
     _, sigma = analyser_luminosite(image)
 
     if sigma < 25:
-        return (0.005, 0.02)
+        return 85, 115
 
-    elif sigma < 50:
-        return (0.01, 0.03)
+    if sigma < 50:
+        return 90, 110
 
-    else:
-        return (0.01, 0.04)
+    return 95, 105
+
+
+def parametres_bruit(image):
+    """
+    Détermine la plage de bruit à appliquer en fonction
+    de l'écart-type de l'image.
+    """
+
+    _, sigma = analyser_luminosite(image)
+
+    if sigma < 25:
+        return 0.005, 0.02
+
+    if sigma < 50:
+        return 0.01, 0.03
+
+    return 0.01, 0.04
+
 
 def seuil_detection(image):
+    """
+    Détermine automatiquement un seuil de détection
+    selon l'écart-type de l'image.
+    """
 
     _, sigma = analyser_luminosite(image)
 
     if sigma < 20:
         return 28
 
-    elif sigma < 35:
+    if sigma < 35:
         return 35
 
-    elif sigma < 50:
+    if sigma < 50:
         return 40
 
-    else:
-        return 45
+    return 45
 
-# ============================================================
-# Analyse de l'image pour détecter la bestiole pour le zoom
-# ============================================================
 
-def ajouter_marge_bbox(
+# ==================================================================================================
+# ESTIMATION DE LA COULEUR DU FOND
+# ==================================================================================================
+
+def couleur_fond(
     image,
-    bbox,
-    marge_pct=0.03,
-    marge_min_px=5
+    taille=20
 ):
     """
-    Agrandit une bounding box en ajoutant une marge.
-
-    La marge est calculée à partir des dimensions de l'image,
-    avec une valeur minimale en pixels.
+    Estime la couleur BGR du fond à partir des quatre coins.
 
     Parameters
     ----------
     image : np.ndarray
-        Image OpenCV.
+        Image OpenCV BGR.
 
-    bbox : tuple | None
-        (x_min, y_min, x_max, y_max).
+    taille : int
+        Taille en pixels des zones analysées dans les coins.
 
-    marge_pct : float
-        Marge proportionnelle aux dimensions de l'image.
-        Par exemple, 0.03 correspond à 3 %.
+    Returns
+    -------
+    tuple
+        Couleur médiane BGR du fond.
+    """
 
-    marge_min_px : int
-        Marge minimale en pixels.
+    if image is None:
+        raise ValueError(
+            "L'image transmise à couleur_fond() est None."
+        )
+
+    hauteur, largeur = image.shape[:2]
+
+    taille_maximale = max(
+        1,
+        min(
+            hauteur // 2,
+            largeur // 2
+        )
+    )
+
+    taille = int(
+        np.clip(
+            taille,
+            1,
+            taille_maximale
+        )
+    )
+
+    coin_haut_gauche = image[
+        0:taille,
+        0:taille
+    ].reshape(-1, 3)
+
+    coin_haut_droit = image[
+        0:taille,
+        largeur - taille:largeur
+    ].reshape(-1, 3)
+
+    coin_bas_gauche = image[
+        hauteur - taille:hauteur,
+        0:taille
+    ].reshape(-1, 3)
+
+    coin_bas_droit = image[
+        hauteur - taille:hauteur,
+        largeur - taille:largeur
+    ].reshape(-1, 3)
+
+    pixels_coins = np.concatenate(
+        [
+            coin_haut_gauche,
+            coin_haut_droit,
+            coin_bas_gauche,
+            coin_bas_droit
+        ],
+        axis=0
+    )
+
+    fond = np.median(
+        pixels_coins,
+        axis=0
+    )
+
+    return tuple(
+        int(valeur)
+        for valeur in fond
+    )
+
+
+# ==================================================================================================
+# TRAITEMENT DES COMPOSANTES CONNEXES
+# ==================================================================================================
+
+def selectionner_composante_principale(
+    masque,
+    surface_min_pct=0.001
+):
+    """
+    Conserve la plus grande composante connexe du masque.
+
+    Une composante touchant un bord n'est pas rejetée.
+
+    Parameters
+    ----------
+    masque : np.ndarray
+        Masque binaire uint8.
+
+    surface_min_pct : float
+        Surface minimale d'une composante par rapport
+        à la surface totale de l'image.
+
+    Returns
+    -------
+    masque_final : np.ndarray
+        Masque contenant uniquement la composante retenue.
+
+    meilleur_label : int | None
+        Identifiant de la composante retenue.
+
+    meilleure_surface : int
+        Surface en pixels de la composante retenue.
+    """
+
+    if masque is None:
+        raise ValueError(
+            "Le masque transmis est None."
+        )
+
+    if masque.ndim != 2:
+        raise ValueError(
+            "Le masque doit comporter un seul canal."
+        )
+
+    masque = masque.astype(
+        np.uint8,
+        copy=False
+    )
+
+    hauteur, largeur = masque.shape[:2]
+
+    surface_image = hauteur * largeur
+
+    surface_min = max(
+        1,
+        int(surface_image * surface_min_pct)
+    )
+
+    nombre_labels, labels, statistiques, _ = (
+        cv2.connectedComponentsWithStats(
+            masque,
+            connectivity=8
+        )
+    )
+
+    meilleur_label = None
+    meilleure_surface = 0
+
+    for label in range(1, nombre_labels):
+
+        surface = int(
+            statistiques[
+                label,
+                cv2.CC_STAT_AREA
+            ]
+        )
+
+        if surface < surface_min:
+            continue
+
+        if surface > meilleure_surface:
+            meilleur_label = label
+            meilleure_surface = surface
+
+    masque_final = np.zeros_like(
+        masque,
+        dtype=np.uint8
+    )
+
+    if meilleur_label is not None:
+        masque_final[
+            labels == meilleur_label
+        ] = 255
+
+    return (
+        masque_final,
+        meilleur_label,
+        meilleure_surface
+    )
+
+
+
+
+def calculer_seuil_depuis_difference(
+    difference,
+    taille_bord=20,
+    percentile_fond=99.0,
+    facteur_mad=4.0,
+    marge_seuil=2.0,
+    seuil_min=5.0,
+    seuil_max=None
+):
+    """
+    Calcule automatiquement le seuil de détection à partir
+    des distances observées dans une bande périphérique.
+
+    Parameters
+    ----------
+    difference : np.ndarray
+        Carte des distances à la couleur estimée du fond.
+
+    taille_bord : int
+        Épaisseur de la bande périphérique analysée.
+
+    percentile_fond : float
+        Percentile des distances du fond utilisé pour
+        éliminer la majorité des variations du fond.
+
+    facteur_mad : float
+        Nombre d'écarts-types robustes ajoutés à la médiane.
+
+    marge_seuil : float
+        Petite marge supplémentaire ajoutée au seuil.
+
+    seuil_min : float
+        Valeur minimale autorisée pour le seuil.
+
+    seuil_max : float | None
+        Valeur maximale autorisée. Si None, aucune limite
+        maximale n'est appliquée.
+
+    Returns
+    -------
+    seuil : float
+        Seuil automatique calculé.
+
+    informations : dict
+        Informations permettant de diagnostiquer le calcul.
+    """
+
+    if difference is None:
+        raise ValueError(
+            "La carte de différence est None."
+        )
+
+    if difference.ndim != 2:
+        raise ValueError(
+            "La carte de différence doit comporter deux dimensions."
+        )
+
+    hauteur, largeur = difference.shape
+
+    taille_maximale = max(
+        1,
+        min(
+            hauteur // 2,
+            largeur // 2
+        )
+    )
+
+    taille_bord = int(
+        np.clip(
+            taille_bord,
+            1,
+            taille_maximale
+        )
+    )
+
+    # Création d'un masque correspondant à toute la périphérie
+    masque_bord = np.zeros(
+        (hauteur, largeur),
+        dtype=bool
+    )
+
+    masque_bord[:taille_bord, :] = True
+    masque_bord[-taille_bord:, :] = True
+    masque_bord[:, :taille_bord] = True
+    masque_bord[:, -taille_bord:] = True
+
+    differences_fond = difference[masque_bord]
+
+    differences_fond = differences_fond[
+        np.isfinite(differences_fond)
+    ]
+
+    if differences_fond.size == 0:
+        raise ValueError(
+            "Aucune distance valide n'a été trouvée sur les bords."
+        )
+
+    mediane = float(
+        np.median(differences_fond)
+    )
+
+    mad = float(
+        np.median(
+            np.abs(
+                differences_fond - mediane
+            )
+        )
+    )
+
+    # Conversion du MAD en estimation robuste de l'écart-type
+    sigma_robuste = 1.4826 * mad
+
+    seuil_mad = (
+        mediane
+        + facteur_mad * sigma_robuste
+    )
+
+    seuil_percentile = float(
+        np.percentile(
+            differences_fond,
+            percentile_fond
+        )
+    )
+
+    # On retient la méthode la plus prudente
+    seuil = max(
+        seuil_mad,
+        seuil_percentile
+    )
+
+    seuil += float(
+        marge_seuil
+    )
+
+    seuil = max(
+        float(seuil_min),
+        float(seuil)
+    )
+
+    if seuil_max is not None:
+        seuil = min(
+            float(seuil_max),
+            seuil
+        )
+
+    informations = {
+        "mediane_fond": mediane,
+        "mad_fond": mad,
+        "sigma_robuste_fond": sigma_robuste,
+        "seuil_mad": float(seuil_mad),
+        "seuil_percentile": seuil_percentile,
+        "percentile_fond": float(percentile_fond),
+        "nombre_pixels_fond": int(differences_fond.size)
+    }
+
+    return float(seuil), informations
+
+
+# ==================================================================================================
+# CRÉATION DU MASQUE
+# ==================================================================================================
+
+def creer_masque_bestiole(
+    image,
+    seuil=None,
+    taille_bord=TAILLE_BORD,
+    surface_min_pct=SURFACE_MIN_PCT,
+    afficher_informations=False
+):
+    """
+    Crée un masque contenant la principale composante détectée.
+
+    Si seuil est None, le seuil est calculé automatiquement à
+    partir des distances observées dans la périphérie de l'image.
+    """
+
+    if image is None:
+        raise ValueError(
+            "L'image transmise à creer_masque_bestiole() "
+            "est None."
+        )
+
+    if image.ndim != 3 or image.shape[2] != 3:
+        raise ValueError(
+            "L'image doit être une image BGR à trois canaux."
+        )
+
+    hauteur, largeur = image.shape[:2]
+
+    # ------------------------------------------------------------------
+    # Lissage léger
+    # ------------------------------------------------------------------
+
+    image_lissee = cv2.GaussianBlur(
+        image,
+        (5, 5),
+        0
+    )
+
+    # ------------------------------------------------------------------
+    # Estimation de la couleur du fond
+    # ------------------------------------------------------------------
+
+    fond = couleur_fond(
+        image=image_lissee,
+        taille=taille_bord
+    )
+
+    fond_array = np.asarray(
+        fond,
+        dtype=np.float32
+    )
+
+    # ------------------------------------------------------------------
+    # Distance euclidienne BGR de chaque pixel au fond
+    # ------------------------------------------------------------------
+
+    difference = np.linalg.norm(
+        image_lissee.astype(np.float32) - fond_array,
+        axis=2
+    )
+
+    # ------------------------------------------------------------------
+    # Calcul automatique du seuil APRÈS le calcul de difference
+    # ------------------------------------------------------------------
+
+    seuil_automatique = seuil is None
+    informations_seuil = None
+
+    if seuil_automatique:
+
+        seuil, informations_seuil = (
+            calculer_seuil_depuis_difference(
+                difference=difference,
+                taille_bord=taille_bord,
+                percentile_fond=99.0,
+                facteur_mad=4.0,
+                marge_seuil=2.0,
+                seuil_min=5.0,
+                seuil_max=None
+            )
+        )
+
+    else:
+
+        seuil = float(seuil)
+
+    # ------------------------------------------------------------------
+    # Seuillage
+    # ------------------------------------------------------------------
+
+    masque_initial = (
+        difference > seuil
+    ).astype(np.uint8) * 255
+
+    # ------------------------------------------------------------------
+    # Ouverture
+    # ------------------------------------------------------------------
+
+    noyau_ouverture = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (3, 3)
+    )
+
+    masque_nettoye = cv2.morphologyEx(
+        masque_initial,
+        cv2.MORPH_OPEN,
+        noyau_ouverture
+    )
+
+    # ------------------------------------------------------------------
+    # Fermeture
+    # ------------------------------------------------------------------
+
+    noyau_fermeture = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (7, 7)
+    )
+
+    masque_nettoye = cv2.morphologyEx(
+        masque_nettoye,
+        cv2.MORPH_CLOSE,
+        noyau_fermeture
+    )
+
+    # ------------------------------------------------------------------
+    # Conservation de la composante principale
+    # ------------------------------------------------------------------
+
+    (
+        masque_bestiole,
+        meilleur_label,
+        meilleure_surface
+    ) = selectionner_composante_principale(
+        masque=masque_nettoye,
+        surface_min_pct=surface_min_pct
+    )
+
+    if meilleur_label is None:
+
+        methode_detection = "aucune détection"
+
+        masque_bestiole = np.zeros(
+            (hauteur, largeur),
+            dtype=np.uint8
+        )
+
+    else:
+
+        methode_detection = (
+            "distance à la couleur du fond"
+        )
+
+    # ------------------------------------------------------------------
+    # Informations
+    # ------------------------------------------------------------------
+
+    if afficher_informations:
+
+        pixels_masque_initial = int(
+            np.count_nonzero(masque_initial)
+        )
+
+        pixels_masque_final = int(
+            np.count_nonzero(masque_bestiole)
+        )
+
+        print()
+        print("Informations sur la création du masque :")
+        print(f"  Méthode               : {methode_detection}")
+        print(f"  Couleur du fond BGR   : {fond}")
+
+        if seuil_automatique:
+            print("  Type de seuil         : automatique")
+        else:
+            print("  Type de seuil         : manuel")
+
+
+        p_m_i = util.format_nombre(pixels_masque_initial)
+        p_m_f = util.format_nombre(pixels_masque_final)
+        m_s   = util.format_nombre(meilleure_surface)
+
+        print(f"  Seuil utilisé         : {seuil:.3f}")
+        print(f"  Pixels masque initial : {p_m_i}")
+        print(f"  Pixels masque final   : {p_m_f}")
+        print(f"  Composante principale : {m_s} px")
+
+        if informations_seuil is not None:
+
+            print()
+            print("  Calcul automatique du seuil :")
+
+            print(
+                f"    Médiane du fond      : "
+                f"{informations_seuil['mediane_fond']:.3f}"
+            )
+
+            print(
+                f"    MAD du fond          : "
+                f"{informations_seuil['mad_fond']:.3f}"
+            )
+
+            print(
+                f"    Sigma robuste        : "
+                f"{informations_seuil['sigma_robuste_fond']:.3f}"
+            )
+
+            print(
+                f"    Seuil médiane + MAD  : "
+                f"{informations_seuil['seuil_mad']:.3f}"
+            )
+
+            print(
+                f"    Seuil percentile     : "
+                f"{informations_seuil['seuil_percentile']:.3f}"
+            )
+
+            print(
+                f"    Pixels analysés      : "
+                f"{informations_seuil['nombre_pixels_fond']:,}"
+            )
+
+    return (
+        masque_bestiole,
+        fond,
+        difference,
+        float(seuil)
+    )
+
+
+# ==================================================================================================
+# CALCUL DE LA BOUNDING BOX
+# ==================================================================================================
+
+def detecter_zone_depuis_masque(masque):
+    """
+    Calcule la bounding box à partir d'un masque déjà créé.
 
     Returns
     -------
     tuple | None
-        Bounding box agrandie et limitée aux dimensions
-        de l'image.
+        (x_min, y_min, x_max, y_max).
+    """
+
+    positions_y, positions_x = np.where(
+        masque > 0
+    )
+
+    if positions_y.size == 0:
+        return None
+
+    x_min = int(
+        positions_x.min()
+    )
+
+    x_max = int(
+        positions_x.max()
+    )
+
+    y_min = int(
+        positions_y.min()
+    )
+
+    y_max = int(
+        positions_y.max()
+    )
+
+    return (
+        x_min,
+        y_min,
+        x_max,
+        y_max
+    )
+
+
+def detecter_zone_bestiole(
+    image,
+    seuil=None
+):
+    """
+    Crée le masque puis calcule la bounding box.
+
+    Cette fonction reste disponible pour une utilisation
+    indépendante. Dans le programme principal, le masque
+    n'est calculé qu'une seule fois.
+    """
+
+    masque_bestiole, _, _, _ = creer_masque_bestiole(
+        image=image,
+        seuil=seuil
+    )
+
+    return detecter_zone_depuis_masque(
+        masque_bestiole
+    )
+
+
+def ajouter_marge_bbox(
+    image,
+    bbox,
+    marge_pct=MARGE_BBOX_PCT,
+    marge_min_px=MARGE_BBOX_MIN_PX
+):
+    """
+    Ajoute une marge autour de la bounding box tout en
+    restant dans les dimensions de l'image.
     """
 
     if bbox is None:
@@ -200,13 +919,13 @@ def ajouter_marge_bbox(
     x_min, y_min, x_max, y_max = bbox
 
     marge_x = max(
-        marge_min_px,
-        int(largeur * marge_pct)
+        int(marge_min_px),
+        int(round(largeur * marge_pct))
     )
 
     marge_y = max(
-        marge_min_px,
-        int(hauteur * marge_pct)
+        int(marge_min_px),
+        int(round(hauteur * marge_pct))
     )
 
     x_min = max(
@@ -236,452 +955,342 @@ def ajouter_marge_bbox(
         y_max
     )
 
-def selectionner_composante_principale(
-    masque,
-    surface_min_pct=0.001
+
+# ==================================================================================================
+# CALCUL DE L'OCCUPATION
+# ==================================================================================================
+
+def calculer_occupation_depuis_masque(masque_bestiole):
+    """
+    Calcule l'occupation réelle à partir d'un masque existant.
+    """
+
+    surface_bestiole = int(
+        np.count_nonzero(masque_bestiole)
+    )
+
+    surface_image = int(
+        masque_bestiole.size
+    )
+
+    if surface_image == 0:
+        occupation = 0.0
+    else:
+        occupation = (
+            surface_bestiole
+            / surface_image
+        )
+
+    occupation_pct = (
+        occupation * 100.0
+    )
+
+    return InfoOccupationBestiole(
+        occupation=float(occupation),
+        occupation_pct=float(occupation_pct),
+        surface_bestiole=float(surface_bestiole),
+        surface_image=float(surface_image)
+    )
+
+
+def calculer_occupation(
+    image,
+    seuil=None
 ):
     """
-    Conserve la plus grande composante connexe du masque.
+    Crée un masque et calcule l'occupation réelle.
 
-    Contrairement à la version précédente, une composante
-    touchant un bord n'est pas automatiquement rejetée.
+    Pour éviter les recalculs, utiliser de préférence
+    calculer_occupation_depuis_masque() lorsqu'un masque
+    est déjà disponible.
     """
 
-    hauteur, largeur = masque.shape[:2]
+    masque_bestiole, _, _, _ = creer_masque_bestiole(
+        image=image,
+        seuil=seuil
+    )
+
+    return calculer_occupation_depuis_masque(
+        masque_bestiole
+    )
+
+
+def calculer_occupation_bbox(
+    image,
+    bbox
+):
+    """
+    Calcule le rapport entre la surface de la bounding box
+    et la surface totale de l'image.
+    """
+
+    if bbox is None:
+        return 0.0
+
+    hauteur, largeur = image.shape[:2]
 
     surface_image = hauteur * largeur
 
-    surface_min = int(
-        surface_image * surface_min_pct
+    x_min, y_min, x_max, y_max = bbox
+
+    largeur_bbox = (
+        x_max - x_min + 1
     )
 
-    nombre_labels, labels, statistiques, _ = (
-        cv2.connectedComponentsWithStats(
-            masque,
-            connectivity=8
-        )
+    hauteur_bbox = (
+        y_max - y_min + 1
     )
 
-    meilleur_label = None
-    meilleure_surface = 0
+    if largeur_bbox <= 0 or hauteur_bbox <= 0:
+        return 0.0
 
-    for label in range(1, nombre_labels):
-
-        surface = statistiques[
-            label,
-            cv2.CC_STAT_AREA
-        ]
-
-        if surface < surface_min:
-            continue
-
-        if surface > meilleure_surface:
-
-            meilleur_label = label
-            meilleure_surface = surface
-
-    masque_final = np.zeros_like(
-        masque,
-        dtype=np.uint8
+    surface_bbox = (
+        largeur_bbox * hauteur_bbox
     )
 
-    if meilleur_label is not None:
-
-        masque_final[
-            labels == meilleur_label
-        ] = 255
-
-    return (
-        masque_final,
-        meilleur_label,
-        meilleure_surface
+    return float(
+        surface_bbox / surface_image
     )
 
-def creer_masque_par_saturation(
+
+# ==================================================================================================
+# CALCUL DU ZOOM MAXIMAL
+# ==================================================================================================
+
+def calculer_zoom_max(
     image,
-    seuil_saturation=25
+    bbox
 ):
     """
-    Détecte une bestiole colorée sur un fond gris
-    en utilisant la saturation HSV.
+    Calcule le zoom maximal centré sur l'image permettant
+    de conserver la bounding box dans l'image.
     """
 
-    # --------------------------------------------------------
-    # Lissage léger
-    # --------------------------------------------------------
+    if bbox is None:
+        return 1.0
 
-    image_lissee = cv2.GaussianBlur(
-        image,
-        (5, 5),
-        0
+    x_min, y_min, x_max, y_max = bbox
+
+    hauteur, largeur = image.shape[:2]
+
+    centre_x = largeur / 2.0
+    centre_y = hauteur / 2.0
+
+    limites = []
+
+    distance_gauche = centre_x - x_min
+    distance_droite = x_max - centre_x
+    distance_haut = centre_y - y_min
+    distance_bas = y_max - centre_y
+
+    if distance_gauche > 0:
+        limites.append(
+            centre_x / distance_gauche
+        )
+
+    if distance_droite > 0:
+        limites.append(
+            (largeur - 1 - centre_x)
+            / distance_droite
+        )
+
+    if distance_haut > 0:
+        limites.append(
+            centre_y / distance_haut
+        )
+
+    if distance_bas > 0:
+        limites.append(
+            (hauteur - 1 - centre_y)
+            / distance_bas
+        )
+
+    limites_valides = [
+        limite
+        for limite in limites
+        if np.isfinite(limite) and limite > 0
+    ]
+
+    if not limites_valides:
+        return 1.0
+
+    zoom_max = min(
+        limites_valides
     )
 
-    # --------------------------------------------------------
-    # Conversion BGR vers HSV
-    # --------------------------------------------------------
-
-    image_hsv = cv2.cvtColor(
-        image_lissee,
-        cv2.COLOR_BGR2HSV
+    return max(
+        1.0,
+        float(zoom_max)
     )
 
-    saturation = image_hsv[:, :, 1]
 
-    # --------------------------------------------------------
-    # Les pixels colorés sont plus saturés que le fond gris
-    # --------------------------------------------------------
+# ==================================================================================================
+# DIAGNOSTIC
+# ==================================================================================================
 
-    masque = (
-        saturation > seuil_saturation
+def afficher_carte_difference(
+    difference,
+    seuil
+):
+    """
+    Affiche la carte des distances avec le seuil utilisé.
+    """
+
+    plt.figure(
+        figsize=(12, 8)
+    )
+
+    plt.imshow(
+        difference,
+        cmap="hot"
+    )
+
+    plt.colorbar(
+        label="Distance BGR au fond"
+    )
+
+    plt.title(
+        f"Distance à la couleur du fond, seuil = {seuil}"
+    )
+
+    plt.axis("off")
+    plt.tight_layout()
+    plt.show()
+
+
+def afficher_comparaison_seuils(
+    difference,
+    seuil
+):
+    """
+    Affiche les pixels supprimés lorsque le seuil passe
+    de seuil à seuil + pas.
+    """
+
+    seuil_suivant = seuil + pas_seuil
+
+    pixels_critiques = (
+        (difference > seuil)
+        & (difference <= seuil_suivant)
     ).astype(np.uint8) * 255
 
-    # --------------------------------------------------------
-    # Nettoyage
-    # --------------------------------------------------------
-
-    noyau_ouverture = cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE,
-        (3, 3)
+    nombre_pixels_critiques = int(
+        np.count_nonzero(pixels_critiques)
     )
 
-    masque = cv2.morphologyEx(
-        masque,
-        cv2.MORPH_OPEN,
-        noyau_ouverture
+    nb = util.format_nombre(nombre_pixels_critiques)
+    print(
+        f"Pixels conservés à {seuil:.3f} mais supprimés à "
+        f"{seuil_suivant:.3f} : {nb}"
     )
 
-    noyau_fermeture = cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE,
-        (7, 7)
+    plt.figure(
+        figsize=(12, 8)
     )
 
-    masque = cv2.morphologyEx(
-        masque,
-        cv2.MORPH_CLOSE,
-        noyau_fermeture
+    plt.imshow(
+        pixels_critiques,
+        cmap="gray"
     )
 
-    # --------------------------------------------------------
-    # Conservation de la composante principale
-    # --------------------------------------------------------
-
-    masque_bestiole, _, _ = (
-        selectionner_composante_principale(
-            masque=masque,
-            surface_min_pct=0.001
-        )
+    plt.title(
+        f"Pixels perdus entre les seuils "
+        f"{seuil:.3f} et {seuil_suivant:.3f}"
     )
 
-    return masque_bestiole
+    plt.axis("off")
+    plt.tight_layout()
+    plt.show()
 
-def creer_masque_bestiole(
+
+def diagnostiquer_detection_bestiole(
     image,
-    seuil= SEUIL_DETECTION,
-    taille_bord=20,
-    surface_min_pct=0.001
+    masque_bestiole,
+    fond,
+    difference,
+    seuil,
+    bbox_detectee=None,
+    bbox_securisee=None
 ):
     """
-    Crée un masque nettoyé contenant uniquement la bestiole.
-
-    Étapes :
-      1. lissage léger de l'image ;
-      2. estimation de la couleur du fond ;
-      3. création du masque initial ;
-      4. nettoyage morphologique ;
-      5. suppression des composantes touchant les bords ;
-      6. conservation de la plus grande composante valide.
-
-    Returns
-    -------
-    masque_bestiole : np.ndarray
-        Masque uint8 contenant 0 pour le fond et 255
-        pour la bestiole.
-
-    fond : tuple
-        Couleur BGR estimée du fond.
-
-    difference : np.ndarray
-        Carte de distance à la couleur du fond.
+    Affiche le masque, la carte des distances, les bounding
+    boxes et les informations numériques de diagnostic.
     """
 
     hauteur, largeur = image.shape[:2]
 
-    # --------------------------------------------------------
-    # Réduction du bruit et des artefacts JPEG
-    # --------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Affichage du masque
+    # ------------------------------------------------------------------
 
-    image_lissee = cv2.GaussianBlur(
-        image,
-        (5, 5),
-        0
+    plt.figure(
+        figsize=(12, 8)
     )
 
-    # --------------------------------------------------------
-    # Estimation du fond
-    # --------------------------------------------------------
-
-    fond = couleur_fond(
-        image_lissee
-    )
-
-    fond_array = np.array(
-        fond,
-        dtype=np.float32
-    )
-
-    # --------------------------------------------------------
-    # Distance de chaque pixel à la couleur du fond
-    # --------------------------------------------------------
-
-    difference = np.sqrt(
-        np.sum(
-            (
-                image_lissee.astype(np.float32)
-                - fond_array
-            ) ** 2,
-            axis=2
-        )
-    )
-
-    # --------------------------------------------------------
-    # Masque initial
-    # --------------------------------------------------------
-
-    masque_initial = (
-        difference > seuil
-    ).astype(np.uint8) * 255
-
-    # --------------------------------------------------------
-    # Suppression des petits pixels isolés
-    # --------------------------------------------------------
-
-    noyau_ouverture = cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE,
-        (3, 3)
-    )
-
-    masque_nettoye = cv2.morphologyEx(
-        masque_initial,
-        cv2.MORPH_OPEN,
-        noyau_ouverture
-    )
-
-    # --------------------------------------------------------
-    # Fermeture de petits trous dans la bestiole
-    # --------------------------------------------------------
-
-    noyau_fermeture = cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE,
-        (7, 7)
-    )
-
-    masque_nettoye = cv2.morphologyEx(
-        masque_nettoye,
-        cv2.MORPH_CLOSE,
-        noyau_fermeture
-    )
-
-    # --------------------------------------------------------
-    # Recherche des composantes connexes
-    # --------------------------------------------------------
-
-    nombre_labels, labels, statistiques, _ = (
-        cv2.connectedComponentsWithStats(
-            masque_nettoye,
-            connectivity=8
-        )
-    )
-
-    surface_image = hauteur * largeur
-
-    surface_min = int(
-        surface_image * surface_min_pct
-    )
-
-    meilleur_label = None
-    meilleure_surface = 0
-
-    # --------------------------------------------------------
-    # Sélection de la plus grande composante ne touchant
-    # aucun bord de l'image
-    # --------------------------------------------------------
-
-    for label in range(1, nombre_labels):
-
-        x = statistiques[
-            label,
-            cv2.CC_STAT_LEFT
-        ]
-
-        y = statistiques[
-            label,
-            cv2.CC_STAT_TOP
-        ]
-
-        largeur_composante = statistiques[
-            label,
-            cv2.CC_STAT_WIDTH
-        ]
-
-        hauteur_composante = statistiques[
-            label,
-            cv2.CC_STAT_HEIGHT
-        ]
-
-        surface = statistiques[
-            label,
-            cv2.CC_STAT_AREA
-        ]
-
-        x_max = x + largeur_composante - 1
-        y_max = y + hauteur_composante - 1
-
-        # ----------------------------------------------------
-        # Ignore les petites composantes
-        # ----------------------------------------------------
-
-        if surface < surface_min:
-            continue
-
-        # ----------------------------------------------------
-        # Ignore toutes les composantes touchant un bord
-        # ----------------------------------------------------
-
-        touche_bord = (
-            x <= 0
-            or y <= 0
-            or x_max >= largeur - 1
-            or y_max >= hauteur - 1
-        )
-
-        if touche_bord:
-            continue
-
-        # ----------------------------------------------------
-        # Conservation de la plus grande composante valide
-        # ----------------------------------------------------
-
-        if surface > meilleure_surface:
-
-            meilleure_surface = surface
-            meilleur_label = label
-
-    # --------------------------------------------------------
-    # Création du masque final par distance au fond
-    # --------------------------------------------------------
-
-    masque_bestiole = np.zeros(
-        (hauteur, largeur),
-        dtype=np.uint8
-    )
-
-    if meilleur_label is not None:
-
-        masque_bestiole[
-            labels == meilleur_label
-        ] = 255
-
-        methode_detection = "distance au fond"
-
-    else:
-
-        # ----------------------------------------------------
-        # Méthode de secours pour les spécimens colorés
-        # sur un fond gris
-        # ----------------------------------------------------
-
-        masque_bestiole = creer_masque_par_saturation(
-            image=image,
-            seuil_saturation=25
-        )
-
-        methode_detection = "saturation HSV"
-    print(
-            "Méthode de détection :",
-            methode_detection
-        )
-
-    return (
+    plt.imshow(
         masque_bestiole,
-        fond,
-        difference
+        cmap="gray",
+        vmin=0,
+        vmax=255
     )
 
-def diagnostiquer_detection_bestiole(image, seuil=SEUIL_DETECTION):
-    """
-    Affiche le masque nettoyé et la bounding box
-    réellement utilisés par le programme.
-    """
-    # --------------------------------------------------------
-    # Création du masque nettoyé
-    # --------------------------------------------------------
-
-    masque_bestiole, fond, difference = (
-        creer_masque_bestiole(
-            image=image,
-            seuil=seuil
-        )
+    plt.title(
+        "Masque nettoyé de la bestiole"
     )
-
-
-    # --------------------------------------------------------
-    # Affichage du masque final
-    # --------------------------------------------------------
-
-
-    plt.figure(figsize=(12, 8))
-    plt.imshow(masque_bestiole, cmap="gray")
-    plt.title("Masque nettoyé de la bestiole")
 
     plt.axis("off")
     plt.tight_layout()
     plt.show()
 
-    # --------------------------------------------------------
-    # Affichage facultatif de la carte des distances
-    # Cette partie peut rester en commentaire après les tests.
-    # --------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Affichage de la carte des distances
+    # ------------------------------------------------------------------
 
-    plt.figure(figsize=(12, 8))
-    plt.imshow(difference, cmap="hot")
-    plt.colorbar()
-    plt.title("Distance à la couleur du fond")
-    
-    plt.axis("off")
-    plt.tight_layout()
-    plt.show()
+    afficher_carte_difference(
+        difference=difference,
+        seuil=seuil
+    )
 
-    # --------------------------------------------------------
-    # Recherche de la bounding box
-    # --------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Histogramme des distances
+    # ------------------------------------------------------------------
 
-    positions = np.where(masque_bestiole > 0)
+    afficher_histogramme_difference(
+    difference=difference,
+    seuil=seuil
+    )
 
-    if len(positions[0]) == 0:
+
+
+    # ------------------------------------------------------------------
+    # Visualisation des pixels critiques entre seuil et seuil + pas
+    # ------------------------------------------------------------------
+
+    afficher_comparaison_seuils(
+        difference=difference,
+        seuil=seuil
+    )
+
+    # ------------------------------------------------------------------
+    # Vérification de la détection
+    # ------------------------------------------------------------------
+
+    if bbox_detectee is None:
 
         print()
+        print("-" * 60)
+        print("DIAGNOSTIC DE LA DÉTECTION")
+        print("-" * 60)
         print("Aucune bestiole détectée.")
         print(f"Couleur du fond estimée : {fond}")
-        print(f"Seuil utilisé : {seuil}")
+        print(f"Seuil utilisé            : {seuil}")
 
         return
 
-    y_min = int(positions[0].min())
-    y_max = int(positions[0].max())
-    x_min = int(positions[1].min())
-    x_max = int(positions[1].max())
+    x_min, y_min, x_max, y_max = bbox_detectee
 
-    # --------------------------------------------------------
-    # Dimensions de l'image
-    # --------------------------------------------------------
-    hauteur, largeur = image.shape[:2]
-
-    # --------------------------------------------------------
-    # Calcul des marges
-    # --------------------------------------------------------
     marge_gauche = x_min
     marge_droite = largeur - 1 - x_max
-
     marge_haut = y_min
     marge_bas = hauteur - 1 - y_max
 
@@ -692,18 +1301,25 @@ def diagnostiquer_detection_bestiole(image, seuil=SEUIL_DETECTION):
         marge_bas
     )
 
-    # --------------------------------------------------------
-    # Calcul des marges en pourcentage
-    # --------------------------------------------------------
+    marge_gauche_pct = (
+        marge_gauche / largeur * 100.0
+    )
 
-    marge_gauche_pct = (marge_gauche / largeur * 100)
-    marge_droite_pct = (marge_droite / largeur * 100)
-    marge_haut_pct = (marge_haut / hauteur * 100)
-    marge_bas_pct = (marge_bas / hauteur * 100)
- 
-    # --------------------------------------------------------
+    marge_droite_pct = (
+        marge_droite / largeur * 100.0
+    )
+
+    marge_haut_pct = (
+        marge_haut / hauteur * 100.0
+    )
+
+    marge_bas_pct = (
+        marge_bas / hauteur * 100.0
+    )
+
+    # ------------------------------------------------------------------
     # Affichage des informations
-    # --------------------------------------------------------
+    # ------------------------------------------------------------------
 
     print()
     print("-" * 60)
@@ -711,7 +1327,18 @@ def diagnostiquer_detection_bestiole(image, seuil=SEUIL_DETECTION):
     print("-" * 60)
 
     print(f"Couleur du fond estimée : {fond}")
-    print(f"Seuil de détection      : {seuil}")
+    print(f"Seuil de détection      : {seuil:.3f}")
+
+    fond_pct = np.sum(difference < seuil)
+    objet_pct = np.sum(difference >= seuil)
+
+    fond_pct = fond_pct / difference.size * 100
+    objet_pct = objet_pct / difference.size * 100
+
+    print()
+    print(f"Fond   : {fond_pct:.1f}%")
+    print(f"Objet  : {objet_pct:.1f}%")
+
 
     print()
     print("Zone détectée :")
@@ -719,6 +1346,15 @@ def diagnostiquer_detection_bestiole(image, seuil=SEUIL_DETECTION):
     print(f"  Haut   : {y_min} px")
     print(f"  Droite : {x_max} px")
     print(f"  Bas    : {y_max} px")
+
+    print()
+    print(f"P90 : {np.percentile(difference,90):.1f}")
+    print(f"P95 : {np.percentile(difference,95):.1f}")
+    print(f"P98 : {np.percentile(difference,98):.1f}")
+    print(f"P99 : {np.percentile(difference,99):.1f}")
+
+    print(f"Médiane : {np.median(difference):.1f}")
+    print(f"Maximum : {difference.max():.1f}")
 
     print()
     print("Marges :")
@@ -746,27 +1382,15 @@ def diagnostiquer_detection_bestiole(image, seuil=SEUIL_DETECTION):
     print()
     print(f"Marge minimale : {marge_min} px")
 
-
-    bbox_detectee = detecter_zone_bestiole(
-    image=image,
-    seuil=SEUIL_DETECTION
-    )
-
-    bbox_securisee = ajouter_marge_bbox(
-    image=image,
-    bbox=bbox_detectee,
-    marge_pct=0.03,
-    marge_min_px=5
-    )
-
+    # ------------------------------------------------------------------
+    # Dessin des bounding boxes
+    # ------------------------------------------------------------------
 
     image_affichage = image.copy()
 
-    if bbox_detectee is not None:
+    x_min, y_min, x_max, y_max = bbox_detectee
 
-        x_min, y_min, x_max, y_max = bbox_detectee
-
-        cv2.rectangle(
+    cv2.rectangle(
         image_affichage,
         (x_min, y_min),
         (x_max, y_max),
@@ -776,282 +1400,278 @@ def diagnostiquer_detection_bestiole(image, seuil=SEUIL_DETECTION):
 
     if bbox_securisee is not None:
 
-        x_min, y_min, x_max, y_max = bbox_securisee
+        (
+            x_min_marge,
+            y_min_marge,
+            x_max_marge,
+            y_max_marge
+        ) = bbox_securisee
 
         cv2.rectangle(
-        image_affichage,
-        (x_min, y_min),
-        (x_max, y_max),
-        (0, 255, 0),
-        2
+            image_affichage,
+            (x_min_marge, y_min_marge),
+            (x_max_marge, y_max_marge),
+            (0, 255, 0),
+            2
         )
 
     image_rgb = cv2.cvtColor(
-    image_affichage,
-    cv2.COLOR_BGR2RGB
+        image_affichage,
+        cv2.COLOR_BGR2RGB
     )
 
-    plt.figure(figsize=(10, 7))
-    plt.imshow(image_rgb)
+    plt.figure(
+        figsize=(10, 7)
+    )
+
+    plt.imshow(
+        image_rgb
+    )
 
     plt.title(
-    "BBox détectée en rouge, "
-    "bbox sécurisée en vert"
+        "BBox détectée en rouge, bbox sécurisée en vert"
     )
 
     plt.axis("off")
     plt.tight_layout()
     plt.show()
 
-def detecter_zone_bestiole(image, seuil=SEUIL_DETECTION):
-    """
-    Détecte la bounding box de la bestiole à partir
-    du masque nettoyé.
 
-    Returns
-    -------
-    tuple | None
-        (x_min, y_min, x_max, y_max), ou None
-        si aucune bestiole n'est détectée.
+# ==================================================================================================
+# PROGRAMME PRINCIPAL
+# ==================================================================================================
+
+def traiter_image(
+    chemin_image,
+    seuil=None
+):
+    """
+    Analyse une image et affiche les informations nécessaires
+    pour déterminer le zoom et les augmentations.
     """
 
-    masque_bestiole, _, _ = creer_masque_bestiole(
+    # ------------------------------------------------------------------
+    # Lecture
+    # ------------------------------------------------------------------
+
+    image = lire_image(
+        chemin_image
+    )
+
+    # ------------------------------------------------------------------
+    # Création unique du masque
+    # ------------------------------------------------------------------
+
+    (
+        masque_bestiole,
+        fond,
+        difference,
+        seuil_utilise
+    ) = creer_masque_bestiole(
         image=image,
-        seuil=seuil
+        seuil=seuil,
+        taille_bord=TAILLE_BORD,
+        surface_min_pct=SURFACE_MIN_PCT,
+        afficher_informations=True
     )
 
-    positions = np.where(
-        masque_bestiole > 0
-    )
+    # ------------------------------------------------------------------
+    # Bounding box
+    # ------------------------------------------------------------------
 
-    if len(positions[0]) == 0:
-        return None
-
-    y_min = int(positions[0].min())
-    y_max = int(positions[0].max())
-    x_min = int(positions[1].min())
-    x_max = int(positions[1].max())
-
-    return (
-        x_min,
-        y_min,
-        x_max,
-        y_max
-    )
-
-def calculer_zoom_max(image, bbox):
-    """
-    Calculate the maximum zoom factor that keeps
-    the detected specimen inside the image.
-
-    The zoom is assumed to be centered on the image.
-    """
-
-    if bbox is None:
-        return 1.0
-
-    x_min, y_min, x_max, y_max = bbox
-
-    hauteur, largeur = image.shape[:2]
-
-    centre_x = largeur / 2
-    centre_y = hauteur / 2
-
-    limites = []
-
-    # Horizontal limits
-    if centre_x - x_min > 0:
-        limites.append(
-            centre_x / (centre_x - x_min)
-        )
-
-    if x_max - centre_x > 0:
-        limites.append(
-            (largeur - centre_x) / (x_max - centre_x)
-        )
-
-    # Vertical limits
-    if centre_y - y_min > 0:
-        limites.append(
-            centre_y / (centre_y - y_min)
-        )
-
-    if y_max - centre_y > 0:
-        limites.append(
-            (hauteur - centre_y) / (y_max - centre_y)
-        )
-
-    if not limites:
-        return 1.0
-
-    return min(limites)
-
-def calculer_occupation(image, seuil=SEUIL_DETECTION):
-    """
-    Calcule l'occupation réelle à partir du masque nettoyé
-    de la bestiole.
-    """
-
-    masque_bestiole, _, _ = creer_masque_bestiole(
-        image=image,
-        seuil=seuil
-    )
-
-    surface_bestiole = np.count_nonzero(
+    bbox_detectee = detecter_zone_depuis_masque(
         masque_bestiole
     )
 
-    surface_image = masque_bestiole.size
-
-    occupation = (
-        surface_bestiole
-        / surface_image
+    bbox_securisee = ajouter_marge_bbox(
+        image=image,
+        bbox=bbox_detectee,
+        marge_pct=MARGE_BBOX_PCT,
+        marge_min_px=MARGE_BBOX_MIN_PX
     )
 
-    occupation_pct = (
-        occupation * 100
+    # ------------------------------------------------------------------
+    # Occupation
+    # ------------------------------------------------------------------
+
+    info_occ = calculer_occupation_depuis_masque(
+        masque_bestiole
     )
 
-    return InfoOccupationBestiole(
-        occupation=occupation,
-        occupation_pct=occupation_pct,
-        surface_bestiole=float(surface_bestiole),
-        surface_image=float(surface_image)
+    info_image_bboxe = calculer_occupation_bbox(
+        image=image,
+        bbox=bbox_securisee
     )
 
-def calculer_occupation_bbox(image, bbox):
+    # ------------------------------------------------------------------
+    # Diagnostic graphique
+    # ------------------------------------------------------------------
 
-    if bbox is None:
-        return 0.0
-
-    hauteur, largeur = image.shape[:2]
-
-    surface_image = hauteur * largeur
-
-    x_min, y_min, x_max, y_max = bbox
-
-    surface_bbox = (
-        (x_max - x_min + 1)
-        * (y_max - y_min + 1)
+    diagnostiquer_detection_bestiole(
+        image=image,
+        masque_bestiole=masque_bestiole,
+        fond=fond,
+        difference=difference,
+        seuil=seuil_utilise,
+        bbox_detectee=bbox_detectee,
+        bbox_securisee=bbox_securisee
     )
 
-    return (
-        surface_bbox
-        / surface_image
+    # ------------------------------------------------------------------
+    # Affichage des surfaces
+    # ------------------------------------------------------------------
+
+    print()
+    print(f"Surface image     : {info_occ.surface_image:,.0f} px")
+    print(f"Surface bestiole  : {info_occ.surface_bestiole:,.0f} px")
+
+    print(
+        f"Occupation réelle : {info_occ.occupation:.3f}, "
+        f"soit {info_occ.occupation_pct:.1f} %"
     )
 
-
-# ============================================================
-# PROGRAMME PRINCIPAL
-# ============================================================
-
-# Efface l'écran avant de commencer
-syst.clear_screen()
-
-
-# ------------------------------------------------------------
-# Lecture de l'image
-# ------------------------------------------------------------
-
-
-ima_select = util.get_path_color("Sélectionner l'image")
-
-image = cv2.imread(str(ima_select))
-
-if image is None:
-    raise FileNotFoundError(
-        f"Impossible de lire : {ima_select}"
-    )
-    
-
-# ------------------------------------------------------------
-# Détermination du zoom maxi
-# ------------------------------------------------------------
-diagnostiquer_detection_bestiole(image, seuil = SEUIL_DETECTION)
-
-bestiole = detecter_zone_bestiole(image, seuil = SEUIL_DETECTION)
-
-bestiole = ajouter_marge_bbox(
-    image=image,
-    bbox=bestiole,
-    marge_pct=0.03,
-    marge_min_px=5
+    print(
+        f"Occupation BBox   : {info_image_bboxe:.3f}, "
+        f"soit {info_image_bboxe * 100:.1f} %"
     )
 
-info_occ = calculer_occupation(image)
-info_image_bboxe = calculer_occupation_bbox(image, bestiole)
+    occupation_pct = info_occ.occupation_pct
 
+    # ------------------------------------------------------------------
+    # Calcul du zoom maximal
+    # ------------------------------------------------------------------
 
-print("\n\n")
-print(f"Surface image     : {info_occ.surface_image:,.0f} px")
-print(f"Surface bestiole  : {info_occ.surface_bestiole:,.0f} px")
-print(f"Occupation réelle : {info_occ.occupation:.3f} soit {info_occ.occupation_pct:.1f} %")
-print(f"Occupation Bboxe  : {info_image_bboxe:.3f}")
-print()
+    if bbox_securisee is None:
 
-occupation_pct = info_occ.occupation_pct
-
-if bestiole is None:
-
-    zoom_max_possible = 1.0
-    zoom_limite = 1.0
-
-else:
-
-    zoom_max_possible = calculer_zoom_max(
-        image,
-        bestiole
-    )
-
-    if occupation_pct < 3:
+        zoom_max_possible = 1.0
         zoom_limite = 1.0
 
-    elif occupation_pct < 10:
-        zoom_limite = 1.35
-
-    elif occupation_pct < 20:
-        zoom_limite = 1.25
-
-    elif occupation_pct < 30:
-        zoom_limite = 1.15
-
     else:
-        zoom_limite = 1.05
 
-zoom_max = min(
-    zoom_max_possible,
-    zoom_limite
-)
+        zoom_max_possible = calculer_zoom_max(
+            image=image,
+            bbox=bbox_securisee
+        )
+
+        if occupation_pct < 3:
+            zoom_limite = 1.0
+
+        elif occupation_pct < 10:
+            zoom_limite = 1.35
+
+        elif occupation_pct < 20:
+            zoom_limite = 1.25
+
+        elif occupation_pct < 30:
+            zoom_limite = 1.15
+
+        else:
+            zoom_limite = 1.05
+
+    zoom_max = min(
+        zoom_max_possible,
+        zoom_limite
+    )
+
+    # ------------------------------------------------------------------
+    # Paramètres d'augmentation
+    # ------------------------------------------------------------------
+
+    moyenne, ecart_type = analyser_luminosite(
+        image
+    )
+
+    brightness, contrast = parametres_lum_contraste(
+        image
+    )
+
+    gamma = parametres_gamma(
+        image
+    )
+
+    noise_range = parametres_bruit(
+        image
+    )
+
+    # ------------------------------------------------------------------
+    # Résumé
+    # ------------------------------------------------------------------
+
+    print()
+    print("-" * 80)
+
+    print(
+        f" - Zoom maxi possible/retenu         : "
+        f"{zoom_max_possible:.2f} / {zoom_max:.2f}"
+    )
+
+    print(f" - Luminosité                        : {moyenne:.3f}")
+    print(f" - Écart-type                        : {ecart_type:.3f}")
+
+    print(
+        f" - Paramètres luminosité/contraste   : "
+        f"{brightness:.3f} / {contrast:.3f}"
+    )
+
+    print(f" - Plage de réglage gamma            : {gamma}")
+    print(f" - Plage de réglage du bruit         : {noise_range}")
+
+    print("-" * 80)
+    print()
+
+    return {
+        "image": image,
+        "masque": masque_bestiole,
+        "fond": fond,
+        "difference": difference,
+        "bbox_detectee": bbox_detectee,
+        "bbox_securisee": bbox_securisee,
+        "occupation": info_occ,
+        "zoom_max_possible": zoom_max_possible,
+        "zoom_max": zoom_max
+    }
 
 
-print()
-print('-' * 80)
-print(f" - Zoom maxi possible/retenu : {zoom_max_possible:.2f} / {zoom_max:.2f}")
-print()
+def main():
+    """
+    Boucle principale du programme.
+    """
 
-# ------------------------------------------------------------
-# Détermination du contraste et de la luminosité
-# ------------------------------------------------------------
+    continuer = True
 
-moyenne, ecart_type = analyser_luminosite(image)
+    while continuer:
 
-print(f" - Luminosité : {moyenne:.3f}")
-print(f" - Écart-type : {ecart_type:.3f}")
-print()
+        syst.clear_screen()
 
-brightness, contrast = parametres_lum_contraste(image)
-print(f" - Paramètres luminosité/contraste : {brightness:.3f} / {contrast:.3f}\n")
+        chemin_image = util.get_path_color(
+            "Sélectionner l'image"
+        )
 
-brig_cont = brightness, contrast
-gamma = parametres_gamma(image)
-print(f' - plage réglage gamma : {gamma}\n')
+        try:
+
+            traiter_image(
+                chemin_image=chemin_image,
+                seuil=SEUIL_DETECTION
+            )
+
+        except Exception as erreur:
+
+            print()
+            print("-" * 80)
+            print("ERREUR PENDANT LE TRAITEMENT")
+            print("-" * 80)
+            print(f"Type    : {type(erreur).__name__}")
+            print(f"Message : {erreur}")
+            print("-" * 80)
+            print()
+
+        continuer = util.answer_yes_or_no(
+            "Voulez-vous continuer",
+            True
+        )
+
+    print("Fin du traitement !!!")
 
 
-noise_range = parametres_bruit(image)
-print(f' - plage réglage bruit : {noise_range}\n')
-
-print('-' * 80)
-print()
-
-
-print("Fin du traitement !!!")
+if __name__ == "__main__":
+    main()

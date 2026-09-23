@@ -329,7 +329,7 @@ def get_path_color(prompt: str, color_key: str = 'input') -> Path:
         if os.path.isdir(path_input):
             return Path(path_input)
 
-        error_text: str = f"Chemin invalide: {path_input}. Veuillez réessayer."
+        error_text: str = f"Sélection invalide: '{path_input}'.\n Veuillez réessayer."
         display.print(error_text, colors['error'])
 
 def get_directory_color(prompt: str, color_key: str = "input") -> Path:

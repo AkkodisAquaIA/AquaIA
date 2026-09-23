@@ -1,5 +1,78 @@
+"""
+Génération automatique d'images augmentées
+
+Ce programme permet de générer automatiquement des images supplémentaires à partir d'un jeu d'images
+ de référence afin d'enrichir un jeu de données destiné à l'entraînement de modèles d'intelligence artificielle.
+
+Le traitement s'effectue dans chaque sous-répertoire direct sur l'ensemble des sous-répertoires contenus dans le répertoire de travail
+spécifié. Les éventuels sous-répertoires de niveau inférieur ne sont pas parcourus.Les nouvelles images sont générées à l'aide de la 
+bibliothèque Albumentations, spécialisée dans l'augmentation de données pour le traitement d'images.
+
+Les fichiers dont le nom contient le marqueur _aug_ sont exclus du traitement afin d’éviter d’appliquer de nouvelles augmentations 
+aux images déjà générées.
 
 
+Transformations unitaires
+
+Les transformations suivantes sont appliquées individuellement :
+
+Symétrie horizontale (Horizontal Flip)
+Symétrie verticale (Vertical Flip)
+Rotation aléatoire comprise entre -20° et +20°
+Modification aléatoire de la luminosité, du contraste ou du gamma
+Ajout de bruit gaussien
+Zoom ou dézoom aléatoire
+Transformations combinées
+
+Des combinaisons de transformations sont également générées afin d'augmenter la diversité du jeu de données :
+
+Rotation + symétrie horizontale
+Rotation + symétrie horizontale + modification du contraste
+Rotation + symétrie verticale
+Rotation + symétrie verticale + modification du contraste
+Zoom + modification du contraste
+Zoom + rotation
+Zoom + rotation + modification du contraste
+Modification du contraste + ajout de bruit
+Nombre d'images générées
+
+À l'exception des symétries horizontales et verticales, pour lesquelles une seule image est produite,
+le nombre d'images générées pour chaque type d'augmentation est paramétrable.
+
+Cette approche permet d'adapter facilement le volume d'images produites en fonction de la taille du jeu 
+de données initial et des besoins du projet.
+
+
+Convention de nommage
+
+Les images générées sont enregistrées dans le même répertoire que l'image source.
+
+Le nom d'origine du fichier est conservé et complété par un suffixe indiquant les transformations appliquées :
+
+Suffixe	 Transformation
+_H	     Symétrie horizontale
+_V	     Symétrie verticale
+_R	     Rotation
+_C	     Modification de la luminosité, du contraste ou du gamma
+_Z	     Zoom ou dézoom
+_B	 Ajout de bruit
+
+Exemples
+photo_01_aug_01_H.jpg
+photo_01_aug_02_V.jpg
+photo_01_aug_03_R.jpg
+photo_01_aug_11_Z_C.jpg
+photo_01_aug_13_Z_R_C.jpg
+
+photo_01_aug_13_Z_R_C.jpg
+│        │   │  └──── Zoom + rotation + contraste/luminosité/gamma
+│        │   └─────── Numéro de l'image augmentée
+│        └─────────── Marqueur d'une image générée
+└──────────────────── Nom de l'image source
+
+
+
+"""
 from tools import system as syst
 from pathlib import Path
 
@@ -7,7 +80,6 @@ from dataclasses import dataclass
 import numpy as np
 import csv
 from datetime import datetime
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 import cv2
 
@@ -51,33 +123,41 @@ class InfoOccupationBestiole:
     # x_max: int
     # y_max: int
 
+@dataclass
+class DetectionBestiole:
+    masque: np.ndarray
+    bbox: tuple[int, int, int, int] | None
+    fond: tuple[int, int, int]
+    difference: np.ndarray
+    surface_bestiole: int
+    surface_image: int
+    occupation: float
+    occupation_pct: float
+
 
 # ------------------------------------------------------------
 # Nombre de modifications par type
 # ------------------------------------------------------------
 
-# Transformation unique
-NB_UNITAIRE =1
-
-# Transformations multiples
 NB_MULTI = 1
-#
 
-SEUIL_DETECTION =  35  # seuil_detection(image)
+# seuil_detection(image)
+SEUIL_DETECTION =  35  
 
 
 #==================================================================================================
 # Création d'un fichier d'erreurs pour les images
-def create_file_fault(file):
+def create_file_fault(repertoire, defauts):
 
-    with open(
-        repertoire_de_travail / "rapport_defauts.csv",
+    chemin_rapport = repertoire / "rapport_defauts.csv"
+
+    with chemin_rapport.open(
         "w",
         newline="",
         encoding="utf-8"
-    ) as f:
+    ) as fichier:
 
-        writer = csv.writer(f, delimiter=";")
+        writer = csv.writer(fichier, delimiter=";")
 
         writer.writerow([
             "Date",
@@ -86,14 +166,16 @@ def create_file_fault(file):
             "Erreur"
         ])
 
-        for defaut in liste_defauts:
-
+        for defaut in defauts:
             writer.writerow([
                 defaut["date"],
                 defaut["repertoire"],
                 defaut["image"],
                 defaut["erreur"]
             ])
+
+    return chemin_rapport
+
 
 
 # ============================================================
@@ -638,7 +720,6 @@ def creer_masque_bestiole(
             labels == meilleur_label
         ] = 255
 
-        methode_detection = "distance au fond"
 
     else:
 
@@ -885,38 +966,74 @@ def appliquer_augmentation(
     extension
 ):
     """
-    Applique une transformation plusieurs fois
-    et sauvegarde les images produites.
+    Applique une transformation plusieurs fois et sauvegarde
+    les images produites.
 
     Retourne le prochain numéro disponible.
+
+    Raises
+    ------
+    RuntimeError
+        Si Albumentations ne retourne pas d'image ou si
+        l'encodage OpenCV échoue.
+
+    OSError
+        Si le fichier produit est absent ou vide.
     """
 
     for _ in range(nombre):
 
         resultat = transform(image=image)
 
+        if "image" not in resultat:
+            raise RuntimeError(
+                f"La transformation {nom_augmentation} "
+                "n'a retourné aucune image."
+            )
+
         image_aug = resultat["image"]
+
+        if image_aug is None:
+            raise RuntimeError(
+                f"La transformation {nom_augmentation} "
+                "a retourné une image vide."
+            )
 
         nom = (
             f"{nom_source}"
             f"_aug_{numero:02d}"
             f"_{nom_augmentation}"
-            f"{extension}"
+            f"{extension.lower()}"
         )
 
         chemin_sortie = dossier_sortie / nom
 
-        success, buffer = cv2.imencode(chemin_sortie.suffix, image_aug)
-        if success:
-            buffer.tofile(str(chemin_sortie))
+        success, buffer = cv2.imencode(
+            chemin_sortie.suffix.lower(),
+            image_aug
+        )
 
+        if not success:
+            raise RuntimeError(
+                f"Impossible d'encoder l'image : {chemin_sortie}"
+            )
+
+        buffer.tofile(str(chemin_sortie))
+
+        if (
+            not chemin_sortie.exists()
+            or chemin_sortie.stat().st_size == 0
+        ):
+            raise OSError(
+                f"Fichier absent ou vide : {chemin_sortie}"
+            )
 
         numero += 1
 
     return numero
 
 ################################################################################################################
-def transf_image(img, repertoire, defaut, liste_defauts):
+def transf_image(img, repertoire,  liste_defauts):
 
     try:
 
@@ -937,8 +1054,8 @@ def transf_image(img, repertoire, defaut, liste_defauts):
                 "erreur": "Lecture Impossible"
             })
 
-            defaut += 1
-            return 0, defaut
+            
+            return 0
         
         dossier_sortie = img.parent
             
@@ -952,7 +1069,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         # Détermination du zoom maxi
         # ------------------------------------------------------------
 
-        diagnostiquer_detection_bestiole(image, seuil = SEUIL_DETECTION)
+        # diagnostiquer_detection_bestiole(image, seuil = SEUIL_DETECTION)
         bestiole = detecter_zone_bestiole(image, seuil = SEUIL_DETECTION)
 
         bestiole = ajouter_marge_bbox(
@@ -962,8 +1079,10 @@ def transf_image(img, repertoire, defaut, liste_defauts):
             marge_min_px=5
             )
 
-        info_occ = calculer_occupation(image)
-        info_image_bboxe = calculer_occupation_bbox(image, bestiole)
+        info_occ = calculer_occupation(
+            image=image,
+            seuil=SEUIL_DETECTION
+            )
 
 
         occupation_pct = info_occ.occupation_pct
@@ -1005,10 +1124,8 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         # Détermination du contraste et de la luminosité
         # ------------------------------------------------------------
 
-        moyenne, ecart_type = analyser_luminosite(image)
         brightness, contrast = parametres_lum_contraste(image)
-        brig_cont = brightness, contrast
-
+     
         gamma = parametres_gamma(image)
 
         noise_range = parametres_bruit(image)
@@ -1033,8 +1150,8 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.augmentation_flip_horizontal(),
-            nom_augmentation="flip_h",
-            nombre= NB_UNITAIRE,
+            nom_augmentation="H",
+            nombre= 1,
             numero=numero,
             dossier_sortie=dossier_sortie,
             nom_source=img.stem,
@@ -1045,8 +1162,8 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.augmentation_flip_vertical(),
-            nom_augmentation="flip_v",
-            nombre= NB_UNITAIRE,
+            nom_augmentation="V",
+            nombre= 1,
             numero=numero,
             dossier_sortie=dossier_sortie,
             nom_source=img.stem,
@@ -1057,7 +1174,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.augmentation_rotation(fond),
-            nom_augmentation="Rot",
+            nom_augmentation="R",
             nombre=NB_MULTI,
             numero=numero,
             dossier_sortie=dossier_sortie,
@@ -1069,7 +1186,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.augmentation_luminosite_contraste(light_data),
-            nom_augmentation="Lum_Contraste",
+            nom_augmentation="C",
             nombre=NB_MULTI,
             numero=numero,
             dossier_sortie=dossier_sortie,
@@ -1081,7 +1198,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.augmentation_bruit(noise_range),
-            nom_augmentation="Bruit",
+            nom_augmentation="B",
             nombre=NB_MULTI,
             numero=numero,
             dossier_sortie=dossier_sortie,
@@ -1093,7 +1210,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.augmentation_zoom(zoom_max, fond),
-            nom_augmentation="Zoom",
+            nom_augmentation="Z",
             nombre=NB_MULTI,
             numero=numero,
             dossier_sortie=dossier_sortie,
@@ -1106,7 +1223,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.aug_rot_flip_h(fond),
-            nom_augmentation="R_+_FH",
+            nom_augmentation="R_H",
             nombre= NB_MULTI,
             numero= numero,
             dossier_sortie=dossier_sortie,
@@ -1118,7 +1235,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.aug_rot_flip_h_cont(fond, light_data),
-            nom_augmentation="R_+_FH_+_Cont",
+            nom_augmentation="R_H_C",
             nombre= NB_MULTI,
             numero= numero,
             dossier_sortie=dossier_sortie,
@@ -1130,7 +1247,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform= aug.aug_rot_flip_v(fond),
-            nom_augmentation="R_+_FV",
+            nom_augmentation="R_V",
             nombre= NB_MULTI,
             numero= numero,
             dossier_sortie=dossier_sortie,
@@ -1142,7 +1259,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform= aug.aug_rot_flip_v_cont(fond, light_data),
-            nom_augmentation="R_+_FH_+_Cont",
+            nom_augmentation="R_V_C",
             nombre= NB_MULTI,
             numero= numero,
             dossier_sortie=dossier_sortie,
@@ -1154,7 +1271,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.aug_zoom_cont(zoom_max, fond, light_data),
-            nom_augmentation="Z_+_ Cont",
+            nom_augmentation="Z_C",
             nombre=NB_MULTI,
             numero=numero,
             dossier_sortie=dossier_sortie,
@@ -1166,7 +1283,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.aug_zoom_rot(zoom_max, fond),
-            nom_augmentation="Z_+_ R",
+            nom_augmentation="Z_R",
             nombre=NB_MULTI,
             numero=numero,
             dossier_sortie=dossier_sortie,
@@ -1178,7 +1295,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.aug_zoom_rot_cont(zoom_max, fond, light_data),
-            nom_augmentation="Z_+_ R_+_ Cont",
+            nom_augmentation="Z_R_C",
             nombre=NB_MULTI,
             numero=numero,
             dossier_sortie=dossier_sortie,
@@ -1190,7 +1307,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
         numero = appliquer_augmentation(
             image=image,
             transform=aug.aug_lum_cont_bruit(light_data, noise_range),
-            nom_augmentation="Lum_Cont_Bruit",
+            nom_augmentation="C_B",
             nombre=NB_MULTI,
             numero=numero,
             dossier_sortie=dossier_sortie,
@@ -1198,7 +1315,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
             extension=img.suffix
         )
 
-        return numero - 1 , defaut
+        return numero - 1 
 
     except Exception as e:
 
@@ -1209,9 +1326,7 @@ def transf_image(img, repertoire, defaut, liste_defauts):
             "erreur": str(e)
         })
 
-        defaut += 1
-
-        return 0, defaut
+        return 0
 
 ################################################################################################################
 
@@ -1263,7 +1378,6 @@ else:
 
 # Initialisation des variables de Travail
 nombre_total_images_creees = 0
-df = 0
 liste_defauts = []
 liste_rep_vide = []
 total_image = 0
@@ -1292,6 +1406,7 @@ for indice_rep, repertoire in enumerate(
             for fichier in repertoire.iterdir()
             if fichier.is_file()
             and fichier.suffix.lower() in cst.IMAGE_EXT
+            and "_aug_" not in fichier.stem.lower()
         ],
         key=lambda p: p.name.lower()
     )
@@ -1321,10 +1436,9 @@ for indice_rep, repertoire in enumerate(
         # Appel la fonction d'augmentation
         # ------------------------------------------------
  
-        nombre_images_creees, df = transf_image(
+        nombre_images_creees = transf_image(
             img=image,
             repertoire=repertoire,
-            defaut=df,
             liste_defauts=liste_defauts
         )
 
@@ -1332,32 +1446,42 @@ for indice_rep, repertoire in enumerate(
                 nombre_images_creees
         )
 
+nombre_defauts = len(liste_defauts)
+
 
 # ============================================================
 # RÉSULTAT
 # ============================================================
 print()
 display.titre(
-        "Résumait d’exécution",
+        "Résumé d’exécution",
         colors['aqua']
     )
 
+# Détermination du status d’exécution
+if nombre_defauts != 0 :
+    status = 'error'
+elif len(liste_rep_vide) != 0:
+    status = 'warning'
+else: 
+    status = 'ok'
+
 # Nombres de répertoire & d'images
-
-
-rep_traited = nombre_sous_repertoires - len(liste_rep_vide) 
+nombre_repertoires_traites = nombre_sous_repertoires - len(liste_rep_vide) 
 nb_i = util.format_nombre(total_image)
 display.print(
-    f"- {rep_traited}/{nombre_sous_repertoires} Répertoires traités comprenant "
+    f"- {nombre_repertoires_traites}/{nombre_sous_repertoires} Répertoires traités comprenant "
     f"{nb_i} images ",
-    colors['ok']
+    colors[status]
     )  
 
 # Nombre de répertoire vide & liste de ceux-ci
 if len(liste_rep_vide) != 0:
+
+    pls = "s" if len(liste_rep_vide) > 1 else ""
     display.print(
-        f"- Nombre de répertoires vides : "
-        f"{len(liste_rep_vide) :}",
+        f"- Il y a {len(liste_rep_vide)} répertoire{pls} vide{pls} "
+        f"\n  Voici la liste :",
         colors['warning']
         )  
     util.afficher_liste_alignee(liste_rep_vide)
@@ -1372,14 +1496,23 @@ display.print(
 )
 
 # Nombres images en défaut
-if df != 0 :
-    display.print(f"- Nombre de défaut : {df}", colors['error'])
-    print(
-    f" - Rapport des défauts enregistré dans :\n"
-    f"  {repertoire_de_travail}"
-    )
-    create_file_fault(liste_defauts)
+if nombre_defauts != 0:
 
+    pluriel = "s" if nombre_defauts > 1 else ""
+
+    display.print(
+        f"- Nombre de défaut{pluriel} : {nombre_defauts}",
+        colors["error"]
+    )
+
+    chemin_rapport = create_file_fault(
+        repertoire=repertoire_de_travail,
+        defauts=liste_defauts
+    )
+
+    print(
+        "\n- Rapport des défauts enregistré dans :"
+        f"\n  {chemin_rapport}"
+    )
 
 print("\nFin du traitement !!!")
-
