@@ -37,7 +37,14 @@ def infer_dino(config, context):
     infer_data_root = context["infer_data_root"]
     output_dir = context["output_dir"]
 
-    _, num_classes = load_class_names(infer_data_root)
+    # Reuse the mapping saved at training time. This is required because the
+    # checkpoint's DETR head has one output when single_cls=True.
+    single_cls = bool(run_config["training"].get("single_cls", False))
+    class_name = str(run_config["data"].get("single_class_name", "specimen")).strip()
+    if single_cls:
+        num_classes = 1
+    else:
+        _, num_classes = load_class_names(infer_data_root)
     model = load_model(
         run_dir=run_dir,
         backbone_id=f"{run_config['model']['family']}_{run_config['model']['size']}",
@@ -51,6 +58,10 @@ def infer_dino(config, context):
         dataset_root=infer_data_root,
         data_split=data_split,
         img_size=imgsz,
+        # Test targets are also converted to class 0, otherwise mAP would
+        # compare mono-class predictions with the original taxon IDs.
+        single_cls=single_cls,
+        class_name=class_name,
     )
     num_workers = max(int(inference_config.get("workers", 0)), 0)
     infer_loader = DataLoader(

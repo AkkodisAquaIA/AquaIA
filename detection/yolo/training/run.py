@@ -63,7 +63,9 @@ def train_yolo(config) -> Any:
     use_amp = device == "cuda"
 
     # ---------- 4. Build train arguments ----------
-    # Start from training section and inject data/device
+    # Start from training section and inject data/device. This deliberately
+    # forwards `single_cls` to Ultralytics, which remaps every taxon ID to 0
+    # in memory for both training and its integrated validation.
     train_args: Dict[str, Any] = dict(training_config)
     train_args["data"] = dataset_config
     train_args["device"] = device

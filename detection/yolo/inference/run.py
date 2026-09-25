@@ -7,8 +7,14 @@ from detection.utils.plot_utils import save_sample_predictions
 from detection.yolo.predict import predict, normalize_imgsz
 
 
-def load_model(run_dir, device):
-    return YOLO(str(Path(run_dir) / "weights" / "best.pt")).to(device)
+def load_model(run_dir, device, class_name=None):
+    """Permet de définir un autre nom pour la classe de base ’item‘ pour les prédictions et les exports si le modèle a été entraîné sur une seule classe."""
+    model = YOLO(str(Path(run_dir) / "weights" / "best.pt")).to(device)
+    if class_name is not None:
+        # Ultralytics internally calls a single class "item". Keep its class
+        # ID 0 but expose the project name in predictions and exports.
+        model.model.names = {0: class_name}
+    return model
 
 
 def infer_yolo(config, ctx):
@@ -18,14 +24,21 @@ def infer_yolo(config, ctx):
 
     device = ctx["device"]
     run_dir = ctx["run_dir"]
+    run_config = ctx["run_config"]
     infer_data_root = ctx["infer_data_root"]
     output_dir = ctx["output_dir"]
 
-    model = load_model(run_dir, device)
+    # Use the training configuration saved in resolved_config.yaml so custom
+    # test metrics apply the same target mapping as Ultralytics training.
+    single_cls = bool(run_config["training"].get("single_cls", False))
+    class_name = str(run_config["data"].get("single_class_name", "specimen")).strip()
+    model = load_model(run_dir, device, class_name=class_name if single_cls else None)
     infer_dataset = JpgDetectionDataset(
         dataset_root=infer_data_root,
         data_split=data_cfg.get("split", "test"),
         img_size=normalize_imgsz(config, "inference"),
+        single_cls=single_cls,
+        class_name=class_name,
     )
     num_workers = max(int(inference_config.get("workers", 0)), 0)
     infer_loader = DataLoader(

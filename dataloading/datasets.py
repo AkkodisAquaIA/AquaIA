@@ -35,6 +35,8 @@ class BaseDetectionDataset:
         augment: bool = False,
         augmentation_config=None,
         img_format: str = "jpg",
+        single_cls: bool = False,
+        class_name: str = "specimen",
     ):
         self.dataset_root = Path(dataset_root)
         self.data_split = data_split
@@ -43,8 +45,18 @@ class BaseDetectionDataset:
         self.stats_file = stats_file or f"stats_{self.img_size}.npy"
         self.img_format = img_format
         self.augment = bool(augment and self.data_split == "train")
+        self.single_cls = bool(single_cls)
+        self.single_class_name = str(class_name).strip()
+        if self.single_cls and not self.single_class_name:
+            raise ValueError("class_name must not be empty when single_cls=True")
         self.load_stats()
         self.class_names, self.num_classes = load_class_names(dataset_root)
+        # Connection with the detector heads and visualization code:
+        # all original taxon IDs become class 0, so the model must expose one
+        # output class and plots must display the configured generic name.
+        if self.single_cls:
+            self.class_names = [self.single_class_name]
+            self.num_classes = 1
         self.load_targets()
         # Ultralytics Mosaic samples the full dataset when cache is set to "ram"
         # Images remain loaded on demand; this flag only selects its index-sampling path
@@ -108,7 +120,11 @@ class BaseDetectionDataset:
                         if not line:
                             continue
                         class_id, x_center, y_center, width, height = line.split()
-                        labels.append(int(class_id))
+                        # Keep source label files untouched. In two-stage mode,
+                        # the detector only learns "specimen" and the separate
+                        # classifier predicts the original taxon from the crop.
+                        class_id = 0 if self.single_cls else int(class_id)
+                        labels.append(class_id)
                         boxes.append([float(x_center), float(y_center), float(width), float(height)])
             self.targets.append(
                 {

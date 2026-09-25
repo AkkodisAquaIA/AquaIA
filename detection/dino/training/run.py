@@ -24,8 +24,10 @@ def get_datasets(
     data_yaml_path,
     img_size=640,
     augmentation_config=None,
+    single_cls=False,
+    class_name="specimen",
 ):
-    """Create the training and validation datasets, return train_dataset, val_dataset, num_classes."""
+    """Create train/val datasets with the same class mapping and return their class count."""
     augmentation_config = augmentation_config or {}
     train_dataset = JpgDetectionDataset(
         dataset_root=data_yaml_path,
@@ -33,11 +35,16 @@ def get_datasets(
         img_size=img_size,
         augment=augmentation_config.get("augment", False),
         augmentation_config=augmentation_config,
+        # Both splits must remap taxon IDs in exactly the same way.
+        single_cls=single_cls,
+        class_name=class_name,
     )
     val_dataset = JpgDetectionDataset(
         dataset_root=data_yaml_path,
         data_split="val",
         img_size=img_size,
+        single_cls=single_cls,
+        class_name=class_name,
     )
     num_classes = train_dataset.num_classes
     return train_dataset, val_dataset, num_classes
@@ -79,10 +86,16 @@ def train_dino(config, resume_dir=None):
     use_amp = device == "cuda"
 
     imgsz = normalize_imgsz(config, "training")
+    # The resolved run configuration keeps these values so inference can
+    # rebuild a DETR head with the same size and remap test targets as well.
+    single_cls = bool(training_config.get("single_cls", False))
+    class_name = str(config["data"].get("single_class_name", "specimen")).strip()
     train_set, val_set, num_classes = get_datasets(
         config["data"]["dataset_yaml"],
         img_size=imgsz,
         augmentation_config=training_config,
+        single_cls=single_cls,
+        class_name=class_name,
     )
     close_mosaic = max(int(training_config.get("close_mosaic", 0)), 0)
     # When to close
@@ -152,6 +165,9 @@ def train_dino(config, resume_dir=None):
         device=device,
         num_classes=num_classes,
     ).to(device)
+
+    # With single_cls=True, num_classes is 1. This connects the Dataset
+    # remapping to DETR's classification head [batch, queries, 1].
 
     matcher = HungarianMatcher(
         cost_class=training_config["cost_class"],

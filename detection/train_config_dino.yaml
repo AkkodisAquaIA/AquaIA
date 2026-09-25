@@ -7,6 +7,8 @@ model:
 
 data:
   dataset_yaml: "datasets/coco_custom_match"
+  # Display name of class 0 in the two-stage detection -> classification pipeline.
+  single_class_name: "specimen"
 
 output:
   # Root directory for run folders. Each run creates project/{YYYYMMDD_HHMMSS}/
@@ -22,6 +24,9 @@ training:
   # ---------- CORE TASK / MODE ----------
   # Both use it to create output dir, YOLO uses it to specify the training task
   task: "detect"
+  # The shared Dataset remaps every original taxon ID to 0. Train, validation,
+  # test metrics and the DETR classification head all reuse this setting.
+  single_cls: true
 
   # ---------- DEVICE ----------
   device: "auto"

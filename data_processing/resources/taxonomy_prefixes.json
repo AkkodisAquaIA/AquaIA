@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "prefix_length": 5,
+  "ranks": [
+    "embranchement",
+    "classe",
+    "ordre"
+  ],
+  "prefixes": [
+    {
+      "Annel": "Annelida",
+      "Arthr": "Arthropoda",
+      "Cnida": "Cnidaria",
+      "Mollu": "Mollusca",
+      "Platy": "Platyhelminthes"
+    },
+    {
+      "Bival": "Bivalvia",
+      "Clite": "Clitellata",
+      "Gastr": "Gastropoda",
+      "Hydro": "Hydrozoa",
+      "Insec": "Insecta",
+      "Malac": "Malacostraca",
+      "Rhabd": "Rhabditophora"
+    },
+    {
+      "Amphi": "Amphipoda",
+      "Arhyn": "Arhynchobdellida",
+      "Branc": "Branchiobdellida",
+      "Cardi": "Cardiida",
+      "Coleo": "Coleoptera",
+      "Cyclo": "Cycloneritida",
+      "Decap": "Decapoda",
+      "Dipte": "Diptera",
+      "Ectob": "Ectobranchia",
+      "Ephem": "Ephemeroptera",
+      "Gastr": "Gastropoda",
+      "Hemip": "Hemiptera",
+      "Hygro": "Hygrophila",
+      "Hymen": "Hymenoptera",
+      "Isopo": "Isopoda",
+      "Lepid": "Lepidoptera",
+      "Litto": "Littorinimorpha",
+      "Megal": "Megaloptera",
+      "Myida": "Myida",
+      "Mysid": "Mysida",
+      "Mytil": "Mytilida",
+      "Neuro": "Neuroptera",
+      "Odona": "Odonata",
+      "Rhync": "Rhynchobdellida",
+      "Sphae": "Sphaeriida",
+      "Trich": "Trichoptera",
+      "Tricl": "Tricladida",
+      "Union": "Unionida",
+      "Vener": "Venerida",
+      "sp": "sp"
+    }
+  ]
+}
