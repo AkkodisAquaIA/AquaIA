@@ -104,10 +104,28 @@ A DINO run can contain model weights, the training state, the resolved configura
 │   └── last.pt
 ├── last_training_state.pt
 ├── resolved_config.yaml
+├── train.log
+├── run_meta.json
 ├── metrics.npy
 ├── best_metric.npy
+├── tensorboard/
+│   └── events.out.tfevents...
 ├── eval_predictions/
 └── train_predictions/
+```
+
+A YOLO run contains the Ultralytics training artifacts and the project-level TensorBoard events:
+
+```text
+<run_directory>/
+├── weights/
+│   ├── best.pt
+│   └── last.pt
+├── resolved_config.yaml
+├── results.csv
+├── tensorboard/
+│   └── events.out.tfevents...
+└── ...
 ```
 
 By default, inference results are stored inside the selected training run:
@@ -120,6 +138,32 @@ By default, inference results are stored inside the selected training run:
 
 For the DINO text log, run metadata, checkpoints, resume behavior, CLI
 commands, and tmux usage, see [logging/LOGGING.md](logging/LOGGING.md).
+
+## TensorBoard
+
+TensorBoard training logging is enabled by default for both DINO / DETR and YOLO. No YAML option or global Ultralytics setting is required. Each training run writes its own event file under `<run_directory>/tensorboard/`, while all existing text logs, metrics, plots, and checkpoints are preserved.
+
+DINO / DETR records the existing training and validation losses and errors at the end of every epoch, together with the learning rate. The post-training train-subset and validation mAP values are recorded under the `evaluation/` group.
+
+YOLO uses project-level Ultralytics callbacks to record its training losses, learning rates, and validation metrics at the end of every epoch. It does not depend on the global Ultralytics `tensorboard` setting.
+
+To compare DINO / DETR runs within the same model branch, start TensorBoard from the repository root with the parent directory containing the timestamped runs:
+
+```powershell
+& "C:\Users\zhijian.zhou\Aquaia_dino\Scripts\tensorboard.exe" `
+  --logdir "results\detect\dinov3_small_pretrained"
+```
+
+To compare YOLO runs within its own branch:
+
+```powershell
+& "C:\Users\zhijian.zhou\Aquaia_dino\Scripts\tensorboard.exe" `
+  --logdir "results\detect\yolo11_n_pretrained"
+```
+
+TensorBoard recursively discovers the event files below the selected directory and displays each timestamped training directory as a separate run. Open `http://localhost:6006/` after starting the server.
+
+The TensorBoard output created during YOLO training is separate from `yolo/yolo_run_diagnostics.py`, which reloads a completed checkpoint and writes post-training validation, IoU, confidence, and prediction-image diagnostics.
 
 ## Repository structure
 
@@ -163,7 +207,7 @@ The Detection part contains the following folders and files.
 │   │   ├── __init__.py           # Declares logging package.
 │   │   ├── checkpoint_manager.py # Saves best.pt on improvement; last.pt + last_training_state.pt every save_period epochs and at the end of training.
 │   │   ├── LOGGING.md            # Current logging behavior, usage, limitations, and planned work.
-│   │   └── training_logger.py    # TrainingLogger (train.log and run_meta.json).
+│   │   └── training_logger.py    # TrainingLogger (train.log, run_meta.json, and DINO TensorBoard events).
 │   │
 │   ├── utils/
 │   │   ├── box_ops.py            # Bbox operations.
@@ -176,7 +220,7 @@ The Detection part contains the following folders and files.
 │   │   │   └── run.py            # Main inference process, loads the best YOLO checkpoint and evaluates it on the configured dataset split.
 │   │   │
 │   │   ├── training/
-│   │   │   └── run.py            # Main training process, resolves the Ultralytics model identifier and launches training.
+│   │   │   └── run.py            # Main training process, resolves the Ultralytics model identifier, registers TensorBoard callbacks, and launches training.
 │   │   │
 │   │   ├── batch_eval.py         # Evaluates multiple YOLO runs with yolo_run_diagnostics.py and generates CSV and Markdown reports.
 │   │   ├── plot_metrics.py       # Plots training metrics for one YOLO run or compares metrics across multiple runs.
