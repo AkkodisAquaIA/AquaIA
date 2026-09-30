@@ -430,17 +430,21 @@ def train_dino(config, resume_dir=None):
         )
     # ------ END ------
 
-    metrics = compute_metrics(
-        model=best_model,
-        # dataloaders=[train_dataloader, val_dataloader],
-        # !Temporary! The line above is the original
-        dataloaders=[train_subset_dataloader, val_dataloader],
-        predict_fn=predict,
-        device=device,
-        conf_thresh=training_config.get("conf_thresh", 0.05),
-    )
-    logger.info(str(metrics))
-    np.save(os.path.join(run_dir, "best_metric.npy"), metrics, allow_pickle=True)
+    try:
+        metrics = compute_metrics(
+            model=best_model,
+            # dataloaders=[train_dataloader, val_dataloader],
+            # !Temporary! The line above is the original
+            dataloaders=[train_subset_dataloader, val_dataloader],
+            predict_fn=predict,
+            device=device,
+            conf_thresh=training_config.get("conf_thresh", 0.05),
+        )
+        logger.info(str(metrics))
+        logger.tb_log_evaluation(metrics, step=training_config["epochs"])
+        np.save(os.path.join(run_dir, "best_metric.npy"), metrics, allow_pickle=True)
+    finally:
+        logger.tb_close()
 
     save_sample_predictions(
         model=best_model,

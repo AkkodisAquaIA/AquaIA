@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 import torch
 from ultralytics import YOLO
+from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from detection.utils.config_utils import save_resolved_config
 from pathlib import Path
@@ -88,4 +89,25 @@ def train_yolo(config) -> Any:
         run_dir=run_dir,
     )
 
-    return model.train(**train_args)
+    tensorboard_writer = SummaryWriter(log_dir=str(Path(run_dir) / "tensorboard"))
+
+    def log_train_epoch(trainer) -> None:
+        step = trainer.epoch + 1
+        for metric_name, value in trainer.label_loss_items(trainer.tloss, prefix="train").items():
+            tensorboard_writer.add_scalar(metric_name, value, step)
+        for metric_name, value in trainer.lr.items():
+            tensorboard_writer.add_scalar(metric_name, value, step)
+
+    def log_fit_epoch(trainer) -> None:
+        step = trainer.epoch + 1
+        for metric_name, value in trainer.metrics.items():
+            tensorboard_writer.add_scalar(metric_name, value, step)
+        tensorboard_writer.flush()
+
+    model.add_callback("on_train_epoch_end", log_train_epoch)
+    model.add_callback("on_fit_epoch_end", log_fit_epoch)
+
+    try:
+        return model.train(**train_args)
+    finally:
+        tensorboard_writer.close()
