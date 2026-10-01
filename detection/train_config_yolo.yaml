@@ -6,7 +6,7 @@ model:
   init: "pretrained"
 
 data:
-  dataset_yaml: "datasets/coco_custom_match"
+  dataset_yaml: "datasets/aquatic_insects_v7_1classe"
 
 output:
   # Root directory for run folders. Each run creates project/{YYYYMMDD_HHMMSS}/
@@ -33,7 +33,7 @@ training:
   workers: 3
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 100
+  epochs: 25
 
   # ---------- OPTIMIZER & LR ----------
   optimizer: "AdamW"
@@ -57,19 +57,19 @@ training:
 
   # ---------- DATA AUGMENTATION ----------
   # Set all zero to disable training augmentation
-  hsv_h: 0.005
-  hsv_s: 0.1
-  hsv_v: 0.1
-  degrees: 5
-  translate: 0.05
-  scale: 0.1
-  flipud: 0.1
-  fliplr: 0.5
-  mosaic: 0.01
-  cutmix: 0.01
+  hsv_h: 0
+  hsv_s: 0
+  hsv_v: 0
+  degrees: 0
+  translate: 0
+  scale: 0
+  flipud: 0
+  fliplr: 0
+  mosaic: 0
+  cutmix: 0
   # Disable Mosaic and CutMix in the last N epochs
   # Make sure close_mosaic <= epochs
-  close_mosaic: 40
+  close_mosaic: 25
 
   # ---------- INFERENCE / EVAL-RELATED ----------
   # Confidence threshold for bbox prediction filtering

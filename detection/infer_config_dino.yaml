@@ -5,13 +5,13 @@ run:
   run_dir: null
 
 data:
-  infer_data_root: "datasets/coco_custom_match"
+  infer_data_root: "datasets/aquatic_insects_v7_1classe"
   # Dataset split used for inference
   split: "test"
 
 inference:
   imgsz : 640
-  batch: 8
+  batch: 30
   # Number of PyTorch DataLoader workers
   workers: 3
   # Confidence threshold used to filter bbox predictions before mAP calculation
@@ -27,4 +27,4 @@ inference:
   seed: 0
 
 output:
-  output_dir: null
+  output_dir: "results/infer_dino"

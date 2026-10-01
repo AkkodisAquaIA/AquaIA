@@ -6,7 +6,7 @@ model:
   init: "pretrained"
 
 data:
-  dataset_yaml: "datasets/coco_custom_match"
+  dataset_yaml: "datasets/aquatic_insects_v7_1classe"
 
 output:
   # Root directory for run folders. Each run creates project/{YYYYMMDD_HHMMSS}/
@@ -33,7 +33,7 @@ training:
   workers: 3
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 100
+  epochs: 25
   # If cos_lr, warmup steps = epochs * warmup_ratio 
   warmup_ratio: 0.05
 
@@ -58,7 +58,7 @@ training:
   giou: 2.0
 
   # ---------- DATA AUGMENTATION ----------
-  augment: true
+  augment: false
   hsv_h: 0.005
   hsv_s: 0.1
   hsv_v: 0.1
@@ -71,13 +71,13 @@ training:
   cutmix: 0.01
   # Disable Mosaic and CutMix in the last N epochs
   # Make sure close_mosaic <= epochs
-  close_mosaic: 40
+  close_mosaic: 25
 
   # ---------- INFERENCE / EVAL-RELATED ----------
   # !Temporary! Seed used to sample training set for post-training mAP evaluation
   train_subset_seed: 42
   # !Temporary! Fraction of sampling
-  train_subset_ratio: 0.5
+  train_subset_ratio: 1
   # Confidence threshold used to filter bbox predictions before mAP calculation
   conf_thresh: 0.05
   # Confidence threshold for bbox prediction filtering
