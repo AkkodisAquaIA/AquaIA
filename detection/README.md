@@ -163,8 +163,6 @@ To compare YOLO runs within its own branch:
 
 TensorBoard recursively discovers the event files below the selected directory and displays each timestamped training directory as a separate run. Open `http://localhost:6006/` after starting the server.
 
-The TensorBoard output created during YOLO training is separate from `yolo/tools/yolo_run_diagnostics.py`, which reloads a completed checkpoint and writes post-training validation, IoU, confidence, and prediction-image diagnostics. The scripts under `yolo/tools/` are optional, manually invoked post-training utilities and are not part of the `main.py train` or `main.py infer` execution path.
-
 ## Repository structure
 
 The Detection part contains the following folders and files.
@@ -221,11 +219,6 @@ The Detection part contains the following folders and files.
 │   │   │
 │   │   ├── training/
 │   │   │   └── run.py            # Main training process, resolves the Ultralytics model identifier, registers TensorBoard callbacks, and launches training.
-│   │   │
-│   │   ├── tools/                # Optional post-training analysis tools; not used by the main train/infer path.
-│   │   │   ├── batch_eval.py     # Evaluates multiple YOLO runs with yolo_run_diagnostics.py and generates CSV and Markdown reports.
-│   │   │   ├── plot_metrics.py   # Plots training metrics for one YOLO run or compares metrics across multiple runs.
-│   │   │   └── yolo_run_diagnostics.py # Evaluates one YOLO run, analyzes prediction errors and IoU, and writes TensorBoard diagnostics.
 │   │   │
 │   │   └── predict.py            # Adapts Ultralytics YOLO predictions to the common detection prediction format.
 │   │
