@@ -1,7 +1,6 @@
 from __future__ import annotations
 import os
 from typing import Any, Dict
-
 import torch
 from ultralytics import YOLO
 from torch.utils.tensorboard import SummaryWriter
@@ -10,36 +9,24 @@ from detection.utils.config_utils import save_resolved_config
 from pathlib import Path
 
 
-# -----------------------------
-# Model resolution (family/size/init)
-# -----------------------------
 def resolve_model_identifier(model_cfg: Dict[str, Any]) -> str:
     """
     Resolve the model identifier passed to Ultralytics YOLO().
-
-    - model.family + model.size + model.init
-      - init="pretrained" -> "{family}{size}.pt"
-      - init="random"     -> "{family}{size}.yaml"
+    model.family + model.size + model.init
+    init="pretrained" -> "{family}{size}.pt"
+    init="random"     -> "{family}{size}.yaml"
     """
     family = str(model_cfg.get("family", "yolo11")).strip().lower()
     size = str(model_cfg.get("size", "n")).strip().lower()
     init = str(model_cfg.get("init", "pretrained")).strip().lower()
-
     if size not in {"n", "s", "m", "l", "x"}:
         raise ValueError(f"[CONFIG ERROR] Unsupported size '{size}'. Expected one of n/s/m/l/x.")
-
     base = f"{family}{size}"
     if init == "random":
         return f"{base}.yaml"
     if init == "pretrained":
         return f"{base}.pt"
-
     raise ValueError(f"[CONFIG ERROR] Unsupported model.init '{init}'. Use 'pretrained' or 'random'.")
-
-
-# -----------------------------
-# Main entrypoint
-# -----------------------------
 
 
 def train_yolo(config) -> Any:
@@ -47,11 +34,11 @@ def train_yolo(config) -> Any:
     training_config = config["training"]
     output_config = config.get("output", {})
 
-    # ---------- 2. Resolve dataset path ----------
+    # ---------- Resolve dataset path ----------
     dataset_root = Path(config["data"]["dataset_yaml"])
     dataset_config = str(dataset_root / dataset_root.stem) + ".yaml"
 
-    # ---------- 3. Build model and device ----------
+    # ---------- Build model and device ----------
     # Instantiate YOLO model (keep variable name: model)
     model_id = resolve_model_identifier(model_config)
     model = YOLO(model_id)
@@ -63,14 +50,14 @@ def train_yolo(config) -> Any:
         device = configured_device
     use_amp = device == "cuda"
 
-    # ---------- 4. Build train arguments ----------
-    # Start from training section and inject data/device
+    # ---------- Build train arguments ----------
+    # Start from training section and inject data/device/amp
     train_args: Dict[str, Any] = dict(training_config)
     train_args["data"] = dataset_config
     train_args["device"] = device
     train_args["amp"] = use_amp
 
-    # ---------- 5. Resolve output project/name ----------
+    # ---------- Resolve output project/name ----------
     run_dir = os.path.join(output_config["project"], datetime.now().strftime("%Y%m%d_%H%M%S"))
     os.makedirs(run_dir, exist_ok=output_config.get("exist_ok", True))
     train_args["save_dir"] = run_dir
@@ -81,6 +68,7 @@ def train_yolo(config) -> Any:
             train_args[k] = output_config[k]
 
     resolved_config_path = os.path.join(run_dir, "resolved_config.yaml")
+    # !Warning! Save before model.train() hence if Ulytralytics adjusts config, no longer reflected
     save_resolved_config(
         path=resolved_config_path,
         config=config,
@@ -92,21 +80,27 @@ def train_yolo(config) -> Any:
     tensorboard_writer = SummaryWriter(log_dir=str(Path(run_dir) / "tensorboard"))
 
     def log_train_epoch(trainer) -> None:
+        """Log training losses and learning rates to TensorBoard at the end of each training epoch."""
         step = trainer.epoch + 1
+        # Itertate over the loss items and log them to TensorBoard
         for metric_name, value in trainer.label_loss_items(trainer.tloss, prefix="train").items():
             tensorboard_writer.add_scalar(metric_name, value, step)
+        # Iterate over the learning rate items and log them to TensorBoard
         for metric_name, value in trainer.lr.items():
             tensorboard_writer.add_scalar(metric_name, value, step)
 
     def log_fit_epoch(trainer) -> None:
+        """Log validation losses and evaluation metrics to TensorBoard at the end of each fit epoch."""
         step = trainer.epoch + 1
         for metric_name, value in trainer.metrics.items():
             tensorboard_writer.add_scalar(metric_name, value, step)
         tensorboard_writer.flush()
 
+    # Add callbacks to log training and validation metrics to TensorBoard
     model.add_callback("on_train_epoch_end", log_train_epoch)
     model.add_callback("on_fit_epoch_end", log_fit_epoch)
 
+    # ---------- Train ----------
     try:
         return model.train(**train_args)
     finally:

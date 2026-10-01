@@ -7,21 +7,17 @@ from detection.utils.plot_utils import save_sample_predictions
 from detection.yolo.predict import predict, normalize_imgsz
 
 
-def load_model(run_dir, device):
-    return YOLO(str(Path(run_dir) / "weights" / "best.pt")).to(device)
-
-
-def infer_yolo(config, ctx):
-    # config from infer_config.yaml, ctx derived from resolved_config.yaml
+def infer_yolo(config, context):
+    # config from infer_config_yolo.yaml, context derived from resolved_config.yaml
     inference_config = dict(config["inference"])
     data_cfg = config["data"]
 
-    device = ctx["device"]
-    run_dir = ctx["run_dir"]
-    infer_data_root = ctx["infer_data_root"]
-    output_dir = ctx["output_dir"]
+    device = context["device"]
+    run_dir = context["run_dir"]
+    infer_data_root = context["infer_data_root"]
+    output_dir = context["output_dir"]
 
-    model = load_model(run_dir, device)
+    model = YOLO(str(Path(run_dir) / "weights" / "best.pt")).to(device)
     infer_dataset = JpgDetectionDataset(
         dataset_root=infer_data_root,
         data_split=data_cfg.get("split", "test"),
@@ -35,10 +31,11 @@ def infer_yolo(config, ctx):
         num_workers=num_workers,
         collate_fn=detection_collate_fn,
     )
-
     num_samples = int(inference_config.get("num_samples", 20))
     if num_samples <= 0:
         raise ValueError("inference.num_samples must be greater than 0")
+
+    # num_samples visualization
     save_sample_predictions(
         model=model,
         subset=infer_dataset,
@@ -49,13 +46,17 @@ def infer_yolo(config, ctx):
         seed=inference_config["seed"],
         device=device,
     )
+
+    # Inference full size
     metrics = compute_metrics(
         model=model,
         dataloaders=[infer_loader],
         predict_fn=predict,
-        conf_thresh=inference_config.get("conf", 0.3),
+        conf_thresh=inference_config.get("conf_thresh", 0.05),
         device=device,
     )
+    print(metrics)
     save_metrics(metrics, output_dir)
+    print("Inference complete!")
 
     return output_dir

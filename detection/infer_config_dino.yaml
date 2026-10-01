@@ -16,11 +16,7 @@ inference:
   workers: 3
   # Confidence threshold used to filter bbox predictions before mAP calculation
   conf_thresh: 0.05
-  # Confidence threshold for bbox prediction filtering
-  # DINO uses it to filter saved prediction visualizations
-  # YOLO uses it to filter saved inference visualizations
-  # and predictions passed to the custom compute_metrics()
-  # thereby affecting the custom mAP
+  # Confidence threshold for bbox prediction visualization filtering
   conf: 0.3
   # Number of samples used for prediction visualization, must be greater than 0
   num_samples: 20

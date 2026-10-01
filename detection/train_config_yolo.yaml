@@ -14,14 +14,13 @@ output:
   # Set a path string to override the automatically generated project directory
   project: null
   exist_ok: true
-  save_period: 0
+  save_period: 5
   plots: true
 
 training:
   # ---------- CORE TASK / MODE ----------
   # Both use it to create output dir, YOLO uses it to specify the training task
   task: "detect"
-  mode: "train"
 
   # ---------- DEVICE ----------
   device: "auto"
@@ -48,6 +47,7 @@ training:
   # Weights for class, bbox in loss
   cls: 4.0
   box: 5.0
+  dfl: 1.5
 
   # ---------- LOSS / BOX / CLS HYPERPARAMETERS ----------
   # See Ultralytics default.yaml for the latest recommended defaults
@@ -76,7 +76,9 @@ training:
   # DINO uses it to filter saved prediction visualizations
   # YOLO uses it as the confidence threshold during validation
   conf: 0.3
+  # IoU threshold for NMS
   iou: 0.5
+  # Run validation after epochs
   val: true
 
   # ---------- PERFORMANCE / MISC ----------
