@@ -1,11 +1,13 @@
-"""Découpe un dataset type YOLO et range les crops dans un dossier par classe."""
+"""Découpe les bounding boxes d'un dataset YOLO en images de classification."""
 
 import argparse
 import csv
 import json
+import logging
 import math
 import unicodedata
 import warnings
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import yaml
@@ -14,6 +16,7 @@ from PIL import Image
 
 SPLITS = ["train", "val", "test"]
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
+LOGGER = logging.getLogger(__name__)
 
 
 def normalize_text(text):
@@ -57,19 +60,28 @@ def load_class_ids(yaml_path=None, json_path=None):
     if json_path is None:
         raise FileNotFoundError("Aucun data.yaml trouvé. Utilisez --classes-json comme solution de secours.")
 
+    for class_id, class_name in enumerate(load_json_class_names(json_path)):
+        class_ids[class_id] = class_name
+        class_sources[class_id] = "json"
+
+    return class_ids, class_sources
+
+
+def load_json_class_names(json_path):
+    """Lit les noms du référentiel JSON."""
     with json_path.open("r", encoding="utf-8") as file:
         json_data = json.load(file)
 
     if not isinstance(json_data, list):
         raise ValueError("Le fichier JSON doit contenir une liste de classes.")
 
-    for class_id, item in enumerate(json_data):
+    class_names = []
+    for index, item in enumerate(json_data):
         if not isinstance(item, dict) or "name" not in item:
-            raise ValueError(f"Classe JSON invalide à l'index {class_id}.")
-        class_ids[class_id] = normalize_text(item["name"])
-        class_sources[class_id] = "json"
+            raise ValueError(f"Classe JSON invalide à l'index {index}.")
+        class_names.append(normalize_text(item["name"]))
 
-    return class_ids, class_sources
+    return class_names
 
 
 def load_taxonomy_prefixes(json_path):
@@ -92,10 +104,10 @@ def load_taxonomy_prefixes(json_path):
 
 
 def decode_class_name(encoded_name, prefixes):
-    """Développe les trois premiers taxons et conserve famille, genre et espèce."""
+    """Développe un nom taxonomique connu, sinon conserve le nom d'origine."""
     parts = normalize_text(encoded_name).split("_")
     if len(parts) < 3:
-        return None, "nom_incomplet"
+        return encoded_name, "nom_conserve"
 
     decoded_parts = []
     expanded = False
@@ -110,7 +122,7 @@ def decode_class_name(encoded_name, prefixes):
         elif token in rank_prefixes.values():
             decoded_parts.append(token)
         else:
-            return None, "prefixe_inconnu"
+            return encoded_name, "nom_conserve"
 
     standard_name = "_".join([*decoded_parts, *parts[3:]])
     status = "converti_par_prefixes" if expanded else "deja_complet"
@@ -150,6 +162,60 @@ def save_conversion_table(rows, output_path):
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def compare_yaml_and_json_classes(class_ids, conversion_rows, manifest, json_path):
+    """Compare les classes du YAML au JSON et journalise leur utilisation. Notamment pour suivre les images/classes ajoutées non prévues à la base"""
+    json_names = load_json_class_names(json_path)
+    json_names_by_key = {name.casefold(): name for name in json_names}
+    conversion_by_id = {row["class_id"]: row for row in conversion_rows}
+    annotation_counts = Counter(row["class_id"] for row in manifest)
+    image_paths = defaultdict(set)
+    split_counts = defaultdict(Counter)
+
+    for row in manifest:
+        image_paths[row["class_id"]].add(row["image_source"])
+        split_counts[row["class_id"]][row["split"]] += 1
+
+    matched_json_keys = set()
+    missing_count = 0
+    LOGGER.info("Comparaison des classes YAML avec %s (%d classe(s) JSON)", json_path, len(json_names))
+
+    for class_id in sorted(class_ids):
+        yaml_name = class_ids[class_id]
+        standard_name = conversion_by_id[class_id]["nom_standard"]
+        candidate_keys = {yaml_name.casefold(), standard_name.casefold()}
+        matched_key = next((key for key in candidate_keys if key in json_names_by_key), None)
+        annotation_count = annotation_counts[class_id]
+        image_count = len(image_paths[class_id])
+        counts_by_split = [f"{split}={count}" for split, count in sorted(split_counts[class_id].items())]
+        split_summary = ", ".join(counts_by_split) or "aucune annotation"
+
+        message = (
+            "Classe id=%d '%s' : %d annotation(s), %d image(s), %s"
+            % (class_id, yaml_name, annotation_count, image_count, split_summary)
+        )
+
+        if matched_key is None:
+            missing_count += 1
+            LOGGER.warning("Absente du JSON - %s", message)
+        else:
+            matched_json_keys.add(matched_key)
+            LOGGER.info("Présente dans le JSON - %s", message)
+
+        if annotation_count == 0:
+            LOGGER.warning("La classe YAML id=%d '%s' n'est utilisée par aucune annotation.", class_id, yaml_name)
+
+    json_only_names = [name for name in json_names if name.casefold() not in matched_json_keys]
+    for name in json_only_names:
+        LOGGER.info("Classe présente uniquement dans le JSON : '%s'", name)
+
+    LOGGER.info(
+        "Résumé YAML/JSON : %d classe(s) YAML, %d absente(s) du JSON, %d présente(s) uniquement dans le JSON.",
+        len(class_ids),
+        missing_count,
+        len(json_only_names),
+    )
 
 
 def list_images(image_dir):
@@ -367,6 +433,9 @@ def crop_directory_list(
     ignored_path = output_dir / "annotations_ignorees.csv"
     save_ignored_annotations(ignored, ignored_path)
 
+    if yaml_path is not None and json_path is not None:
+        compare_yaml_and_json_classes(class_ids, conversion_rows, manifest, json_path)
+
     if ignored:
         warnings.warn(
             f"{len(ignored)} annotation(s) ignorée(s). Consultez le fichier : {ignored_path}",
@@ -404,11 +473,15 @@ def crop_directories(
     )
 
 
-def crop_splits(dataset_dir, output_dir, taxonomy_path, yaml_path=None, json_path=None):
-    """Traite les dossiers train, val et test d'un dataset complet."""
+def crop_splits(dataset_dir, output_dir, taxonomy_path, yaml_path=None, json_path=None, splits=None):
+    """Traite les splits demandés (train, val et test par défaut)."""
     directories = []
 
-    for split in SPLITS:
+    selected_splits = SPLITS if splits is None else splits
+    if not selected_splits:
+        raise ValueError("La liste des splits ne peut pas être vide.")
+
+    for split in selected_splits:
         images_dir = dataset_dir / "images" / split
         labels_dir = dataset_dir / "labels" / split
         directories.append((split, images_dir, labels_dir))
@@ -434,16 +507,29 @@ def find_parent_file(start_dir, filename):
 def parse_args():
     parser = argparse.ArgumentParser(description="Découpe les bounding boxes YOLO et range les crops par classe.")
     parser.add_argument(
+        "--dataset-dir",
+        type=Path,
+        default=None,
+        help="Racine d'un dataset structuré en images/<split> et labels/<split>",
+    )
+    parser.add_argument(
         "--images-dir",
         type=Path,
-        required=True,
+        default=None,
         help="Dossier contenant les images sources",
     )
     parser.add_argument(
         "--labels-dir",
         type=Path,
-        required=True,
+        default=None,
         help="Dossier contenant les annotations TXT",
+    )
+    parser.add_argument(
+        "--splits",
+        nargs="+",
+        choices=SPLITS,
+        default=None,
+        help="Splits à traiter avec --dataset-dir (par défaut : train val test)",
     )
     parser.add_argument(
         "--output-dir",
@@ -455,7 +541,7 @@ def parse_args():
         "--classes-json",
         type=Path,
         default=None,
-        help="JSON de secours à utiliser seulement en l'absence de data.yaml",
+        help="Référentiel JSON comparé au YAML, ou source de secours si le YAML manque",
     )
     parser.add_argument(
         "--classes-yaml",
@@ -469,16 +555,32 @@ def parse_args():
         default=None,
         help="Registre JSON des préfixes taxonomiques",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.dataset_dir is None and (args.images_dir is None or args.labels_dir is None):
+        parser.error("utilisez --dataset-dir, ou fournissez ensemble --images-dir et --labels-dir")
+    if args.dataset_dir is not None and (args.images_dir is not None or args.labels_dir is not None):
+        parser.error("--dataset-dir ne peut pas être combiné avec --images-dir ou --labels-dir")
+    if args.dataset_dir is None and args.splits is not None:
+        parser.error("--splits s'utilise uniquement avec --dataset-dir")
+
+    return args
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     args = parse_args()
-    images_dir = args.images_dir.resolve()
-    labels_dir = args.labels_dir.resolve()
     output_dir = args.output_dir.resolve()
 
-    yaml_path = args.classes_yaml or find_parent_file(labels_dir, "data.yaml")
+    if args.dataset_dir is not None:
+        dataset_dir = args.dataset_dir.resolve()
+        class_search_dir = dataset_dir
+    else:
+        images_dir = args.images_dir.resolve()
+        labels_dir = args.labels_dir.resolve()
+        class_search_dir = labels_dir
+
+    yaml_path = args.classes_yaml or find_parent_file(class_search_dir, "data.yaml")
     json_path = args.classes_json
 
     if yaml_path is None and json_path is None:
@@ -488,14 +590,25 @@ def main():
     if taxonomy_path is None:
         taxonomy_path = Path(__file__).parent / "resources" / "taxonomy_prefixes.json"
 
-    crop_directories(
-        images_dir=images_dir,
-        labels_dir=labels_dir,
-        output_dir=output_dir,
-        taxonomy_path=taxonomy_path.resolve(),
-        yaml_path=yaml_path.resolve() if yaml_path else None,
-        json_path=json_path.resolve() if json_path else None,
-    )
+    common_arguments = {
+        "output_dir": output_dir,
+        "taxonomy_path": taxonomy_path.resolve(),
+        "yaml_path": yaml_path.resolve() if yaml_path else None,
+        "json_path": json_path.resolve() if json_path else None,
+    }
+
+    if args.dataset_dir is not None:
+        crop_splits(
+            dataset_dir=dataset_dir,
+            splits=args.splits,
+            **common_arguments,
+        )
+    else:
+        crop_directories(
+            images_dir=images_dir,
+            labels_dir=labels_dir,
+            **common_arguments,
+        )
 
 
 if __name__ == "__main__":
