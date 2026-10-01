@@ -28,7 +28,6 @@ coco128
 detection/sam/*_result_det_*/
 detection/sam/*_result_det/
 /runs
-tests/
 
 #Linter
 .ruff_cache/
