@@ -191,10 +191,7 @@ def compare_yaml_and_json_classes(class_ids, conversion_rows, manifest, json_pat
         counts_by_split = [f"{split}={count}" for split, count in sorted(split_counts[class_id].items())]
         split_summary = ", ".join(counts_by_split) or "aucune annotation"
 
-        message = (
-            "Classe id=%d '%s' : %d annotation(s), %d image(s), %s"
-            % (class_id, yaml_name, annotation_count, image_count, split_summary)
-        )
+        message = "Classe id=%d '%s' : %d annotation(s), %d image(s), %s" % (class_id, yaml_name, annotation_count, image_count, split_summary)
 
         if matched_key is None:
             missing_count += 1
