@@ -6,7 +6,7 @@ def normalize_imgsz(config, phase):
     return int(config[phase]["imgsz"])
 
 
-def predict(model, samples, device, conf_thres, imgsz=None):
+def predict(model, samples, device, conf_thres, imgsz=None, iou=0.5):
     """Return pixel xyxy boxes in the resized sample image coordinate system.
     For YOLO inference."""
     image_files = samples["img_paths"]
@@ -15,7 +15,7 @@ def predict(model, samples, device, conf_thres, imgsz=None):
     # If no inference imgsz provided use sample resized imgsz
     if imgsz is None:
         imgsz = (target_height, target_width)
-    results = model.predict(source=image_files, conf=conf_thres, device=device, verbose=False, imgsz=imgsz)
+    results = model.predict(source=image_files, conf=conf_thres, iou=iou, device=device, verbose=False, imgsz=imgsz)
     preds = []
     for result in results:
         boxes = result.boxes

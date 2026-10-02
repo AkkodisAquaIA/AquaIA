@@ -18,6 +18,8 @@ inference:
   conf_thresh: 0.05
   # Confidence threshold for bbox prediction visualization filtering
   conf: 0.3
+  # IoU threshold for NMS; matches training.iou
+  iou: 0.5
   # Number of samples used for prediction visualization, must be greater than 0
   num_samples: 20
   seed: 0

@@ -75,7 +75,7 @@ training:
   # Confidence threshold for bbox prediction filtering
   # DINO uses it to filter saved prediction visualizations
   # YOLO uses it as the confidence threshold during validation
-  conf: 0.3
+  conf: 0.05
   # IoU threshold for NMS
   iou: 0.5
   # Run validation after epochs

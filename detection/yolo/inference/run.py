@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 from torch.utils.data import DataLoader
 from ultralytics import YOLO
@@ -11,6 +12,9 @@ def infer_yolo(config, context):
     # config from infer_config_yolo.yaml, context derived from resolved_config.yaml
     inference_config = dict(config["inference"])
     data_cfg = config["data"]
+    # Bind the configured NMS IoU to predict so shared evaluation and visualization
+    # functions can call it without accepting a YOLO-specific iou argument
+    predict_fn = partial(predict, iou=float(inference_config.get("iou", 0.5)))
 
     device = context["device"]
     run_dir = context["run_dir"]
@@ -39,7 +43,7 @@ def infer_yolo(config, context):
     save_sample_predictions(
         model=model,
         subset=infer_dataset,
-        predict_fn=predict,
+        predict_fn=predict_fn,
         output_dir=output_dir / "inference_predictions",
         num_samples=num_samples,
         conf=inference_config.get("conf", 0.3),
@@ -51,7 +55,7 @@ def infer_yolo(config, context):
     metrics = compute_metrics(
         model=model,
         dataloaders=[infer_loader],
-        predict_fn=predict,
+        predict_fn=predict_fn,
         conf_thresh=inference_config.get("conf_thresh", 0.05),
         device=device,
     )
