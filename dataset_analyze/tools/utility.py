@@ -353,7 +353,9 @@ def get_directory_color(prompt: str, color_key: str = "input") -> Path:
         )
 
 
-        
+def est_incluse(liste1, liste2):
+    return all(element in liste2 for element in liste1)
+     
 
 def selection(maxi) -> int:
   

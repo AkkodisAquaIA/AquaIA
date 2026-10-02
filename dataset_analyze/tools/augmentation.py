@@ -1,5 +1,4 @@
 
-
 import cv2
 import albumentations as A
 
@@ -39,7 +38,7 @@ def transformation_rotation(fond):
         A.SafeRotate(
             limit=(-20, 20 ),
             interpolation= cv2.INTER_LINEAR,
-            border_mode= cv2.BORDER_CONSTANT,  #  cv2.BORDER_REFLECT_101,    border_mode= cv2.BORDER_CONSTANT,
+            border_mode= cv2.BORDER_REFLECT_101,  #  cv2.BORDER_REFLECT_101,  / cv2.BORDER_REFLECT / cv2.BORDER_CONSTANT,  
             fill=fond,
             p=1.0
         )

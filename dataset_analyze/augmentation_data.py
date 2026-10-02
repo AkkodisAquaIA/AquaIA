@@ -118,11 +118,7 @@ class InfoOccupationBestiole:
     surface_bestiole : float
     surface_image : float
 
-    # x_min: int
-    # y_min: int
-    # x_max: int
-    # y_max: int
-
+ 
 @dataclass
 class DetectionBestiole:
     masque: np.ndarray
@@ -135,17 +131,52 @@ class DetectionBestiole:
     occupation_pct: float
 
 
-# ------------------------------------------------------------
-# Nombre de modifications par type
-# ------------------------------------------------------------
 
-NB_MULTI = 1
 
 # seuil_detection(image)
 SEUIL_DETECTION =  35  
 
 
+# ------------------------------------------------------------
+# Nombre de modifications par type
+# ------------------------------------------------------------
+"""
+Pour les Flip H & V, le nombre de modifications zst toujours 1
+"""
+NB_MULTI = 15
+
+# ------------------------------------------------------------
+# Ensemble des augmentations disponibles 
+# ------------------------------------------------------------
+# ---- augmentations unitaires -------------------------------
+FLIP_H      = "Flip_H"     # 1
+FLIP_V      = "Flip_V"     # 2
+ROTATION    = "Rotation"   # 3  
+CONTRASTE   = "Contraste"  # 4
+BRUIT       = "Bruit"      # 5
+ZOOM        = "Zoom"       # 6
+
+# ---- augmentations combinées -------------------------------
+ROT_FLIT_H       = "Roration + Flip_H"              # 7       
+ROT_FLIT_H_C     = "Roration + Flip_H + Contraste"  # 8
+ROT_FLIT_V       = "Roration + Flip_V"              # 9
+ROT_FLIT_V_C     = "Roration + Flip_V + Contraste"  # 10
+ZOOM_C           = "Zoom + Contraste"               # 11
+ZOOM_ROTATION    = "Zoom + Rotation"                # 12
+ZOOM_ROTATION_C  = "Zoom + Rotation + Contraste"    # 13
+CONTRASTE_BRUIT = "Contraste + Bruit"               # 14
+
+traitements_a_effectuer = [
+    CONTRASTE_BRUIT
+   
+    ]
+
+
 #==================================================================================================
+def traitement_actif(nom_traitement):
+    return nom_traitement in traitements_a_effectuer
+
+
 # Création d'un fichier d'erreurs pour les images
 def create_file_fault(repertoire, defauts):
 
@@ -1138,7 +1169,7 @@ def transf_image(img, repertoire,  liste_defauts):
         )
 
 
-        # Début des blocs d'augmentations
+        # -----Début des blocs d'augmentations ----------------------------------------------------
         # ------------------------------------------------------------
         # Initialisation du compteur
         # ------------------------------------------------------------
@@ -1147,173 +1178,187 @@ def transf_image(img, repertoire,  liste_defauts):
 
         # ------ Augmentations simples ---------------------------------------------------------- 
         # 1 : FLIP HORIZONTAL
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.augmentation_flip_horizontal(),
-            nom_augmentation="H",
-            nombre= 1,
-            numero=numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        if traitement_actif(FLIP_H) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.augmentation_flip_horizontal(),
+                nom_augmentation="H",
+                nombre= 1,
+                numero=numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
         # 2 : FLIP VERTICAL
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.augmentation_flip_vertical(),
-            nom_augmentation="V",
-            nombre= 1,
-            numero=numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        if traitement_actif(FLIP_V) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.augmentation_flip_vertical(),
+                nom_augmentation="V",
+                nombre= 1,
+                numero=numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
         # 3 : ROTATIONS
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.augmentation_rotation(fond),
-            nom_augmentation="R",
-            nombre=NB_MULTI,
-            numero=numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        if traitement_actif(ROTATION) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.augmentation_rotation(fond),
+                nom_augmentation="R",
+                nombre=NB_MULTI,
+                numero=numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
         # 4 : LUMINOSITÉ / CONTRASTE
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.augmentation_luminosite_contraste(light_data),
-            nom_augmentation="C",
-            nombre=NB_MULTI,
-            numero=numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        if traitement_actif(CONTRASTE) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.augmentation_luminosite_contraste(light_data),
+                nom_augmentation="C",
+                nombre=NB_MULTI,
+                numero=numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
         # 5 : BRUIT
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.augmentation_bruit(noise_range),
-            nom_augmentation="B",
-            nombre=NB_MULTI,
-            numero=numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        if traitement_actif(BRUIT) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.augmentation_bruit(noise_range),
+                nom_augmentation="B",
+                nombre=NB_MULTI,
+                numero=numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
         # 6 : Zoom
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.augmentation_zoom(zoom_max, fond),
-            nom_augmentation="Z",
-            nombre=NB_MULTI,
-            numero=numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        if traitement_actif(ZOOM) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.augmentation_zoom(zoom_max, fond),
+                nom_augmentation="Z",
+                nombre=NB_MULTI,
+                numero=numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
-        # ------ Augmentations combinées -------------------------------------------------------- 
-        # 11 : Rotation + Symétrie Horizontale 
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.aug_rot_flip_h(fond),
-            nom_augmentation="R_H",
-            nombre= NB_MULTI,
-            numero= numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        # # ------ Augmentations combinées -------------------------------------------------------- 
+        # 7 : Rotation + Symétrie Horizontale 
+        if traitement_actif(ROT_FLIT_H) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.aug_rot_flip_h(fond),
+                nom_augmentation="R_H",
+                nombre= NB_MULTI,
+                numero= numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
-        # 12 : Rotation + Symétrie Horizontale + Contrast
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.aug_rot_flip_h_cont(fond, light_data),
-            nom_augmentation="R_H_C",
-            nombre= NB_MULTI,
-            numero= numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        # 8 : Rotation + Symétrie Horizontale + Contrast
+        if traitement_actif(ROT_FLIT_H_C) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.aug_rot_flip_h_cont(fond, light_data),
+                nom_augmentation="R_H_C",
+                nombre= NB_MULTI,
+                numero= numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
-        # 13 : Rotation + Symétrie Verticale 
-        numero = appliquer_augmentation(
-            image=image,
-            transform= aug.aug_rot_flip_v(fond),
-            nom_augmentation="R_V",
-            nombre= NB_MULTI,
-            numero= numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        # 9 : Rotation + Symétrie Verticale 
+        if traitement_actif(ROT_FLIT_V) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform= aug.aug_rot_flip_v(fond),
+                nom_augmentation="R_V",
+                nombre= NB_MULTI,
+                numero= numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
-        # 14 : Rotation + Symétrie Verticale + Contrast
-        numero = appliquer_augmentation(
-            image=image,
-            transform= aug.aug_rot_flip_v_cont(fond, light_data),
-            nom_augmentation="R_V_C",
-            nombre= NB_MULTI,
-            numero= numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        # 10 : Rotation + Symétrie Verticale + Contrast
+        if traitement_actif(ROT_FLIT_V_C) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform= aug.aug_rot_flip_v_cont(fond, light_data),
+                nom_augmentation="R_V_C",
+                nombre= NB_MULTI,
+                numero= numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
-        # 15 : Zoom + contrast
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.aug_zoom_cont(zoom_max, fond, light_data),
-            nom_augmentation="Z_C",
-            nombre=NB_MULTI,
-            numero=numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        # 11 : Zoom + contrast
+        if traitement_actif(ZOOM_C) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.aug_zoom_cont(zoom_max, fond, light_data),
+                nom_augmentation="Z_C",
+                nombre=NB_MULTI,
+                numero=numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
-        # 16 : Zoom + rotation
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.aug_zoom_rot(zoom_max, fond),
-            nom_augmentation="Z_R",
-            nombre=NB_MULTI,
-            numero=numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        # 12 : Zoom + rotation
+        if traitement_actif(ZOOM_ROTATION) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.aug_zoom_rot(zoom_max, fond),
+                nom_augmentation="Z_R",
+                nombre=NB_MULTI,
+                numero=numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
-        # 17 : Zoom + rotation + Contrast
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.aug_zoom_rot_cont(zoom_max, fond, light_data),
-            nom_augmentation="Z_R_C",
-            nombre=NB_MULTI,
-            numero=numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        # 13 : Zoom + rotation + Contrast
+        if traitement_actif(ZOOM_ROTATION_C) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.aug_zoom_rot_cont(zoom_max, fond, light_data),
+                nom_augmentation="Z_R_C",
+                nombre=NB_MULTI,
+                numero=numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
-        # 18 :  LUMINOSITÉ / CONTRASTE + BRUIT
-        numero = appliquer_augmentation(
-            image=image,
-            transform=aug.aug_lum_cont_bruit(light_data, noise_range),
-            nom_augmentation="C_B",
-            nombre=NB_MULTI,
-            numero=numero,
-            dossier_sortie=dossier_sortie,
-            nom_source=img.stem,
-            extension=img.suffix
-        )
+        # 14 :  LUMINOSITÉ / CONTRASTE + BRUIT
+        if traitement_actif(CONTRASTE_BRUIT) :
+            numero = appliquer_augmentation(
+                image=image,
+                transform=aug.aug_lum_cont_bruit(light_data, noise_range),
+                nom_augmentation="C_B",
+                nombre=NB_MULTI,
+                numero=numero,
+                dossier_sortie=dossier_sortie,
+                nom_source=img.stem,
+                extension=img.suffix
+            )
 
         return numero - 1 
 
@@ -1515,4 +1560,5 @@ if nombre_defauts != 0:
         f"\n  {chemin_rapport}"
     )
 
-print("\nFin du traitement !!!")
+print()
+display.print("Fin du traitement !!!", colors['goodbye'])
