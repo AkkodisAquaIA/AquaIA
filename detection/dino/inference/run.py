@@ -27,7 +27,7 @@ def infer_dino(config, context):
     """Read inference params from config, load best trained model,
     create inference dataset and dataloader, run prediction and metric evaluation,
     save inference visualizations and metrics."""
-    # config from infer_config.yaml, context derived from resolved_config.yaml
+    # config from infer_config_dino.yaml, context derived from resolved_config.yaml
     inference_config = config["inference"]
     data_cfg = config["data"]
 

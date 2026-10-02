@@ -145,7 +145,7 @@ def save_sample_predictions(model, subset, output_dir, predict_fn, num_samples=2
 
 def plot_metrics(run_dir, output_dir=None, metrics_filename="metrics.npy"):
     """Read one training run's metrics.npy file, plot the metrics curves and save, return figure path.
-    For training."""
+    For training. Plot from second epoch."""
     run_dir = Path(run_dir)
     output_dir = Path(output_dir) if output_dir is not None else run_dir
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -164,7 +164,10 @@ def plot_metrics(run_dir, output_dir=None, metrics_filename="metrics.npy"):
     #   {"train": {"loss": 1.10, "loss_ce": 0.40,...},
     #      "val": {"loss": 1.42, "loss_ce": 0.48,...},...
     #    "epoch": 2} ]
-    metrics_history = list(metrics_history)
+    # Plot only epochs >= 2
+    metrics_history = [entry for entry in metrics_history if entry["epoch"] >= 2]
+    if not metrics_history:
+        return None
     epochs = [entry["epoch"] for entry in metrics_history]
     flattened_history = [_flatten_metrics(entry) for entry in metrics_history]
     grouped_metrics = _group_metrics_by_name(flattened_history)

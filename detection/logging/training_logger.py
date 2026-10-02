@@ -5,10 +5,12 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from torch.utils.tensorboard import SummaryWriter
 
 
 class TrainingLogger:
-    """Persistent training logger: human-readable text train.log and run metadata run_meta.json."""
+    """Persistent training logger: human-readable text train.log and run metadata run_meta.json,
+    as well as TensorBoard implementation."""
 
     def __init__(self, run_dir: str, run_id: str, config: dict, resume: bool = False):
         self.run_dir = Path(run_dir)
@@ -17,6 +19,7 @@ class TrainingLogger:
 
         self._log_path = self.run_dir / "train.log"
         self._meta_path = self.run_dir / "run_meta.json"
+        self._tensorboard_writer = SummaryWriter(log_dir=str(self.run_dir / "tensorboard"))
 
         # Python logger — clear any handlers from a previous run with the same run_id
         # Create new or get used logger with specified name
@@ -102,7 +105,7 @@ class TrainingLogger:
             self._logger.info(f"Dataset: {dataset_info}")
 
     def log_epoch(self, epoch: int, total_epochs: int, metric_dict: dict, lr: float) -> None:
-        """Log epoch metrics to train.log + console and update meta information."""
+        """Log epoch metrics to train.log + console + TensorBoard and update meta information."""
         elapsed = time.time() - self.start_time
         train_loss = metric_dict.get("train", {}).get("loss", 0.0)
         val_loss = metric_dict.get("val", {}).get("loss", 0.0)
@@ -113,6 +116,23 @@ class TrainingLogger:
         self._meta["current_epoch"] = epoch
         self._meta["last_updated"] = datetime.utcnow().isoformat()
         self._write_meta()
+
+        for split in ("train", "val"):
+            for metric_name, value in metric_dict.get(split, {}).items():
+                self._tensorboard_writer.add_scalar(f"{split}/{metric_name}", float(value), epoch)
+        self._tensorboard_writer.add_scalar("train/learning_rate", lr, epoch)
+        self._tensorboard_writer.flush()
+
+    def tb_log_evaluation(self, metrics: dict, step: int) -> None:
+        """Log post-training evaluation metrics to TensorBoard."""
+        for metric_name, value in metrics.items():
+            self._tensorboard_writer.add_scalar(f"evaluation/{metric_name}", float(value), step)
+        self._tensorboard_writer.flush()
+
+    def tb_close(self) -> None:
+        """Flush and close the TensorBoard writer."""
+        self._tensorboard_writer.flush()
+        self._tensorboard_writer.close()
 
     def log_best(self, epoch: int, val_loss: float) -> None:
         """Log when a new best validation loss is achieved into train.log + console and update meta information."""
@@ -129,6 +149,7 @@ class TrainingLogger:
         self._meta["status"] = "done"
         self._meta["last_updated"] = datetime.utcnow().isoformat()
         self._write_meta()
+        self._tensorboard_writer.flush()
 
     def crash(self, error: str) -> None:
         """Log training crash, error message into train.log + console and update meta information."""
@@ -137,6 +158,7 @@ class TrainingLogger:
         self._meta["error"] = error
         self._meta["last_updated"] = datetime.utcnow().isoformat()
         self._write_meta()
+        self.tb_close()
 
     def interrupted(self) -> None:
         """Log training interrupted (KeyboardInterrupt) into train.log + console and update meta information."""
@@ -144,3 +166,4 @@ class TrainingLogger:
         self._meta["status"] = "interrupted"
         self._meta["last_updated"] = datetime.utcnow().isoformat()
         self._write_meta()
+        self.tb_close()
