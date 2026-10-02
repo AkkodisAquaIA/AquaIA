@@ -7,6 +7,8 @@ from detection.metric import compute_metrics, save_metrics
 from detection.utils.plot_utils import save_sample_predictions
 from detection.yolo.predict import predict, normalize_imgsz
 
+# For consistency, the same inference pipeline as DINO/DETR is used here
+
 
 def infer_yolo(config, context):
     # config from infer_config_yolo.yaml, context derived from resolved_config.yaml
