@@ -1,11 +1,11 @@
 run:
   # Root directory where all training runs are saved
-  runs_root: "results/detect/yolo11_n_pretrained"
+  runs_root: "results/detect/yolo26_n_pretrained"
   # One specific training run directory
   run_dir: null
 
 data:
-  infer_data_root: "datasets/coco_custom_match"
+  infer_data_root: "datasets/aquatic_insects_v7_1classe"
   # Dataset split used for inference
   split: "test"
 
