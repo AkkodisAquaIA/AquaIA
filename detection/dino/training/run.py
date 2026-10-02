@@ -19,7 +19,7 @@ from detection.utils.plot_utils import plot_metrics, save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
 from detection.logging import TrainingLogger, CheckpointManager
 
-# !Temporary! 
+# !Temporary!
 # ------ START ------
 import random
 from torch.utils.data import Subset
@@ -50,6 +50,8 @@ def build_train_subset_dataloader(train_dataset, batch_size, num_workers, seed, 
         collate_fn=detection_collate_fn,
     )
     return loader
+
+
 # ------ End ------
 
 
@@ -412,7 +414,7 @@ def train_dino(config, resume_dir=None):
 
     best_model.eval()
     # Compute metrics on train and val sets using the best model
-    # !Temporary! 
+    # !Temporary!
     # ------ START ------
     train_subset_seed = int(training_config.get("train_subset_seed", 42))
     train_subset_ratio = float(training_config.get("train_subset_ratio", 0.5))
@@ -427,7 +429,7 @@ def train_dino(config, resume_dir=None):
         logger.info(
             f"[EVALUATION] Training subset: {len(train_subset_dataloader.dataset)}/{len(train_set)} "
             f"images (ratio={train_subset_ratio}, seed={train_subset_seed})"
-        )
+        )  # fmt: skip
     # ------ END ------
 
     try:
