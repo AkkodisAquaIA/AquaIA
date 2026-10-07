@@ -272,6 +272,64 @@ class Menu :
                 self.display.print(text, colors['error'])
 
 
+    def multiple_selection(self) -> list[int]:
+        """
+        Permet la sélection de plusieurs choix du menu.
+
+        Exemple de saisie :
+            1,3,5
+
+        Retour :
+            [1, 3, 5]
+        """
+
+        color = colors['input']
+
+        while True:
+            try:
+                input_color = util.rgb_to_ansi(color[:3])
+                prompt = ("Faites votre choix (plusieurs valeurs séparées par une virgule)")
+                colored_select = (f"{input_color}[?] {prompt}: {Style.RESET_ALL}")
+
+                saisie = input(colored_select).strip()
+
+                selections = [
+                    int(x.strip())
+                    for x in saisie.split(",")
+                ]
+
+                # Suppression des doublons tout en conservant l'ordre
+                selections = list(dict.fromkeys(selections))
+
+                invalides = [
+                    choix
+                    for choix in selections
+                    if not (1 <= choix <= self.ligne - 1)
+                ]
+
+                if invalides:
+                    text = (
+                        f"Choix invalide(s) : {invalides}. "
+                        f"Essayez encore ! {ct.BELL}"
+                    )
+                    self.display.print(text, colors['error'])
+                    continue
+
+                return selections
+
+            except ValueError:
+                text = (
+                    "Format incorrect. "
+                    "Utilisez par exemple : 1,3,5 "
+                    f"{ct.BELL}"
+                )
+                self.display.print(text, colors['error'])
+
+
+
+
+
+
 def print_box(text: str, color) -> None:
     """
     Prints a text string inside a decorative box.
