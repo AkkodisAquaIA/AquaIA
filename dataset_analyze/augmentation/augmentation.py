@@ -315,13 +315,6 @@ def aug_lum_cont_bruit(light_data, noise_range):
 # CHOIX DES TRANSFORMATIONS A REALISER 
 # ============================================================
 
-def ajouter_traitements(menu, mapping, traitement_a_realiser):
-    menu.display_menu()
-
-    for val in menu.multiple_selection():
-        traitement_a_realiser.extend(mapping.get(val, []))
-
-
 def choix_augmentation():   
 
     display = dc.DisplayColor()
@@ -344,7 +337,7 @@ def choix_augmentation():
     }
 
     menu_flip = menu_c.Menu('SYMETRIE',           # Nom du menu
-                        style= "double",          # Style du menu 
+                        style= "simple",          # Style du menu 
                         theme = menu_c.AQUA_IA    # Theme du menu
                         )
     menu_flip.display_menu()
@@ -371,7 +364,7 @@ def choix_augmentation():
     }
 
     menu_rotation = menu_c.Menu('ROTATION',     # Nom du menu
-                        style= "double",        # Style du menu 
+                        style= "rounds",        # Style du menu 
                         theme = menu_c.AQUA_IA  # Theme du menu
                     )
     menu_rotation.display_menu()
@@ -398,7 +391,7 @@ def choix_augmentation():
         ]
     }
     menu_zoom = menu_c.Menu('ZOOM',           # Nom du menu
-                        style= "double",          # Style du menu 
+                        style= "heavy",          # Style du menu 
                         theme = menu_c.AQUA_IA    # Theme du menu
                         )
 
@@ -431,129 +424,6 @@ def choix_augmentation():
 
     for val in menu_divers.multiple_selection():
         traitement_a_realiser.extend(divers_map.get(val, []))
-
-
-
-
-    # # ---- Symètrie Horizontale & Verticale -----------------------------------
-    # menu_flip = menu_c.Menu('SYMETRIE',               # Nom du menu
-    #                     style= "double",          # Style du menu 
-    #                     theme = menu_c.AQUA_IA    # Theme du menu
-    #                     )
-
-    # menu_flip.display_menu()
-    # choice = menu_flip.multiple_selection()
-
-    # for val in choice:
-
-    #     if choice == 1 :
-    #         continue
-
-    #     if choice == 4 :
-    #         traitement_a_realiser.append(FLIP_H)
-    #         traitement_a_realiser.append(FLIP_V)
-    #     else:
-
-    #         if choice == 2 :
-    #             traitement_a_realiser.append(FLIP_H) 
-    #         elif choice == 3 :    
-    #             traitement_a_realiser.append(FLIP_V)
-        
-
-
-    # # ---- Rotation -----------------------------------------------------------
-    # menu_rotation = menu_c.Menu('ROTATION',     # Nom du menu
-    #                     style= "double",        # Style du menu 
-    #                     theme = menu_c.AQUA_IA  # Theme du menu
-    #                     )
-
-    # menu_rotation.display_menu()
-    # choice =  menu_rotation.multiple_selection()
-
-    # for val in choice: 
-
-    #     if val == 7 :
-    #         traitement_a_realiser.append(ROTATION)
-    #         traitement_a_realiser.append(ROT_FLIT_H)
-    #         traitement_a_realiser.append(ROT_FLIT_H_C)
-    #         traitement_a_realiser.append(ROT_FLIT_V)
-    #         traitement_a_realiser.append(ROT_FLIT_V_C)
-    #     else:     
-    #         if val == 2 :
-    #             traitement_a_realiser.append(ROTATION)
-    #         if val == 3 :
-    #             traitement_a_realiser.append(ROT_FLIT_H)
-    #         if val == 4 :
-    #             traitement_a_realiser.append(ROT_FLIT_H_C)
-    #         if val == 5 :
-    #             traitement_a_realiser.append(ROT_FLIT_V)
-    #         if val == 6 :
-    #             traitement_a_realiser.append(ROT_FLIT_V_C)
-
-
-    # # ---- Zoom ---------------------------------------------------------------
-    # menu_zoom = menu_c.Menu('ZOOM',           # Nom du menu
-    #                     style= "double",          # Style du menu 
-    #                     theme = menu_c.AQUA_IA    # Theme du menu
-    #                     )
-
-    # menu_zoom.display_menu()
-    # choice =  menu_zoom.multiple_selection()
-
-    # for val in choice: 
-
-    #     if val == 6 :
-    #         traitement_a_realiser.append(ZOOM)
-    #         traitement_a_realiser.append(ZOOM_C)
-    #         traitement_a_realiser.append(ZOOM_ROTATION)
-    #         traitement_a_realiser.append(ZOOM_ROTATION_C)
-
-    #     else:
-    #         if val == 2 :
-    #             traitement_a_realiser.append(ZOOM)
-                
-    #         if val == 3 :
-    #             traitement_a_realiser.append(ZOOM_C)
-                
-    #         if val == 4 :
-    #             traitement_a_realiser.append(ZOOM_ROTATION)
-                
-    #         if val == 5 :
-    #             traitement_a_realiser.append(ZOOM_ROTATION_C)
-
-
-
-    # # ---- Divers -------------------------------------------------------------
-    # menu_divers = menu_c.Menu('DIVERS',           # Nom du menu
-    #                     style= "double",          # Style du menu 
-    #                     theme = menu_c.AQUA_IA    # Theme du menu
-    #                     )
-
-    # menu_divers.display_menu()
-    # choice = menu_divers.multiple_selection()
-
-    # for val in choice: 
-
-    #     if val == 5 :
-    #         traitement_a_realiser.append(CONTRASTE)
-    #         traitement_a_realiser.append(BRUIT)
-    #         traitement_a_realiser.append(CONTRASTE_BRUIT)
-
-    #     else: 
-    #         if val == 2 :
-    #             traitement_a_realiser.append(CONTRASTE)
-
-    #         if val == 3 :
-    #             traitement_a_realiser.append(BRUIT)
-
-    #         if val == 4 :
-    #             traitement_a_realiser.append(CONTRASTE_BRUIT)
-
-
-
-
-
-
 
 
     return traitement_a_realiser

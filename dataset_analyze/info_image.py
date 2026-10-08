@@ -8,6 +8,12 @@ import cv2
 import matplotlib.pyplot as plt
 
 from tools import utility as util
+from config import constants as cst
+import tools.display_color as dc
+from tools.display_color import DISPLAY_COLORS as colors
+
+
+display = dc.DisplayColor()
 
 
 # ==================================================================================================
@@ -33,6 +39,7 @@ class InfoOccupationBestiole:
     occupation_pct: float
     surface_bestiole: float
     surface_image: float
+
 
 
 def afficher_histogramme_difference(
@@ -222,39 +229,6 @@ def parametres_lum_contraste(image):
 
     return 0.25, 0.25
 
-
-# def parametres_gamma(image):
-#     """
-#     Détermine une plage de gamma en fonction
-#     de l'écart-type de l'image.
-#     """
-
-#     _, sigma = analyser_luminosite(image)
-
-#     if sigma < 25:
-#         return 85, 115
-
-#     if sigma < 50:
-#         return 90, 110
-
-#     return 95, 105
-
-
-# def parametres_bruit(image):
-#     """
-#     Détermine la plage de bruit à appliquer en fonction
-#     de l'écart-type de l'image.
-#     """
-
-#     _, sigma = analyser_luminosite(image)
-
-#     if sigma < 25:
-#         return 0.005, 0.02
-
-#     if sigma < 50:
-#         return 0.01, 0.03
-
-#     return 0.01, 0.04
 
 
 def seuil_detection(image):
@@ -484,7 +458,7 @@ def selectionner_composante_principale(
     )
 
 
-#TODO
+
 def calculer_seuil_depuis_difference(
     difference,
     taille_bord=20,
@@ -579,29 +553,11 @@ def calculer_seuil_depuis_difference(
     # Récupération des différences situées sur la périphérie
     differences_fond = difference[masque_bord]
 
-    print(
-        f"Min fond : {differences_fond.min():.2f}"
-    )
-
-    print(
-        f"Max fond : {differences_fond.max():.2f}"
-    )
-
-    print(
-        f"Moyenne fond : "
-        f"{differences_fond.mean():.2f}"
-    )
-
-    print(
-        f"Pixels non nuls : "
-        f"{np.count_nonzero(differences_fond)}"
-    )
-
-    print(
-        f"Nombre pixels : "
-        f"{differences_fond.size}"
-    )
-
+    print(f"Min fond : {differences_fond.min():.2f}")
+    print(f"Max fond : {differences_fond.max():.2f}")
+    print(f"Moyenne fond : {differences_fond.mean():.2f}")
+    print(f"Pixels non nuls : {np.count_nonzero(differences_fond)}")
+    print(f"Nombre pixels : {differences_fond.size}")
 
 
     # Suppression des éventuelles valeurs NaN ou infinies
@@ -610,17 +566,13 @@ def calculer_seuil_depuis_difference(
     ]
 
     if differences_fond.size == 0:
-        raise ValueError(
-            "Aucune distance valide n'a été trouvée sur les bords."
-        )
+        raise ValueError("Aucune distance valide n'a été trouvée sur les bords.")
 
     # --------------------------------------------------------
     # Calcul du seuil robuste fondé sur le MAD
     # --------------------------------------------------------
 
-    mediane = float(
-        np.median(differences_fond)
-    )
+    mediane = float(np.median(differences_fond))
 
     mad = float(
         np.median(
@@ -722,40 +674,35 @@ def calculer_seuil_depuis_difference(
 
     seuil += float(marge_seuil)
 
-    seuil = max(
-        float(seuil_min),
-        float(seuil)
-    )
+    seuil = max(float(seuil_min), float(seuil))
 
     if seuil_max is not None:
-        seuil = min(
-            float(seuil_max),
-            seuil
-        )
+        seuil = min(float(seuil_max), seuil)
+
+    # seuil à utiliser 
+
+    # seuil = seuil * 0.8            # seuil_percentile        
+    if rapport_percentile_mad < 0.8:
+        seuil = seuil_percentile
+
+    elif rapport_percentile_mad > 2.5:
+        seuil = mediane + 6 * sigma_robuste
+
+    else:
+        seuil = max(seuil_mad,  seuil_percentile)
+
+    # Ici ----- Seuil à utiliser -------------------------------------------------- 
+ 
 
     # --------------------------------------------------------
     # Informations de diagnostic
     # --------------------------------------------------------
 
-    print(
-        f"Médiane du fond             : {mediane:.2f}"
-    )
-
-    print(
-        f"MAD du fond                 : {mad:.2f}"
-    )
-
-    print(
-        f"Sigma robuste du fond       : {sigma_robuste:.2f}"
-    )
-
-    print(
-        f"Seuil MAD                   : {seuil_mad:.2f}"
-    )
-
-    print(
-        f"Seuil percentile            : {seuil_percentile:.2f}"
-    )
+    print(f"Médiane du fond             : {mediane:.2f}")
+    print(f"MAD du fond                 : {mad:.2f}")
+    print(f"Sigma robuste du fond       : {sigma_robuste:.2f}")
+    print(f"Seuil MAD                   : {seuil_mad:.2f}")
+    print(f"Seuil percentile            : {seuil_percentile:.2f}")
 
     if np.isfinite(rapport_percentile_mad):
 
@@ -771,13 +718,8 @@ def calculer_seuil_depuis_difference(
             "(seuil MAD nul)"
         )
 
-    print(
-        f"Méthode retenue             : {methode_seuil}"
-    )
-
-    print(
-        f"Seuil automatique final     : {seuil:.2f}"
-    )
+    print(f"Méthode retenue             : {methode_seuil}")
+    print(f"Seuil automatique final     : {seuil:.2f}")
 
     informations = {
         "mediane_fond": mediane,
@@ -805,6 +747,8 @@ def calculer_seuil_depuis_difference(
 # ==================================================================================================
 
 def creer_masque_bestiole(
+    voir_image,
+    rep,
     image,
     seuil=None,
     taille_bord=TAILLE_BORD,
@@ -858,11 +802,32 @@ def creer_masque_bestiole(
     # ------------------------------------------------------------------
     # Distance euclidienne BGR de chaque pixel au fond
     # ------------------------------------------------------------------
-
     difference = np.linalg.norm(
         image_lissee.astype(np.float32) - fond_array,
         axis=2
     )
+
+
+    # Normalisation entre 0 et 255
+    visu = cv2.normalize(
+        difference,
+        None,
+        0,
+        255,
+        cv2.NORM_MINMAX
+    )
+
+
+    if voir_image :
+        plt.figure(figsize=(12, 6))
+        plt.imshow(visu, cmap="gray")  # retirer cmap si image couleur
+        plt.title("Difference Visualisation")
+        plt.axis("off")
+        plt.show()
+
+
+
+
 
     # ------------------------------------------------------------------
     # Calcul automatique du seuil APRÈS le calcul de difference
@@ -1077,6 +1042,8 @@ def detecter_zone_bestiole(
     """
 
     masque_bestiole, _, _, _ = creer_masque_bestiole(
+        voir_image=voir_image,
+        rep=repertoire, 
         image=image,
         seuil=seuil
     )
@@ -1192,6 +1159,8 @@ def calculer_occupation(
     """
 
     masque_bestiole, _, _, _ = creer_masque_bestiole(
+        voir_image=voir_image,
+        rep=repertoire,
         image=image,
         seuil=seuil
     )
@@ -1237,75 +1206,6 @@ def calculer_occupation_bbox(
     return float(
         surface_bbox / surface_image
     )
-
-
-# # ==================================================================================================
-# # CALCUL DU ZOOM MAXIMAL
-# # ==================================================================================================
-
-# def calculer_zoom_max(
-#     image,
-#     bbox
-# ):
-#     """
-#     Calcule le zoom maximal centré sur l'image permettant
-#     de conserver la bounding box dans l'image.
-#     """
-
-#     if bbox is None:
-#         return 1.0
-
-#     x_min, y_min, x_max, y_max = bbox
-
-#     hauteur, largeur = image.shape[:2]
-
-#     centre_x = largeur / 2.0
-#     centre_y = hauteur / 2.0
-
-#     limites = []
-
-#     distance_gauche = centre_x - x_min
-#     distance_droite = x_max - centre_x
-#     distance_haut = centre_y - y_min
-#     distance_bas = y_max - centre_y
-
-#     if distance_gauche > 0:
-#         limites.append(
-#             centre_x / distance_gauche
-#         )
-
-#     if distance_droite > 0:
-#         limites.append(
-#             (largeur - 1 - centre_x)
-#             / distance_droite
-#         )
-
-#     if distance_haut > 0:
-#         limites.append(
-#             centre_y / distance_haut
-#         )
-
-#     if distance_bas > 0:
-#         limites.append(
-#             (hauteur - 1 - centre_y)
-#             / distance_bas
-#         )
-
-#     limites_valides = [
-#         limite
-#         for limite in limites
-#         if np.isfinite(limite) and limite > 0
-#     ]
-
-#     if not limites_valides:
-#         return 1.0
-
-#     zoom_max = min(limites_valides)
-
-#     return max(
-#         1.0,
-#         float(zoom_max)
-#     )
 
 
 # ==================================================================================================
@@ -1374,14 +1274,15 @@ def afficher_comparaison_seuils(
 
 
 def diagnostiquer_detection_bestiole(
+    voir_image,
     image,
     masque_bestiole,
     fond,
     difference,
     seuil,
     bbox_detectee=None,
-    bbox_securisee=None
-):
+    bbox_securisee=None,
+    ):
     """
     Affiche le masque, la carte des distances, les bounding
     boxes et les informations numériques de diagnostic.
@@ -1389,51 +1290,49 @@ def diagnostiquer_detection_bestiole(
 
     hauteur, largeur = image.shape[:2]
 
-    # ------------------------------------------------------------------
-    # Affichage du masque
-    # ------------------------------------------------------------------
 
-    plt.figure(figsize=(12, 8))
+    if voir_image : 
 
-    plt.imshow(
-        masque_bestiole,
-        cmap="gray",
-        vmin=0,
-        vmax=255
-    )
+        # ------------------------------------------------------------------
+        # Affichage du masque
+        # ------------------------------------------------------------------
 
-    plt.title("Masque nettoyé de la bestiole")
+        plt.figure(figsize=(12, 8))
+        plt.imshow(
+            masque_bestiole,
+            cmap="gray",
+            vmin=0,
+            vmax=255
+        )
 
-    plt.axis("off")
-    plt.tight_layout()
-    plt.show()
+        plt.title("Masque nettoyé de la bestiole")
+        plt.axis("off")
+        plt.tight_layout()
+        plt.show()
 
-    # ------------------------------------------------------------------
-    # Affichage de la carte des distances
-    # ------------------------------------------------------------------
+        #------------------------------------------------------------------
+        #Affichage de la carte des distances
+        #------------------------------------------------------------------
+        afficher_carte_difference(
+            difference=difference,
+            seuil=seuil
+        )
 
-    afficher_carte_difference(
+        # ------------------------------------------------------------------
+        # Histogramme des distances
+        # ------------------------------------------------------------------
+        afficher_histogramme_difference(
         difference=difference,
         seuil=seuil
-    )
+        )
 
-    # ------------------------------------------------------------------
-    # Histogramme des distances
-    # ------------------------------------------------------------------
-
-    afficher_histogramme_difference(
-    difference=difference,
-    seuil=seuil
-    )
-
-    # ------------------------------------------------------------------
-    # Visualisation des pixels critiques entre seuil et seuil + pas
-    # ------------------------------------------------------------------
-
-    afficher_comparaison_seuils(
-        difference=difference,
-        seuil=seuil
-    )
+        # ------------------------------------------------------------------
+        # Visualisation des pixels critiques entre seuil et seuil + pas
+        # ------------------------------------------------------------------
+        afficher_comparaison_seuils(
+            difference=difference,
+            seuil=seuil
+        )
 
     # ------------------------------------------------------------------
     # Vérification de la détection
@@ -1545,7 +1444,6 @@ def diagnostiquer_detection_bestiole(
     print(f"\n Nombre de bord touchant : {nombre_bords_touches}")
 
 
-
     # ------------------------------------------------------------------
     # Dessin des bounding boxes
     # ------------------------------------------------------------------
@@ -1580,16 +1478,13 @@ def diagnostiquer_detection_bestiole(
         )
 
     image_rgb = cv2.cvtColor(image_affichage, cv2.COLOR_BGR2RGB)
-
     plt.figure(figsize=(10, 7))
-
     plt.imshow(image_rgb)
-
     plt.title("BBox détectée en rouge, bbox sécurisée en vert")
-
     plt.axis("off")
     plt.tight_layout()
     plt.show()
+    
 
 
 # ==================================================================================================
@@ -1597,6 +1492,8 @@ def diagnostiquer_detection_bestiole(
 # ==================================================================================================
 
 def traiter_image(
+    rep,
+    voir_image,
     chemin_image,
     seuil=None
 ):
@@ -1623,6 +1520,8 @@ def traiter_image(
         difference,
         seuil_utilise
     ) = creer_masque_bestiole(
+        voir_image=voir_image,
+        rep= rep,
         image=image,
         seuil=seuil,
         taille_bord=TAILLE_BORD,
@@ -1663,13 +1562,14 @@ def traiter_image(
     # ------------------------------------------------------------------
 
     diagnostiquer_detection_bestiole(
+        voir_image=voir_image,
         image=image,
         masque_bestiole=masque_bestiole,
         fond=fond,
         difference=difference,
         seuil=seuil_utilise,
         bbox_detectee=bbox_detectee,
-        bbox_securisee=bbox_securisee
+        bbox_securisee=bbox_securisee,
     )
 
     # ------------------------------------------------------------------
@@ -1693,136 +1593,47 @@ def traiter_image(
     occupation_pct = info_occ.occupation_pct
 
 
-
     # # ------------------------------------------------------------------
     # # Sauvegarde de l"image 
     # # ------------------------------------------------------------------
 
-    # print()
-    # print("-" * 60)
-    # print("SAUVEGARDE")
-    # print("-" * 60)
+    print()
+    print("-" * 60)
+    print("SAUVEGARDE")
+    print("-" * 60)
 
-    # choix = input(
-    #     "[R] BBox rouge  "
-    #     "[V] BBox verte  "
-    #     "[N] Annuler : "
-    # ).strip().upper()
+    choix = input(
+        "[R] BBox rouge  "
+        "[V] BBox verte  "
+        "[N] Annuler : "
+    ).strip().upper()
 
-    # if choix == "R":
+    if choix == "R":
 
-    #     fichier = sauvegarder_bbox(
-    #         image=image,
-    #         bbox=bbox_detectee,
-    #         chemin_image=chemin_image,
-    #         suffixe="bbox_rouge"
-    #     )
+        fichier = sauvegarder_bbox(
+            image=image,
+            bbox=bbox_detectee,
+            chemin_image=chemin_image,
+            suffixe="bbox_rouge"
+        )
 
-    #     print(
-    #         f"Image sauvegardée : {fichier}"
-    #     )
+        print(f"Image sauvegardée : {fichier}")
 
-    # elif choix == "V":
+    elif choix == "V":
 
-    #     fichier = sauvegarder_bbox(
-    #         image=image,
-    #         bbox=bbox_securisee,
-    #         chemin_image=chemin_image,
-    #         suffixe="bbox_verte"
-    #     )
+        fichier = sauvegarder_bbox(
+            image=image,
+            bbox=bbox_securisee,
+            chemin_image=chemin_image,
+            suffixe="bbox_verte"
+        )
 
-    #     print(
-    #         f"Image sauvegardée : {fichier}"
-    #     )
-
-    # else:
-
-    #     print(
-    #         "Sauvegarde annulée."
-    #     )
+        print(f"Image sauvegardée : {fichier}")
 
 
-    # # ------------------------------------------------------------------
-    # # Calcul du zoom maximal
-    # # ------------------------------------------------------------------
+    else:
+        print("Sauvegarde annulée.")
 
-    # if bbox_securisee is None:
-
-    #     zoom_max_possible = 1.0
-    #     zoom_limite = 1.0
-
-    # else:
-
-    #     zoom_max_possible = calculer_zoom_max(
-    #         image=image,
-    #         bbox=bbox_securisee
-    #     )
-
-    #     if occupation_pct < 3:
-    #         zoom_limite = 1.0
-
-    #     elif occupation_pct < 10:
-    #         zoom_limite = 1.35
-
-    #     elif occupation_pct < 20:
-    #         zoom_limite = 1.25
-
-    #     elif occupation_pct < 30:
-    #         zoom_limite = 1.15
-
-    #     else:
-    #         zoom_limite = 1.05
-
-    # zoom_max = min(
-    #     zoom_max_possible,
-    #     zoom_limite
-    # )
-
-    # # ------------------------------------------------------------------
-    # # Paramètres d'augmentation
-    # # ------------------------------------------------------------------
-
-    # moyenne, ecart_type = analyser_luminosite(
-    #     image
-    # )
-
-    # brightness, contrast = parametres_lum_contraste(
-    #     image
-    # )
-
-    # gamma = parametres_gamma(
-    #     image
-    # )
-
-    # noise_range = parametres_bruit(
-    #     image
-    # )
-
-    # # ------------------------------------------------------------------
-    # # Résumé
-    # # ------------------------------------------------------------------
-
-    # print()
-    # print("-" * 80)
-
-    # print(
-    #     f" - Zoom maxi possible/retenu         : "
-    #     f"{zoom_max_possible:.2f} / {zoom_max:.2f}"
-    # )
-
-    # print(f" - Luminosité                        : {moyenne:.3f}")
-    # print(f" - Écart-type                        : {ecart_type:.3f}")
-
-    # print(
-    #     f" - Paramètres luminosité/contraste   : "
-    #     f"{brightness:.3f} / {contrast:.3f}"
-    # )
-
-    # print(f" - Plage de réglage gamma            : {gamma}")
-    # print(f" - Plage de réglage du bruit         : {noise_range}")
-
-    # print("-" * 80)
-    # print()
 
     return {
         "image": image,
@@ -1844,18 +1655,30 @@ def main():
 
     continuer = True
 
-    while continuer:
+    syst.clear_screen()
 
-        syst.clear_screen()
+    repertoire = util.get_directory_color("Répertoire à utiliser")
 
-        chemin_image = util.get_path_color(
-            "Sélectionner l'image"
-        )
+    liste_images = [
+        fichier
+        for fichier in repertoire.iterdir()
+        if fichier.is_file() and fichier.suffix.lower() in cst.IMAGE_EXT
+        ]
 
+    print()
+    display.print(f"Nombre d'images à visualisées {len(liste_images)}", colors["info"])
+    print()
+
+    voir_image = util.answer_yes_or_no("Voulez-vous voir les images intermédiares", False)
+
+    for img in liste_images :
+ 
         try:
 
             traiter_image(
-                chemin_image=chemin_image,
+                repertoire,
+                voir_image,
+                chemin_image=  img,    # chemin_image,
                 seuil=SEUIL_DETECTION
             )
 
@@ -1875,521 +1698,10 @@ def main():
             print("-" * 80)
             print()
 
-        continuer = util.answer_yes_or_no(
-            "Voulez-vous continuer",
-            True
-        )
 
-    print("Fin du traitement !!!")
+    print()
+    display.print("Fin du traitement !!!", colors['goodbye'])
 
 
 if __name__ == "__main__":
     main()
-
-
-# """
-
-# def calculer_seuil_depuis_difference(
-#     difference,
-#     taille_bord=20,
-#     percentile_fond=99.0,
-#     facteur_mad=4.0,
-#     marge_seuil=2.0,
-#     seuil_min=5.0,
-#     seuil_max=None
-# ):
-#     """
-#     Calcule automatiquement le seuil de détection à partir
-#     des distances observées dans une bande périphérique.
-
-#     Parameters
-#     ----------
-#     difference : np.ndarray
-#         Carte des distances à la couleur estimée du fond.
-
-#     taille_bord : int
-#         Épaisseur de la bande périphérique analysée.
-
-#     percentile_fond : float
-#         Percentile des distances du fond utilisé pour
-#         éliminer la majorité des variations du fond.
-
-#     facteur_mad : float
-#         Nombre d'écarts-types robustes ajoutés à la médiane.
-
-#     marge_seuil : float
-#         Petite marge supplémentaire ajoutée au seuil.
-
-#     seuil_min : float
-#         Valeur minimale autorisée pour le seuil.
-
-#     seuil_max : float | None
-#         Valeur maximale autorisée. Si None, aucune limite
-#         maximale n'est appliquée.
-
-#     Returns
-#     -------
-#     seuil : float
-#         Seuil automatique calculé.
-
-#     informations : dict
-#         Informations permettant de diagnostiquer le calcul.
-#     """
-
-#     if difference is None:
-#         raise ValueError(
-#             "La carte de différence est None."
-#         )
-
-#     if difference.ndim != 2:
-#         raise ValueError(
-#             "La carte de différence doit comporter deux dimensions."
-#         )
-
-#     hauteur, largeur = difference.shape
-
-#     taille_maximale = max(
-#         1,
-#         min(
-#             hauteur // 2,
-#             largeur // 2
-#         )
-#     )
-
-#     taille_bord = int(
-#         np.clip(
-#             taille_bord,
-#             1,
-#             taille_maximale
-#         )
-#     )
-
-#     # Création d'un masque correspondant à toute la périphérie
-#     masque_bord = np.zeros(
-#         (hauteur, largeur),
-#         dtype=bool
-#     )
-
-#     masque_bord[:taille_bord, :] = True
-#     masque_bord[-taille_bord:, :] = True
-#     masque_bord[:, :taille_bord] = True
-#     masque_bord[:, -taille_bord:] = True
-
-#     differences_fond = difference[masque_bord]
-
-#     differences_fond = differences_fond[
-#         np.isfinite(differences_fond)
-#     ]
-
-#     if differences_fond.size == 0:
-#         raise ValueError(
-#             "Aucune distance valide n'a été trouvée sur les bords."
-#         )
-
-#     mediane = float(
-#         np.median(differences_fond)
-#     )
-
-#     mad = float(
-#         np.median(
-#             np.abs(
-#                 differences_fond - mediane
-#             )
-#         )
-#     )
-
-#     # Conversion du MAD en estimation robuste de l'écart-type
-#     sigma_robuste = 1.4826 * mad
-
-#     seuil_mad = (
-#         mediane
-#         + facteur_mad * sigma_robuste
-#     )
-
-#     seuil_percentile = float(
-#         np.percentile(
-#             differences_fond,
-#             percentile_fond
-#         )
-#     )
-
-#     # On retient la méthode la plus prudente
-#     seuil = max( seuil_mad, seuil_percentile)
-
-#     seuil += float( marge_seuil)
-
-#     rapport_percentile_mad = (
-#     seuil_percentile
-#     / max(seuil_mad, 1e-6)
-# )
-
-#     percentile_suspect = (
-#         rapport_percentile_mad > 2.5
-#     )
-
-#     if percentile_suspect:
-
-#         seuil = (
-#             mediane
-#             + 6.0 * sigma_robuste
-#         )
-
-#         methode_seuil = (
-#             "MAD renforcé, percentile périphérique suspect"
-#         )
-
-#     else:
-
-#         seuil = max(
-#             seuil_mad,
-#             seuil_percentile
-#         )
-
-#         methode_seuil = (
-#             "maximum MAD / percentile périphérique"
-#         )
-
-#     seuil += float(
-#         marge_seuil
-#     )
-
-#     seuil = max(
-#         float(seuil_min),
-#         float(seuil)
-#     )
-
-#     if seuil_max is not None:
-
-#         seuil = min(
-#             float(seuil_max),
-#             seuil
-#         )
-
-#     rapport = seuil_percentile / seuil_mad
-
-#     print(
-#         f"Rapport percentile/MAD : "
-#         f"{rapport:.1f}"
-#     )
-
-
-
-#     if seuil_max is not None:
-#         seuil = min(
-#             float(seuil_max),
-#             seuil
-#         )
-
-#     informations = {
-#         "mediane_fond": mediane,
-#         "mad_fond": mad,
-#         "sigma_robuste_fond": sigma_robuste,
-#         "seuil_mad": float(seuil_mad),
-#         "seuil_percentile": seuil_percentile,
-#         "percentile_fond": float(percentile_fond),
-#         "nombre_pixels_fond": int(differences_fond.size)
-#     }
-
-#     # seuil *= 0.4
-#     seuil = seuil_mad
-    
-
-#     return float(seuil), informations
-
-
-# """
-
-#===============================================================================================================================================
-#===============================================================================================================================================
-
-# def calculer_seuil_depuis_difference(
-#     difference,
-#     taille_bord=20,
-#     percentile_fond=99.0,
-#     facteur_mad=4.0,
-#     marge_seuil=2.0,
-#     seuil_min=5.0,
-#     seuil_max=None
-# ):
-#     """
-#     Calcule automatiquement le seuil de détection à partir
-#     des distances observées dans une bande périphérique.
-
-#     Parameters
-#     ----------
-#     difference : np.ndarray
-#         Carte des distances à la couleur estimée du fond.
-
-#     taille_bord : int
-#         Épaisseur de la bande périphérique analysée.
-
-#     percentile_fond : float
-#         Percentile des distances du fond utilisé pour
-#         éliminer la majorité des variations du fond.
-
-#     facteur_mad : float
-#         Nombre d'écarts-types robustes ajoutés à la médiane.
-
-#     marge_seuil : float
-#         Petite marge supplémentaire ajoutée au seuil.
-
-#     seuil_min : float
-#         Valeur minimale autorisée pour le seuil.
-
-#     seuil_max : float | None
-#         Valeur maximale autorisée. Si None, aucune limite
-#         maximale n'est appliquée.
-
-#     Returns
-#     -------
-#     seuil : float
-#         Seuil automatique calculé.
-
-#     informations : dict
-#         Informations permettant de diagnostiquer le calcul.
-#     """
-
-#     if difference is None:
-#         raise ValueError(
-#             "La carte de différence est None."
-#         )
-
-#     if difference.ndim != 2:
-#         raise ValueError(
-#             "La carte de différence doit comporter deux dimensions."
-#         )
-
-#     hauteur, largeur = difference.shape
-
-#     if hauteur == 0 or largeur == 0:
-#         raise ValueError(
-#             "La carte de différence est vide."
-#         )
-
-#     taille_maximale = max(
-#         1,
-#         min(
-#             hauteur // 2,
-#             largeur // 2
-#         )
-#     )
-
-#     taille_bord = int(
-#         np.clip(
-#             taille_bord,
-#             1,
-#             taille_maximale
-#         )
-#     )
-
-#     # Création du masque de la bande périphérique
-#     masque_bord = np.zeros(
-#         (hauteur, largeur),
-#         dtype=bool
-#     )
-
-#     masque_bord[:taille_bord, :] = True
-#     masque_bord[-taille_bord:, :] = True
-#     masque_bord[:, :taille_bord] = True
-#     masque_bord[:, -taille_bord:] = True
-
-#     # Récupération des différences situées sur la périphérie
-#     differences_fond = difference[masque_bord]
-
-#     # Suppression des éventuelles valeurs NaN ou infinies
-#     differences_fond = differences_fond[
-#         np.isfinite(differences_fond)
-#     ]
-
-#     if differences_fond.size == 0:
-#         raise ValueError(
-#             "Aucune distance valide n'a été trouvée sur les bords."
-#         )
-
-#     # --------------------------------------------------------
-#     # Calcul du seuil robuste fondé sur le MAD
-#     # --------------------------------------------------------
-
-#     mediane = float(
-#         np.median(differences_fond)
-#     )
-
-#     mad = float(
-#         np.median(
-#             np.abs(
-#                 differences_fond - mediane
-#             )
-#         )
-#     )
-
-#     # Conversion du MAD en estimation robuste de l'écart-type
-#     sigma_robuste = 1.4826 * mad
-
-#     seuil_mad = float(
-#         mediane
-#         + facteur_mad * sigma_robuste
-#     )
-
-#     # --------------------------------------------------------
-#     # Calcul du seuil fondé sur le percentile
-#     # --------------------------------------------------------
-
-#     seuil_percentile = float(
-#         np.percentile(
-#             differences_fond,
-#             percentile_fond
-#         )
-#     )
-
-#     # --------------------------------------------------------
-#     # Comparaison des deux méthodes
-#     # --------------------------------------------------------
-
-#     epsilon = 1e-6
-
-#     if seuil_mad > epsilon:
-
-#         rapport_percentile_mad = (
-#             seuil_percentile / seuil_mad
-#         )
-
-#         percentile_suspect = (
-#             rapport_percentile_mad > 2.5
-#         )
-
-#     else:
-
-#         # Le MAD ne fournit aucun seuil exploitable.
-#         rapport_percentile_mad = (
-#             float("inf")
-#             if seuil_percentile > epsilon
-#             else 1.0
-#         )
-
-#         percentile_suspect = False
-
-#     # --------------------------------------------------------
-#     # Sélection du seuil
-#     # --------------------------------------------------------
-
-#     if seuil_mad <= epsilon:
-
-#         # Fond parfaitement uniforme :
-#         # le MAD est nul, donc utilisation du percentile.
-#         seuil = seuil_percentile
-
-#         methode_seuil = (
-#             "percentile périphérique, seuil MAD nul"
-#         )
-
-#     elif percentile_suspect:
-
-#         # Le percentile est très supérieur au seuil MAD.
-#         # Une partie de l'organisme ou un artefact se trouve
-#         # probablement dans la bande périphérique.
-#         seuil = (
-#             mediane
-#             + 6.0 * sigma_robuste
-#         )
-
-#         methode_seuil = (
-#             "MAD renforcé, percentile périphérique suspect"
-#         )
-
-#     else:
-
-#         # Cas normal : utilisation de la méthode la plus prudente.
-#         seuil = max(
-#             seuil_mad,
-#             seuil_percentile
-#         )
-
-#         methode_seuil = (
-#             "maximum MAD / percentile périphérique"
-#         )
-
-#     # --------------------------------------------------------
-#     # Application de la marge et des limites
-#     # --------------------------------------------------------
-
-#     seuil += float(marge_seuil)
-
-#     seuil = max(
-#         float(seuil_min),
-#         float(seuil)
-#     )
-
-#     if seuil_max is not None:
-#         seuil = min(
-#             float(seuil_max),
-#             seuil
-#         )
-
-#     # --------------------------------------------------------
-#     # Informations de diagnostic
-#     # --------------------------------------------------------
-
-#     print(
-#         f"Médiane du fond             : {mediane:.2f}"
-#     )
-
-#     print(
-#         f"MAD du fond                 : {mad:.2f}"
-#     )
-
-#     print(
-#         f"Sigma robuste du fond       : {sigma_robuste:.2f}"
-#     )
-
-#     print(
-#         f"Seuil MAD                   : {seuil_mad:.2f}"
-#     )
-
-#     print(
-#         f"Seuil percentile            : {seuil_percentile:.2f}"
-#     )
-
-#     if np.isfinite(rapport_percentile_mad):
-
-#         print(
-#             f"Rapport percentile/MAD      : "
-#             f"{rapport_percentile_mad:.2f}"
-#         )
-
-#     else:
-
-#         print(
-#             "Rapport percentile/MAD      : infini "
-#             "(seuil MAD nul)"
-#         )
-
-#     print(
-#         f"Méthode retenue             : {methode_seuil}"
-#     )
-
-#     print(
-#         f"Seuil automatique final     : {seuil:.2f}"
-#     )
-
-#     informations = {
-#         "mediane_fond": mediane,
-#         "mad_fond": mad,
-#         "sigma_robuste_fond": sigma_robuste,
-#         "seuil_mad": seuil_mad,
-#         "seuil_percentile": seuil_percentile,
-#         "rapport_percentile_mad": rapport_percentile_mad,
-#         "percentile_suspect": bool(percentile_suspect),
-#         "methode_seuil": methode_seuil,
-#         "percentile_fond": float(percentile_fond),
-#         "taille_bord": int(taille_bord),
-#         "nombre_pixels_fond": int(
-#             differences_fond.size
-#         ),
-#         "seuil_final": float(seuil)
-#     }
-
-#     return float(seuil), informations
-
-
-
-

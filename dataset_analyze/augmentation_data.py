@@ -137,12 +137,12 @@ SEUIL_DETECTION =  35
 
 
 # ------------------------------------------------------------
-# Nombre de modifications par type
+# Nombre maxi de modifications par type
 # ------------------------------------------------------------
 """
 Pour les Flip H & V, le nombre de modifications est toujours 1
 """
-NB_MULTI = 2
+NB_MULTI_MAX = 10
 
 # ------------------------------------------------------------
 # Ensemble des augmentations disponibles 
@@ -163,7 +163,7 @@ ROT_FLIT_V_C     = "Roration + Flip_V + Contraste"  # 10
 ZOOM_C           = "Zoom + Contraste"               # 11
 ZOOM_ROTATION    = "Zoom + Rotation"                # 12
 ZOOM_ROTATION_C  = "Zoom + Rotation + Contraste"    # 13
-CONTRASTE_BRUIT = "Contraste + Bruit"               # 14
+CONTRASTE_BRUIT  = "Contraste + Bruit"              # 14
 
 
 #==================================================================================================
@@ -247,13 +247,9 @@ def couleur_fond(image):
 # ============================================================
 def analyser_luminosite(image):
 
-    gray = cv2.cvtColor(
-        image,
-        cv2.COLOR_BGR2GRAY
-    )
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     moyenne = np.mean(gray)
-
     ecart_type = np.std(gray)
 
     return moyenne, ecart_type
@@ -273,10 +269,7 @@ def parametres_lum_contraste(image):
 
 def parametres_gamma(image):
 
-    gray = cv2.cvtColor(
-        image,
-        cv2.COLOR_BGR2GRAY
-    )
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     sigma = np.std(gray)
 
@@ -363,42 +356,16 @@ def ajouter_marge_bbox(
 
     x_min, y_min, x_max, y_max = bbox
 
-    marge_x = max(
-        marge_min_px,
-        int(largeur * marge_pct)
-    )
+    marge_x = max(marge_min_px, int(largeur * marge_pct))
+    marge_y = max(marge_min_px, int(hauteur * marge_pct))
 
-    marge_y = max(
-        marge_min_px,
-        int(hauteur * marge_pct)
-    )
+    x_min = max(0, x_min - marge_x)
+    y_min = max(0, y_min - marge_y)
 
-    x_min = max(
-        0,
-        x_min - marge_x
-    )
+    x_max = min(largeur - 1, x_max + marge_x)
+    y_max = min(hauteur - 1, y_max + marge_y)
 
-    y_min = max(
-        0,
-        y_min - marge_y
-    )
-
-    x_max = min(
-        largeur - 1,
-        x_max + marge_x
-    )
-
-    y_max = min(
-        hauteur - 1,
-        y_max + marge_y
-    )
-
-    return (
-        x_min,
-        y_min,
-        x_max,
-        y_max
-    )
+    return (x_min, y_min, x_max, y_max)
 
 def selectionner_composante_principale(
     masque,
@@ -1093,7 +1060,6 @@ def transf_image(img, repertoire,  liste_defauts):
         # Détermination du zoom maxi
         # ------------------------------------------------------------
 
-        # diagnostiquer_detection_bestiole(image, seuil = SEUIL_DETECTION)
         bestiole = detecter_zone_bestiole(image, seuil = SEUIL_DETECTION)
 
         bestiole = ajouter_marge_bbox(
@@ -1202,7 +1168,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.augmentation_rotation(fond),
                 nom_augmentation="R",
-                nombre=NB_MULTI,
+                nombre=nb_augmentation,
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1215,7 +1181,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.augmentation_luminosite_contraste(light_data),
                 nom_augmentation="C",
-                nombre=NB_MULTI,
+                nombre=nb_augmentation,
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1228,7 +1194,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.augmentation_bruit(noise_range),
                 nom_augmentation="B",
-                nombre=NB_MULTI,
+                nombre=nb_augmentation,
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1241,7 +1207,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.augmentation_zoom(zoom_max, fond),
                 nom_augmentation="Z",
-                nombre=NB_MULTI,
+                nombre=nb_augmentation,
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1255,7 +1221,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_rot_flip_h(fond),
                 nom_augmentation="R_H",
-                nombre= NB_MULTI,
+                nombre= nb_augmentation,
                 numero= numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1268,7 +1234,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_rot_flip_h_cont(fond, light_data),
                 nom_augmentation="R_H_C",
-                nombre= NB_MULTI,
+                nombre= nb_augmentation,
                 numero= numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1281,7 +1247,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform= aug.aug_rot_flip_v(fond),
                 nom_augmentation="R_V",
-                nombre= NB_MULTI,
+                nombre= nb_augmentation,
                 numero= numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1294,7 +1260,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform= aug.aug_rot_flip_v_cont(fond, light_data),
                 nom_augmentation="R_V_C",
-                nombre= NB_MULTI,
+                nombre= nb_augmentation,
                 numero= numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1307,7 +1273,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_zoom_cont(zoom_max, fond, light_data),
                 nom_augmentation="Z_C",
-                nombre=NB_MULTI,
+                nombre=nb_augmentation,
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1320,7 +1286,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_zoom_rot(zoom_max, fond),
                 nom_augmentation="Z_R",
-                nombre=NB_MULTI,
+                nombre=nb_augmentation,
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1333,7 +1299,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_zoom_rot_cont(zoom_max, fond, light_data),
                 nom_augmentation="Z_R_C",
-                nombre=NB_MULTI,
+                nombre=nb_augmentation,
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1346,7 +1312,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_lum_cont_bruit(light_data, noise_range),
                 nom_augmentation="C_B",
-                nombre=NB_MULTI,
+                nombre=nb_augmentation,
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1385,21 +1351,7 @@ print()
 # --------------------------------------------------------
 # Récupération du Répertoire à utiliser
 # --------------------------------------------------------
-
 repertoire_de_travail = util.get_directory_color("Répertoire à utiliser")
-# repertoire_de_travail = Path(r"D:\Augmentation\CTRL")
-
-
-# Détermination des traitements à effectuer
-traitements_a_effectuer = aug.choix_augmentation() 
-
-if len(traitements_a_effectuer) == 0:
-    print()
-    display.print("Aucune demande d'augmentation !!!", colors["error"])
-
-    print()
-    display.print("Fin du traitement !!!", colors['goodbye'])
-
 
 
 # --------------------------------------------------------
@@ -1418,14 +1370,32 @@ sous_repertoires = sorted(
 nombre_sous_repertoires = len(sous_repertoires)
 
 if nombre_sous_repertoires == 0:
-
-    print("\nAucun sous-répertoire trouvé.")
-    exit()
+    print()
+    display.print("Aucun sous-répertoire trouvé !!!", colors["error"])
+    util.sortie_de_programme()
+      
 else:
+
+    # --------------------------------------------------------
+    # Détermination des traitements à effectuer
+    # --------------------------------------------------------
+    traitements_a_effectuer = aug.choix_augmentation() 
+
+    if len(traitements_a_effectuer) == 0:
+        print()
+        display.print("Aucune demande d'augmentation sélectionnée !!!", colors["error"])
+        util.sortie_de_programme()
+
+    # --------------------------------------------------------
+    # Nombre d'augmentation à appliquer (par type)
+    # --------------------------------------------------------
+    print()
+    nb_augmentation = util.entrer_valeur("Nombre d'augmentation par type", NB_MULTI_MAX) 
+
+
     nb_spret =  util.format_nombre(nombre_sous_repertoires)
     pls = "s" if nombre_sous_repertoires != 1 else ""
     print(f"\n  Il y a {nb_spret} sous répertoire{pls} à traiter\n\n")    
-
 
 
 # Initialisation des variables de Travail
@@ -1505,10 +1475,7 @@ nombre_defauts = len(liste_defauts)
 # RÉSULTAT
 # ============================================================
 print()
-display.titre(
-        "Résumé d’exécution",
-        colors['aqua']
-    )
+display.titre("Résumé d'exécution", colors['aqua'])
 
 # Détermination du status d’exécution
 if nombre_defauts != 0 :
@@ -1542,8 +1509,7 @@ if len(liste_rep_vide) != 0:
 # Nombre d'images crées
 nb_t = util.format_nombre(nombre_total_images_creees)
 display.print(
-    f"- Nombre total d'images créées : "
-    f"{nb_t} ",
+    f"- Nombre total d'images créées : {nb_t} ",
     colors['info']
 )
 
@@ -1552,10 +1518,7 @@ if nombre_defauts != 0:
 
     pluriel = "s" if nombre_defauts > 1 else ""
 
-    display.print(
-        f"- Nombre de défaut{pluriel} : {nombre_defauts}",
-        colors["error"]
-    )
+    display.print(f"- Nombre de défaut{pluriel} : {nombre_defauts}", colors["error"])
 
     chemin_rapport = create_file_fault(
         repertoire=repertoire_de_travail,
@@ -1565,7 +1528,7 @@ if nombre_defauts != 0:
     print(
         "\n- Rapport des défauts enregistré dans :"
         f"\n  {chemin_rapport}"
-    )
+        )
 
 print()
 display.print("Fin du traitement !!!", colors['goodbye'])

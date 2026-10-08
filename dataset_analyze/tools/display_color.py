@@ -139,6 +139,7 @@ class DisplayColor:
 
         # Final output
         print(f"{rgb_code}{bold_code}{prefix}{text}{self.RESET}")
+        print()
 
     def titre(self, text: str, color_spec: ColorSpec, bold: bool = False) -> None:
         """

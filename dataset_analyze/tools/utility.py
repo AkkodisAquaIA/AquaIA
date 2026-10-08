@@ -385,6 +385,37 @@ def selection(maxi) -> int:
                 )
             display.print(text, colors['error'])
 
+
+def entrer_valeur(texte, maxi) -> int:
+  
+    display = dc.DisplayColor()
+    color = colors['input']
+
+    while True:
+        try:
+            #  # Convert the input color from DISPLAY_COLORS to ANSI
+            input_color = rgb_to_ansi(color[:3])
+            # # Displays the prompt in color
+            prompt = f"{texte} (Maxi : {maxi}) " 
+            colored_select = f"{input_color}[?] {prompt}: {Style.RESET_ALL}"
+
+            select = int(input(colored_select).strip())
+
+            if 1 <= select <= maxi  :
+                return select
+            text = f"Sélection invalide. Veuillez réessayer. {ct.BELL}"
+            display.print(text, colors['error'])
+
+        # Input is not a number
+        except ValueError:
+            text = (
+                    f"Ce n'est pas un nombre . "
+                    f"Réessayez! {ct.BELL}"
+                )
+            display.print(text, colors['error'])
+
+
+
 def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> bool:
     """
     This function returns
