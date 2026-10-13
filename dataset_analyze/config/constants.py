@@ -12,6 +12,9 @@ INFO_PROD = r"""
    └────────────────────────────────────┘
 """
 
+# Mode débogage
+DEBUG_MOODE = False
+
 # Chargement du dataset
 # True  -> Chargement via fichier de config 
 # False -> Saisie manuelle des chemins 
@@ -87,7 +90,7 @@ MENUS = {
         "Pas de symétrie",
         "Symétrie horizontale",
         "Symétrie verticale",
-        "Les deux",
+        "Toutes",
       ],
     'ROTATION': [
         "Rotation",
@@ -116,4 +119,11 @@ MENUS = {
         "Contraste + Bruit gaussien",
         "Toutes",
       ],     
+      'SAUVEGARDE': [
+        "Sauvegarde",
+        "Bbox Rouge",
+        "Bbox Verte",
+        "Pas de Sauvegarde"
+      ],
+
 }

@@ -6,11 +6,13 @@ import traceback
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import csv
 
 from tools import utility as util
 from config import constants as cst
 import tools.display_color as dc
 from tools.display_color import DISPLAY_COLORS as colors
+from tools import menu_color as menu_c
 
 
 display = dc.DisplayColor()
@@ -40,6 +42,76 @@ class InfoOccupationBestiole:
     surface_bestiole: float
     surface_image: float
 
+class ErreurLectureImage(Exception):
+    """Erreur lors de la lecture ou du décodage d'une image."""
+    pass
+
+
+def afficher_erreur(erreur):
+
+    print()
+    display.print("-" * 80, colors["error"])
+    display.print("ERREUR PENDANT LE TRAITEMENT", colors["error"])
+    display.print("-" * 80, colors["error"])
+    display.print(f"Type    : {type(erreur).__name__}", colors["error"])
+    display.print(f"Message : {erreur}", colors["error"])
+
+    if cst.DEBUG_MOODE:
+        print()
+        traceback.print_exc()
+        print()
+
+    display.print("-" * 80, colors["error"])
+    print()
+
+
+def sauvegarder_liste_images(
+    liste_images,
+    fichier_sortie,
+    nb_colonnes=4
+):
+    """
+    Sauvegarde une liste de noms d'images dans un fichier texte.
+
+    Les éléments sont répartis sur plusieurs colonnes,
+    alignés et séparés par ' | '.
+    """
+
+    if not liste_images:
+        return
+
+    fichier_sortie = Path(fichier_sortie)
+
+    # Largeur nécessaire pour la colonne la plus longue
+    largeur_colonne = max(
+        len(nom)
+        for nom in liste_images
+    )
+
+    with fichier_sortie.open(
+        "w",
+        encoding="utf-8"
+    ) as fichier:
+
+        for i in range(
+            0,
+            len(liste_images),
+            nb_colonnes
+        ):
+
+            ligne = liste_images[
+                i:i + nb_colonnes
+            ]
+
+            ligne_formatee = " | ".join(
+                f"{nom:<{largeur_colonne}}"
+                for nom in ligne
+            )
+
+            fichier.write(
+                ligne_formatee.rstrip() + "\n"
+            )
+
 
 
 def afficher_histogramme_difference(
@@ -50,8 +122,7 @@ def afficher_histogramme_difference(
     Affiche l'histogramme des distances à la couleur du fond.
     """
 
-    plt.figure(
-        figsize=(12, 6)
+    plt.figure(figsize=(12, 8)
     )
 
     plt.hist(
@@ -111,9 +182,11 @@ def sauvegarder_bbox(
 
     chemin_image = Path(chemin_image)
 
+    nom_fichier = f"{chemin_image.stem}_{suffixe}.jpg" 
+
     fichier_sortie = (
         chemin_image.parent
-        / f"{chemin_image.stem}_{suffixe}.jpg"
+        / nom_fichier
     )
 
     success, buffer = cv2.imencode(
@@ -126,8 +199,7 @@ def sauvegarder_bbox(
             str(fichier_sortie)
         )
 
-    return fichier_sortie
-
+    return  nom_fichier  #fichier_sortie
 
 
 
@@ -158,11 +230,6 @@ def lire_image(chemin_image):
 
     chemin_image = Path(chemin_image)
 
-    if not chemin_image.is_file():
-        raise FileNotFoundError(
-            f"Le fichier n'existe pas : {chemin_image}"
-        )
-
     try:
         donnees = np.fromfile(
             str(chemin_image),
@@ -175,80 +242,17 @@ def lire_image(chemin_image):
         )
 
     except Exception as erreur:
-        raise FileNotFoundError(
+        raise ErreurLectureImage(
             f"Impossible de lire l'image : {chemin_image}"
         ) from erreur
 
+
     if image is None:
-        raise FileNotFoundError(
+        raise ErreurLectureImage(
             f"Impossible de décoder l'image : {chemin_image}"
         )
 
-    return image
-
-
-# ==================================================================================================
-# ANALYSE DE LA LUMINOSITÉ ET DU CONTRASTE
-# ==================================================================================================
-
-def analyser_luminosite(image):
-    """
-    Calcule la luminosité moyenne et l'écart-type
-    de l'image en niveaux de gris.
-    """
-
-    image_grise = cv2.cvtColor(
-        image,
-        cv2.COLOR_BGR2GRAY
-    )
-
-    moyenne = float(
-        np.mean(image_grise)
-    )
-
-    ecart_type = float(
-        np.std(image_grise)
-    )
-
-    return moyenne, ecart_type
-
-
-def parametres_lum_contraste(image):
-    """
-    Détermine les paramètres de luminosité et de contraste
-    en fonction de l'écart-type de l'image.
-    """
-
-    _, sigma = analyser_luminosite(image)
-
-    if sigma < 25:
-        return 0.10, 0.10
-
-    if sigma < 50:
-        return 0.15, 0.15
-
-    return 0.25, 0.25
-
-
-
-def seuil_detection(image):
-    """
-    Détermine automatiquement un seuil de détection
-    selon l'écart-type de l'image.
-    """
-
-    _, sigma = analyser_luminosite(image)
-
-    if sigma < 20:
-        return 28
-
-    if sigma < 35:
-        return 35
-
-    if sigma < 50:
-        return 40
-
-    return 45
+    return image 
 
 
 # ==================================================================================================
@@ -335,15 +339,16 @@ def couleur_fond(
     axis=0
     )
 
-    print(
-        f"Ecart-type fond : "
-        f"{ecart_type.mean():.1f}"
-    )
+    if False :
+        print(
+            f"Ecart-type fond : "
+            f"{ecart_type.mean():.1f}"
+        )
 
-    if ecart_type.mean() < 10.0 :
-        print("Les coins représente bien le fond")
-    elif ecart_type.mean() > 40.0 :
-        print("Une partioe de la bestiole touche un coin !!")
+        if ecart_type.mean() < 10.0 :
+            print("Les coins représente bien le fond")
+        elif ecart_type.mean() > 40.0 :
+            print("Une partioe de la bestiole touche un coin !!")
 
 
     fond = np.median(
@@ -458,8 +463,8 @@ def selectionner_composante_principale(
     )
 
 
-
 def calculer_seuil_depuis_difference(
+    afficher_informations,
     difference,
     taille_bord=20,
     percentile_fond=95.0,  # 99.0
@@ -553,11 +558,13 @@ def calculer_seuil_depuis_difference(
     # Récupération des différences situées sur la périphérie
     differences_fond = difference[masque_bord]
 
-    print(f"Min fond : {differences_fond.min():.2f}")
-    print(f"Max fond : {differences_fond.max():.2f}")
-    print(f"Moyenne fond : {differences_fond.mean():.2f}")
-    print(f"Pixels non nuls : {np.count_nonzero(differences_fond)}")
-    print(f"Nombre pixels : {differences_fond.size}")
+    
+    if afficher_informations :
+        print(f"Min fond : {differences_fond.min():.2f}")
+        print(f"Max fond : {differences_fond.max():.2f}")
+        print(f"Moyenne fond : {differences_fond.mean():.2f}")
+        print(f"Pixels non nuls : {np.count_nonzero(differences_fond)}")
+        print(f"Nombre pixels : {differences_fond.size}")
 
 
     # Suppression des éventuelles valeurs NaN ou infinies
@@ -691,51 +698,50 @@ def calculer_seuil_depuis_difference(
     else:
         seuil = max(seuil_mad,  seuil_percentile)
 
-    # Ici ----- Seuil à utiliser -------------------------------------------------- 
  
 
     # --------------------------------------------------------
     # Informations de diagnostic
     # --------------------------------------------------------
 
-    print(f"Médiane du fond             : {mediane:.2f}")
-    print(f"MAD du fond                 : {mad:.2f}")
-    print(f"Sigma robuste du fond       : {sigma_robuste:.2f}")
-    print(f"Seuil MAD                   : {seuil_mad:.2f}")
-    print(f"Seuil percentile            : {seuil_percentile:.2f}")
+    if afficher_informations : 
 
-    if np.isfinite(rapport_percentile_mad):
+        print(f"Médiane du fond         : {mediane:.2f}")
+        print(f"MAD du fond             : {mad:.2f}")
+        print(f"Sigma robuste du fond   : {sigma_robuste:.2f}")
+        print(f"Seuil MAD               : {seuil_mad:.2f}")
+        print(f"Seuil percentile        : {seuil_percentile:.2f}")
 
-        print(
-            f"Rapport percentile/MAD      : "
-            f"{rapport_percentile_mad:.2f}"
-        )
+        if np.isfinite(rapport_percentile_mad):
 
-    else:
+            print(
+                f"Rapport percentile/MAD: "
+                f"{rapport_percentile_mad:.2f}"
+            )
 
-        print(
-            "Rapport percentile/MAD      : infini "
-            "(seuil MAD nul)"
-        )
+        else:
 
-    print(f"Méthode retenue             : {methode_seuil}")
-    print(f"Seuil automatique final     : {seuil:.2f}")
+            print(
+                "Rapport percentile/MAD : infini "
+                "(seuil MAD nul)"
+            )
+
+        print(f"Méthode retenue         : {methode_seuil}")
+        print(f"Seuil automatique final : {seuil:.2f}")
 
     informations = {
-        "mediane_fond": mediane,
-        "mad_fond": mad,
-        "sigma_robuste_fond": sigma_robuste,
-        "seuil_mad": seuil_mad,
-        "seuil_percentile": seuil_percentile,
-        "rapport_percentile_mad": rapport_percentile_mad,
-        "percentile_suspect": bool(percentile_suspect),
-        "methode_seuil": methode_seuil,
-        "percentile_fond": float(percentile_fond),
-        "taille_bord": int(taille_bord),
-        "nombre_pixels_fond": int(
-            differences_fond.size
-        ),
-        "seuil_final": float(seuil)
+        "mediane_fond"           : mediane,
+        "mad_fond"               : mad,
+        "sigma_robuste_fond"     : sigma_robuste,
+        "seuil_mad"              : seuil_mad,
+        "seuil_percentile"       : seuil_percentile,
+        "rapport_percentile_mad" : rapport_percentile_mad,
+        "percentile_suspect"     : bool(percentile_suspect),
+        "methode_seuil"          : methode_seuil,
+        "percentile_fond"        : float(percentile_fond),
+        "taille_bord"            : int(taille_bord),
+        "nombre_pixels_fond"     : int(differences_fond.size),
+        "seuil_final"            : float(seuil)
     }
 
     return float(seuil), informations
@@ -753,7 +759,7 @@ def creer_masque_bestiole(
     seuil=None,
     taille_bord=TAILLE_BORD,
     surface_min_pct=SURFACE_MIN_PCT,
-    afficher_informations=False
+    afficher_informations= False
 ):
     """
     Crée un masque contenant la principale composante détectée.
@@ -819,14 +825,11 @@ def creer_masque_bestiole(
 
 
     if voir_image :
-        plt.figure(figsize=(12, 6))
+        plt.figure(figsize=(12, 8))
         plt.imshow(visu, cmap="gray")  # retirer cmap si image couleur
         plt.title("Difference Visualisation")
         plt.axis("off")
         plt.show()
-
-
-
 
 
     # ------------------------------------------------------------------
@@ -839,7 +842,8 @@ def creer_masque_bestiole(
     if seuil_automatique:
 
         seuil, informations_seuil = (
-            calculer_seuil_depuis_difference(
+                calculer_seuil_depuis_difference(
+                afficher_informations=afficher_informations,
                 difference=difference,
                 taille_bord=taille_bord,
                 percentile_fond= 95.0,   #  99.0,
@@ -923,8 +927,8 @@ def creer_masque_bestiole(
     # ------------------------------------------------------------------
     # Informations
     # ------------------------------------------------------------------
-
-    if afficher_informations:
+    
+    if afficher_informations :
 
         pixels_masque_initial = int(
             np.count_nonzero(masque_initial)
@@ -940,9 +944,9 @@ def creer_masque_bestiole(
         print(f"  Couleur du fond BGR   : {fond}")
 
         if seuil_automatique:
-            print("  Type de seuil         : automatique")
+            print("  Type de seuil      : automatique")
         else:
-            print("  Type de seuil         : manuel")
+            print("  Type de seuil      : manuel")
 
 
         p_m_i = util.format_nombre(pixels_masque_initial)
@@ -1022,10 +1026,8 @@ def detecter_zone_depuis_masque(masque):
     y_max = int(positions_y.max())
 
     return (
-        x_min,
-        y_min,
-        x_max,
-        y_max
+        x_min, y_min,
+        x_max, y_max
     )
 
 
@@ -1081,31 +1083,14 @@ def ajouter_marge_bbox(
         int(round(hauteur * marge_pct))
     )
 
-    x_min = max(
-        0,
-        x_min - marge_x
-    )
-
-    y_min = max(
-        0,
-        y_min - marge_y
-    )
-
-    x_max = min(
-        largeur - 1,
-        x_max + marge_x
-    )
-
-    y_max = min(
-        hauteur - 1,
-        y_max + marge_y
-    )
+    x_min = max(0, x_min - marge_x)
+    y_min = max(0, y_min - marge_y)
+    x_max = min( largeur - 1, x_max + marge_x)
+    y_max = min( hauteur - 1, y_max + marge_y)
 
     return (
-        x_min,
-        y_min,
-        x_max,
-        y_max
+        x_min, y_min,
+        x_max, y_max
     )
 
 
@@ -1221,11 +1206,8 @@ def afficher_carte_difference(
     """
 
     plt.figure(figsize=(12, 8))
-
     plt.imshow(difference, cmap="hot")
-
     plt.colorbar(label="Distance BGR au fond")
-
     plt.title(f"Distance à la couleur du fond, seuil = {seuil}")
 
     plt.axis("off")
@@ -1260,9 +1242,7 @@ def afficher_comparaison_seuils(
     )
 
     plt.figure(figsize=(12, 8))
-
     plt.imshow(pixels_critiques, cmap="gray")
-
     plt.title(
         f"Pixels perdus entre les seuils "
         f"{seuil:.3f} et {seuil_suivant:.3f}"
@@ -1275,6 +1255,7 @@ def afficher_comparaison_seuils(
 
 def diagnostiquer_detection_bestiole(
     voir_image,
+    afficher_informations,
     image,
     masque_bestiole,
     fond,
@@ -1341,14 +1322,9 @@ def diagnostiquer_detection_bestiole(
     if bbox_detectee is None:
 
         print()
-        print("-" * 60)
-        print("DIAGNOSTIC DE LA DÉTECTION")
-        print("-" * 60)
-        print("Aucune bestiole détectée.")
-        print(f"Couleur du fond estimée : {fond}")
-        print(f"Seuil utilisé            : {seuil}")
+        display.print("Aucune bestiole détectée !!\n", colors['warning'])
 
-        return
+        return False
 
     x_min, y_min, x_max, y_max = bbox_detectee
 
@@ -1366,82 +1342,84 @@ def diagnostiquer_detection_bestiole(
     marge_gauche_pct = (marge_gauche / largeur * 100.0)
     marge_droite_pct = (marge_droite / largeur * 100.0)
     marge_haut_pct = (marge_haut / hauteur * 100.0)
-    marge_bas_pct = (marge_bas / hauteur * 100.0)
+    marge_bas_pct = (marge_bas / hauteur * 100.0) 
 
     # ------------------------------------------------------------------
     # Affichage des informations
     # ------------------------------------------------------------------
 
-    print()
-    print("-" * 60)
-    print("DIAGNOSTIC DE LA DÉTECTION")
-    print("-" * 60)
+    if afficher_informations : 
 
-    print(f"Couleur du fond estimée : {fond}")
-    print(f"Seuil de détection      : {seuil:.3f}")
+        print()
+        print("-" * 60)
+        print("DIAGNOSTIC DE LA DÉTECTION")
+        print("-" * 60)
 
-    fond_pct = np.sum(difference < seuil)
-    objet_pct = np.sum(difference >= seuil)
+        print(f"Couleur du fond estimée : {fond}")
+        print(f"Seuil de détection      : {seuil:.3f}")
 
-    fond_pct = fond_pct / difference.size * 100
-    objet_pct = objet_pct / difference.size * 100
+        fond_pct = np.sum(difference < seuil)
+        objet_pct = np.sum(difference >= seuil)
 
-    print()
-    print(f"Fond   : {fond_pct:.1f}%")
-    print(f"Objet  : {objet_pct:.1f}%")
+        fond_pct = fond_pct / difference.size * 100
+        objet_pct = objet_pct / difference.size * 100
+
+        print()
+        print(f"Fond   : {fond_pct:.1f}%")
+        print(f"Objet  : {objet_pct:.1f}%")
 
 
-    print()
-    print("Zone détectée :")
-    print(f"  Gauche : {x_min} px")
-    print(f"  Haut   : {y_min} px")
-    print(f"  Droite : {x_max} px")
-    print(f"  Bas    : {y_max} px")
+        print()
+        print("Zone détectée :")
+        print(f"  Gauche : {x_min} px")
+        print(f"  Haut   : {y_min} px")
+        print(f"  Droite : {x_max} px")
+        print(f"  Bas    : {y_max} px")
 
-    print()
-    print(f"P90 : {np.percentile(difference,90):.1f}")
-    print(f"P95 : {np.percentile(difference,95):.1f}")
-    print(f"P98 : {np.percentile(difference,98):.1f}")
-    print(f"P99 : {np.percentile(difference,99):.1f}")
+        print()
+        print(f"P90 : {np.percentile(difference,90):.1f}")
+        print(f"P95 : {np.percentile(difference,95):.1f}")
+        print(f"P98 : {np.percentile(difference,98):.1f}")
+        print(f"P99 : {np.percentile(difference,99):.1f}")
 
-    print(f"Médiane : {np.median(difference):.1f}")
-    print(f"Maximum : {difference.max():.1f}")
+        print(f"Médiane : {np.median(difference):.1f}")
+        print(f"Maximum : {difference.max():.1f}")
 
-    print()
-    print("Marges :")
+        print()
+        print("Marges :")
 
-    print(
-        f"  Gauche : {marge_gauche:4d} px "
-        f"({marge_gauche_pct:.2f} %)"
+        print(
+            f"  Gauche : {marge_gauche:4d} px "
+            f"({marge_gauche_pct:.2f} %)"
+        )
+
+        print(
+            f"  Droite : {marge_droite:4d} px "
+            f"({marge_droite_pct:.2f} %)"
+        )
+
+        print(
+            f"  Haut   : {marge_haut:4d} px "
+            f"({marge_haut_pct:.2f} %)"
+        )
+
+        print(
+            f"  Bas    : {marge_bas:4d} px "
+            f"({marge_bas_pct:.2f} %)"
     )
 
-    print(
-        f"  Droite : {marge_droite:4d} px "
-        f"({marge_droite_pct:.2f} %)"
-    )
+        print()
+        print(f"Marge minimale : {marge_min} px")
+        if marge_min == 0:
+            print("Objet déjà recadré au plus près.")
 
-    print(
-        f"  Haut   : {marge_haut:4d} px "
-        f"({marge_haut_pct:.2f} %)"
-    )
-
-    print(
-        f"  Bas    : {marge_bas:4d} px "
-        f"({marge_bas_pct:.2f} %)"
-)
-
-    print()
-    print(f"Marge minimale : {marge_min} px")
-    if marge_min == 0:
-        print("Objet déjà recadré au plus près.")
-
-    nombre_bords_touches = sum([
-        x_min == 0,
-        y_min == 0,
-        x_max >= largeur - 1,
-        y_max >= hauteur - 1
-    ])
-    print(f"\n Nombre de bord touchant : {nombre_bords_touches}")
+        nombre_bords_touches = sum([
+            x_min == 0,
+            y_min == 0,
+            x_max >= largeur - 1,
+            y_max >= hauteur - 1
+        ])
+        print(f"\n Nombre de bord touchant : {nombre_bords_touches}")
 
 
     # ------------------------------------------------------------------
@@ -1478,13 +1456,14 @@ def diagnostiquer_detection_bestiole(
         )
 
     image_rgb = cv2.cvtColor(image_affichage, cv2.COLOR_BGR2RGB)
-    plt.figure(figsize=(10, 7))
+    plt.figure(figsize=(12, 8))
     plt.imshow(image_rgb)
     plt.title("BBox détectée en rouge, bbox sécurisée en vert")
     plt.axis("off")
     plt.tight_layout()
     plt.show()
     
+    return True
 
 
 # ==================================================================================================
@@ -1494,9 +1473,10 @@ def diagnostiquer_detection_bestiole(
 def traiter_image(
     rep,
     voir_image,
+    afficher_informations,
     chemin_image,
-    seuil=None
-):
+    seuil=None,
+    ):
     """
     Analyse une image et affiche les informations nécessaires
     pour déterminer le zoom et les augmentations.
@@ -1526,7 +1506,7 @@ def traiter_image(
         seuil=seuil,
         taille_bord=TAILLE_BORD,
         surface_min_pct=SURFACE_MIN_PCT,
-        afficher_informations=True
+        afficher_informations= afficher_informations
     )
 
     # ------------------------------------------------------------------
@@ -1561,91 +1541,88 @@ def traiter_image(
     # Diagnostic graphique
     # ------------------------------------------------------------------
 
-    diagnostiquer_detection_bestiole(
-        voir_image=voir_image,
-        image=image,
-        masque_bestiole=masque_bestiole,
-        fond=fond,
-        difference=difference,
-        seuil=seuil_utilise,
-        bbox_detectee=bbox_detectee,
-        bbox_securisee=bbox_securisee,
+    detection = diagnostiquer_detection_bestiole(
+        voir_image = voir_image,
+        afficher_informations = afficher_informations,
+        image = image,
+        masque_bestiole = masque_bestiole,
+        fond = fond,
+        difference =  difference,
+        seuil = seuil_utilise,
+        bbox_detectee = bbox_detectee,
+        bbox_securisee = bbox_securisee,
     )
 
-    # ------------------------------------------------------------------
-    # Affichage des surfaces
-    # ------------------------------------------------------------------
 
-    print()
-    print(f"Surface image     : {info_occ.surface_image:,.0f} px")
-    print(f"Surface bestiole  : {info_occ.surface_bestiole:,.0f} px")
+    if detection :
 
-    print(
-        f"Occupation réelle : {info_occ.occupation:.3f}, "
-        f"soit {info_occ.occupation_pct:.1f} %"
-    )
+        # ------------------------------------------------------------------
+        # Affichage des surfaces
+        # ------------------------------------------------------------------
 
-    print(
-        f"Occupation BBox   : {info_image_bboxe:.3f}, "
-        f"soit {info_image_bboxe * 100:.1f} %\n"
-    )
+        print()
+        display.print(f"Surface image     : {info_occ.surface_image:,.0f} px", colors["info"])
+        display.print(f"Surface bestiole  : {info_occ.surface_bestiole:,.0f} px", colors["info"])
+        
+        display.print(f"Occupation réelle : {info_occ.occupation_pct:.1f} %" , colors["info"])
+        display.print( f"Occupation BBox  : {info_image_bboxe * 100:.1f} %" , colors["info"])
 
-    occupation_pct = info_occ.occupation_pct
+        occupation_pct = info_occ.occupation_pct
 
 
-    # # ------------------------------------------------------------------
-    # # Sauvegarde de l"image 
-    # # ------------------------------------------------------------------
+        # # ------------------------------------------------------------------
+        # # Sauvegarde de l"image 
+        # # ------------------------------------------------------------------
 
-    print()
-    print("-" * 60)
-    print("SAUVEGARDE")
-    print("-" * 60)
+        display.header_title("Sauvegade de l'image", colors["aqua"], chemin_image.stem)
 
-    choix = input(
-        "[R] BBox rouge  "
-        "[V] BBox verte  "
-        "[N] Annuler : "
-    ).strip().upper()
+        menu_saucegarde = menu_c.Menu('SAUVEGARDE',   # Nom du menu
+                            style= "rounds",          # Style du menu 
+                            theme = menu_c.AQUA_IA    # Theme du menu
+                            )
+        menu_saucegarde.display_menu()
+        choix = menu_saucegarde.selection()
 
-    if choix == "R":
+        # Sauvegarde Bbox Rougr
+        if choix == 1 :
 
-        fichier = sauvegarder_bbox(
-            image=image,
-            bbox=bbox_detectee,
-            chemin_image=chemin_image,
-            suffixe="bbox_rouge"
-        )
+            fichier = sauvegarder_bbox(
+                image=image,
+                bbox=bbox_detectee,
+                chemin_image=chemin_image,
+                suffixe="Bbox_Rouge"
+            )
 
-        print(f"Image sauvegardée : {fichier}")
+            print(f"Image sauvegardée : {fichier}\n")
 
-    elif choix == "V":
+        # Sauvegarde Bbox Verte
+        if choix == 2 :
 
-        fichier = sauvegarder_bbox(
-            image=image,
-            bbox=bbox_securisee,
-            chemin_image=chemin_image,
-            suffixe="bbox_verte"
-        )
+            fichier = sauvegarder_bbox(
+                image=image,
+                bbox=bbox_securisee,
+                chemin_image=chemin_image,
+                suffixe="Bbox_Verte"
+            )
 
-        print(f"Image sauvegardée : {fichier}")
+            print(f"Image sauvegardée : {fichier}\n")
+
+        # Pas de Sauvegarde
+        if choix == 3 :
+            print("Sauvegarde annulée.\n")
 
 
-    else:
-        print("Sauvegarde annulée.")
-
-
-    return {
-        "image": image,
-        "masque": masque_bestiole,
-        "fond": fond,
-        "difference": difference,
-        "bbox_detectee": bbox_detectee,
-        "bbox_securisee": bbox_securisee,
-        "occupation": info_occ,
-        # "zoom_max_possible": zoom_max_possible,
-        # "zoom_max": zoom_max
-    }
+    return detection
+    # return {
+    #     "detection" : detection,
+    #     "image": image,
+    #     "masque": masque_bestiole,
+    #     "fond": fond,
+    #     "difference": difference,
+    #     "bbox_detectee": bbox_detectee,
+    #     "bbox_securisee": bbox_securisee,
+    #     "occupation": info_occ,
+    # }
 
 
 def main():
@@ -1653,10 +1630,12 @@ def main():
     Boucle principale du programme.
     """
 
-    continuer = True
-
     syst.clear_screen()
 
+    display.titre("Info & Crop d'imaghes", colors["aqua"])
+
+    # Saisie du répertoire contenant les images à traiter
+    print()
     repertoire = util.get_directory_color("Répertoire à utiliser")
 
     liste_images = [
@@ -1665,39 +1644,127 @@ def main():
         if fichier.is_file() and fichier.suffix.lower() in cst.IMAGE_EXT
         ]
 
+    nb_images = len(liste_images)
+    
     print()
-    display.print(f"Nombre d'images à visualisées {len(liste_images)}", colors["info"])
-    print()
+    if nb_images == 0:
+        
+        display.print("Aucune image trouvée dans le répertoire.", colors["error"])
+        util.sortie_de_programme()
+
+    else :
+
+        display.print(f"Nombre d'images à traiter : {len(liste_images)}", colors['info'])
+
 
     voir_image = util.answer_yes_or_no("Voulez-vous voir les images intermédiares", False)
+    afficher_informations = util.answer_yes_or_no("Voulez-vous voir les informations de calculs", False)
 
-    for img in liste_images :
+    pas_de_detection = 0
+    images_sans_detection = []
+    erreurs_lecture = 0
+    images_erreur_lecture = []
+
+    # Début de la boucle de traitement des images
+    nb_images = len(liste_images)
+    for i, img in enumerate(liste_images, start=1):
  
         try:
 
-            traiter_image(
-                repertoire,
-                voir_image,
-                chemin_image=  img,    # chemin_image,
-                seuil=SEUIL_DETECTION
+            en_tete = f"{i}/{nb_images}"
+            display.header_title(img.stem, colors["aqua"], en_tete)
+
+            detec = traiter_image(
+                repertoire,             # Répertoire contenant les images
+                voir_image,             # Afficher les images intermédiaires
+                afficher_informations,  # Afficher les informations de calculs
+                chemin_image=  img,     # image à traiter         
+                seuil=SEUIL_DETECTION   # Seuil de détection 
             )
 
+            # Pas de détection de bestioles
+            if not detec :
+                pas_de_detection +=1
+                images_sans_detection.append(img.name)
+
+        except ErreurLectureImage  as erreur:
+            erreurs_lecture += 1
+            images_erreur_lecture.append(img.name)
+            afficher_erreur(erreur)
+
         except Exception as erreur:
+            afficher_erreur(erreur)
 
-            print()
-            print("-" * 80)
-            print("ERREUR PENDANT LE TRAITEMENT")
-            print("-" * 80)
-            print(f"Type    : {type(erreur).__name__}")
-            print(f"Message : {erreur}")
+    nb_ok = nb_images - pas_de_detection - erreurs_lecture
 
-            print()
-            traceback.print_exc()
-            print()
 
-            print("-" * 80)
-            print()
+    # ----- Résumé d'exécution ----------------------------------------------------------
+    if erreurs_lecture != 0 :
+        status = 'error'
+    elif pas_de_detection != 0 :
+        status = 'warning'
+    else :
+        status = 'ok'
 
+
+    display.titre("Résumé d'exécution", colors[status])
+    print()
+
+    display.print(
+        f"Nombre d'images traitées       : {nb_ok} / {nb_images}",
+        colors[status]
+    )
+
+    # Total d'images avec détection
+    if nb_ok != nb_images :
+        display.print(
+            f"Nombre d'images avec détection : {nb_ok}",
+            colors["ok"]
+        )
+
+
+    # Pas de détection de bestioles
+    if pas_de_detection != 0 :
+
+        display.print(
+            f"Nombre d'images sans détection : {pas_de_detection}",
+            colors["warning"]
+        )
+
+        fichier_erreurs = (repertoire  / "images_sans_detection.txt")
+
+        sauvegarder_liste_images(
+        liste_images = images_sans_detection,
+        fichier_sortie = fichier_erreurs,
+        nb_colonnes = 6
+        )
+
+        display.print(
+            f"Liste des non dérection sauvegardée : {fichier_erreurs}",
+            colors["info"]
+        )
+
+    # Erreur de lecture du fichier image
+    if images_erreur_lecture:
+
+        display.print(
+        f"Nombre d'erreurs de lecture    : {erreurs_lecture}",
+        colors["error"]
+        )
+
+        fichier_erreurs = (repertoire / "images_erreur_lecture.txt")
+
+        sauvegarder_liste_images(
+            liste_images = images_erreur_lecture,
+            fichier_sortie = fichier_erreurs,
+            nb_colonnes = 6
+        )
+
+        display.print(
+            f"Liste des erreurs sauvegardée : {fichier_erreurs}",
+            colors["info"]
+        )
+    
 
     print()
     display.print("Fin du traitement !!!", colors['goodbye'])
