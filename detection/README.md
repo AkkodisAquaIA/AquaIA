@@ -229,6 +229,7 @@ The Detection part contains the following folders and files.
 │   ├── inference_context.py      # Shared run context and header tools for inference.
 │   ├── metric.py                 # Metrics’ update, print, save, calculate functions.
 │   ├── runner.py                 # Loads configs and dispatches training (detection/<model>/training/run.py/train_<model>) or inference (detection/<model>/inference/run.py/infer_<model>).
+│   ├── test_vit7b16.py            # Standalone offline FP16 inference smoke test for the official DINOv3-7B COCO detector; measures CUDA memory usage, not COCO accuracy.
 │   ├── train_config_dino.yaml    # Training config for DINO (default).
 │   └── train_config_yolo.yaml    # Training config for YOLO.
 │
