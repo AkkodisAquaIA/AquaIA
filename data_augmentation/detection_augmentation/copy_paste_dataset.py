@@ -57,10 +57,7 @@ ALLOW_OVERLAP = True
 IOU_MAX = 1.0
 MULTI_CLASS = False
 CLASS_MODE = "multi" if MULTI_CLASS else "single"
-TEST_MANIFEST_PATH = PROJECT_ROOT / (
-    f"datasets/copy_paste_test_manifest_{CUTOUT_DIR.name}_{CLASS_MODE}_"
-    f"{BACKGROUND_KIND}_{MIN_MACROINVERTEBRATES}_{MAX_MACROINVERTEBRATES}.json"
-)
+TEST_MANIFEST_PATH = PROJECT_ROOT / (f"datasets/copy_paste_test_manifest_{CUTOUT_DIR.name}_{CLASS_MODE}_{BACKGROUND_KIND}_{MIN_MACROINVERTEBRATES}_{MAX_MACROINVERTEBRATES}.json")
 
 BATCH_SIZE = 2
 NUM_WORKERS = 2
@@ -237,10 +234,7 @@ class CopyPasteDataset(Dataset):
         if manifest.get("version") != 1 or manifest.get("split") != "test":
             raise ValueError(f"Manifest de test invalide : {self.manifest_path}")
         if manifest.get("parameters") != self._manifest_parameters():
-            raise ValueError(
-                "Les paramètres demandés diffèrent du manifest de test. "
-                "Réutiliser les mêmes paramètres ou choisir un nouveau manifest."
-            )
+            raise ValueError("Les paramètres demandés diffèrent du manifest de test. Réutiliser les mêmes paramètres ou choisir un nouveau manifest.")
 
         self.backgrounds = [self.background_dir / relative_path for relative_path in manifest["backgrounds"]]
         self.cutouts = [self.cutout_dir / relative_path for relative_path in manifest["cutouts"]]
@@ -321,10 +315,7 @@ class CopyPasteDataset(Dataset):
             y = rng.randint(padding_y, max_y)
             box = (x, y, x + cutout.width, y + cutout.height)
             overlap_limit = self.iou_max if self.allow_overlap else 0.0
-            invalid_position = any(
-                boxes_are_nested(box, other_box) or box_iou(box, other_box) > overlap_limit
-                for _, other_box in annotations
-            )
+            invalid_position = any(boxes_are_nested(box, other_box) or box_iou(box, other_box) > overlap_limit for _, other_box in annotations)
             if invalid_position:
                 continue
 
@@ -579,7 +570,6 @@ class CopyPasteYOLOTrainer(DetectionTrainer):
             shuffle=mode == "train",
             rank=rank,
             drop_last=self.args.compile and mode == "train",
-            device=self.device,
         )
 
     @staticmethod
@@ -640,16 +630,12 @@ class CopyPasteYOLOValidator(DetectionValidator):
             workers=self.args.workers,
             shuffle=False,
             rank=-1,
-            device=self.device,
         )
 
     def get_stats(self):
         """Conserve les prédictions brutes pour les compter à un seuil choisi."""
 
-        self.metrics.raw_stats = {
-            key: np.concatenate(values, axis=0) if values else np.array([])
-            for key, values in self.metrics.stats.items()
-        }
+        self.metrics.raw_stats = {key: np.concatenate(values, axis=0) if values else np.array([]) for key, values in self.metrics.stats.items()}
         return super().get_stats()
 
 

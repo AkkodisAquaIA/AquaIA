@@ -80,21 +80,12 @@ def list_images(directory, extensions=IMAGE_EXTENSIONS):
     if not directory.is_dir():
         raise FileNotFoundError(f"Dossier introuvable : {directory.resolve()}")
 
-    return [
-        path
-        for path in sorted(directory.rglob("*"))
-        if path.suffix.lower() in extensions
-    ]
+    return [path for path in sorted(directory.rglob("*")) if path.suffix.lower() in extensions]
 
 
 def boxes_are_nested(first, second):
     def contains(outer, inner):
-        return (
-            outer[0] <= inner[0]
-            and outer[1] <= inner[1]
-            and outer[2] >= inner[2]
-            and outer[3] >= inner[3]
-        )
+        return outer[0] <= inner[0] and outer[1] <= inner[1] and outer[2] >= inner[2] and outer[3] >= inner[3]
 
     return contains(first, second) or contains(second, first)
 
@@ -122,9 +113,7 @@ def split_counts(number_of_images, split_ratios):
 
     # Les images restantes vont aux splits ayant les plus grandes décimales.
     missing = number_of_images - sum(counts)
-    order = sorted(
-        range(3), key=lambda index: exact_counts[index] - counts[index], reverse=True
-    )
+    order = sorted(range(3), key=lambda index: exact_counts[index] - counts[index], reverse=True)
     for index in order[:missing]:
         counts[index] += 1
 
@@ -199,29 +188,20 @@ def save_validation_preview(
             stroke_fill="white",
         )
 
-    preview.save(
-        output_path, format="PNG", compress_level=png_compress_level
-    )
+    preview.save(output_path, format="PNG", compress_level=png_compress_level)
 
 
-def validate_image_label_pairs(
-    dataset_dir, split_names, with_labels_multi, image_extension
-):
+def validate_image_label_pairs(dataset_dir, split_names, with_labels_multi, image_extension):
     for split_name in split_names:
         base_dir = dataset_dir / split_name if split_name else dataset_dir
-        image_stems = {
-            path.stem
-            for path in (base_dir / "images").glob(f"*{image_extension}")
-        }
+        image_stems = {path.stem for path in (base_dir / "images").glob(f"*{image_extension}")}
         label_stems = {path.stem for path in (base_dir / "labels").glob("*.txt")}
 
         if image_stems != label_stems:
             raise RuntimeError(f"Images et labels différents dans {base_dir}")
 
         if with_labels_multi:
-            multi_stems = {
-                path.stem for path in (base_dir / "labels_multi").glob("*.txt")
-            }
+            multi_stems = {path.stem for path in (base_dir / "labels_multi").glob("*.txt")}
             if image_stems != multi_stems:
                 raise RuntimeError(f"Images et labels_multi différents dans {base_dir}")
 
@@ -296,11 +276,7 @@ def generate_augmented_dataset(
 
     if create_splits:
         counts = split_counts(number_of_images, split_ratios)
-        sample_splits = [
-            split_name
-            for split_name, count in zip(("train", "val", "test"), counts)
-            for _ in range(count)
-        ]
+        sample_splits = [split_name for split_name, count in zip(("train", "val", "test"), counts) for _ in range(count)]
         rng.shuffle(sample_splits)
         split_names = ["train", "val", "test"]
     else:
@@ -328,10 +304,7 @@ def generate_augmented_dataset(
     while sample_index < number_of_images:
         generation_attempts += 1
         if generation_attempts > number_of_images * 30:
-            raise RuntimeError(
-                "Impossible de placer assez d'insectes. Réduire leur nombre, le padding "
-                "ou les contraintes de superposition."
-            )
+            raise RuntimeError("Impossible de placer assez d'insectes. Réduire leur nombre, le padding ou les contraintes de superposition.")
 
         with Image.open(rng.choice(backgrounds)) as image:
             background = image.convert("RGB")
@@ -368,11 +341,7 @@ def generate_augmented_dataset(
             y = rng.randint(padding_y, max_y)
             box = (x, y, x + insect.width, y + insect.height)
             overlap_limit = iou_max if allow_overlap else 0.0
-            invalid_position = any(
-                boxes_are_nested(box, other_box)
-                or box_iou(box, other_box) > overlap_limit
-                for _, other_box in annotations
-            )
+            invalid_position = any(boxes_are_nested(box, other_box) or box_iou(box, other_box) > overlap_limit for _, other_box in annotations)
             if invalid_position:
                 continue
 
@@ -399,15 +368,9 @@ def generate_augmented_dataset(
             multi_labels.append(f"{class_id} {coordinates}")
 
         active_labels = multi_labels if multi_class else single_labels
-        (base_dir / "labels" / f"{stem}.txt").write_text(
-            "\n".join(active_labels) + ("\n" if active_labels else ""), encoding="utf-8"
-        )
-        (base_dir / "labels_multi" / f"{stem}.txt").write_text(
-            "\n".join(multi_labels) + ("\n" if multi_labels else ""), encoding="utf-8"
-        )
-        save_lossless_image(
-            background, image_path, output_image_format, png_compress_level
-        )
+        (base_dir / "labels" / f"{stem}.txt").write_text("\n".join(active_labels) + ("\n" if active_labels else ""), encoding="utf-8")
+        (base_dir / "labels_multi" / f"{stem}.txt").write_text("\n".join(multi_labels) + ("\n" if multi_labels else ""), encoding="utf-8")
+        save_lossless_image(background, image_path, output_image_format, png_compress_level)
 
         if sample_index in preview_indices:
             save_validation_preview(
@@ -429,9 +392,7 @@ def generate_augmented_dataset(
         "nc": len(active_names),
         "names": {index: name for index, name in enumerate(active_names)},
     }
-    (dataset_dir / "classes.json").write_text(
-        json.dumps(classes, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    (dataset_dir / "classes.json").write_text(json.dumps(classes, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     multi_classes = {
         "nc": len(multi_names),
         "names": {index: name for index, name in enumerate(multi_names)},
@@ -445,9 +406,7 @@ def generate_augmented_dataset(
     write_yolo_yaml(dataset_dir, active_names, create_splits, "dataset.yaml")
     write_yolo_yaml(dataset_dir, active_names, create_splits, yaml_name)
 
-    validate_image_label_pairs(
-        dataset_dir, split_names, with_labels_multi=True, image_extension=image_extension
-    )
+    validate_image_label_pairs(dataset_dir, split_names, with_labels_multi=True, image_extension=image_extension)
     print(f"Dataset YOLO enregistré dans : {dataset_dir.resolve()}")
     return dataset_dir
 
@@ -537,9 +496,7 @@ def move_sam3_outputs_to_cpu(outputs):
 def segment_all_sam3(image, model, processor, device, prompt, threshold):
     import torch
 
-    inputs = processor(
-        images=Image.fromarray(image), text=prompt, return_tensors="pt"
-    ).to(device)
+    inputs = processor(images=Image.fromarray(image), text=prompt, return_tensors="pt").to(device)
     with torch.inference_mode():
         outputs = model(**inputs)
 
@@ -619,49 +576,23 @@ def refine_sam3_instance(
     low_right = min(reduced_width, int(np.ceil(crop_right / scale_x)))
     low_bottom = min(reduced_height, int(np.ceil(crop_bottom / scale_y)))
     global_crop = global_mask[low_top:low_bottom, low_left:low_right]
-    global_crop = np.asarray(
-        Image.fromarray(global_crop).resize(model_image.size, Image.Resampling.NEAREST)
-    ).astype(bool)
-    fallback = np.asarray(
-        Image.fromarray(global_crop).resize(
-            (image_crop.shape[1], image_crop.shape[0]), Image.Resampling.NEAREST
-        )
-    ).astype(bool)
+    global_crop = np.asarray(Image.fromarray(global_crop).resize(model_image.size, Image.Resampling.NEAREST)).astype(bool)
+    fallback = np.asarray(Image.fromarray(global_crop).resize((image_crop.shape[1], image_crop.shape[0]), Image.Resampling.NEAREST)).astype(bool)
     if full_resolution:
         fallback = refine_mask_full_resolution(image_crop, fallback)
 
-    candidates = [
-        mask.numpy().astype(bool) for mask in result["masks"] if mask.any()
-    ]
+    candidates = [mask.numpy().astype(bool) for mask in result["masks"] if mask.any()]
     global_area = max(1, global_crop.sum())
-    candidates = [
-        mask
-        for mask in candidates
-        if 0.5 <= mask.sum() / global_area <= 1.8
-        and not (
-            mask[0].any()
-            or mask[-1].any()
-            or mask[:, 0].any()
-            or mask[:, -1].any()
-        )
-    ]
+    candidates = [mask for mask in candidates if 0.5 <= mask.sum() / global_area <= 1.8 and not (mask[0].any() or mask[-1].any() or mask[:, 0].any() or mask[:, -1].any())]
     if not candidates:
         return image_crop, fallback, (crop_left, crop_top)
 
-    ious = [
-        np.logical_and(mask, global_crop).sum()
-        / max(1, np.logical_or(mask, global_crop).sum())
-        for mask in candidates
-    ]
+    ious = [np.logical_and(mask, global_crop).sum() / max(1, np.logical_or(mask, global_crop).sum()) for mask in candidates]
     best = int(np.argmax(ious))
     if ious[best] < 0.5:
         return image_crop, fallback, (crop_left, crop_top)
 
-    refined_mask = np.asarray(
-        Image.fromarray(candidates[best]).resize(
-            (image_crop.shape[1], image_crop.shape[0]), Image.Resampling.NEAREST
-        )
-    ).astype(bool)
+    refined_mask = np.asarray(Image.fromarray(candidates[best]).resize((image_crop.shape[1], image_crop.shape[0]), Image.Resampling.NEAREST)).astype(bool)
     if full_resolution:
         refined_mask = refine_mask_full_resolution(image_crop, refined_mask)
     return image_crop, refined_mask, (crop_left, crop_top)
@@ -708,16 +639,10 @@ def create_cutouts_sam3(
             original_pil = image.convert("RGB")
         original_image = np.asarray(original_pil)
         detection_image = original_pil.copy()
-        detection_image.thumbnail(
-            (detection_max_size, detection_max_size), Image.Resampling.LANCZOS
-        )
-        instances = segment_all_sam3(
-            np.asarray(detection_image), model, processor, device, prompt, threshold
-        )
+        detection_image.thumbnail((detection_max_size, detection_max_size), Image.Resampling.LANCZOS)
+        instances = segment_all_sam3(np.asarray(detection_image), model, processor, device, prompt, threshold)
         global_masks = instances["masks"].cpu()
-        relative_name = "__".join(
-            image_path.relative_to(source_dir).with_suffix("").parts
-        )
+        relative_name = "__".join(image_path.relative_to(source_dir).with_suffix("").parts)
         labels = []
 
         for index, global_mask in enumerate(global_masks, start=1):
@@ -762,9 +687,7 @@ def create_cutouts_sam3(
 
         if create_labels:
             label_path = labels_dir / f"{relative_name}.txt"
-            label_path.write_text(
-                "\n".join(labels) + ("\n" if labels else ""), encoding="utf-8"
-            )
+            label_path.write_text("\n".join(labels) + ("\n" if labels else ""), encoding="utf-8")
 
         del instances, global_masks
         if torch.cuda.is_available():
@@ -784,9 +707,7 @@ def create_cutouts_sam3(
 def mask_otsu(image):
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     gray = cv2.GaussianBlur(gray, (5, 5), 0)
-    _, mask = cv2.threshold(
-        gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-    )
+    _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     return mask > 0
 
 
@@ -800,9 +721,7 @@ def mask_sam2_from_otsu(image, model, processor, device):
     with torch.inference_mode():
         outputs = model(**inputs, input_masks=prompt, multimask_output=False)
 
-    return processor.post_process_masks(
-        outputs.pred_masks.cpu(), inputs["original_sizes"]
-    )[0][0, 0].numpy().astype(bool)
+    return processor.post_process_masks(outputs.pred_masks.cpu(), inputs["original_sizes"])[0][0, 0].numpy().astype(bool)
 
 
 def create_cutouts_sam2_otsu(
@@ -839,15 +758,10 @@ def create_cutouts_sam2_otsu(
         rgba = rgba[y.min() : y.max() + 1, x.min() : x.max() + 1]
         output_path = output_dir / image_path.relative_to(source_dir).with_suffix(".png")
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        Image.fromarray(rgba).save(
-            output_path, format="PNG", compress_level=PNG_COMPRESS_LEVEL
-        )
+        Image.fromarray(rgba).save(output_path, format="PNG", compress_level=PNG_COMPRESS_LEVEL)
         saved_count += 1
 
-    print(
-        f"{saved_count} cutout(s) SAM2 + Otsu enregistré(s) dans : "
-        f"{output_dir.resolve()}"
-    )
+    print(f"{saved_count} cutout(s) SAM2 + Otsu enregistré(s) dans : {output_dir.resolve()}")
     return output_dir
 
 
@@ -858,7 +772,7 @@ def create_cutouts_sam2_otsu(
 
 def main():
     ## Fonction finale utilisée par défaut.
-    #generate_augmented_dataset(
+    # generate_augmented_dataset(
     #    cutout_dir=CUTOUT_DIR,
     #    background_dir=BACKGROUND_DIR,
     #    output_dir=OUTPUT_DIR,
@@ -878,7 +792,7 @@ def main():
     #    png_compress_level=PNG_COMPRESS_LEVEL,
     #    output_image_format=OUTPUT_IMAGE_FORMAT,
     #    random_seed=RANDOM_SEED,
-    #)
+    # )
 
     # Décommenter pour segmenter des images globales avec SAM3 + GrabCut.
     create_cutouts_sam3(
