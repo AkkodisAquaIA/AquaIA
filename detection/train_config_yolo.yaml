@@ -14,7 +14,12 @@ output:
   # Set a path string to override the automatically generated project directory
   project: null
   exist_ok: true
-  save_period: 5
+  # Disable Ultralytics epoch checkpoints; the four window-best checkpoints
+  # configured below are saved separately.
+  save_period: 0
+  # Keep the best mAP50-95 model from each consecutive block of N epochs
+  # under <run_dir>/milestone_checkpoints/.
+  best_checkpoint_period: 75
   plots: true
 
 training:
@@ -32,7 +37,9 @@ training:
   workers: 3
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 25
+  epochs: 300
+  # Disable early stopping so all 300 epochs are executed.
+  patience: 0
 
   # ---------- OPTIMIZER & LR ----------
   optimizer: "AdamW"

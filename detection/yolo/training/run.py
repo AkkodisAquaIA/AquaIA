@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import shutil
 from typing import Any, Dict
 import torch
 from ultralytics import YOLO
@@ -79,6 +80,34 @@ def train_yolo(config) -> Any:
 
     tensorboard_writer = SummaryWriter(log_dir=str(Path(run_dir) / "tensorboard"))
 
+    best_checkpoint_period = int(output_config.get("best_checkpoint_period", 0))
+    if best_checkpoint_period < 0:
+        raise ValueError("output.best_checkpoint_period must be greater than or equal to zero.")
+    window_best_fitness = {}
+
+    def save_window_best_checkpoint(trainer) -> None:
+        """Keep the best checkpoint from each consecutive epoch window."""
+        if best_checkpoint_period == 0:
+            return
+
+        epoch = trainer.epoch + 1
+        window_index = (epoch - 1) // best_checkpoint_period
+        fitness = float(trainer.fitness)
+        if fitness < window_best_fitness.get(window_index, float("-inf")):
+            return
+
+        source = Path(trainer.last)
+        if not source.is_file():
+            return
+
+        window_best_fitness[window_index] = fitness
+        start_epoch = window_index * best_checkpoint_period + 1
+        end_epoch = min((window_index + 1) * best_checkpoint_period, int(training_config["epochs"]))
+        checkpoint_dir = Path(run_dir) / "milestone_checkpoints"
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        destination = checkpoint_dir / f"best_epochs_{start_epoch:03d}_{end_epoch:03d}.pt"
+        shutil.copy2(source, destination)
+
     def log_train_epoch(trainer) -> None:
         """Log training losses and learning rates to TensorBoard at the end of each training epoch."""
         step = trainer.epoch + 1
@@ -99,6 +128,7 @@ def train_yolo(config) -> Any:
     # Add callbacks to log training and validation metrics to TensorBoard
     model.add_callback("on_train_epoch_end", log_train_epoch)
     model.add_callback("on_fit_epoch_end", log_fit_epoch)
+    model.add_callback("on_model_save", save_window_best_checkpoint)
 
     # ---------- Train ----------
     try:
