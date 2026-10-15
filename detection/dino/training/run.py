@@ -18,6 +18,7 @@ from detection.utils.config_utils import save_resolved_config
 from detection.utils.plot_utils import plot_metrics, save_sample_predictions
 from detection.dino.predict import predict, normalize_imgsz
 from detection.logging import TrainingLogger, CheckpointManager
+from detection.checkpoint import load_pretrain_model_checkpoint, load_training_state_checkpoint
 
 # !Temporary!
 # ------ START ------
@@ -100,9 +101,18 @@ def build_scheduler(training_config, optimizer):
 def train_dino(config, resume_dir=None):
     """Read training params from config, create dataset and model, execute training and validation,
     save checkpoints, logs, metrics, prediction results."""
-    training_config = config["training"]
+    model_config = config["model"]
     output_config = config["output"]
-    log_config = config.get("logging", {})
+    log_config = config["logging"]
+    training_config = config["training"]
+    model_init = str(model_config.get("init")).lower()
+    init_checkpoint = model_config.get("init_checkpoint")
+    # When resuming load last.pt and states no need for checking
+    if not resume_dir:
+        if model_init == "pretrained" and not init_checkpoint:
+            raise ValueError("DINO model.init='pretrained' requires model.init_checkpoint")
+        if model_init == "random" and init_checkpoint:
+            raise ValueError("DINO model.init='random' requires an empty model.init_checkpoint")
 
     configured_device = training_config.get("device", "auto")
     if configured_device == "auto":
@@ -188,6 +198,19 @@ def train_dino(config, resume_dir=None):
         num_classes=num_classes,
     ).to(device)
 
+    pretrained_training_state = None
+    if not resume_dir and model_init == "pretrained":
+        # If num_classes in the checkpoint is different from newly built model
+        reset_class_head = load_pretrain_model_checkpoint(init_checkpoint, model)
+        logger.info(f"[INIT] Loaded model weights from {init_checkpoint}")
+        if reset_class_head:
+            logger.info("[INIT] Num classes changed; classif layer and training state will be initialized from 0")
+        else:
+            # Continue pretraining in a new run, retaining optimizer/scaler
+            state_path = Path(init_checkpoint).parent.parent / "last_training_state.pt"
+            pretrained_training_state = load_training_state_checkpoint(state_path, device=device)
+            logger.info(f"[INIT] Loaded optimizer and scaler state from {state_path}")
+
     matcher = HungarianMatcher(
         cost_class=training_config["cost_class"],
         cost_bbox=training_config["cost_bbox"],
@@ -213,10 +236,21 @@ def train_dino(config, resume_dir=None):
         weight_decay=training_config["weight_decay"],
     )
 
+    # Continue pretraining in a new run, retaining optimizer
+    if pretrained_training_state is not None:
+        optimizer.load_state_dict(pretrained_training_state["optimizer_state_dict"])
+        # The new task uses the learning rate and weight decay specified in its YAML
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = training_config["lr0"]
+            param_group["initial_lr"] = training_config["lr0"]
+            param_group["weight_decay"] = training_config["weight_decay"]
     scheduler = build_scheduler(training_config, optimizer)
 
     # Create a GradScaler to prevent gradient underflow when using AMP
     scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+    # Continue pretraining in a new run, retaining scaler
+    if pretrained_training_state is not None:
+        scaler.load_state_dict(pretrained_training_state["scaler_state_dict"])
     # step 1 scale the loss then backpropagate the scaled loss producing scaled gradients
     #    scaler.scale(total_loss).backward()
     # step 2 unscale gradients then check whether they contain inf or NaN
@@ -230,8 +264,6 @@ def train_dino(config, resume_dir=None):
 
     # === Load checkpoint if resuming (before compile) ===
     if resume_dir:
-        from detection.checkpoint import load_training_state_checkpoint
-
         last_weights = os.path.join(run_dir, "weights", "last.pt")
         last_state = os.path.join(run_dir, "last_training_state.pt")
 

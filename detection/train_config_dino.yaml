@@ -1,12 +1,14 @@
 model:
   family: "dinov3"
   size : "small"
-  # DINO uses it to create output dir, YOLO uses it to load .pt or .yaml
-  # "pretrained" or "random"
-  init: "pretrained"
+  # "random": initializes DETR head ramdomly
+  # "pretrained": initializes from a previous COCO detection checkpoint
+  init: "random"
+  # Required for "pretrained", e.g. "results/.../weights/last.pt"
+  init_checkpoint: null
 
 data:
-  dataset_yaml: "datasets/aquatic_insects_v7_1classe"
+  dataset_yaml: "datasets/coco_custom_match"
 
 output:
   # Root directory for run folders. Each run creates project/{YYYYMMDD_HHMMSS}/
@@ -33,7 +35,8 @@ training:
   workers: 3
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 25
+  # Epoch budget of this run
+  epochs: 120
   # If cos_lr, warmup steps = epochs * warmup_ratio 
   warmup_ratio: 0.05
 
@@ -71,13 +74,13 @@ training:
   cutmix: 0.01
   # Disable Mosaic and CutMix in the last N epochs
   # Make sure close_mosaic <= epochs
-  close_mosaic: 25
+  close_mosaic: 70
 
   # ---------- INFERENCE / EVAL-RELATED ----------
   # !Temporary! Seed used to sample training set for post-training mAP evaluation
   train_subset_seed: 42
   # !Temporary! Fraction of sampling
-  train_subset_ratio: 1
+  train_subset_ratio: 0.5
   # Confidence threshold used to filter bbox predictions before mAP calculation
   conf_thresh: 0.05
   # Confidence threshold for bbox prediction filtering

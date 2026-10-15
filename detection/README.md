@@ -87,6 +87,14 @@ The active configuration files are:
 - `detection/infer_config_yolo.yaml` for YOLO inference and evaluation.
 - `num_queries` in [dino/dino_detector.py](dino/dino_detector.py) sets the maximum number of objects the DINO / DETR model can predict per image; remember to adjust it for your dataset before training.
 
+For DINO, `model.init: random` uses a random DETR head; `model.init: pretrained` loads `model.init_checkpoint` (the source run's `weights/last.pt`). The DINO backbone remains pretrained and is not updated. A class-count change resets the classification layer. One uses this mechanisme for example to pre-train on the COCO dataset, then fine-tune on target data:
+
+1. **COCO pretraining:** use `model.init: random` on COCO.
+2. **Custom-dataset training:** use `model.init: pretrained` with the COCO run's `last.pt`; reset the classification layer when the class count changes and start fresh training state using the new YAML.
+3. **Additional COCO training:** return to the COCO run's `last.pt` with `model.init: pretrained`. Set `warmup_ratio: 0` and `lr0` to that run's final learning rate; use the current YAML's `weight_decay`, reuse its optimizer/scaler from `last_training_state.pt`. Then repeat custom-dataset training from the new COCO result.
+
+Each new task has its own run directory; `training.epochs` applies only to that task. `--resume` restores the interrupted task's state and skips checkpoint initialization.
+
 ## Output directories
 
 Training runs are stored under:
@@ -151,7 +159,7 @@ To compare DINO / DETR runs within the same model branch, start TensorBoard from
 
 ```powershell
 & "C:\Users\zhijian.zhou\Aquaia_dino\Scripts\tensorboard.exe" `
-  --logdir "results\detect\dinov3_small_pretrained"
+  --logdir "results\detect\dinov3_small_random"
 ```
 
 To compare YOLO runs within its own branch:

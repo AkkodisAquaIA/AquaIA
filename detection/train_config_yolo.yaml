@@ -1,7 +1,7 @@
 model:
   family: "yolo11"
   size : "n"
-  # DINO uses it to create output dir, YOLO uses it to load .pt or .yaml
+  # DINO uses it to initialize DETR head, YOLO uses it to load .pt or .yaml
   # "pretrained" or "random"
   init: "pretrained"
 
