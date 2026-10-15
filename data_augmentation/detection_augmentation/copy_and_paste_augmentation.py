@@ -59,6 +59,7 @@ SAM3_DETECTION_MAX_SIZE = 3000
 SAM3_CONTEXT_RATIO = 3.0
 SAM3_REFINE_THRESHOLD = 0.3
 SAM3_REFINE_MAX_SIZE = 1008
+SAM3_CREATE_LABELS = True
 
 # Paramètres de segmentation SAM2 + Otsu pour des images déjà cropées.
 SAM2_SOURCE_DIR = PROJECT_ROOT / "datasets/LPL_dataset_crop"
@@ -259,8 +260,8 @@ def generate_augmented_dataset(
         raise ValueError("padding doit être compris entre 0 et 0.5.")
     if not 0 <= iou_max <= 1:
         raise ValueError("iou_max doit être compris entre 0 et 1.")
-    if min_macroinvertebrates < 1 or max_macroinvertebrates < min_macroinvertebrates:
-        raise ValueError("Vérifier min_macroinvertebrates et max_macroinvertebrates.")
+    if min_macroinvertebrates < 0 or max_macroinvertebrates < min_macroinvertebrates:
+        raise ValueError("Le minimum doit être positif ou nul et inférieur ou égal au maximum.")
     if validation_count < 0 or validation_max_size <= 0:
         raise ValueError("Les paramètres de validation doivent être positifs.")
     if not 0 <= png_compress_level <= 9:
@@ -399,10 +400,10 @@ def generate_augmented_dataset(
 
         active_labels = multi_labels if multi_class else single_labels
         (base_dir / "labels" / f"{stem}.txt").write_text(
-            "\n".join(active_labels) + "\n", encoding="utf-8"
+            "\n".join(active_labels) + ("\n" if active_labels else ""), encoding="utf-8"
         )
         (base_dir / "labels_multi" / f"{stem}.txt").write_text(
-            "\n".join(multi_labels) + "\n", encoding="utf-8"
+            "\n".join(multi_labels) + ("\n" if multi_labels else ""), encoding="utf-8"
         )
         save_lossless_image(
             background, image_path, output_image_format, png_compress_level
@@ -504,6 +505,25 @@ def refine_mask_full_resolution(image, mask):
     refined = np.zeros_like(mask)
     refined[top:bottom, left:right] = refined_roi
     return refined
+
+
+def mask_to_yolo_box(mask, image_width, image_height, offset_x=0, offset_y=0):
+    """Convertit un masque local en boîte YOLO normalisée dans l'image globale."""
+
+    y, x = np.where(mask)
+    if len(x) == 0:
+        return None
+
+    left = offset_x + x.min()
+    top = offset_y + y.min()
+    right = offset_x + x.max() + 1
+    bottom = offset_y + y.max() + 1
+    return (
+        (left + right) / 2 / image_width,
+        (top + bottom) / 2 / image_height,
+        (right - left) / image_width,
+        (bottom - top) / image_height,
+    )
 
 
 def move_sam3_outputs_to_cpu(outputs):
@@ -626,7 +646,7 @@ def refine_sam3_instance(
         )
     ]
     if not candidates:
-        return image_crop, fallback
+        return image_crop, fallback, (crop_left, crop_top)
 
     ious = [
         np.logical_and(mask, global_crop).sum()
@@ -635,7 +655,7 @@ def refine_sam3_instance(
     ]
     best = int(np.argmax(ious))
     if ious[best] < 0.5:
-        return image_crop, fallback
+        return image_crop, fallback, (crop_left, crop_top)
 
     refined_mask = np.asarray(
         Image.fromarray(candidates[best]).resize(
@@ -644,7 +664,7 @@ def refine_sam3_instance(
     ).astype(bool)
     if full_resolution:
         refined_mask = refine_mask_full_resolution(image_crop, refined_mask)
-    return image_crop, refined_mask
+    return image_crop, refined_mask, (crop_left, crop_top)
 
 
 def create_cutouts_sam3(
@@ -659,8 +679,9 @@ def create_cutouts_sam3(
     refine_max_size=1008,
     full_resolution=True,
     class_name="macroinvertebrates",
+    create_labels=True,
 ):
-    """Détecte tous les insectes des images globales et crée les PNG détourés."""
+    """Crée les PNG détourés et les labels YOLO des images originales."""
 
     import torch
     from transformers import Sam3Model, Sam3Processor
@@ -671,8 +692,12 @@ def create_cutouts_sam3(
     model = Sam3Model.from_pretrained(model_id).to(device).eval()
 
     source_dir = Path(source_dir)
-    class_dir = Path(output_dir) / class_name
+    output_dir = Path(output_dir)
+    class_dir = output_dir / class_name
     class_dir.mkdir(parents=True, exist_ok=True)
+    labels_dir = output_dir / "labels"
+    if create_labels:
+        labels_dir.mkdir(parents=True, exist_ok=True)
     image_paths = list_images(source_dir)
     if not image_paths:
         raise FileNotFoundError("Aucune image à segmenter avec SAM3.")
@@ -693,13 +718,14 @@ def create_cutouts_sam3(
         relative_name = "__".join(
             image_path.relative_to(source_dir).with_suffix("").parts
         )
+        labels = []
 
         for index, global_mask in enumerate(global_masks, start=1):
             global_mask = global_mask.numpy().astype(bool)
             if not global_mask.any():
                 continue
 
-            image_crop, refined_mask = refine_sam3_instance(
+            image_crop, refined_mask, (crop_left, crop_top) = refine_sam3_instance(
                 global_mask,
                 original_image,
                 model,
@@ -713,6 +739,17 @@ def create_cutouts_sam3(
             if not refined_mask.any():
                 continue
 
+            if create_labels:
+                box = mask_to_yolo_box(
+                    refined_mask,
+                    original_image.shape[1],
+                    original_image.shape[0],
+                    crop_left,
+                    crop_top,
+                )
+                coordinates = " ".join(f"{value:.6f}" for value in box)
+                labels.append(f"0 {coordinates}")
+
             y, x = np.where(refined_mask)
             image_crop = image_crop[y.min() : y.max() + 1, x.min() : x.max() + 1]
             refined_mask = refined_mask[y.min() : y.max() + 1, x.min() : x.max() + 1]
@@ -723,12 +760,20 @@ def create_cutouts_sam3(
             )
             saved_count += 1
 
+        if create_labels:
+            label_path = labels_dir / f"{relative_name}.txt"
+            label_path.write_text(
+                "\n".join(labels) + ("\n" if labels else ""), encoding="utf-8"
+            )
+
         del instances, global_masks
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
     print(f"{saved_count} cutout(s) SAM3 enregistré(s) dans : {class_dir.resolve()}")
-    return Path(output_dir)
+    if create_labels:
+        print(f"Labels YOLO enregistrés dans : {labels_dir.resolve()}")
+    return output_dir
 
 
 # -----------------------------------------------------------------------------
@@ -812,41 +857,42 @@ def create_cutouts_sam2_otsu(
 
 
 def main():
-    # Fonction finale utilisée par défaut.
-    generate_augmented_dataset(
-        cutout_dir=CUTOUT_DIR,
-        background_dir=BACKGROUND_DIR,
-        output_dir=OUTPUT_DIR,
-        number_of_images=NUMBER_OF_IMAGES,
-        min_macroinvertebrates=MIN_MACROINVERTEBRATES,
-        max_macroinvertebrates=MAX_MACROINVERTEBRATES,
-        padding=PADDING,
-        max_rotation=MAX_ROTATION,
-        allow_overlap=ALLOW_OVERLAP,
-        iou_max=IOU_MAX,
-        create_splits=CREATE_SPLITS,
-        split_ratios=SPLIT_RATIOS,
-        multi_class=MULTI_CLASS,
-        create_validation=CREATE_VALIDATION,
-        validation_count=VALIDATION_COUNT,
-        validation_max_size=VALIDATION_MAX_SIZE,
-        png_compress_level=PNG_COMPRESS_LEVEL,
-        output_image_format=OUTPUT_IMAGE_FORMAT,
-        random_seed=RANDOM_SEED,
-    )
+    ## Fonction finale utilisée par défaut.
+    #generate_augmented_dataset(
+    #    cutout_dir=CUTOUT_DIR,
+    #    background_dir=BACKGROUND_DIR,
+    #    output_dir=OUTPUT_DIR,
+    #    number_of_images=NUMBER_OF_IMAGES,
+    #    min_macroinvertebrates=MIN_MACROINVERTEBRATES,
+    #    max_macroinvertebrates=MAX_MACROINVERTEBRATES,
+    #    padding=PADDING,
+    #    max_rotation=MAX_ROTATION,
+    #    allow_overlap=ALLOW_OVERLAP,
+    #    iou_max=IOU_MAX,
+    #    create_splits=CREATE_SPLITS,
+    #    split_ratios=SPLIT_RATIOS,
+    #    multi_class=MULTI_CLASS,
+    #    create_validation=CREATE_VALIDATION,
+    #    validation_count=VALIDATION_COUNT,
+    #    validation_max_size=VALIDATION_MAX_SIZE,
+    #    png_compress_level=PNG_COMPRESS_LEVEL,
+    #    output_image_format=OUTPUT_IMAGE_FORMAT,
+    #    random_seed=RANDOM_SEED,
+    #)
 
     # Décommenter pour segmenter des images globales avec SAM3 + GrabCut.
-    # create_cutouts_sam3(
-    #     source_dir=SAM3_SOURCE_DIR,
-    #     output_dir=SAM3_OUTPUT_DIR,
-    #     model_id=SAM3_MODEL_ID,
-    #     prompt=SAM3_PROMPT,
-    #     threshold=SAM3_THRESHOLD,
-    #     detection_max_size=SAM3_DETECTION_MAX_SIZE,
-    #     context_ratio=SAM3_CONTEXT_RATIO,
-    #     refine_threshold=SAM3_REFINE_THRESHOLD,
-    #     refine_max_size=SAM3_REFINE_MAX_SIZE,
-    # )
+    create_cutouts_sam3(
+        source_dir=SAM3_SOURCE_DIR,
+        output_dir=SAM3_OUTPUT_DIR,
+        model_id=SAM3_MODEL_ID,
+        prompt=SAM3_PROMPT,
+        threshold=SAM3_THRESHOLD,
+        detection_max_size=SAM3_DETECTION_MAX_SIZE,
+        context_ratio=SAM3_CONTEXT_RATIO,
+        refine_threshold=SAM3_REFINE_THRESHOLD,
+        refine_max_size=SAM3_REFINE_MAX_SIZE,
+        create_labels=SAM3_CREATE_LABELS,
+    )
 
     # Décommenter pour segmenter des crops avec SAM2 guidé par Otsu.
     # create_cutouts_sam2_otsu(

@@ -10,6 +10,12 @@ Le fichier `copy_paste_dataset.py` propose aussi une génération directement en
 mémoire avec un `Dataset` et des `DataLoader` PyTorch. Cette version évite de stocker
 les grandes images augmentées sur le disque.
 
+Le fonctionnement détaillé, l'entraînement YOLO et la visualisation des prédictions
+sont présentés dans [`GUIDE.md`](GUIDE.md).
+
+Le notebook [`yolo_validation.ipynb`](yolo_validation.ipynb) permet de contrôler les
+images synthétiques, lancer l'entraînement et tester `best.pt` visuellement.
+
 ## Génération en mémoire avec PyTorch
 
 Dans `copy_paste_dataset.py`, modifier notamment :
@@ -70,9 +76,9 @@ boîtes sont au format YOLO normalisé `(centre_x, centre_y, largeur, hauteur)`.
 normalisation supplémentaire peut être demandée avec `normalization_mean` et
 `normalization_std`.
 
-Cette classe fournit des DataLoaders PyTorch génériques. L'API haut niveau
-Ultralytics `model.train(data="dataset.yaml")` attend, elle, un dataset présent sur
-le disque : son Trainer devra être adapté séparément pour consommer ce DataLoader.
+La sortie générique peut être utilisée dans une boucle PyTorch classique. Pour YOLO,
+`YOLOCopyPasteDataset` adapte les noms des champs et `CopyPasteYOLOTrainer` raccorde
+le DataLoader au moteur d'entraînement Ultralytics. Voir `GUIDE.md` pour le lancement.
 
 ## Les trois fonctions principales
 
@@ -95,6 +101,29 @@ puis GrabCut affine les contours sur l'image en résolution native.
 
 Les PNG transparents sont enregistrés dans un sous-dossier de classe nommé
 `macroinvertebrates` par défaut.
+
+Avec `create_labels=True` (valeur par défaut), la fonction crée aussi un dossier
+`labels`. Il contient un fichier texte par image source avec les boîtes calculées
+sur les masques raffinés en résolution native :
+
+```text
+LPL_dataset_cutouts_single/
+├── macroinvertebrates/   # PNG transparents individuels
+└── labels/               # annotations des images réelles originales
+    ├── 0024-20260820-084243.txt
+    └── ...
+```
+
+Chaque ligne respecte le format YOLO mono-classe :
+
+```text
+0 centre_x centre_y largeur hauteur
+```
+
+Les coordonnées sont normalisées par rapport à l'image originale. Un fichier vide
+est créé si aucune instance n'est détectée ; YOLO l'interprète comme une image
+négative. Le nom du label correspond au nom de l'image source, ce qui permet de
+réutiliser les TIFF réels sans les dupliquer.
 
 SAM3 nécessite un accès autorisé au modèle `facebook/sam3` sur Hugging Face et une
 connexion préalable avec `huggingface-cli login`.
@@ -236,7 +265,7 @@ pourcentages donnent des valeurs non entières.
 | `background_dir` | Dossier contenant les fonds PNG ou TIFF | obligatoire |
 | `output_dir` | Dossier parent des datasets générés | obligatoire |
 | `number_of_images` | Nombre total d'images à générer | `1000` |
-| `min_macroinvertebrates` | Nombre minimum d'insectes par image | `4` |
+| `min_macroinvertebrates` | Nombre minimum d'insectes par image ; `0` autorise les images négatives sans insecte | `4` |
 | `max_macroinvertebrates` | Nombre maximum d'insectes par image | `10` |
 | `padding` | Marge interdite autour de l'image, en proportion | `0.08` |
 | `max_rotation` | Rotation aléatoire maximale en degrés | `180` |
