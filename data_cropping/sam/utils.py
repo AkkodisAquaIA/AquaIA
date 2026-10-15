@@ -64,7 +64,7 @@ def load_label_txt(path: Path, with_conf: bool, conf_threshold: float | None = N
     dim = 6 if with_conf else 5
 
     # If file does not exist, return empty array
-    if not path.exists():
+    if not Path(to_long_path(path)).exists():
         return np.zeros((0, dim), dtype=np.float32)
 
     # If file is empty, return empty array

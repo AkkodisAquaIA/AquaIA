@@ -30,7 +30,7 @@ class DINODetector(nn.Module):
         # !Warning! quantize not used
         quantize=False,
         num_classes=80,
-        num_queries=50,
+        num_queries=90,
     ):
         super(DINODetector, self).__init__()
         self.img_size = img_size

@@ -5,26 +5,22 @@ run:
   run_dir: null
 
 data:
-  infer_data_root: "datasets/coco_custom_match"
+  infer_data_root: "datasets/aquatic_insects_v7_1classe"
   # Dataset split used for inference
   split: "test"
 
 inference:
   imgsz : 640
-  batch: 8
+  batch: 30
   # Number of PyTorch DataLoader workers
   workers: 3
   # Confidence threshold used to filter bbox predictions before mAP calculation
   conf_thresh: 0.05
-  # Confidence threshold for bbox prediction filtering
-  # DINO uses it to filter saved prediction visualizations
-  # YOLO uses it to filter saved inference visualizations
-  # and predictions passed to the custom compute_metrics()
-  # thereby affecting the custom mAP
+  # Confidence threshold for bbox prediction visualization filtering
   conf: 0.3
   # Number of samples used for prediction visualization, must be greater than 0
   num_samples: 20
   seed: 0
 
 output:
-  output_dir: null
+  output_dir: "results/infer_dino"

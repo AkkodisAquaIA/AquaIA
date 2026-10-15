@@ -8,3 +8,4 @@ scipy
 termcolor
 pycocotools
 nvidia-dali-cuda130
+tensorboard>=2.20,<2.22
