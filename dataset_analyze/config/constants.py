@@ -15,10 +15,15 @@ INFO_PROD = r"""
 # Mode débogage
 DEBUG_MOODE = False
 
+NB_COLONNES = 2
+
+
 # Chargement du dataset
 # True  -> Chargement via fichier de config 
 # False -> Saisie manuelle des chemins 
 LOAD_DIR = True
+
+
 
 # System bell sound (used to alert on errors)
 BELL = "\a"
@@ -38,7 +43,7 @@ FICHIER = True
 #-----------------------------------------------------------------------------------
 
 # Supported image file extensions
-IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
+IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"}
 
 
 #-----------------------------------------------------------------------------------
@@ -46,7 +51,7 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 #-----------------------------------------------------------------------------------
 
 # Nombre maximal de classe
-NB_CLASSES = 200
+NB_CLASSES = 400
 
 
 # imbalance
@@ -58,7 +63,7 @@ PROFILES = {
 
 
 # Max number of worst images displayed in report
-MAX_WORST_IMAGES = 12
+MAX_WORST_IMAGES = 5
 
 # Max number of images displayed in summary (if too many, only a sample is shown)
 MAX_IMAGES_AFFICHEES = 30
@@ -67,7 +72,7 @@ MAX_IMAGES_AFFICHEES = 30
 TQDM_NCOLS = 150
 
 # Number of items displayed per line in reports
-N_PER_LINE = 7
+N_PER_LINE = 3
 
 # valeur du 'Bin' pour Bargraphe
 BINS = 60

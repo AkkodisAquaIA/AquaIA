@@ -77,20 +77,10 @@ def afficher_stats_bbox(stats, cfg):
         print()
         display.print("Dataset conforme aux limites de configuration", colors["ok"])
 
-
-def verifier_classes_dataset(class_distribution, class_names):
-    n_classes = len(class_names)
-    classes_presentes = set(class_distribution.keys())
-    classes_yaml = set(range(n_classes))
-    inutilisees = classes_yaml - classes_presentes
-    manquantes = classes_presentes - classes_yaml
-    valides = classes_presentes & classes_yaml
-    return {"inutilisees": inutilisees, "manquantes": manquantes, "valides": valides}
-
 #============================================================================
 
 
-def afficher_info_general(mode_aff, stats, info_general, class_names, cfg):
+def afficher_info_general(mode_aff, stats, info_general, cfg):
 
     display = dc.DisplayColor()
 
@@ -108,47 +98,12 @@ def afficher_info_general(mode_aff, stats, info_general, class_names, cfg):
 
     # --- résumé général ---
     display.titre("Dataset Summary", colors["aqua"])
-    print(f"{'Images':18}: {util.format_nombre(stats['images'])}")
-    print(f"{'Labels':18}: {util.format_nombre(stats['labels'])}")
-    print(f"{'Bounding boxes':18}: {util.format_nombre(total_boxes)}") 
-    print(f"{'BBox / image':18}: {total_boxes / stats['images']:.2f}")
-    print(f"{'Classes':18}: {total_classes}")
-    print()
+    print(f"{'Nb Images analysées':20}: {util.format_nombre(stats['images'])}")
+    # print(f"{'Labels':20}: {util.format_nombre(stats['labels'])}")
+    print(f"{'Nb Bounding boxes':20}: {util.format_nombre(total_boxes)}") 
+    print(f"{'Moy. BBox par image':20}: {total_boxes / stats['images']:.2f}")
+    
 
     # --- statistiques BBOX ---
     display.titre("Statistiques des BBOX", colors["aqua"])
     afficher_stats_bbox(stats, cfg)
-
-    # --- Vérification YAML ---
-    missing_label  = False
-    if class_names:
-        verif = verifier_classes_dataset(class_distribution, class_names)
-        # Classes inutilisées
-        if verif["inutilisees"]:
-            print("")
-            display.print(f"Classes définies dans YAML mais jamais utilisées ({len(verif['inutilisees'])}) : ", colors["warning"])
-            inutilisees = [f"{cls} {class_names[cls]}" for cls in sorted(verif["inutilisees"])]
-            max_width = max(len(t) for t in inutilisees) + 2
-            for i in range(0, len(inutilisees), 5):
-                print(" │ ".join(f"{entry:<{max_width}}" for entry in inutilisees[i:i+5]))
-
-        # Classes manquantes
-        if verif["manquantes"]:
-            print("")
-            missing_label = True
-
-            display.print(
-                f"Classes présentes dans labels mais absentes du YAML ({len(verif['manquantes'])}) :",
-                colors["warning"]
-            )
-
-            for cls in sorted(verif["manquantes"]):
-                fichiers = class_to_images.get(cls, [])
-                print(f"Classe {cls}")
-
-                if fichiers:
-                    for f in fichiers:
-                        print(f"   └── {Path(f).name}")
-                else:
-                    print("   └── Aucun fichier trouvé")
-

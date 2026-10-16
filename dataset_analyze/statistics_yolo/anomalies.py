@@ -1,4 +1,4 @@
-
+from pathlib import Path
 from collections import Counter, defaultdict
 
 from tools import utility as util
@@ -38,6 +38,15 @@ def compute_totals(anomaly_matrix, id_to_type):
             totaux[i] += img_data.get(t, 0)
 
     return totaux
+
+def verifier_classes_dataset(class_distribution, class_names):
+    n_classes = len(class_names)
+    classes_presentes = set(class_distribution.keys())
+    classes_yaml = set(range(n_classes))
+    inutilisees = classes_yaml - classes_presentes
+    manquantes = classes_presentes - classes_yaml
+    valides = classes_presentes & classes_yaml
+    return {"inutilisees": inutilisees, "manquantes": manquantes, "valides": valides}
 
 
 # ==============================================================
@@ -138,6 +147,77 @@ def recherche_anomalie(mode_aff, stats, info_anomalie, cfg):
 
     anomalies = info_anomalie[0]
     resultats = info_anomalie[1]
+    class_distribution = info_anomalie[2]
+    class_to_images = info_anomalie[3]
+    class_names = info_anomalie[4]
+
+    # ============================================================
+    # Vérification YAML
+    # ============================================================
+
+    verif = verifier_classes_dataset(
+        class_distribution,
+        class_names
+    )
+
+    not_used_labels = False
+    missing_label = False
+
+    if class_names:
+
+        # --------------------------------------------------------
+        # Classes définies dans YAML mais non utilisées
+        # --------------------------------------------------------
+        if verif["inutilisees"]:
+
+            not_used_labels = True
+            print()
+
+            display.print(
+                f" - {len(verif['inutilisees'])} Classes définies dans YAML mais pas utilisées ",
+                colors["warning"]
+            )
+
+            inutilisees = [
+                f"{cls:>3} : {class_names[cls]}"
+                for cls in sorted(verif["inutilisees"])
+            ]
+
+            max_width = max(len(entry) for entry in inutilisees)
+
+            for i in range(0, len(inutilisees), 3):
+                print(
+                    " | ".join(
+                        f"{entry:<{max_width}}"
+                        for entry in inutilisees[i:i + 3]
+                    )
+                )
+
+        # --------------------------------------------------------
+        # Classes présentes dans les labels mais absentes du YAML
+        # --------------------------------------------------------
+        if verif["manquantes"]:
+            print()
+
+            missing_label = True
+
+            display.print(
+                f" - {len(verif['manquantes'])} Classes présentes dans labels mais absentes du YAML ",
+                colors["warning"]
+            )
+
+            for cls in sorted(verif["manquantes"]):
+
+                fichiers = class_to_images.get(cls, [])
+
+                print(f"Classe {cls}")
+
+                if fichiers:
+                    for f in fichiers:
+                        print(f"   └── {Path(f).name}")
+                else:
+                    print("   └── Aucun fichier trouvé")
+
 
     type_to_id = {
         "bbox_trop_petite": 1,
@@ -152,6 +232,7 @@ def recherche_anomalie(mode_aff, stats, info_anomalie, cfg):
 
     display.titre("Recherche d'anomalies", colors['aqua'])
 
+   
     if not anomalies:
         display.print(" - Aucune anomalie trouvée !!", colors['ok'])
         return

@@ -65,10 +65,11 @@ def afficher_erreur(erreur):
     print()
 
 
-def sauvegarder_liste_images(
-    liste_images,
-    fichier_sortie,
-    nb_colonnes=4
+def sauvegarder_liste_erreurs(
+    repertoire, # Répertoire de sauvegarde
+    fichier,    # Nom du fichier à créer
+    liste,      # LIste des erreurs
+
 ):
     """
     Sauvegarde une liste de noms d'images dans un fichier texte.
@@ -77,41 +78,38 @@ def sauvegarder_liste_images(
     alignés et séparés par ' | '.
     """
 
-    if not liste_images:
+    if not liste:
         return
 
-    fichier_sortie = Path(fichier_sortie)
+
+    fichier_sortie = (repertoire  / fichier)
 
     # Largeur nécessaire pour la colonne la plus longue
     largeur_colonne = max(
         len(nom)
-        for nom in liste_images
+        for nom in liste
     )
 
-    with fichier_sortie.open(
-        "w",
-        encoding="utf-8"
-    ) as fichier:
+    with fichier_sortie.open( "w", encoding="utf-8") as fichier:
 
         for i in range(
             0,
-            len(liste_images),
-            nb_colonnes
+            len(liste),
+            cst.NB_COLONNES
         ):
 
-            ligne = liste_images[
-                i:i + nb_colonnes
-            ]
+            ligne = liste[i:i + cst.NB_COLONNES]
 
             ligne_formatee = " | ".join(
                 f"{nom:<{largeur_colonne}}"
                 for nom in ligne
             )
 
-            fichier.write(
-                ligne_formatee.rstrip() + "\n"
-            )
+            fichier.write( ligne_formatee.rstrip() + "\n")
 
+    # Message 
+    display.print("Liste sauvegardée dans le fichier : ", colors["info"])
+    print(f"    -  {fichier_sortie}")
 
 
 def afficher_histogramme_difference(
@@ -1699,6 +1697,7 @@ def main():
 
 
     # ----- Résumé d'exécution ----------------------------------------------------------
+   # Status de l'exécution pour affichage
     if erreurs_lecture != 0 :
         status = 'error'
     elif pas_de_detection != 0 :
@@ -1710,61 +1709,36 @@ def main():
     display.titre("Résumé d'exécution", colors[status])
     print()
 
-    display.print(
-        f"Nombre d'images traitées       : {nb_ok} / {nb_images}",
-        colors[status]
-    )
+    # Total d'images traitées sur le total avec status d'exécution
+    display.print(f"Nombre d'images traitées       : {nb_ok} / {nb_images}", colors[status])
+    
+
 
     # Total d'images avec détection
     if nb_ok != nb_images :
-        display.print(
-            f"Nombre d'images avec détection : {nb_ok}",
-            colors["ok"]
-        )
-
+        display.print(f"Nombre d'images avec détection : {nb_ok}", colors["ok"])
+        display.print(f"Nombre d'images non traitées   : {nb_images - nb_ok}", colors["warning"])
 
     # Pas de détection de bestioles
     if pas_de_detection != 0 :
-
-        display.print(
-            f"Nombre d'images sans détection : {pas_de_detection}",
-            colors["warning"]
-        )
-
-        fichier_erreurs = (repertoire  / "images_sans_detection.txt")
-
-        sauvegarder_liste_images(
-        liste_images = images_sans_detection,
-        fichier_sortie = fichier_erreurs,
-        nb_colonnes = 6
-        )
-
-        display.print(
-            f"Liste des non dérection sauvegardée : {fichier_erreurs}",
-            colors["info"]
-        )
+        display.print(f"Nombre d'images sans détection : {pas_de_detection}", colors["warning"])
+        
+        sauvegarder_liste_erreurs(
+            repertoire = repertoire,
+            fichier = "images_sans_detection.txt",
+            liste = images_sans_detection
+            )
 
     # Erreur de lecture du fichier image
     if images_erreur_lecture:
+        display.print(f"Nombre d'erreurs de lecture    : {erreurs_lecture}", colors["error"])
 
-        display.print(
-        f"Nombre d'erreurs de lecture    : {erreurs_lecture}",
-        colors["error"]
-        )
+        sauvegarder_liste_erreurs(
+            repertoire = repertoire,
+            fichier = "images_erreur_lecture.txt",
+            liste = images_erreur_lecture
+            )
 
-        fichier_erreurs = (repertoire / "images_erreur_lecture.txt")
-
-        sauvegarder_liste_images(
-            liste_images = images_erreur_lecture,
-            fichier_sortie = fichier_erreurs,
-            nb_colonnes = 6
-        )
-
-        display.print(
-            f"Liste des erreurs sauvegardée : {fichier_erreurs}",
-            colors["info"]
-        )
-    
 
     print()
     display.print("Fin du traitement !!!", colors['goodbye'])

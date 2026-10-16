@@ -231,6 +231,49 @@ def sup_file_def(path_file):
         for fichier in fichiers:
             fichier.unlink()
 
+def abreger_names_yaml(fichier_yaml, nb_champs=4, nb_lettres=3):
+    """
+    Crée une copie d'un fichier YAML en abrégeant à 3 caractères
+    les 3 premiers champs des valeurs de 'names'.
+
+    Exemple :
+        Arthr_Insec_Diptera_Simuliidae_Genus
+        -> Art_Ins_Dip_Simuliidae_Genus
+    """
+
+    fichier_yaml = Path(fichier_yaml)
+
+    # Nom automatique du fichier de sortie
+    fichier_sortie = fichier_yaml.with_name(
+            f"{fichier_yaml.stem}_abrege{fichier_yaml.suffix}"
+        )
+
+    # Lecture du YAML
+    with open(fichier_yaml, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    # Modification des noms
+    for cle, nom in data["names"].items():
+
+        morceaux = nom.split("_")
+
+        # On abrège uniquement les 3 premiers champs
+        morceaux[:nb_champs] = [champ[:nb_lettres] for champ in morceaux[:nb_champs]]
+
+        data["names"][cle] = "_".join(morceaux)
+
+    # Sauvegarde de la copie
+    with open(fichier_sortie, "w", encoding="utf-8") as f:
+        yaml.safe_dump(
+            data,
+            f,
+            allow_unicode=True,
+            sort_keys=False
+        )
+
+    return fichier_sortie
+
+
 
 #----------------------------------------------------------------------------------------
 def main():
@@ -263,8 +306,7 @@ def main():
                         )
 
     print(tag)
-
-
+    
     # Chargement & Vérification du fichier de Paramètrage
     try: 
         cfg = load_config() 
@@ -320,6 +362,9 @@ def main():
         # Saisie manuel
         DATASET_DIR = util.get_path_color("Entrez le chemin du Dataset")
     
+    if not util.answer_yes_or_no("Voulez-vous continuer avec ces valeurs", True):
+        util.sortie_de_programme()
+
 
     #  ------------------------------------------------------------------------------------------
     # Démarrage du traitement 
@@ -374,7 +419,13 @@ def main():
 
     display.print(f"fichier '.yaml' utilisé : {nom}", colors['ok'])
     print()
-    dataset_yaml =  DATASET_DIR / dataset_yaml_
+    dataset_yaml_long =  DATASET_DIR / dataset_yaml_
+    dataset_yaml = dataset_yaml_long
+
+    # Abrége les noms de classes dans le fichier .yaml pour les stats
+    if util.answer_yes_or_no("Voulez-vous abréger les nom", False):
+        dataset_yaml = abreger_names_yaml(dataset_yaml_long,  nb_champs=3, nb_lettres=3)
+
 
     # Création d'un fichier de rapport
     rapport = rp.create_file_report(DATASET_DIR, path_save, nom, cfg) # type: ignore

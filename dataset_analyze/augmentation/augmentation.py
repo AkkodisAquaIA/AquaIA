@@ -321,11 +321,7 @@ def choix_augmentation():
 
     traitement_a_realiser = []
 
-    
-    display.titre(
-        "Choix des augmentations à appliquer",
-        colors['aqua']
-    )
+    display.titre("Choix des augmentations à appliquer", colors['aqua'])
 
 
     # ---- Symètrie Horizontale & Verticale -----------------------------------
@@ -356,10 +352,8 @@ def choix_augmentation():
         6: [ROT_FLIT_V_C],
         7: [
             ROTATION,
-            ROT_FLIT_H,
-            ROT_FLIT_H_C,
-            ROT_FLIT_V,
-            ROT_FLIT_V_C
+            ROT_FLIT_H, ROT_FLIT_H_C,
+            ROT_FLIT_V, ROT_FLIT_V_C
         ]
     }
 
@@ -373,9 +367,6 @@ def choix_augmentation():
         traitement_a_realiser.extend(rotation_map.get(val, []))
 
 
-
-
-
     # # ---- Zoom ---------------------------------------------------------------
     zoom_map = {
         1: [],
@@ -386,21 +377,17 @@ def choix_augmentation():
         6: [
             ZOOM,
             ZOOM_C,
-            ZOOM_ROTATION,
-            ZOOM_ROTATION_C
+            ZOOM_ROTATION, ZOOM_ROTATION_C
         ]
     }
     menu_zoom = menu_c.Menu('ZOOM',           # Nom du menu
                         style= "heavy",          # Style du menu 
                         theme = menu_c.AQUA_IA    # Theme du menu
                         )
-
     menu_zoom.display_menu()
 
     for val in menu_zoom.multiple_selection():
         traitement_a_realiser.extend(zoom_map.get(val, []))
-
-
 
 
     # # ---- Divers -------------------------------------------------------------
@@ -419,7 +406,6 @@ def choix_augmentation():
                         style= "double",          # Style du menu 
                         theme = menu_c.AQUA_IA    # Theme du menu
                         )
-
     menu_divers.display_menu()
 
     for val in menu_divers.multiple_selection():

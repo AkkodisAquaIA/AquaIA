@@ -24,6 +24,7 @@ def info_classes(mode_aff, info_classes, cfg):
     etat_dataset = mode_aff[1]
     nom_dataset = mode_aff[2]
 
+    
 
     while  True:
 
@@ -31,11 +32,15 @@ def info_classes(mode_aff, info_classes, cfg):
             syst.clear_screen()
 
         display.header_title("(2) Information sur les classes", colors[etat_dataset], nom_dataset) # type: ignore
+
         class_distribution = info_classes[0]
         class_names =  info_classes[1]
+        nb_classes_yaml = len(class_names)
+
+        print("\n - Pour chaque classe, on indique le nombre d'objets trouvés dans celle-ci.")
+
 
         total = sum(class_distribution.values())
-
         items = sorted(class_distribution.items())
 
         max_name_len = max(
@@ -79,7 +84,7 @@ def info_classes(mode_aff, info_classes, cfg):
 
             bloc = (
                 f"{ccolor}"
-                f"{cls:>2} "
+                f"{cls:>3} "
                 f"{name:<{max_name_len}} "
                 f'{ccount:>8} '   
                 f"{pct:5.2f}% "
@@ -89,7 +94,10 @@ def info_classes(mode_aff, info_classes, cfg):
 
             blocs.append(bloc)
 
-        tag = f"Répartition des classes par fréquences ({rary + moy + dom})"
+        tag = (
+             f"Répartition des {rary + moy + dom} classes utilisées par fréquences"
+                f" sur {nb_classes_yaml} classes définies"
+        )                
         display.titre(tag , colors['aqua'])
         legend_colored = (
             f'{Fore.GREEN}■ ({dom}) ≥ {cfg["DOMINANT"]}% Dominant{Style.RESET_ALL}   '
@@ -101,7 +109,7 @@ def info_classes(mode_aff, info_classes, cfg):
         # Largeur terminal
         term_width = ct.DISPLAY_WIDTH # shutil.get_terminal_size().columns (317)
         bloc_width = max(len(b) for b in blocs) + 1
-        classes_par_ligne = max(1, term_width // bloc_width)
+        classes_par_ligne = max(2, term_width // bloc_width)
 
         for i in range(0, len(blocs), classes_par_ligne):
             ligne = blocs[i:i + classes_par_ligne]
@@ -138,7 +146,7 @@ def info_classes(mode_aff, info_classes, cfg):
             if not classes_faibles:
                 display.print(f'Aucune classe sous {cfg["RARE"]}% ', colors['ok'])
             else:
-                message = f'Classes Rares ({rary}) < {cfg["RARE"]}%'
+                message = f'{rary} Classes Rares  < {cfg["RARE"]}%'
                 display.titre(message, colors['aqua'])
                 # tri optionnel (du pire au moins pire)
                 classes_faibles.sort(key=lambda x: x[3])  # tri par %

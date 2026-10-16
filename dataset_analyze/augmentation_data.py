@@ -1475,7 +1475,6 @@ nombre_defauts = len(liste_defauts)
 # RÉSULTAT
 # ============================================================
 print()
-display.titre("Résumé d'exécution", colors['aqua'])
 
 # Détermination du status d’exécution
 if nombre_defauts != 0 :
@@ -1485,9 +1484,13 @@ elif len(liste_rep_vide) != 0:
 else: 
     status = 'ok'
 
+display.titre("Résumé d'exécution", colors[status])
+
+
 # Nombres de répertoire & d'images
 nombre_repertoires_traites = nombre_sous_repertoires - len(liste_rep_vide) 
 nb_i = util.format_nombre(total_image)
+
 display.print(
     f"- {nombre_repertoires_traites}/{nombre_sous_repertoires} Répertoires traités comprenant "
     f"{nb_i} images ",
@@ -1508,10 +1511,7 @@ if len(liste_rep_vide) != 0:
 
 # Nombre d'images crées
 nb_t = util.format_nombre(nombre_total_images_creees)
-display.print(
-    f"- Nombre total d'images créées : {nb_t} ",
-    colors['info']
-)
+display.print(f"- Nombre total d'images créées : {nb_t} ",  colors['info'])
 
 # Nombres images en défaut
 if nombre_defauts != 0:

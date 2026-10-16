@@ -494,7 +494,7 @@ def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dat
             if mode_affichage == ct.ECRAN :
                 syst.clear_screen()
             info_general = (total_boxes, total_classes, class_distribution, class_to_images )
-            ige.afficher_info_general(mode_aff, stats, info_general, class_names, cfg)
+            ige.afficher_info_general(mode_aff, stats, info_general, cfg)
 
         elif choice == 2:
             # ---- Information sur les classes --------------------------------------------
@@ -520,7 +520,7 @@ def afficher_dataset_statistics(mode_affichage, DATASET_DIR,resultats, cfg,  dat
             # --- anomalies ---------------------------------------------------------------
             if mode_affichage == ct.ECRAN :
                 syst.clear_screen()
-            info_anomalie = (anomalies, resultats)
+            info_anomalie = (anomalies, resultats, class_distribution, class_to_images, class_names)
             ano.recherche_anomalie(mode_aff, stats, info_anomalie,cfg)
 
         elif choice == 6:
