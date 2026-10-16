@@ -1,13 +1,17 @@
 run:
   # Root directory where all training runs are saved
-  runs_root: "results/detect/yolo11_n_pretrained"
+  runs_root: "results/detect_lpl/from_roboflow_no_aug"
   # One specific training run directory
-  run_dir: null
+  run_dir: "results/detect_lpl/from_roboflow_no_aug/20261016_155357"
+  # Checkpoint path relative to run_dir, or an absolute path.
+  checkpoint: "weights/best.pt"
 
 data:
-  infer_data_root: "datasets/aquatic_insects_v7_1classe"
+  infer_data_root: "datasets/LPL_dataset_final/dataset"
   # Dataset split used for inference
   split: "test"
+  # Extension of the images in images/<split>, without a leading dot
+  img_format: "TIF"
 
 inference:
   imgsz : 640
@@ -17,7 +21,7 @@ inference:
   # Confidence threshold used to filter bbox predictions before mAP calculation
   conf_thresh: 0.05
   # Confidence threshold for bbox prediction visualization filtering
-  conf: 0.3
+  conf: 0.1
   # IoU threshold for NMS; matches training.iou
   iou: 0.5
   # Number of samples used for prediction visualization, must be greater than 0

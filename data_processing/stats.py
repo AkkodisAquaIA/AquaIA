@@ -18,31 +18,38 @@ IMAGE_SIZE = 640
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def _get_sorted_jpg_files(dataset_dir):
-    """Get all jpg files in dataset_dir, sort them by numeric order if possible, otherwise by name."""
+SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+
+
+def _get_sorted_image_files(dataset_dir):
+    """Get supported image files, sorted numerically when possible and otherwise by name."""
 
     def _numeric_sort_key(path):
         stem = Path(path).stem
         return (0, int(stem)) if stem.isdigit() else (1, stem)
 
     # For train, val, test subdirs
-    jpg_files = []
+    image_files = []
     sub_dirs = ["train", "val", "test"]
     for sub_dir in sub_dirs:
         img_dir = os.path.join(dataset_dir, "images", sub_dir)
         if os.path.exists(img_dir):
-            # Only jpg in img_dir not deeper
-            files = [str(p) for p in Path(img_dir).glob("*.jpg")]
-            jpg_files.extend(files)
-    return sorted(jpg_files, key=_numeric_sort_key)
+            # Only images directly in img_dir, not deeper
+            files = [
+                str(path)
+                for path in Path(img_dir).iterdir()
+                if path.is_file() and path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS
+            ]
+            image_files.extend(files)
+    return sorted(image_files, key=_numeric_sort_key)
 
 
 def compute_and_save_stats(dataset_name=DATASET_NAME, image_size=IMAGE_SIZE):
     dataset_dir = os.path.join(BASE_DIR, "datasets", dataset_name)
-    sorted_files = _get_sorted_jpg_files(dataset_dir)
+    sorted_files = _get_sorted_image_files(dataset_dir)
     n = len(sorted_files)
     if n == 0:
-        raise FileNotFoundError(f"No jpg files found under {os.path.join(dataset_dir, 'images')}")
+        raise FileNotFoundError(f"No supported image files found under {os.path.join(dataset_dir, 'images')}")
     print(f"Found {n} images")
 
     # To avoid memory overflow, compute mean and std incrementally

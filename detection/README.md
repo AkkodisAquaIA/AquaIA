@@ -132,7 +132,12 @@ By default, inference results are stored inside the selected training run:
 
 ```text
 <run_directory>/inference/<dataset_name>_<timestamp>/
+├── inference_metadata.yaml
+├── metrics.npy
+└── inference_predictions/
 ```
+
+`inference_metadata.yaml` records the exact checkpoint path and SHA-256 fingerprint, model and training configuration, effective Ultralytics training arguments, inference configuration, dataset split, device, and software versions. It is written before model evaluation so failed inference attempts remain traceable.
 
 ## Logging
 

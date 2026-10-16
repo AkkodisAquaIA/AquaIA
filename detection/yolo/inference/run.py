@@ -1,5 +1,4 @@
 from functools import partial
-from pathlib import Path
 from torch.utils.data import DataLoader
 from ultralytics import YOLO
 from dataloading.datasets import JpgDetectionDataset, detection_collate_fn
@@ -19,15 +18,16 @@ def infer_yolo(config, context):
     predict_fn = partial(predict, iou=float(inference_config.get("iou", 0.5)))
 
     device = context["device"]
-    run_dir = context["run_dir"]
+    checkpoint_path = context["checkpoint_path"]
     infer_data_root = context["infer_data_root"]
     output_dir = context["output_dir"]
 
-    model = YOLO(str(Path(run_dir) / "weights" / "best.pt")).to(device)
+    model = YOLO(str(checkpoint_path)).to(device)
     infer_dataset = JpgDetectionDataset(
         dataset_root=infer_data_root,
         data_split=data_cfg.get("split", "test"),
         img_size=normalize_imgsz(config, "inference"),
+        img_format=data_cfg.get("img_format", "jpg"),
     )
     num_workers = max(int(inference_config.get("workers", 0)), 0)
     infer_loader = DataLoader(

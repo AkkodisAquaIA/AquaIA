@@ -14,12 +14,12 @@ output:
   # Set a path string to override the automatically generated project directory
   project: null
   exist_ok: true
-  # Disable Ultralytics epoch checkpoints; the four window-best checkpoints
+  # Disable Ultralytics epoch checkpoints; the window-best checkpoints
   # configured below are saved separately.
   save_period: 0
   # Keep the best mAP50-95 model from each consecutive block of N epochs
   # under <run_dir>/milestone_checkpoints/.
-  best_checkpoint_period: 75
+  best_checkpoint_period: 150
   plots: true
 
 training:
@@ -32,13 +32,13 @@ training:
 
   # ---------- DATA INPUT / LOADING ----------
   imgsz: 640
-  batch: 30
+  batch: 16
   # Number of PyTorch DataLoader workers
   workers: 3
 
   # ---------- TRAINING SCHEDULE ----------
-  epochs: 300
-  # Disable early stopping so all 300 epochs are executed.
+  epochs: 1000
+  # Disable early stopping so all 1000 epochs are executed.
   patience: 0
 
   # ---------- OPTIMIZER & LR ----------
@@ -64,16 +64,16 @@ training:
 
   # ---------- DATA AUGMENTATION ----------
   # Set all zero to disable training augmentation
-  hsv_h: 0
-  hsv_s: 0
-  hsv_v: 0
-  degrees: 0
-  translate: 0
-  scale: 0
-  flipud: 0
-  fliplr: 0
-  mosaic: 0
-  cutmix: 0
+  hsv_h: 0.5
+  hsv_s: 0.5
+  hsv_v: 0.5
+  degrees: 180
+  translate: 0.1
+  scale: 0.3
+  flipud: 0.5
+  fliplr: 0.5
+  mosaic: 0.5
+  cutmix: 0.5
   # Disable Mosaic and CutMix in the last N epochs
   # Make sure close_mosaic <= epochs
   close_mosaic: 25

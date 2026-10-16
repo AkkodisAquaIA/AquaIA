@@ -4,6 +4,7 @@ from pathlib import Path
 import csv
 from tqdm import tqdm
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
+from torchvision.ops import box_iou
 from dataloading.datasets import parse_batch
 from detection.utils.box_ops import box_cxcywh_to_xyxy
 
@@ -41,6 +42,23 @@ def print_metrics(metrics):
     { "train": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
       "val": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
       "epoch": ... }"""
+    if metrics and all(not isinstance(value, dict) for value in metrics.values()):
+        print("-" * 5 + " Evaluation summary " + "-" * 5)
+        for key in sorted(metrics):
+            if not key.endswith("_map_50"):
+                continue
+            split = key.removesuffix("_map_50")
+            print(
+                f" ■  {split:<5} : "
+                f"precision={metrics[f'{split}_precision']:.4f} | "
+                f"recall={metrics[f'{split}_recall']:.4f} | "
+                f"f1={metrics[f'{split}_f1']:.4f} | "
+                f"mAP50={metrics[key]:.4f} | "
+                f"mAP50-95={metrics[f'{split}_map_50_95']:.4f}"
+            )
+        print()
+        return
+
     print("-" * 5 + " Epoch summary " + "-" * 5)
     for split, loss_dict in metrics.items():
         # Skip items like "epoch" that are not loss dicts
@@ -70,7 +88,7 @@ def save_metrics(metrics, output_dir):
 
     with (Path(output_dir) / "inference_metrics.csv").open("w", encoding="utf-8", newline="") as f:
         # Create a CSV writer with the specified fieldnames
-        writer = csv.DictWriter(f, fieldnames=["split", "map_50", "map_50_95"])
+        writer = csv.DictWriter(f, fieldnames=["split", "precision", "recall", "f1", "map_50", "map_50_95"])
         writer.writeheader()
         for key in sorted(metrics):
             if not key.endswith("_map_50"):
@@ -79,6 +97,9 @@ def save_metrics(metrics, output_dir):
             writer.writerow(
                 {
                     "split": split,
+                    "precision": metrics[f"{split}_precision"],
+                    "recall": metrics[f"{split}_recall"],
+                    "f1": metrics[f"{split}_f1"],
                     "map_50": metrics[key],
                     "map_50_95": metrics[f"{split}_map_50_95"],
                 }
@@ -87,7 +108,7 @@ def save_metrics(metrics, output_dir):
 
 @torch.no_grad()
 def evaluate_map(predictions, targets, imgsz, split, device):
-    """Compute mAP50 and mAP50_95 for a given split during training and inference.
+    """Compute detection metrics for a given split during training and inference.
     predictions xyxy pixel coords. target boxes cxcywh."""
     # Create a mAP calculator
     metric = MeanAveragePrecision(
@@ -122,7 +143,41 @@ def evaluate_map(predictions, targets, imgsz, split, device):
     # Feed calculator
     metric.update(predictions, refs)
     computed_metrics = metric.compute()
+
+    true_positives = 0
+    false_positives = 0
+    false_negatives = 0
+    for prediction, reference in zip(predictions, refs):
+        pred_boxes = prediction["boxes"]
+        pred_labels = prediction["labels"]
+        pred_scores = prediction["scores"]
+        target_boxes = reference["boxes"]
+        target_labels = reference["labels"]
+        matched_targets = torch.zeros(len(target_boxes), dtype=torch.bool, device=target_boxes.device)
+
+        for pred_index in pred_scores.argsort(descending=True):
+            candidates = torch.where((target_labels == pred_labels[pred_index]) & ~matched_targets)[0]
+            if len(candidates) == 0:
+                false_positives += 1
+                continue
+
+            ious = box_iou(pred_boxes[pred_index].unsqueeze(0), target_boxes[candidates]).squeeze(0)
+            best_iou, best_candidate = ious.max(dim=0)
+            if best_iou >= 0.5:
+                matched_targets[candidates[best_candidate]] = True
+                true_positives += 1
+            else:
+                false_positives += 1
+
+        false_negatives += int((~matched_targets).sum().item())
+
+    precision = true_positives / max(true_positives + false_positives, 1)
+    recall = true_positives / max(true_positives + false_negatives, 1)
+    f1 = 2 * precision * recall / max(precision + recall, 1e-12)
     return {
+        f"{split}_precision": precision,
+        f"{split}_recall": recall,
+        f"{split}_f1": f1,
         f"{split}_map_50": float(computed_metrics["map_50"].item()),
         f"{split}_map_50_95": float(computed_metrics["map"].item()),
     }

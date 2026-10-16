@@ -1,7 +1,7 @@
 from detection.config_printer import print_train_config
 from detection.dino.training.run import train_dino
 from detection.dino.inference.run import infer_dino
-from detection.inference_context import get_run_context, print_infer_header
+from detection.inference_context import get_run_context, print_infer_header, save_inference_metadata
 from detection.utils.config_utils import load_infer_config, load_train_config
 from detection.yolo.training.run import train_yolo
 from detection.yolo.inference.run import infer_yolo
@@ -24,6 +24,7 @@ def infer_from_config(config_path):
     """Load the inference config and dispatch inference to the selected backend."""
     config = load_infer_config(config_path)
     context = get_run_context(config)
+    context["metadata_path"] = save_inference_metadata(config, context, config_path=config_path)
     print_infer_header(context)
     model_config = context["run_config"].get("model", {})
     model_family = str(model_config.get("family", "")).lower()

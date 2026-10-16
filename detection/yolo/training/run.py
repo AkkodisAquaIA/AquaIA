@@ -16,6 +16,7 @@ def resolve_model_identifier(model_cfg: Dict[str, Any]) -> str:
     model.family + model.size + model.init
     init="pretrained" -> "{family}{size}.pt"
     init="random"     -> "{family}{size}.yaml"
+    init="checkpoint" -> path configured in model.checkpoint
     """
     family = str(model_cfg.get("family", "yolo11")).strip().lower()
     size = str(model_cfg.get("size", "n")).strip().lower()
@@ -27,7 +28,17 @@ def resolve_model_identifier(model_cfg: Dict[str, Any]) -> str:
         return f"{base}.yaml"
     if init == "pretrained":
         return f"{base}.pt"
-    raise ValueError(f"[CONFIG ERROR] Unsupported model.init '{init}'. Use 'pretrained' or 'random'.")
+    if init == "checkpoint":
+        checkpoint = model_cfg.get("checkpoint")
+        if not checkpoint:
+            raise ValueError("[CONFIG ERROR] model.checkpoint is required when model.init='checkpoint'.")
+        checkpoint_path = Path(checkpoint).expanduser().resolve()
+        if not checkpoint_path.is_file():
+            raise FileNotFoundError(f"[CONFIG ERROR] Checkpoint not found: {checkpoint_path}")
+        return str(checkpoint_path)
+    raise ValueError(
+        f"[CONFIG ERROR] Unsupported model.init '{init}'. Use 'pretrained', 'random', or 'checkpoint'."
+    )
 
 
 def train_yolo(config) -> Any:

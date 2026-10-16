@@ -1,0 +1,56 @@
+# Fine-tune on LPL directly from the standard YOLO11n COCO pretrained weights.
+model:
+  family: "yolo11"
+  size: "n"
+  init: "pretrained"
+
+data:
+  dataset_yaml: "datasets/LPL_dataset_final/dataset"
+
+output:
+  project: "results/detect_lpl/from_coco_pretrained"
+  exist_ok: true
+  save_period: 0
+  best_checkpoint_period: 0
+  plots: true
+
+training:
+  task: "detect"
+  device: "auto"
+  imgsz: 640
+  batch: 16
+  workers: 3
+
+  # Keep identical in all four configs for a fair comparison.
+  epochs: 300
+  patience: 0
+
+  optimizer: "AdamW"
+  lr0: 0.0001
+  lrf: 0.05
+  cos_lr: true
+  weight_decay: 0.00005
+
+  cls: 4.0
+  box: 5.0
+  dfl: 1.5
+
+  hsv_h: 0.015
+  hsv_s: 0.3
+  hsv_v: 0.3
+  degrees: 180
+  translate: 0.1
+  scale: 0.3
+  flipud: 0.5
+  fliplr: 0.5
+  mosaic: 0.5
+  cutmix: 0
+  close_mosaic: 25
+
+  conf: 0.001
+  iou: 0.5
+  val: true
+
+  seed: 42
+  deterministic: true
+  compile: true
