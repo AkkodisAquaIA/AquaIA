@@ -25,4 +25,4 @@ inference:
   seed: 0
 
 output:
-  output_dir: "results/infer_yolo"
+  output_dir: "results/inference"

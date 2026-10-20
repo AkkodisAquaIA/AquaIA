@@ -23,4 +23,4 @@ inference:
   seed: 0
 
 output:
-  output_dir: "results/infer_dino"
+  output_dir: "results/inference"
