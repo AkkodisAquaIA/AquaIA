@@ -1,5 +1,11 @@
 ﻿un fichier 'aqua_ia_conf.ini' permet de régler certains paramètres. Si ce fichier n'est pas correcte ou absent, le programme s'arrête 
 
+On demande de confirmer que les données du fichier de paramètres sont valides.
+
+Si il n'y a pas de fichier '.yaml', un fichier par  défaut est créé à partir des informations contenus dans les fichiers labels.
+
+La possibilité est donnée ensuite d'abréger le nom de taxons en réduisant le début des noms aux trois premières lettres. Un fichier '.yaml' avec le même nom avec '_abrege' sera aloes créé.
+
 Le programme commence par une analyse complète du Dataset afin de vérifier sa conformité et sa qualité. 
 Cette analyse repose sur une série de contrôles classés en deux catégories :
 

@@ -237,7 +237,13 @@ def launch_fifty_one(mode_aff, data_fifty_one):
 
     dataset = get_dataset(DATASET_DIR, dataset_yaml, anomalies)
 
-    # Lancement de Fifty_One
-    launch_fiftyone_interface(dataset) # type: ignore   
 
+    if len(dataset) != 0 :
 
+        # Lancement de Fifty_One
+        launch_fiftyone_interface(dataset) # type: ignore   
+
+    else:
+
+        display.print("Nombre d'images dans le Dataset nul :", colors["warning"])
+        display.print("Pas de lancement de 'FiftyOne'", colors["warning"])

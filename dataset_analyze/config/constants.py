@@ -21,7 +21,7 @@ NB_COLONNES = 2
 # Chargement du dataset
 # True  -> Chargement via fichier de config 
 # False -> Saisie manuelle des chemins 
-LOAD_DIR = True
+LOAD_DIR = False
 
 
 

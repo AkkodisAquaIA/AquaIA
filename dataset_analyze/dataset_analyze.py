@@ -1,3 +1,8 @@
+import sys
+import multiprocessing
+
+if getattr(sys, "frozen", False):
+    sys.executable = r"F:\aqua_ia\Scripts\python.exe"
 
 import os
 import re
@@ -312,10 +317,11 @@ def main():
         cfg = load_config() 
     except Exception as e:
         display.print(f"Erreur de chargement du fichier de configuration :\n   {e}", colors['error'])
+       
         print()
         util.sortie_de_programme()
 
-    
+    # ----- Vérification du fichier de configuration ----------------------------------------------
     print()
     vc.controle(cfg) # type: ignore
     print()
@@ -353,7 +359,7 @@ def main():
     print()
     util.afficher_mode("Sauvegarde des Graphiques :", cfg["SAVE_PLOT"]) # type: ignore
 
-
+    # ----- Contrôle du répertoire du Dataset et des sous-répertoires -----------------------------
     # Chargement du Répertoire du Dataset
     if ct.LOAD_DIR :
         # Via le fichier de configuration
@@ -362,11 +368,25 @@ def main():
         # Saisie manuel
         DATASET_DIR = util.get_path_color("Entrez le chemin du Dataset")
     
+
+    # Vérification du répertoire du Dataset
+    if  not any(DATASET_DIR.iterdir()):
+        display.print("Le chemin du Dataset est vide !!!", colors["error"])
+        util.sortie_de_programme()
+
+    # Vérification des sous-répertoires
+    ctrl_images = util.check_directory(DATASET_DIR  , "images/train2017")
+    ctrl_labels = util.check_directory(DATASET_DIR  , "labels/train2017")
+
+    if not ctrl_images  or not ctrl_labels : 
+            util.sortie_de_programme()
+
+
     if not util.answer_yes_or_no("Voulez-vous continuer avec ces valeurs", True):
         util.sortie_de_programme()
 
 
-    #  ------------------------------------------------------------------------------------------
+    #  --------------------------------------------------------------------------------------------
     # Démarrage du traitement 
     display.header_title("Démarrage du traitement",
                         colors['aqua_light'],
@@ -380,7 +400,7 @@ def main():
     # Gestion des fichiers .yaml
     display.titre("Gestion des fichiers '.yaml'", colors['aqua']) # type: ignore
 
-    # Recherche des fichiers .yaml
+    # Recherche de tous les fichiers .yaml
     yaml_files = list(DATASET_DIR.glob("*.yaml"))
     dataset_yaml_ = ""
 
@@ -400,7 +420,7 @@ def main():
     elif len(yaml_files) == 1:
         dataset_yaml_ =  yaml_files[0]
 
-    # Sélection d'un fichier parmi une liste
+    # Sélection d'un fichier dans la liste
     else:
 
         file_name = [f.stem for f in yaml_files]  
@@ -410,6 +430,7 @@ def main():
                         style= 'rounds',        # style du menu 
                         theme = menu_c.AQUA_IA) # Theme du menu  
      
+        # Affichage du menu et sélection de l'item
         mm.display_menu()
         choice = mm.selection()
         dataset_yaml_ = yaml_files[choice - 1]
@@ -437,12 +458,12 @@ def main():
        class_names = load_class_names(dataset_yaml)
     except yaml.YAMLError as e:
         print()
-        tag = f"le fichier '.yaml' sélectionné  n'est pas conforme\n  {e} "
+        tag = f"le fichier '.yaml' sélectionné  n'est pas conforme :\n  {e} "
         display.print(tag, colors['error'])
         yaml_ok = False
     except FileNotFoundError as e:
         print()
-        tag = f" '{dataset_yaml}' est introuvable dans {DATASET_DIR}\n  {e} "
+        tag = f" '{dataset_yaml}' est introuvable dans {DATASET_DIR} :\n  {e} "
         display.print(tag, colors['error'])
         yaml_ok = False
 
@@ -457,10 +478,9 @@ def main():
     erreur, ctrl_ok = bb.validate_yolo_dataset_detailed(DATASET_DIR, path_save, rapport, cfg) # type: ignore
  
     # --- Analyse des résultats ---------------------------------------------------------
-    print()
-    
     # --- Datast sain -------------------------------------------------------------------
     if ctrl_ok:
+        print()
         display.print("Analyse de la conformité terminée sans problème", colors['ok']) 
 
     # --- Gestion des erreurs de conformité ---------------------------------------------
@@ -485,11 +505,14 @@ def main():
 
             # Suppresion des fichiers d'erreurs
             sup_file_def(path_save)
-            print()
+            
         except FileNotFoundError:
             tag = f"   fichiers d'erreurs introuvables"
             display.print(f"{tag}\n", colors['error'])
             rp.repport_def(tag, rapport)
+
+            # fin du programme
+            print()
             util.sortie_de_programme()
 
 
@@ -499,8 +522,8 @@ def main():
 
     anomalies = results["anomalies"]
     print()
-    tag = 'avec problèmes' if anomalies else 'sans problème'
-    display.print(f"Analyse statistique terminé {tag}",
+    comment = 'avec problèmes' if anomalies else 'sans problème'
+    display.print(f"Analyse statistique terminé {comment}",
                   colors['warning' if anomalies else 'ok' ]
                   )
 
@@ -537,4 +560,5 @@ def main():
 
 #==========================================================================================
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()

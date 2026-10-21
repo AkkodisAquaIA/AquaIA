@@ -66,7 +66,7 @@ def load_config():
 
             if not path.exists():
                 raise FileNotFoundError(
-                    f"Le répertoire '{name}' est introuvable : {path}"
+                    f"Le répertoire '{path.name}' est introuvable !!! {ct.BELL}"
                 )
 
             if not path.is_dir():
@@ -79,10 +79,10 @@ def load_config():
         return config
 
     except Exception as e:
-        display.print("---- ERREUR DE CONFIGURATION ----", colors["error"])
-        display.print("-----                       ------", colors["error"])
+        display.print("---- Erreur dans le fichier de CONFIGURATION ----", colors["error"])
+        display.print("-----                                       -----", colors["error"])
         display.print(e, colors["error"]) # type: ignore
-        display.print("----------------------------------", colors["error"])
+        display.print("-------------------------------------------------", colors["error"])
 
         util.sortie_de_programme()
 

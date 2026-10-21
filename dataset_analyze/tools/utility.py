@@ -178,8 +178,8 @@ def quoi(valeur):
 def get_dataset_paths(dataset_dir, split="train2017"):
     dataset_dir = Path(dataset_dir)
 
-    images_dir = dataset_dir / "images"   / split
-    labels_dir = dataset_dir / "labels"   / split
+    images_dir = dataset_dir / "images" / split
+    labels_dir = dataset_dir / "labels" / split
 
     if not images_dir.exists():
         raise FileNotFoundError(f"Images dir introuvable : {images_dir}")
@@ -351,6 +351,34 @@ def get_directory_color(prompt: str, color_key: str = "input") -> Path:
             f"Le chemin '{path}' n'est pas un répertoire valide.",
             colors['error']
         )
+
+def check_directory(chemin: Path, name: str):
+    display = dc.DisplayColor()
+
+    path = Path(chemin) / name
+
+    if not path.exists():
+        display.print(
+            f"Le répertoire '{name}' est introuvable !!! {ct.BELL}",
+            colors["error"]
+        )
+        return False
+
+    if not path.is_dir():
+        display.print(
+            f"'{name}' existe mais n'est pas un répertoire !!! {ct.BELL}",
+            colors["error"]
+        )
+        return False
+
+    if not any(path.iterdir()):
+        display.print(
+            f"Le répertoire '{name}' est vide !!!",
+            colors["error"]
+        )
+        return False
+
+    return True
 
 
 def est_incluse(liste1, liste2):
