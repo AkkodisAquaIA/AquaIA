@@ -1623,6 +1623,7 @@ def traiter_image(
     # }
 
 
+#==================================================================================================
 def main():
     """
     Boucle principale du programme.
@@ -1632,117 +1633,126 @@ def main():
 
     display.titre("Info & Crop d'imaghes", colors["aqua"])
 
-    # Saisie du répertoire contenant les images à traiter
-    print()
-    repertoire = util.get_directory_color("Répertoire à utiliser")
-
-    liste_images = [
-        fichier
-        for fichier in repertoire.iterdir()
-        if fichier.is_file() and fichier.suffix.lower() in cst.IMAGE_EXT
-        ]
-
-    nb_images = len(liste_images)
     
-    print()
-    if nb_images == 0:
+    reprendre = True
+    fin_traitement = False
+    while reprendre :
+
+        # Saisie du répertoire contenant les images à traiter
+        print()
+        repertoire = util.get_directory_color("Répertoire à utiliser")
+
+        liste_images = [
+            fichier
+            for fichier in repertoire.iterdir()
+            if fichier.is_file() and fichier.suffix.lower() in cst.IMAGE_EXT
+            ]
+
+        nb_images = len(liste_images)
         
-        display.print("Aucune image trouvée dans le répertoire.", colors["error"])
-        util.sortie_de_programme()
-
-    else :
-
-        display.print(f"Nombre d'images à traiter : {len(liste_images)}", colors['info'])
+        print()
+        if nb_images == 0:
+            
+            display.print("Aucune image trouvée dans le répertoire.", colors["error"])
 
 
-    voir_image = util.answer_yes_or_no("Voulez-vous voir les images intermédiares", False)
-    afficher_informations = util.answer_yes_or_no("Voulez-vous voir les informations de calculs", False)
+        else :
 
-    pas_de_detection = 0
-    images_sans_detection = []
-    erreurs_lecture = 0
-    images_erreur_lecture = []
+            display.print(f"Nombre d'images à traiter : {len(liste_images)}", colors['info'])
 
-    # Début de la boucle de traitement des images
-    nb_images = len(liste_images)
-    for i, img in enumerate(liste_images, start=1):
- 
-        try:
+            voir_image = util.answer_yes_or_no("Voulez-vous voir les images intermédiares", False)
+            afficher_informations = util.answer_yes_or_no("Voulez-vous voir les informations de calculs", False)
 
-            en_tete = f"{i}/{nb_images}"
-            display.header_title(img.stem, colors["aqua"], en_tete)
+            pas_de_detection = 0
+            images_sans_detection = []
+            erreurs_lecture = 0
+            images_erreur_lecture = []
 
-            detec = traiter_image(
-                repertoire,             # Répertoire contenant les images
-                voir_image,             # Afficher les images intermédiaires
-                afficher_informations,  # Afficher les informations de calculs
-                chemin_image=  img,     # image à traiter         
-                seuil=SEUIL_DETECTION   # Seuil de détection 
-            )
+            # Début de la boucle de traitement des images
+            nb_images = len(liste_images)
+            for i, img in enumerate(liste_images, start=1):
+        
+                try:
 
-            # Pas de détection de bestioles
-            if not detec :
-                pas_de_detection +=1
-                images_sans_detection.append(img.name)
+                    en_tete = f"{i}/{nb_images}"
+                    display.header_title(img.stem, colors["aqua"], en_tete)
 
-        except ErreurLectureImage  as erreur:
-            erreurs_lecture += 1
-            images_erreur_lecture.append(img.name)
-            afficher_erreur(erreur)
+                    detec = traiter_image(
+                        repertoire,             # Répertoire contenant les images
+                        voir_image,             # Afficher les images intermédiaires
+                        afficher_informations,  # Afficher les informations de calculs
+                        chemin_image=  img,     # image à traiter         
+                        seuil=SEUIL_DETECTION   # Seuil de détection 
+                    )
 
-        except Exception as erreur:
-            afficher_erreur(erreur)
+                    # Pas de détection de bestioles
+                    if not detec :
+                        pas_de_detection +=1
+                        images_sans_detection.append(img.name)
 
-    nb_ok = nb_images - pas_de_detection - erreurs_lecture
+                except ErreurLectureImage  as erreur:
+                    erreurs_lecture += 1
+                    images_erreur_lecture.append(img.name)
+                    afficher_erreur(erreur)
 
+                except Exception as erreur:
+                    afficher_erreur(erreur)
+
+            nb_ok = nb_images - pas_de_detection - erreurs_lecture
+
+            fin_traitement = True
+
+        reprendre = util.answer_yes_or_no("Voulez-vous reprendre ?", True)
 
     # ----- Résumé d'exécution ----------------------------------------------------------
-   # Status de l'exécution pour affichage
-    if erreurs_lecture != 0 :
-        status = 'error'
-    elif pas_de_detection != 0 :
-        status = 'warning'
-    else :
-        status = 'ok'
+    # Status de l'exécution pour affichage
+    if fin_traitement :
+
+        if erreurs_lecture != 0 :
+            status = 'error'
+        elif pas_de_detection != 0 :
+            status = 'warning'
+        else :
+            status = 'ok'
 
 
-    display.titre("Résumé d'exécution", colors[status])
-    print()
+        display.titre("Résumé d'exécution", colors[status])
+        print()
 
-    # Total d'images traitées sur le total avec status d'exécution
-    display.print(f"Nombre d'images traitées       : {nb_ok} / {nb_images}", colors[status])
-    
-
-
-    # Total d'images avec détection
-    if nb_ok != nb_images :
-        display.print(f"Nombre d'images avec détection : {nb_ok}", colors["ok"])
-        display.print(f"Nombre d'images non traitées   : {nb_images - nb_ok}", colors["warning"])
-
-    # Pas de détection de bestioles
-    if pas_de_detection != 0 :
-        display.print(f"Nombre d'images sans détection : {pas_de_detection}", colors["warning"])
+        # Total d'images traitées sur le total avec status d'exécution
+        display.print(f"Nombre d'images traitées       : {nb_ok} / {nb_images}", colors[status])
         
-        sauvegarder_liste_erreurs(
-            repertoire = repertoire,
-            fichier = "images_sans_detection.txt",
-            liste = images_sans_detection
-            )
 
-    # Erreur de lecture du fichier image
-    if images_erreur_lecture:
-        display.print(f"Nombre d'erreurs de lecture    : {erreurs_lecture}", colors["error"])
 
-        sauvegarder_liste_erreurs(
-            repertoire = repertoire,
-            fichier = "images_erreur_lecture.txt",
-            liste = images_erreur_lecture
-            )
+        # Total d'images avec détection
+        if nb_ok != nb_images :
+            display.print(f"Nombre d'images avec détection : {nb_ok}", colors["ok"])
+            display.print(f"Nombre d'images non traitées   : {nb_images - nb_ok}", colors["warning"])
+
+        # Pas de détection de bestioles
+        if pas_de_detection != 0 :
+            display.print(f"Nombre d'images sans détection : {pas_de_detection}", colors["warning"])
+            
+            sauvegarder_liste_erreurs(
+                repertoire = repertoire,
+                fichier = "images_sans_detection.txt",
+                liste = images_sans_detection
+                )
+
+        # Erreur de lecture du fichier image
+        if images_erreur_lecture:
+            display.print(f"Nombre d'erreurs de lecture    : {erreurs_lecture}", colors["error"])
+
+            sauvegarder_liste_erreurs(
+                repertoire = repertoire,
+                fichier = "images_erreur_lecture.txt",
+                liste = images_erreur_lecture
+                )
 
 
     print()
     display.print("Fin du traitement !!!", colors['goodbye'])
-
+    util.sortie_de_programme()
 
 if __name__ == "__main__":
     main()

@@ -628,9 +628,38 @@ def afficher_liste_alignee(liste, nb_colonnes=4, separateur=" | "):
         )
 
 
+# def sortie_de_programme():
+
+#     display = dc.DisplayColor()
+#     print()
+#     waiting_any_key("Appuyez sur 'Enter' pour continuer ... ")
+    
+#     delay = 3
+#     display.print(f"Programme terminé dans {delay} secondes. Au revoir !{ct.BELL}", colors['goodbye'])
+#     time.sleep(delay)          
+#     sys.exit(0)
+
 def sortie_de_programme():
 
     display = dc.DisplayColor()
     print()
-    display.print(f"Programme terminé. Au revoir !{ct.BELL}", colors['goodbye'])
+
+    waiting_any_key("Appuyez sur 'Enter' pour continuer ... ")
+
+    delay = 3
+
+    for secondes in range(delay, 0, -1):
+        display.print(
+            f"Programme terminé dans {secondes} "
+            f"seconde{'s' if secondes > 1 else ''}. ",
+            colors["goodbye"],
+            end="",
+            flush=True,
+            replace=True
+        )
+
+        time.sleep(1)
+
+    print(ct.BELL, end="", flush=True)
+
     sys.exit(0)

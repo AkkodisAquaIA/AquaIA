@@ -119,7 +119,15 @@ class DisplayColor:
         return f"{rgb_code}{bold_code}{prefix}{text}{self.RESET}"        
 
 
-    def print(self, text: str, color_spec: ColorSpec, bold: bool = False) -> None:
+    def print(
+        self,
+        text: str,
+        color_spec: ColorSpec,
+        bold: bool = False,
+        end: str = "\n",
+        flush: bool = False,
+        replace: bool = False
+    ) -> None:
         """
         Print a colored message using ANSI escape sequences.
 
@@ -137,8 +145,13 @@ class DisplayColor:
 
         rgb_code, bold_code, prefix = self._ansi(color_spec, bold)
 
+        if replace:
+            print("\r\033[2K", end="")
+
         # Final output
-        print(f"{rgb_code}{bold_code}{prefix}{text}{self.RESET}")
+        print(f"{rgb_code}{bold_code}{prefix}{text}{self.RESET}",
+                end=end,
+                flush=flush)
         
 
     def titre(self, text: str, color_spec: ColorSpec, bold: bool = False) -> None:

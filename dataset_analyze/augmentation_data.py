@@ -1348,187 +1348,200 @@ display.titre(
     )
 print()
 
-# --------------------------------------------------------
-# Récupération du Répertoire à utiliser
-# --------------------------------------------------------
-repertoire_de_travail = util.get_directory_color("Répertoire à utiliser")
 
-
-# --------------------------------------------------------
-# Recherche des sous-répertoires
-# --------------------------------------------------------
-
-sous_repertoires = sorted(
-    [
-        repertoire
-        for repertoire in repertoire_de_travail.iterdir()
-        if repertoire.is_dir()
-    ],
-    key=lambda p: p.name.lower()
-)
-
-nombre_sous_repertoires = len(sous_repertoires)
-
-if nombre_sous_repertoires == 0:
-    print()
-    display.print("Aucun sous-répertoire trouvé !!!", colors["error"])
-    util.sortie_de_programme()
-      
-else:
+reprendre = True
+fin_traitement = False
+while reprendre :
 
     # --------------------------------------------------------
-    # Détermination des traitements à effectuer
+    # Récupération du Répertoire à utiliser
     # --------------------------------------------------------
-    traitements_a_effectuer = aug.choix_augmentation() 
+    repertoire_de_travail = util.get_directory_color("Répertoire à utiliser")
 
-    if len(traitements_a_effectuer) == 0:
-        print()
-        display.print("Aucune demande d'augmentation sélectionnée !!!", colors["error"])
-        util.sortie_de_programme()
 
     # --------------------------------------------------------
-    # Nombre d'augmentation à appliquer (par type)
+    # Recherche des sous-répertoires
     # --------------------------------------------------------
-    print()
-    nb_augmentation = util.entrer_valeur("Nombre d'augmentation par type", NB_MULTI_MAX) 
 
-
-    nb_spret =  util.format_nombre(nombre_sous_repertoires)
-    pls = "s" if nombre_sous_repertoires != 1 else ""
-    print(f"\n  Il y a {nb_spret} sous répertoire{pls} à traiter\n\n")    
-
-
-# Initialisation des variables de Travail
-nombre_total_images_creees = 0
-liste_defauts = []
-liste_rep_vide = []
-total_image = 0
-
-# --------------------------------------------------------
-# Parcours des sous-répertoires
-# --------------------------------------------------------
-
-# Boucle principale sur Répétoire
-for indice_rep, repertoire in enumerate(
-    tqdm(
-        sous_repertoires,
-        desc="Répertoires",
-        unit="rep",
-        ncols=120,
-        position=0
-    ),
-    start=1
-    ):
-
-
-    # Recherche des images
-    images = sorted(
+    sous_repertoires = sorted(
         [
-            fichier
-            for fichier in repertoire.iterdir()
-            if fichier.is_file()
-            and fichier.suffix.lower() in cst.IMAGE_EXT
-            and "_aug_" not in fichier.stem.lower()
+            repertoire
+            for repertoire in repertoire_de_travail.iterdir()
+            if repertoire.is_dir()
         ],
         key=lambda p: p.name.lower()
     )
 
-    nombre_images = len(images)
-    total_image += nombre_images
+    nombre_sous_repertoires = len(sous_repertoires)
 
-    if nombre_images == 0:
-        liste_rep_vide.append(repertoire.name)
-        continue
+    if nombre_sous_repertoires == 0:
+        print()
+        display.print("Aucun sous-répertoire trouvé !!!", colors["error"])
+
+        
+    else:
+
+        # --------------------------------------------------------
+        # Détermination des traitements à effectuer
+        # --------------------------------------------------------
+        traitements_a_effectuer = aug.choix_augmentation() 
+
+        if len(traitements_a_effectuer) == 0:
+            print()
+            display.print("Aucune demande d'augmentation sélectionnée !!!\n", colors["error"])
+
+        else:
+
+            # --------------------------------------------------------
+            # Nombre d'augmentation à appliquer (par type)
+            # --------------------------------------------------------
+            print()
+            nb_augmentation = util.entrer_valeur("Nombre d'augmentation par type", NB_MULTI_MAX) 
 
 
-    # Boucle secondaire pour les Images
-    for indice_img, image in enumerate(
-        tqdm(
-            images,
-            desc="Images",
-            unit="img",
-            ncols=120,
-            position=1,
-            leave=False
-            ),
-        start=1
-        ):
-    
-        # ------------------------------------------------
-        # Appel la fonction d'augmentation
-        # ------------------------------------------------
- 
-        nombre_images_creees = transf_image(
-            img=image,
-            repertoire=repertoire,
-            liste_defauts=liste_defauts
-        )
+            nb_spret =  util.format_nombre(nombre_sous_repertoires)
+            pls = "s" if nombre_sous_repertoires != 1 else ""
+            print(f"\n  Il y a {nb_spret} sous répertoire{pls} à traiter\n\n")    
 
-        nombre_total_images_creees += (
-                nombre_images_creees
-        )
 
-nombre_defauts = len(liste_defauts)
+            # Initialisation des variables de Travail
+            nombre_total_images_creees = 0
+            liste_defauts = []
+            liste_rep_vide = []
+            total_image = 0
 
+            # --------------------------------------------------------
+            # Parcours des sous-répertoires
+            # --------------------------------------------------------
+
+            # Boucle principale sur Répétoire
+            for indice_rep, repertoire in enumerate(
+                tqdm(
+                    sous_repertoires,
+                    desc="Répertoires",
+                    unit="rep",
+                    ncols=120,
+                    position=0
+                ),
+                start=1
+                ):
+
+
+                # Recherche des images
+                images = sorted(
+                    [
+                        fichier
+                        for fichier in repertoire.iterdir()
+                        if fichier.is_file()
+                        and fichier.suffix.lower() in cst.IMAGE_EXT
+                        and "_aug_" not in fichier.stem.lower()
+                    ],
+                    key=lambda p: p.name.lower()
+                )
+
+                nombre_images = len(images)
+                total_image += nombre_images
+
+                if nombre_images == 0:
+                    liste_rep_vide.append(repertoire.name)
+                    continue
+
+
+                # Boucle secondaire pour les Images
+                for indice_img, image in enumerate(
+                    tqdm(
+                        images,
+                        desc="Images",
+                        unit="img",
+                        ncols=120,
+                        position=1,
+                        leave=False
+                        ),
+                    start=1
+                    ):
+                
+                    # ------------------------------------------------
+                    # Appel la fonction d'augmentation
+                    # ------------------------------------------------
+            
+                    nombre_images_creees = transf_image(
+                        img=image,
+                        repertoire=repertoire,
+                        liste_defauts=liste_defauts
+                    )
+
+                    nombre_total_images_creees += (
+                            nombre_images_creees
+                    )
+
+            nombre_defauts = len(liste_defauts)
+
+            fin_traitement = True
+
+    print()
+    reprendre = util.answer_yes_or_no("Voulez-vous reprendre ?", True)
 
 # ============================================================
 # RÉSULTAT
 # ============================================================
 print()
 
-# Détermination du status d’exécution
-if nombre_defauts != 0 :
-    status = 'error'
-elif len(liste_rep_vide) != 0:
-    status = 'warning'
-else: 
-    status = 'ok'
+if fin_traitement :
+    # Détermination du status d’exécution
+    if nombre_defauts != 0 :
+        status = 'error'
+    elif len(liste_rep_vide) != 0:
+        status = 'warning'
+    else: 
+        status = 'ok'
 
-display.titre("Résumé d'exécution", colors[status])
+    display.titre("Résumé d'exécution", colors[status])
 
 
-# Nombres de répertoire & d'images
-nombre_repertoires_traites = nombre_sous_repertoires - len(liste_rep_vide) 
-nb_i = util.format_nombre(total_image)
+    # Nombres de répertoire & d'images
+    nombre_repertoires_traites = nombre_sous_repertoires - len(liste_rep_vide) 
+    nb_i = util.format_nombre(total_image)
 
-display.print(
-    f"- {nombre_repertoires_traites}/{nombre_sous_repertoires} Répertoires traités comprenant "
-    f"{nb_i} images ",
-    colors[status]
-    )  
-
-# Nombre de répertoire vide & liste de ceux-ci
-if len(liste_rep_vide) != 0:
-
-    pls = "s" if len(liste_rep_vide) > 1 else ""
     display.print(
-        f"- Il y a {len(liste_rep_vide)} répertoire{pls} vide{pls} "
-        f"\n  Voici la liste :",
-        colors['warning']
+        f"- {nombre_repertoires_traites}/{nombre_sous_repertoires} Répertoires traités comprenant "
+        f"{nb_i} images ",
+        colors[status]
         )  
-    util.afficher_liste_alignee(liste_rep_vide)
-    print()
 
-# Nombre d'images crées
-nb_t = util.format_nombre(nombre_total_images_creees)
-display.print(f"- Nombre total d'images créées : {nb_t} ",  colors['info'])
+    # Nombre de répertoire vide & liste de ceux-ci
+    if len(liste_rep_vide) != 0:
 
-# Nombres images en défaut
-if nombre_defauts != 0:
+        pls = "s" if len(liste_rep_vide) > 1 else ""
+        display.print(
+            f"- Il y a {len(liste_rep_vide)} répertoire{pls} vide{pls} "
+            f"\n  Voici la liste :",
+            colors['warning']
+            )  
+        util.afficher_liste_alignee(liste_rep_vide)
+        print()
 
-    pluriel = "s" if nombre_defauts > 1 else ""
+    # Nombre d'images crées
+    nb_t = util.format_nombre(nombre_total_images_creees)
+    display.print(f"- Nombre total d'images créées : {nb_t} ",  colors['info'])
 
-    display.print(f"- Nombre de défaut{pluriel} : {nombre_defauts}", colors["error"])
+    # Nombres images en défaut
+    if nombre_defauts != 0:
 
-    chemin_rapport = create_file_fault(
-        repertoire=repertoire_de_travail,
-        defauts=liste_defauts
-    )
+        pluriel = "s" if nombre_defauts > 1 else ""
 
-    print(
-        "\n- Rapport des défauts enregistré dans :"
-        f"\n  {chemin_rapport}"
+        display.print(f"- Nombre de défaut{pluriel} : {nombre_defauts}", colors["error"])
+
+        chemin_rapport = create_file_fault(
+            repertoire=repertoire_de_travail,
+            defauts=liste_defauts
         )
+
+        print(
+            "\n- Rapport des défauts enregistré dans :"
+            f"\n  {chemin_rapport}"
+            )
 
 print()
 display.print("Fin du traitement !!!", colors['goodbye'])
+
+util.sortie_de_programme()

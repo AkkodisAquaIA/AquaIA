@@ -14,13 +14,10 @@ def load_config():
     
     print()
 
-    fichier = Path("aqua_ia_conf.ini")
-    if not fichier.is_file():
-        display.print(f"Le fichier de paramètre 'aqua_ia_conf.ini' est introuvable !!! {ct.BELL}", colors['error'])
-        util.sortie_de_programme()
+    fichier = util.get_path_color("Fichier de configuration")
+    fichier = Path(fichier)
 
-
-    cfg = Config("aqua_ia_conf.ini")
+    cfg = Config(fichier)
 
     try:
         config = {
@@ -76,8 +73,8 @@ def load_config():
 
 
         display.print("Fichier de Paramètres valide",colors["ok"])
-        return config
-
+        return config, fichier
+        
     except Exception as e:
         display.print("---- Erreur dans le fichier de CONFIGURATION ----", colors["error"])
         display.print("-----                                       -----", colors["error"])

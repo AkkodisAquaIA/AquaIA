@@ -40,17 +40,37 @@ display = dc.DisplayColor()
 
 #========================================================================================
 
+def resource_path(*parts: str) -> Path:
+    """Retourne le chemin absolu d'une ressource du programme."""
+
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        base_path = Path(sys._MEIPASS)
+    else:
+        base_path = Path(__file__).resolve().parent
+
+    return base_path.joinpath(*parts)
+
 def choix_logo():
 
     pattern = re.compile(r"^image_\d{2}\.png$")
 
+    dossier_logo = resource_path("logo")
+
+    if not dossier_logo.is_dir():
+        raise FileNotFoundError(f"Répertoire introuvable : {dossier_logo}")
+
     fichiers = [
-    f
-    for f in Path("logo").iterdir()
-    if f.is_file() and pattern.match(f.name)
+        f
+        for f in dossier_logo.iterdir()
+        if f.is_file() and pattern.match(f.name)
     ]
 
-    return random.choice(fichiers) if fichiers else Path("logo/image_01.png")
+    if not fichiers:
+        raise FileNotFoundError(
+            f"Aucun logo trouvé dans : {dossier_logo}"
+        )
+
+    return random.choice(fichiers)
 
 def creation_file_yaml(DATASET_DIR ):
     labels_dir = DATASET_DIR / "labels" / "train2017"
@@ -312,11 +332,12 @@ def main():
 
     print(tag)
     
+
     # Chargement & Vérification du fichier de Paramètrage
     try: 
-        cfg = load_config() 
+        cfg , fichier_config = load_config() 
     except Exception as e:
-        display.print(f"Erreur de chargement du fichier de configuration :\n   {e}", colors['error'])
+        display.print(f"Erreur de chargement du fichier de configuration {fichier_config.stem}:\n   {e}", colors['error'])
        
         print()
         util.sortie_de_programme()
@@ -349,7 +370,7 @@ def main():
     # Horodatage au format AAAAMMJJ_HHMMSS
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    source = Path("aqua_ia_conf.ini")
+    source =  fichier_config 
     destination_dir = Path(path_save)
     destination = destination_dir / f"{timestamp}_{source.name}"
     shutil.copy2(source, destination)
