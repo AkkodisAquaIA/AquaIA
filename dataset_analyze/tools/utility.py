@@ -203,96 +203,6 @@ def horodatage(file_name: str, defaut="") -> str:
 
     return filename_with_timestamp
 
-def calibrer_seuils_overflow(results : dict,
-                             warning_percentile : float,
-                             error_percentile : float,
-                             min_warning : float,
-                             min_error : float)-> dict[str, float]:
-    """
-    Automatically calibrate bounding box overflow thresholds based on anomaly statistics.
-
-    This function computes warning and error thresholds for bounding box overflow
-    using percentile values derived from detected anomalies. It extracts the
-    `outside_ratio_pct` values from the provided results and determines threshold
-    levels based on the specified percentiles. Minimum threshold values are enforced
-    to guarantee baseline sensitivity.
-
-    If no overflow anomalies are found, the function directly returns the provided
-    minimum thresholds.
-
-    Args:
-        results (dict):
-            A dictionary containing anomaly detection results. It is expected
-            to include a key `"anomalies"` mapped to a list of dictionaries,
-            each potentially containing an `"outside_ratio_pct"` value
-            representing the percentage of bounding box overflow.
-
-        warning_percentile (float):
-            The percentile used to compute the warning threshold.
-
-        error_percentile (float):
-            The percentile used to compute the error threshold.
-
-        min_warning (float):
-            The minimum allowed value for the warning threshold.
-
-        min_error (float):
-            The minimum allowed value for the error threshold.
-
-    Returns:
-        dict[str, float]:
-            A dictionary containing:
-                - "BBOX_OVERFLOW_WARNING": Final warning threshold (percentage)
-                - "BBOX_OVERFLOW_ERROR": Final error threshold (percentage)
-
-    Notes:
-        - The function ensures that the error threshold is strictly greater
-          than the warning threshold. If necessary, a small safety margin
-          is added to the error threshold.
-        - If no valid `outside_ratio_pct` values are found, the minimum
-          thresholds are returned without percentile computation.
-    """
-
-    display = dc.DisplayColor()
-
-    outside_ratios = [
-        a['outside_ratio_pct']
-        for a in results.get('anomalies', [])
-        if 'outside_ratio_pct' in a
-    ]
-
-    if not outside_ratios:
-        print()
-        display.print(" Aucun dépassement détecté, utilisation des seuils minimaux.", colors['ok'])
-        return {
-            "BBOX_OVERFLOW_WARNING": min_warning,
-            "BBOX_OVERFLOW_ERROR": min_error
-        }
-
-    # Percentile-based thresholds
-    warning_calculated = np.percentile(outside_ratios, warning_percentile)
-    error_calculated   = np.percentile(outside_ratios, error_percentile)
-
-    # Apply minimum guarantee
-    warning_final = max(warning_calculated, min_warning)
-    error_final   = max(error_calculated, min_error)
-
-    # Security: ensure error > warning
-    if error_final <= warning_final:
-        error_final = warning_final + 5.0  # small safety margin
-
-    print()
-    display.print("Calibration automatique des seuils:", colors["warning"])
-    print(f"  - Avertissement ({warning_percentile} percentile): "
-          f"{warning_calculated:.2f}% → Final: {warning_final:.2f}%")
-    print(f"  - Erreur   ({error_percentile} percentile): "
-          f"{error_calculated:.2f}% → Final: {error_final:.2f}%")
-
-    return {
-        "BBOX_OVERFLOW_WARNING": warning_final,
-        "BBOX_OVERFLOW_ERROR": error_final
-    }
-
 def rgb_to_ansi(rgb: tuple[int, int, int]) -> str:
     """Convert RGB color to ANSI escape code."""
     return f"\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
@@ -353,6 +263,7 @@ def get_directory_color(prompt: str, color_key: str = "input") -> Path:
         )
 
 def check_directory(chemin: Path, name: str):
+    
     display = dc.DisplayColor()
 
     path = Path(chemin) / name
@@ -380,42 +291,17 @@ def check_directory(chemin: Path, name: str):
 
     return True
 
-
 def est_incluse(liste1, liste2):
     return all(element in liste2 for element in liste1)
      
 
-def selection(maxi) -> int:
-  
-    display = dc.DisplayColor()
-    color = colors['input']
-
-    while True:
-        try:
-            #  # Convert the input color from DISPLAY_COLORS to ANSI
-            input_color = rgb_to_ansi(color[:3])
-            # # Displays the prompt in color
-            prompt = "Quel est votre choix "
-            colored_select = f"{input_color}[?] {prompt}: {Style.RESET_ALL}"
-
-            select = int(input(colored_select).strip())
-
-            if 1 <= select <= maxi  :
-                return select - 1
-            text = f"Sélection invalide. Veuillez réessayer. {ct.BELL}"
-            display.print(text, colors['error'])
-
-        # Input is not a number
-        except ValueError:
-            text = (
-                    f"Ce n'est pas un nombre . "
-                    f"Réessayez! {ct.BELL}"
-                )
-            display.print(text, colors['error'])
-
-
 def entrer_valeur(texte, maxi) -> int:
-  
+    """
+    This function prompts the user to enter a value between 1 and 'maxi'.
+    It will keep asking until a valid integer within the range is provided.     
+
+    """
+
     display = dc.DisplayColor()
     color = colors['input']
 
@@ -441,7 +327,6 @@ def entrer_valeur(texte, maxi) -> int:
                     f"Réessayez! {ct.BELL}"
                 )
             display.print(text, colors['error'])
-
 
 
 def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> bool:
@@ -477,17 +362,17 @@ def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> b
         text = f"Réponse valide : (o/N) {ct.BELL}"
         display.print(text, colors['error'])
 
-def waiting_any_key(message: str, color_key: str = 'wait') :
+def waiting_enter_key():
     """
-    This function returnsis wainting any key
+    This function returnsis wainting 'Enter' key
     """
 
-    color = get_color(color_key)
+    color = get_color('wait')
     # Convert the input color from DISPLAY_COLORS to ANSI
     input_color = rgb_to_ansi(color) # type: ignore
 
     # Displays the prompt in color
-    colored_prompt = f"{input_color}[Wait...] {message}{Style.RESET_ALL}"
+    colored_prompt = f"{input_color}[Wait...] Appuyez sur 'Enter' pour continuer ... {Style.RESET_ALL}"
 
     _ = input(colored_prompt).strip().lower()
 
@@ -523,53 +408,6 @@ def input_value(message: str, color_key: str = 'input') -> int:
                     )
             display.print(text, colors['error'])
 
-def seuil():
-    """
-        Saisir deux seuils.
-        Les seuils doivent être compris entre 0 & 100.
-        on renvoit les deux seuils dans l'ordre croisant'
-        """
-    
-    display = dc.DisplayColor()
-
-    while True:
-        display.print("Entrez seuil 'Rare' & 'Dominant'", colors["input"])
-        entree = input(" - : ")
-        seuil = entree.split()
-        seuil.sort() # tri croisant des entrées
-
-        if not valider_seuil(seuil):
-            continue
-
-        seuil_rare = float(seuil[0])
-        seuil_dominant = seuil_rare if len(seuil) == 1 else float(seuil[1])
-
-        return seuil_rare, seuil_dominant
-
-def valider_seuil(seuil):
-    """
-    Controle la validitée des entrées
-    """
-    if len(seuil) != 2:
-        print("Veuillez entrer 2 valeurs.")
-        return False
-
-    try:
-        if  0.0 > float(seuil[0]) or float(seuil[0]) > 100.0:
-            print("Veuillez entrer un seuil compris entre 0.0 et 100.0")
-            return False
-    except ValueError:
-        print(f"{seuil[0]} n'est pas valide.")
-        return False
-
-    if len(seuil) == 2:
-        try:
-            float(seuil[1])
-        except ValueError:
-            print(f"{seuil[1]} n'est pas valide.")
-            return False
-
-    return True
 
 def format_nombre(n):
     return f"{n:,}".replace(",", " ")
@@ -627,24 +465,12 @@ def afficher_liste_alignee(liste, nb_colonnes=4, separateur=" | "):
             )
         )
 
-
-# def sortie_de_programme():
-
-#     display = dc.DisplayColor()
-#     print()
-#     waiting_any_key("Appuyez sur 'Enter' pour continuer ... ")
-    
-#     delay = 3
-#     display.print(f"Programme terminé dans {delay} secondes. Au revoir !{ct.BELL}", colors['goodbye'])
-#     time.sleep(delay)          
-#     sys.exit(0)
-
 def sortie_de_programme():
 
     display = dc.DisplayColor()
     print()
 
-    waiting_any_key("Appuyez sur 'Enter' pour continuer ... ")
+    waiting_enter_key()
 
     delay = 3
 

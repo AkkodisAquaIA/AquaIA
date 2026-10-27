@@ -79,6 +79,7 @@ BINS = 60
 
 
 MENUS = {
+    # Menu principal
     'MAIN': [
         "Sélection des informations à afficher",
         "Information générales",
@@ -90,40 +91,44 @@ MENUS = {
         "Lancement Fifty_One",
         "Sortie"    ],
 
+    # Menu pour Augmentations de données
     'SYMETRIE': [
         "Symétrie Horizontale & Verticale",
         "Pas de symétrie",
+        "Toutes",
         "Symétrie horizontale",
         "Symétrie verticale",
-        "Toutes",
       ],
     'ROTATION': [
         "Rotation",
         "Pas de rotation",
+        "Toutes",
         "Rotation simple",
         "Rotation + Flip horizontal",
         "Rotation + Flip horizontal + Contraste",
         "Rotation + Flip vertical",
         "Rotation + Flip vertical + Contraste",
-        "Toutes",
       ],
     'ZOOM': [
         "Zoom",
         "Pas de zoom",
+        "Tous",
         "Zoom simple",
-        "Zoom +  Contraste",
+        "Zoom + Contraste",
         "Zoom + Rotation",
         "Zoom + Rotation + Contraste",
-        "Toutes",
+        
       ],
     'DIVERS': [
         "Divers",
         "Pas de modification",
+        "Toutes",
         "Contraste",
         "Bruit gaussien",
         "Contraste + Bruit gaussien",
-        "Toutes",
       ],     
+
+      # Menu infoq Images
       'SAUVEGARDE': [
         "Sauvegarde",
         "Bbox Rouge",

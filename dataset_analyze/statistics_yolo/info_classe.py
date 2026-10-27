@@ -14,6 +14,58 @@ init(autoreset=True)
 
 #================================================================================
 
+def seuil():
+    """
+        Saisir deux seuils.
+        Les seuils doivent être compris entre 0 & 100.
+        on renvoit les deux seuils dans l'ordre croisant'
+        """
+    
+    display = dc.DisplayColor()
+
+    while True:
+        display.print("Entrez seuil 'Rare' & 'Dominant'", colors["input"])
+        entree = input(" - : ")
+        seuil = entree.split()
+        seuil.sort() # tri croisant des entrées
+
+        if not valider_seuil(seuil):
+            continue
+
+        seuil_rare = float(seuil[0])
+        seuil_dominant = seuil_rare if len(seuil) == 1 else float(seuil[1])
+
+        return seuil_rare, seuil_dominant
+
+def valider_seuil(seuil):
+    """
+    Controle la validitée des entrées
+    """
+    if len(seuil) != 2:
+        print("Veuillez entrer 2 valeurs.")
+        return False
+
+    try:
+        if  0.0 > float(seuil[0]) or float(seuil[0]) > 100.0:
+            print("Veuillez entrer un seuil compris entre 0.0 et 100.0")
+            return False
+    except ValueError:
+        print(f"{seuil[0]} n'est pas valide.")
+        return False
+
+    if len(seuil) == 2:
+        try:
+            float(seuil[1])
+        except ValueError:
+            print(f"{seuil[1]} n'est pas valide.")
+            return False
+
+    return True
+
+
+
+
+
 #================================================================================
 
 def info_classes(mode_aff, info_classes, cfg): 
@@ -24,7 +76,6 @@ def info_classes(mode_aff, info_classes, cfg):
     etat_dataset = mode_aff[1]
     nom_dataset = mode_aff[2]
 
-    
 
     while  True:
 
@@ -125,7 +176,7 @@ def info_classes(mode_aff, info_classes, cfg):
         if  mode_affichage == ct.FICHIER or not util.answer_yes_or_no("Voulez-vous modifier la valeur des seuils") : 
             break         
 
-        cfg["RARE"], cfg["DOMINANT"]=  util.seuil() 
+        cfg["RARE"], cfg["DOMINANT"]=  seuil() 
 
 
     # --- classes Rares ---------------------------------------

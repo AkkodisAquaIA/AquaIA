@@ -6,6 +6,7 @@ if getattr(sys, "frozen", False):
 
 import os
 import re
+import numpy as np
 import random
 from tqdm import tqdm
 
@@ -131,7 +132,7 @@ def creation_file_yaml(DATASET_DIR ):
             "train": "images/train2017",
             "val": "images/train2017",  # à adapter si nécessaire
             "nc": nc,
-            "names": [f"classe_{i}" for i in range(nc)]
+            "names": [f"classe_{i:03d}" for i in range(nc)]
         }
 
         dataset_yaml_ = DATASET_DIR / "default.yaml"
@@ -169,7 +170,7 @@ def statistique(DATASET_DIR, cfg, class_names, path_save, rapport):
      # ================= STATISTICS =================
     results = ds.dataset_statistics_yolo(DATASET_DIR, rapport, cfg)
 
-    seuils = util.calibrer_seuils_overflow(
+    seuils = calibrer_seuils_overflow(
         results,
         warning_percentile= cfg["PERCENTILE_WARNING"],
         error_percentile= cfg["PERCENTILE_ERROR"],
@@ -189,6 +190,98 @@ def statistique(DATASET_DIR, cfg, class_names, path_save, rapport):
             gr.bbox_overflow(cfg, outside_ratios, BBOX_OVERFLOW_WARNING, BBOX_OVERFLOW_ERROR) 
 
     return   results
+
+
+def calibrer_seuils_overflow(results : dict,
+                             warning_percentile : float,
+                             error_percentile : float,
+                             min_warning : float,
+                             min_error : float)-> dict[str, float]:
+    """
+    Automatically calibrate bounding box overflow thresholds based on anomaly statistics.
+
+    This function computes warning and error thresholds for bounding box overflow
+    using percentile values derived from detected anomalies. It extracts the
+    `outside_ratio_pct` values from the provided results and determines threshold
+    levels based on the specified percentiles. Minimum threshold values are enforced
+    to guarantee baseline sensitivity.
+
+    If no overflow anomalies are found, the function directly returns the provided
+    minimum thresholds.
+
+    Args:
+        results (dict):
+            A dictionary containing anomaly detection results. It is expected
+            to include a key `"anomalies"` mapped to a list of dictionaries,
+            each potentially containing an `"outside_ratio_pct"` value
+            representing the percentage of bounding box overflow.
+
+        warning_percentile (float):
+            The percentile used to compute the warning threshold.
+
+        error_percentile (float):
+            The percentile used to compute the error threshold.
+
+        min_warning (float):
+            The minimum allowed value for the warning threshold.
+
+        min_error (float):
+            The minimum allowed value for the error threshold.
+
+    Returns:
+        dict[str, float]:
+            A dictionary containing:
+                - "BBOX_OVERFLOW_WARNING": Final warning threshold (percentage)
+                - "BBOX_OVERFLOW_ERROR": Final error threshold (percentage)
+
+    Notes:
+        - The function ensures that the error threshold is strictly greater
+          than the warning threshold. If necessary, a small safety margin
+          is added to the error threshold.
+        - If no valid `outside_ratio_pct` values are found, the minimum
+          thresholds are returned without percentile computation.
+    """
+
+    display = dc.DisplayColor()
+
+    outside_ratios = [
+        a['outside_ratio_pct']
+        for a in results.get('anomalies', [])
+        if 'outside_ratio_pct' in a
+    ]
+
+    if not outside_ratios:
+        print()
+        display.print(" Aucun dépassement détecté, utilisation des seuils minimaux.", colors['ok'])
+        return {
+            "BBOX_OVERFLOW_WARNING": min_warning,
+            "BBOX_OVERFLOW_ERROR": min_error
+        }
+
+    # Percentile-based thresholds
+    warning_calculated = np.percentile(outside_ratios, warning_percentile)
+    error_calculated   = np.percentile(outside_ratios, error_percentile)
+
+    # Apply minimum guarantee
+    warning_final = max(warning_calculated, min_warning)
+    error_final   = max(error_calculated, min_error)
+
+    # Security: ensure error > warning
+    if error_final <= warning_final:
+        error_final = warning_final + 5.0  # small safety margin
+
+    print()
+    display.print("Calibration automatique des seuils:", colors["warning"])
+    print(f"  - Avertissement ({warning_percentile} percentile): "
+          f"{warning_calculated:.2f}% → Final: {warning_final:.2f}%")
+    print(f"  - Erreur   ({error_percentile} percentile): "
+          f"{error_calculated:.2f}% → Final: {error_final:.2f}%")
+
+    return {
+        "BBOX_OVERFLOW_WARNING": warning_final,
+        "BBOX_OVERFLOW_ERROR": error_final
+    }
+
 
 def deplacer_fichier(DATASET_DIR, dossier, extension, nom):
     source = DATASET_DIR / dossier / "train2017" / f"{nom}{extension}"
@@ -359,11 +452,11 @@ def main():
             f"Répertoire de sauvegarde '{fault_path}' invalide !!! {ct.BELL}",
             colors["error"]
         )
-        color = colors["warning"]
+        color = "warning"
     else:
-        color = colors["ok"]
+        color = "ok"
 
-    display.print(f"Répertoire de sauvegarde utilisé : {path_save}", color)
+    display.print(f"Répertoire de sauvegarde utilisé : {path_save}", colors[color])
 
 
     # Sauvegarde du fichier de configuration
@@ -400,7 +493,7 @@ def main():
     ctrl_labels = util.check_directory(DATASET_DIR  , "labels/train2017")
 
     if not ctrl_images  or not ctrl_labels : 
-            util.sortie_de_programme()
+        util.sortie_de_programme()
 
 
     if not util.answer_yes_or_no("Voulez-vous continuer avec ces valeurs", True):
@@ -430,7 +523,7 @@ def main():
     if len(yaml_files) == 0:
   
         display.print(
-            f"Aucun fichier '.yaml' trouvé dans :\n   {DATASET_DIR}\n - Création d'un fichier par défaut.",
+            f"Aucun fichier '.yaml' trouvé dans :\n   {DATASET_DIR}\n   - Création d'un fichier par défaut.",
             colors['warning']
         )
 
@@ -451,7 +544,7 @@ def main():
                         style= 'rounds',        # style du menu 
                         theme = menu_c.AQUA_IA) # Theme du menu  
      
-        # Affichage du menu et sélection de l'item
+        # Affichage du menu et sélection du fivhier '.YAML'
         mm.display_menu()
         choice = mm.selection()
         dataset_yaml_ = yaml_files[choice - 1]
@@ -566,7 +659,7 @@ def main():
 
     # Attent validation de l'opérateur
     print()
-    util.waiting_any_key("Appuyez sur 'Enter' pour continuer ... ")
+    util.waiting_enter_key()
 
     # --- Visualisation des résultats sur Ecran ------------------------------------------
     ds.afficher_dataset_statistics(ct.ECRAN,

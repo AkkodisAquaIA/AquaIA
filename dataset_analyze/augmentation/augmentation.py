@@ -327,9 +327,9 @@ def choix_augmentation():
     # ---- Symètrie Horizontale & Verticale -----------------------------------
     flip_map = {
     1: [],
-    2: [FLIP_H],
-    3: [FLIP_V],
-    4: [FLIP_H, FLIP_V]
+    2: [FLIP_H, FLIP_V],    
+    3: [FLIP_H],
+    4: [FLIP_V]
     }
 
     menu_flip = menu_c.Menu('SYMETRIE',           # Nom du menu
@@ -345,16 +345,16 @@ def choix_augmentation():
     # # ---- Rotation -----------------------------------------------------------
     rotation_map = {
         1: [],
-        2: [ROTATION],
-        3: [ROT_FLIT_H],
-        4: [ROT_FLIT_H_C],
-        5: [ROT_FLIT_V],
-        6: [ROT_FLIT_V_C],
-        7: [
+        2: [
             ROTATION,
             ROT_FLIT_H, ROT_FLIT_H_C,
             ROT_FLIT_V, ROT_FLIT_V_C
-        ]
+        ],
+        3: [ROTATION],
+        4: [ROT_FLIT_H],
+        5: [ROT_FLIT_H_C],
+        6: [ROT_FLIT_V],
+        7: [ROT_FLIT_V_C],
     }
 
     menu_rotation = menu_c.Menu('ROTATION',     # Nom du menu
@@ -370,15 +370,15 @@ def choix_augmentation():
     # # ---- Zoom ---------------------------------------------------------------
     zoom_map = {
         1: [],
-        2: [ZOOM],
-        3: [ZOOM_C],
-        4: [ZOOM_ROTATION],
-        5: [ZOOM_ROTATION_C],
-        6: [
+        2: [
             ZOOM,
             ZOOM_C,
             ZOOM_ROTATION, ZOOM_ROTATION_C
-        ]
+        ],
+        3: [ZOOM],
+        4: [ZOOM_C],
+        5: [ZOOM_ROTATION],
+        6: [ZOOM_ROTATION_C],
     }
     menu_zoom = menu_c.Menu('ZOOM',           # Nom du menu
                         style= "heavy",          # Style du menu 
@@ -393,14 +393,14 @@ def choix_augmentation():
     # # ---- Divers -------------------------------------------------------------
     divers_map = {
         1: [],
-        2: [CONTRASTE],
-        3: [BRUIT],
-        4: [CONTRASTE_BRUIT],
-        5: [
+        2: [
             CONTRASTE,
             BRUIT,
             CONTRASTE_BRUIT
-        ]
+        ],
+        3: [CONTRASTE],
+        4: [BRUIT],
+        5: [CONTRASTE_BRUIT],
     }
     menu_divers = menu_c.Menu('DIVERS',           # Nom du menu
                         style= "double",          # Style du menu 
