@@ -31,17 +31,24 @@ def predict(model, samples, device, conf_thres):
     with torch.autocast(device_type=device, dtype=torch.float16, enabled=device != "cpu"):
         outputs = model(inputs)
 
+    return postprocess_predictions(outputs, inputs.shape[-2:], conf_thres)
+
+
+# Decorator not needed for val set but added for future train set evaluation
+@torch.no_grad()
+def postprocess_predictions(outputs, image_size, conf_thres):
+    """Convert existing DINO outputs to pixel xyxy predictions without another forward pass."""
     # [B, num_queries, 4]
     pred_boxes = outputs["pred_boxes"].float()
     # [B, num_queries, num_classes]
     pred_logits = outputs["pred_logits"].float()
 
-    _, _, height, width = inputs.shape
+    height, width = image_size
     # [B, num_queries], [B, num_queries]
     scores, labels = pred_logits.sigmoid().max(dim=-1)
     preds = []
     # For each image in batch
-    for i in range(inputs.shape[0]):
+    for i in range(pred_boxes.shape[0]):
         boxes_xyxy = box_cxcywh_to_xyxy(pred_boxes[i]).clamp(0, 1)
         # Scale boxes to original image size
         boxes_xyxy[:, [0, 2]] *= width

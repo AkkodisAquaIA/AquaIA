@@ -77,6 +77,8 @@ training:
   close_mosaic: 70
 
   # ---------- INFERENCE / EVAL-RELATED ----------
+  # Compute val mAP every N epochs using existing batch outputs (0 = disabled)
+  val_map_period: 5
   # !Temporary! Seed used to sample training set for post-training mAP evaluation
   train_subset_seed: 42
   # !Temporary! Fraction of sampling, for COCO use 0.34

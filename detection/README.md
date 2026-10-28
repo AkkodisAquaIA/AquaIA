@@ -151,7 +151,7 @@ commands, and tmux usage, see [logging/LOGGING.md](logging/LOGGING.md).
 
 TensorBoard training logging is enabled by default for both DINO / DETR and YOLO. No YAML option or global Ultralytics setting is required. Each training run writes its own event file under `<run_directory>/tensorboard/`, while all existing text logs, metrics, plots, and checkpoints are preserved.
 
-DINO / DETR records the existing training and validation losses and errors at the end of every epoch, together with the learning rate. The post-training train-subset and validation mAP values are recorded under the `evaluation/` group.
+DINO / DETR records the existing training and validation losses and errors at the end of every epoch, together with the learning rate. When `training.val_map_period` is enabled, validation mAP values are also recorded at the configured interval. The post-training train-subset and validation mAP values are recorded under the `evaluation/` group.
 
 YOLO uses project-level Ultralytics callbacks to record its training losses, learning rates, and validation metrics at the end of every epoch. It does not depend on the global Ultralytics `tensorboard` setting.
 
@@ -207,7 +207,7 @@ The Detection part contains the following folders and files.
 │   │   ├── dino_detector.py      # Combines DINO and DETR, using only the final DETR decoder layer output for training / inference, without intermediate auxiliary outputs.
 │   │   ├── loss.py               # Loss for DETR after backbone (class loss modified to FocalLoss).
 │   │   ├── position_encoding.py  # 2D positional encoding for DETR.
-│   │   └── predict.py            # One function to round image size, one function to infer on a batch of samples (for evaluation or visualization) and return predictions.
+│   │   └── predict.py            # Rounds image size, runs batch inference, and postprocesses existing outputs for evaluation or visualization.
 │   │
 │   ├── logging/
 │   │   ├── __init__.py           # Declares logging package.

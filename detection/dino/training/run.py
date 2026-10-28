@@ -12,11 +12,11 @@ from transformers import get_scheduler
 from dataloading.datasets import JpgDetectionDataset, parse_batch, detection_collate_fn
 from detection.dino.dino_detector import DINODetector
 from detection.dino.loss import SetCriterion
-from detection.metric import compute_metrics, print_metrics, update_metric_dict
+from detection.metric import compute_metrics, evaluate_map, print_metrics, update_metric_dict
 from detection.dino.utils.matcher import HungarianMatcher
 from detection.utils.config_utils import save_resolved_config
 from detection.utils.plot_utils import plot_metrics, save_sample_predictions
-from detection.dino.predict import predict, normalize_imgsz
+from detection.dino.predict import predict, normalize_imgsz, postprocess_predictions
 from detection.logging import TrainingLogger, CheckpointManager
 from detection.checkpoint import load_pretrain_model_checkpoint, load_training_state_checkpoint
 
@@ -319,6 +319,12 @@ def train_dino(config, resume_dir=None):
                 split = loader.dataset.data_split
                 training = split == "train"
 
+                map_period = training_config.get(f"{split}_map_period", 0)
+                compute_epoch_map = map_period and (epoch + 1) % map_period == 0
+                if compute_epoch_map:
+                    map_predictions = []
+                    map_targets = []
+
                 metric_dict[split]["loss"] = 0.0
                 # Batch level loader progress bar, hence train val batch level progress bar
                 progress = tqdm.tqdm(loader, desc="- Training   " if training else "- Validation ", unit="batch")
@@ -349,6 +355,13 @@ def train_dino(config, resume_dir=None):
                             loss_dict = criterion(outputs, targets)
                         total_loss = sum(loss_dict[key] * loss_weight_dict[key] for key in loss_dict if key in loss_weight_dict)
 
+                        if compute_epoch_map:
+                            batch_predictions = postprocess_predictions(outputs, inputs.shape[-2:], training_config.get("conf_thresh", 0.05))
+                            # Gather prediction results and targets from this batch
+                            # Keep these data on CPU without retaining training graphs or GPU memory
+                            map_predictions.extend({key: value.detach().cpu() for key, value in prediction.items()} for prediction in batch_predictions)
+                            map_targets.extend({key: value.detach().cpu() for key, value in target.items()} for target in targets)
+
                         if training:
                             # set_to_none=True set gradients to None, reducing memory usage
                             optimizer.zero_grad(set_to_none=True)
@@ -372,6 +385,13 @@ def train_dino(config, resume_dir=None):
 
                     if training and scheduler is not None:
                         scheduler.step()
+
+                if compute_epoch_map:
+                    map_metrics = evaluate_map(map_predictions, map_targets, loader.dataset.img_size, split, device="cpu")
+                    metric_dict[split].update({key.removeprefix(f"{split}_"): value for key, value in map_metrics.items()})
+                    logger.info(str(map_metrics))
+                    # Delate for memory efficiency
+                    del map_predictions, map_targets
 
             # END for each train val dataloader
 
