@@ -22,10 +22,10 @@ Each DINO run writes:
 ```text
 <run_dir>/
 ├── train.log                   # Human-readable log, also printed to the console
-├── run_meta.json              # Status, PID, progress and best validation loss
+├── run_meta.json              # Status, PID, progress and best validation mAP50-95
 ├── last_training_state.pt     # Epoch, optimizer, scaler and scheduler state
 └── weights/
-    ├── best.pt                # Model with the lowest validation loss
+    ├── best.pt                # Model with the highest validation mAP50-95 among evaluated epochs
     └── last.pt                # Latest periodic or final model checkpoint
 ```
 
@@ -35,13 +35,13 @@ fails, or receives `KeyboardInterrupt`.
 
 Checkpoint behavior:
 
-- `best.pt` is replaced whenever validation loss improves or equals the best value.
+- `best.pt` is replaced only when validation mAP50-95 strictly improves. 
 - With a positive `save_period`, both `last` files are replaced every N epochs.
 - A normal completion always writes both `last` files, even when
   `save_period` is `0`.
 - Resume reuses the run directory, appends to `train.log`, and restores the
   available model, optimizer, scaler, scheduler, saved epoch, and best
-  validation loss.
+  validation mAP50-95.
 
 ## Commands
 

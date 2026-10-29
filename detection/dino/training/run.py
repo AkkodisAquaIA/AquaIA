@@ -258,7 +258,7 @@ def train_dino(config, resume_dir=None):
     #    scaler.step(optimizer)
     # step 3 dynamically adjust the scale factor
     #    scaler.update()
-    best_validation_loss = float("inf")
+    best_validation_map_50_95 = float("-inf")
     metrics_history = []
     start_epoch = 0
 
@@ -288,7 +288,7 @@ def train_dino(config, resume_dir=None):
         if meta_path.exists():
             # Read the JSON text and convert it to a Python dictionary
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            best_validation_loss = float(meta.get("best_val_loss") or "inf")
+            best_validation_map_50_95 = float(meta["best_val_map_50_95"]) if meta["best_val_map_50_95"] is not None else float("-inf")
 
     model.train()
     criterion.train()
@@ -320,7 +320,10 @@ def train_dino(config, resume_dir=None):
                 training = split == "train"
 
                 map_period = training_config.get(f"{split}_map_period", 0)
-                compute_epoch_map = map_period and (epoch + 1) % map_period == 0
+                # Compute mAP on val set, first/last epoch and every map_period epochs
+                compute_epoch_map = (
+                    split == "val" and (epoch == 0 or epoch + 1 == training_config["epochs"])
+                ) or (map_period > 0 and (epoch + 1) % map_period == 0)
                 if compute_epoch_map:
                     map_predictions = []
                     map_targets = []
@@ -409,11 +412,11 @@ def train_dino(config, resume_dir=None):
             logger.log_epoch(epoch + 1, training_config["epochs"], metric_dict, lr)
 
             # Checkpoint: best and periodic last
-            validation_loss = metric_dict["val"]["loss"]
-            is_best = validation_loss <= best_validation_loss
+            validation_map_50_95 = metric_dict["val"].get("map_50_95")
+            is_best = validation_map_50_95 is not None and validation_map_50_95 > best_validation_map_50_95
             if is_best:
-                best_validation_loss = validation_loss
-                logger.log_best(epoch + 1, validation_loss)
+                best_validation_map_50_95 = validation_map_50_95
+                logger.log_best(epoch + 1, validation_map_50_95)
             checkpoint_mgr.step(epoch + 1, model, optimizer, scaler, scheduler, is_best=is_best)
 
         # END for epoch loop

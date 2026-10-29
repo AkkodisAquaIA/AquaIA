@@ -71,7 +71,7 @@ class TrainingLogger:
                     "lr": training_cfg.get("lr0"),
                 },
                 "best_epoch": None,
-                "best_val_loss": None,
+                "best_val_map_50_95": None,
                 "current_epoch": 0,
             }
         # Write the meta information to the run_meta.json file
@@ -134,11 +134,11 @@ class TrainingLogger:
         self._tensorboard_writer.flush()
         self._tensorboard_writer.close()
 
-    def log_best(self, epoch: int, val_loss: float) -> None:
-        """Log when a new best validation loss is achieved into train.log + console and update meta information."""
-        self._logger.info(f"[BEST] New best at epoch {epoch} — val_loss={val_loss:.4f}")
+    def log_best(self, epoch: int, val_map_50_95: float) -> None:
+        """Log when a new best validation mAP50-95 is achieved into train.log + console and update meta information."""
+        self._logger.info(f"[BEST] New best at epoch {epoch} — val_map_50_95={val_map_50_95:.4f}")
         self._meta["best_epoch"] = epoch
-        self._meta["best_val_loss"] = round(float(val_loss), 6)
+        self._meta["best_val_map_50_95"] = float(val_map_50_95)
         self._write_meta()
 
     def finish(self) -> None:

@@ -151,7 +151,7 @@ commands, and tmux usage, see [logging/LOGGING.md](logging/LOGGING.md).
 
 TensorBoard training logging is enabled by default for both DINO / DETR and YOLO. No YAML option or global Ultralytics setting is required. Each training run writes its own event file under `<run_directory>/tensorboard/`, while all existing text logs, metrics, plots, and checkpoints are preserved.
 
-DINO / DETR records the existing training and validation losses and errors at the end of every epoch, together with the learning rate. When `training.val_map_period` is enabled, validation mAP values are also recorded at the configured interval. The post-training train-subset and validation mAP values are recorded under the `evaluation/` group.
+DINO / DETR records the existing training and validation losses and errors at the end of every epoch, together with the learning rate. Validation mAP50 and mAP50-95 are recorded on the first and last epochs and, when `training.val_map_period` is positive, at that interval. The post-training train-subset and validation mAP values are recorded under the `evaluation/` group. Training-set mAP50 and mAP50-95 are computed only on the training subset after training.
 
 YOLO uses project-level Ultralytics callbacks to record its training losses, learning rates, and validation metrics at the end of every epoch. It does not depend on the global Ultralytics `tensorboard` setting.
 

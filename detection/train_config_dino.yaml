@@ -77,7 +77,8 @@ training:
   close_mosaic: 70
 
   # ---------- INFERENCE / EVAL-RELATED ----------
-  # Compute val mAP every N epochs using existing batch outputs (0 = disabled)
+  # Compute val mAP on first/last epochs and every N epochs
+  # 0 = first/last epochs only
   val_map_period: 5
   # !Temporary! Seed used to sample training set for post-training mAP evaluation
   train_subset_seed: 42
