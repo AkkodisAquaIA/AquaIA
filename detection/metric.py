@@ -41,7 +41,7 @@ def print_metrics(metrics):
     { "train": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
       "val": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
       "epoch": ... }"""
-    print("-" * 5 + " Epoch summary " + "-" * 5)
+    print("\n" + "-" * 5 + " Epoch summary " + "-" * 5)
     for split, loss_dict in metrics.items():
         # Skip items like "epoch" that are not loss dicts
         if not isinstance(loss_dict, dict):
