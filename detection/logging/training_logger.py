@@ -111,7 +111,12 @@ class TrainingLogger:
         val_loss = metric_dict.get("val", {}).get("loss", 0.0)
 
         elapsed_str = f"{int(elapsed // 60)}m{int(elapsed % 60)}s"
-        self._logger.info(f"[EPOCH {epoch:>3}/{total_epochs}] train_loss={train_loss:.4f} | val_loss={val_loss:.4f} | lr={lr:.2e} | {elapsed_str}")
+        map_summary = ""
+        for metric_name in ("map_50", "map_50_95"):
+            value = metric_dict.get("val", {}).get(metric_name)
+            if value is not None:
+                map_summary += f" | val_{metric_name}={float(value):.4f}"
+        self._logger.info(f"[EPOCH {epoch:>3}/{total_epochs}] train_loss={train_loss:.4f} | val_loss={val_loss:.4f}{map_summary} | lr={lr:.2e} | {elapsed_str}")
 
         self._meta["current_epoch"] = epoch
         self._meta["last_updated"] = datetime.utcnow().isoformat()

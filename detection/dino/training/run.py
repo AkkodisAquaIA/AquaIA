@@ -408,7 +408,6 @@ def train_dino(config, resume_dir=None):
                 if compute_epoch_map:
                     map_metrics = evaluate_map(map_predictions, map_targets, loader.dataset.img_size, split, device="cpu")
                     metric_dict[split].update({key.removeprefix(f"{split}_"): value for key, value in map_metrics.items()})
-                    logger.info(str(map_metrics))
                     # Delate for memory efficiency
                     del map_predictions, map_targets
 
