@@ -2,7 +2,8 @@ from pathlib import Path
 
 
 class CheckpointManager:
-    """Saves best.pt on improvement; last.pt + last_training_state.pt (optimizer, scaler, scheduler states)
+    """Saves best.pt on improvement; last.pt + last_training_state.pt
+    (optimizer, scaler, early stopping, scheduler states)
     every save_period epochs and at the end of training."""
 
     def __init__(self, run_dir: str, save_period: int = 0):
@@ -10,6 +11,7 @@ class CheckpointManager:
         self.run_dir = Path(run_dir)
         # 0 = only best, N = also save last every N epochs
         self.save_period = save_period
+        self.early_stopping_state = None
 
     def _save_last(self, epoch: int, model, optimizer, scaler, scheduler) -> None:
         """Save last.pt and last_training_state.pt (optimizer, scaler, scheduler states)."""
@@ -22,6 +24,7 @@ class CheckpointManager:
             optimizer_state_dict=optimizer.state_dict(),
             scaler_state_dict=scaler.state_dict(),
             scheduler_state_dict=scheduler.state_dict() if scheduler is not None else None,
+            early_stopping_state=self.early_stopping_state,
         )
 
     def step(self, epoch: int, model, optimizer, scaler, scheduler, is_best: bool) -> None:

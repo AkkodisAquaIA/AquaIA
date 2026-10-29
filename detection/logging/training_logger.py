@@ -141,12 +141,13 @@ class TrainingLogger:
         self._meta["best_val_map_50_95"] = float(val_map_50_95)
         self._write_meta()
 
-    def finish(self) -> None:
+    def finish(self, epoch: int, early_stopped: bool = False) -> None:
         """Log training completion, total elapsed time into train.log + console and update meta information."""
         elapsed = time.time() - self.start_time
         elapsed_str = f"{int(elapsed // 60)}m{int(elapsed % 60)}s"
         self._logger.info(f"Training complete — total time: {elapsed_str}")
-        self._meta["status"] = "done"
+        self._meta["status"] = "done-earlystopped" if early_stopped else "done"
+        self._meta["current_epoch"] = epoch
         self._meta["last_updated"] = datetime.utcnow().isoformat()
         self._write_meta()
         self._tensorboard_writer.flush()

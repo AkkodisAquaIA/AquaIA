@@ -104,6 +104,7 @@ def train_dino(config, resume_dir=None):
     model_config = config["model"]
     output_config = config["output"]
     log_config = config["logging"]
+    early_stopping_config = config["early_stopping"]
     training_config = config["training"]
     model_init = str(model_config.get("init")).lower()
     init_checkpoint = model_config.get("init_checkpoint")
@@ -258,6 +259,7 @@ def train_dino(config, resume_dir=None):
     #    scaler.step(optimizer)
     # step 3 dynamically adjust the scale factor
     #    scaler.update()
+    early_stopping_state = {"reference_val_map_50_95": None, "bad_evaluations": 0}
     best_validation_map_50_95 = float("-inf")
     metrics_history = []
     start_epoch = 0
@@ -282,13 +284,25 @@ def train_dino(config, resume_dir=None):
                 scheduler.load_state_dict(state["scheduler_state_dict"])
             # Resume number of achived epochs
             start_epoch = state["epoch"]
+            early_stopping_state = state["early_stopping_state"]
             logger.info(f"[RESUME] Resuming from epoch {start_epoch + 1}/{training_config['epochs']}")
+
+        # Load metrics history from metrics.npy if it exists
+        metrics_path = Path(run_dir) / "metrics.npy"
+        if metrics_path.exists():
+            metrics_history = [entry for entry in np.load(metrics_path, allow_pickle=True).tolist() if entry["epoch"] <= start_epoch]
 
         meta_path = Path(run_dir) / "run_meta.json"
         if meta_path.exists():
             # Read the JSON text and convert it to a Python dictionary
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             best_validation_map_50_95 = float(meta["best_val_map_50_95"]) if meta["best_val_map_50_95"] is not None else float("-inf")
+
+    # === Early stopping ===
+    checkpoint_mgr.early_stopping_state = early_stopping_state
+    completed_epochs = start_epoch
+    # Whether early stopping has been triggered
+    early_stopped = early_stopping_config["enabled"] and early_stopping_state["bad_evaluations"] >= early_stopping_config["patience"]
 
     model.train()
     criterion.train()
@@ -301,6 +315,8 @@ def train_dino(config, resume_dir=None):
     try:
         # START for epoch loop
         for epoch in range(start_epoch, training_config["epochs"]):
+            if early_stopped:
+                break
             if (
                 training_config.get("augment", False)
                 and close_mosaic > 0
@@ -417,13 +433,40 @@ def train_dino(config, resume_dir=None):
             if is_best:
                 best_validation_map_50_95 = validation_map_50_95
                 logger.log_best(epoch + 1, validation_map_50_95)
-            checkpoint_mgr.step(epoch + 1, model, optimizer, scaler, scheduler, is_best=is_best)
+
+            # Early stopping
+            # If early stopping enabled and val map 50-95 calculated for this epoch
+            if early_stopping_config["enabled"] and validation_map_50_95 is not None:
+                reference_map_50_95 = early_stopping_state["reference_val_map_50_95"]
+                # If improvement > min_delta
+                if reference_map_50_95 is None or validation_map_50_95 > reference_map_50_95 + early_stopping_config["min_delta"]:
+                    early_stopping_state["reference_val_map_50_95"] = validation_map_50_95
+                    early_stopping_state["bad_evaluations"] = 0
+                # If improvement <= min_delta
+                else:
+                    early_stopping_state["bad_evaluations"] += 1
+                early_stopped = early_stopping_state["bad_evaluations"] >= early_stopping_config["patience"]
+                remaining_patience = max(early_stopping_config["patience"] - early_stopping_state["bad_evaluations"], 0)
+                logger.info(
+                    f"[EARLY STOPPING] remaining_patience={remaining_patience}/{early_stopping_config['patience']}"
+                )
+
+            completed_epochs = epoch + 1
+            checkpoint_mgr.step(completed_epochs, model, optimizer, scaler, scheduler, is_best=is_best)
+            if early_stopped:
+                logger.info(
+                    f"[EARLY STOPPING] epoch={completed_epochs} | val_map_50_95={validation_map_50_95:.4f} | "
+                    f"reference={early_stopping_state['reference_val_map_50_95']:.4f} | "
+                    f"min_delta={early_stopping_config['min_delta']} | "
+                    f"bad_evaluations={early_stopping_state['bad_evaluations']}/{early_stopping_config['patience']}"
+                )
+                break
 
         # END for epoch loop
 
         # Training ended normally
-        checkpoint_mgr.save_final(training_config["epochs"], model, optimizer, scaler, scheduler)
-        logger.finish()
+        checkpoint_mgr.save_final(completed_epochs, model, optimizer, scaler, scheduler)
+        logger.finish(completed_epochs, early_stopped=early_stopped)
 
     # Like Ctrl + C
     except KeyboardInterrupt:
@@ -498,7 +541,7 @@ def train_dino(config, resume_dir=None):
             conf_thresh=training_config.get("conf_thresh", 0.05),
         )
         logger.info(str(metrics))
-        logger.tb_log_evaluation(metrics, step=training_config["epochs"])
+        logger.tb_log_evaluation(metrics, step=completed_epochs)
         np.save(os.path.join(run_dir, "best_metric.npy"), metrics, allow_pickle=True)
     finally:
         logger.tb_close()

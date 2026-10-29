@@ -29,7 +29,7 @@ Each DINO run writes:
     └── last.pt                # Latest periodic or final model checkpoint
 ```
 
-`run_meta.json` uses the statuses `running`, `resumed`, `done`, `error`, and
+`run_meta.json` uses the statuses `running`, `resumed`, `done`, `done-earlystopped`, `error`, and
 `interrupted`. It is updated after every epoch and when the process finishes,
 fails, or receives `KeyboardInterrupt`.
 
@@ -42,6 +42,8 @@ Checkpoint behavior:
 - Resume reuses the run directory, appends to `train.log`, and restores the
   available model, optimizer, scaler, scheduler, saved epoch, and best
   validation mAP50-95.
+
+`run_meta.json` records the actual last completed epoch, and uses `done-earlystopped` after successful early-stop completion (`done` after the epoch limit). Early-stopping counters/reference are saved in `last_training_state.pt`, not in the metadata.
 
 ## Commands
 

@@ -53,10 +53,10 @@ def save_model_checkpoint(path, model):
     torch.save(checkpoint, path)
 
 
-def save_training_state_checkpoint(path, epoch, optimizer_state_dict, scaler_state_dict, scheduler_state_dict=None):
+def save_training_state_checkpoint(path, epoch, optimizer_state_dict, scaler_state_dict, scheduler_state_dict=None, early_stopping_state=None):
     # Scaler state dict is needed for mixed precision training
-    """Save model epoch, optimizer state dict, scaler state dict and optionally scheduler state dict.
-    For training and resume."""
+    """Save model epoch, optimizer state dict, scaler state dict, early_stopping_state
+    and optionally scheduler state dict. For training and resume."""
     checkpoint = {
         "epoch": epoch,
         "optimizer_state_dict": optimizer_state_dict,
@@ -64,6 +64,7 @@ def save_training_state_checkpoint(path, epoch, optimizer_state_dict, scaler_sta
     }
     if scheduler_state_dict is not None:
         checkpoint["scheduler_state_dict"] = scheduler_state_dict
+    checkpoint["early_stopping_state"] = early_stopping_state
     torch.save(checkpoint, path)
 
 

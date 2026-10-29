@@ -20,6 +20,12 @@ logging:
   # Save last.pt + last_training_state.pt every N epochs (0 = only at end)
   save_period: 5
 
+early_stopping:
+  enabled: true
+  # Consecutive validation mAP50-95 evaluations without sufficient improvement
+  patience: 5
+  min_delta: 0.001
+
 training:
   # ---------- CORE TASK / MODE ----------
   # Both use it to create output dir, YOLO uses it to specify the training task

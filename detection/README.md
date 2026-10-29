@@ -95,6 +95,8 @@ For DINO, `model.init: random` uses a random DETR head; `model.init: pretrained`
 
 Each new task has its own run directory; `training.epochs` applies only to that task. `--resume` restores the interrupted task's state and skips checkpoint initialization.
 
+DINO early stopping is configured with `early_stopping.enabled`, `patience`, and `min_delta`. Patience counts consecutive validation mAP50-95 evaluations without an increase greater than `min_delta` over the early-stopping reference; epochs without evaluation do not count. `best.pt` still tracks every strict mAP50-95 improvement.
+
 ## Output directories
 
 Training runs are stored under:
