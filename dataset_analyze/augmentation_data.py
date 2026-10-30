@@ -1025,7 +1025,7 @@ def appliquer_augmentation(
     return numero
 
 ################################################################################################################
-def transf_image(img, repertoire,  liste_defauts):
+def transf_image(img, repertoire,  liste_defauts, nb_augnentation):
 
     try:
 
@@ -1142,7 +1142,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.augmentation_flip_horizontal(),
                 nom_augmentation="H",
-                nombre= 1,
+                nombre= nb_augnentation[0],
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1155,7 +1155,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.augmentation_flip_vertical(),
                 nom_augmentation="V",
-                nombre= 1,
+                nombre=nb_augnentation[0],
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1168,7 +1168,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.augmentation_rotation(fond),
                 nom_augmentation="R",
-                nombre=nb_augmentation,
+                nombre=nb_augnentation[1],
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1181,7 +1181,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.augmentation_luminosite_contraste(light_data),
                 nom_augmentation="C",
-                nombre=nb_augmentation,
+                nombre=nb_augnentation[3],
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1194,7 +1194,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.augmentation_bruit(noise_range),
                 nom_augmentation="B",
-                nombre=nb_augmentation,
+                nombre=nb_augnentation[3],
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1207,7 +1207,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.augmentation_zoom(zoom_max, fond),
                 nom_augmentation="Z",
-                nombre=nb_augmentation,
+                nombre=nb_augnentation[2],
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1221,7 +1221,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_rot_flip_h(fond),
                 nom_augmentation="R_H",
-                nombre= nb_augmentation,
+                nombre= nb_augnentation[1],
                 numero= numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1234,7 +1234,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_rot_flip_h_cont(fond, light_data),
                 nom_augmentation="R_H_C",
-                nombre= nb_augmentation,
+                nombre= nb_augnentation[1],
                 numero= numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1247,7 +1247,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform= aug.aug_rot_flip_v(fond),
                 nom_augmentation="R_V",
-                nombre= nb_augmentation,
+                nombre= nb_augnentation[1],
                 numero= numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1260,7 +1260,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform= aug.aug_rot_flip_v_cont(fond, light_data),
                 nom_augmentation="R_V_C",
-                nombre= nb_augmentation,
+                nombre= nb_augnentation[1],
                 numero= numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1273,7 +1273,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_zoom_cont(zoom_max, fond, light_data),
                 nom_augmentation="Z_C",
-                nombre=nb_augmentation,
+                nombre=nb_augnentation[2],
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1286,7 +1286,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_zoom_rot(zoom_max, fond),
                 nom_augmentation="Z_R",
-                nombre=nb_augmentation,
+                nombre=nb_augnentation[2],
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1299,7 +1299,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_zoom_rot_cont(zoom_max, fond, light_data),
                 nom_augmentation="Z_R_C",
-                nombre=nb_augmentation,
+                nombre=nb_augnentation[2],
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1312,7 +1312,7 @@ def transf_image(img, repertoire,  liste_defauts):
                 image=image,
                 transform=aug.aug_lum_cont_bruit(light_data, noise_range),
                 nom_augmentation="C_B",
-                nombre=nb_augmentation,
+                nombre=nb_augnentation[3],
                 numero=numero,
                 dossier_sortie=dossier_sortie,
                 nom_source=img.stem,
@@ -1383,7 +1383,7 @@ while reprendre :
         # --------------------------------------------------------
         # Détermination des traitements à effectuer
         # --------------------------------------------------------
-        traitements_a_effectuer = aug.choix_augmentation() 
+        traitements_a_effectuer, nb_traitement = aug.choix_augmentation() 
 
         if len(traitements_a_effectuer) == 0:
             print()
@@ -1394,9 +1394,14 @@ while reprendre :
             # --------------------------------------------------------
             # Nombre d'augmentation à appliquer (par type)
             # --------------------------------------------------------
-            print()
-            nb_augmentation = util.entrer_valeur("Nombre d'augmentation par type", NB_MULTI_MAX) 
 
+            print()
+            print("Il y aura les augmentations suivantes :")
+            print(f"  - Symètrie : x {nb_traitement[0]}")
+            print(f"  - Rotation : x {nb_traitement[1]}")
+            print(f"  - Zoom     : x {nb_traitement[2]}")
+            print(f"  - Autre    : x {nb_traitement[3]}")
+            print()
 
             nb_spret =  util.format_nombre(nombre_sous_repertoires)
             pls = "s" if nombre_sous_repertoires != 1 else ""
@@ -1466,6 +1471,7 @@ while reprendre :
                     nombre_images_creees = transf_image(
                         img=image,
                         repertoire=repertoire,
+                        nb_augnentation=nb_traitement,
                         liste_defauts=liste_defauts
                     )
 

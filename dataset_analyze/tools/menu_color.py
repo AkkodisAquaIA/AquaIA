@@ -299,7 +299,7 @@ class Menu :
                 ]
 
                 # Suppression des doublons tout en conservant l'ordre
-                selections = list(dict.fromkeys(selections))
+                selections = sorted(list(dict.fromkeys(selections)))
 
                 invalides = [
                     choix

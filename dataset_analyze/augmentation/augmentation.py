@@ -11,8 +11,7 @@ from tools import menu_color as menu_c
 from config import constants as cst
 
 
-
-
+#==================================================================================================
 # ------------------------------------------------------------
 # Ensemble des augmentations disponibles 
 # ------------------------------------------------------------
@@ -33,6 +32,14 @@ ZOOM_C           = "Zoom + Contraste"               # 11
 ZOOM_ROTATION    = "Zoom + Rotation"                # 12
 ZOOM_ROTATION_C  = "Zoom + Rotation + Contraste"    # 13
 CONTRASTE_BRUIT = "Contraste + Bruit"               # 14
+
+# ------------------------------------------------------------
+# Nombre maxi de modifications par type
+# ------------------------------------------------------------
+"""
+Pour les Flip H & V, le nombre de modifications est toujours 1
+"""
+NB_MULTI_MAX = 10
 
 
 
@@ -309,6 +316,14 @@ def aug_lum_cont_bruit(light_data, noise_range):
         transformation_bruit(noise_range)
     ])
 
+def nb_augmentation(selections):
+    if selections == [1]:
+        nb_augmentations = 0
+    else:
+        nb_augmentations = util.entrer_valeur("Nombre d'augmentation par type", NB_MULTI_MAX) 
+
+
+    return nb_augmentations
 
 
 # ============================================================
@@ -320,6 +335,7 @@ def choix_augmentation():
     display = dc.DisplayColor()
 
     traitement_a_realiser = []
+    nb_traitement = []
 
     display.titre("Choix des augmentations à appliquer", colors['aqua'])
 
@@ -338,7 +354,15 @@ def choix_augmentation():
                         )
     menu_flip.display_menu()
 
-    for val in menu_flip.multiple_selection():
+    selection = menu_flip.multiple_selection()
+    nb_traitement.append(nb_augmentation(selection))
+
+    # Pour les symètrie, il n'y a qu'Une augmentation
+    if nb_traitement[0] != 0:
+        nb_traitement[0] = 1
+        display.print("Pour les symètries, il n'y a qu'Une augmentation", colors['warning'])
+
+    for val in selection:
         traitement_a_realiser.extend(flip_map.get(val, []))
 
 
@@ -363,7 +387,10 @@ def choix_augmentation():
                     )
     menu_rotation.display_menu()
 
-    for val in menu_rotation.multiple_selection():
+    selection = menu_rotation.multiple_selection() 
+    nb_traitement.append(nb_augmentation(selection))
+
+    for val in selection:
         traitement_a_realiser.extend(rotation_map.get(val, []))
 
 
@@ -386,7 +413,11 @@ def choix_augmentation():
                         )
     menu_zoom.display_menu()
 
-    for val in menu_zoom.multiple_selection():
+    selection = menu_zoom.multiple_selection() 
+    nb_traitement.append(nb_augmentation(selection))
+
+
+    for val in selection:
         traitement_a_realiser.extend(zoom_map.get(val, []))
 
 
@@ -408,9 +439,12 @@ def choix_augmentation():
                         )
     menu_divers.display_menu()
 
-    for val in menu_divers.multiple_selection():
+    selection = menu_divers.multiple_selection()
+    nb_traitement.append(nb_augmentation(selection))
+
+    for val in selection:
         traitement_a_realiser.extend(divers_map.get(val, []))
 
 
-    return traitement_a_realiser
+    return traitement_a_realiser, nb_traitement
 
