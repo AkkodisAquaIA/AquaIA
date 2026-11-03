@@ -106,6 +106,11 @@ def train_dino(config, resume_dir=None):
     log_config = config["logging"]
     early_stopping_config = config["early_stopping"]
     training_config = config["training"]
+    # Seed model initialization, data shuffling and augmentation
+    seed = training_config.setdefault("seed", 42)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     model_init = str(model_config.get("init")).lower()
     init_checkpoint = model_config.get("init_checkpoint")
     # When resuming load last.pt and states no need for checking

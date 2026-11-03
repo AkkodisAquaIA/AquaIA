@@ -23,13 +23,15 @@ logging:
 early_stopping:
   enabled: true
   # Consecutive validation mAP50-95 evaluations without sufficient improvement
-  patience: 5
+  patience: 25
   min_delta: 0.001
 
 training:
   # ---------- CORE TASK / MODE ----------
   # Both use it to create output dir, YOLO uses it to specify the training task
   task: "detect"
+  # Random seed for model initialization, data shuffling and augmentation
+  seed: 42
 
   # ---------- DEVICE ----------
   device: "auto"
@@ -67,25 +69,25 @@ training:
   giou: 2.0
 
   # ---------- DATA AUGMENTATION ----------
-  augment: false
-  hsv_h: 0.005
-  hsv_s: 0.1
-  hsv_v: 0.1
-  degrees: 5
-  translate: 0.05
-  scale: 0.1
-  flipud: 0.1
-  fliplr: 0.5
-  mosaic: 0.01
-  cutmix: 0.01
+  augment: true
+  hsv_h: 0
+  hsv_s: 0
+  hsv_v: 0
+  degrees: 0
+  translate: 0
+  scale: 0
+  flipud: 0
+  fliplr: 0
+  mosaic: 0
+  cutmix: 0
   # Disable Mosaic and CutMix in the last N epochs
   # Make sure close_mosaic <= epochs
-  close_mosaic: 70
+  close_mosaic: 20
 
   # ---------- INFERENCE / EVAL-RELATED ----------
   # Compute val mAP on first/last epochs and every N epochs
   # 0 = first/last epochs only
-  val_map_period: 5
+  val_map_period: 1
   # !Temporary! Seed used to sample training set for post-training mAP evaluation
   train_subset_seed: 42
   # !Temporary! Fraction of sampling, for COCO use 0.34
