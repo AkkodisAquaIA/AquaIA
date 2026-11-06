@@ -4,7 +4,7 @@ import yaml
 def print_train_config(config):
     """Prints config when training."""
     print("\n=== Training Config ===")
-    for section_name in ("model", "data", "training", "output"):
+    for section_name in ("model", "data", "copy_paste_data", "training", "output"):
         if section_name not in config:
             continue
         print(f"\n[{section_name}]")

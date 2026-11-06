@@ -23,6 +23,7 @@ from ultralytics import YOLO
 from ultralytics.data.build import build_dataloader
 from ultralytics.data.dataset import YOLODataset
 from ultralytics.models.yolo.detect import DetectionTrainer, DetectionValidator
+from ultralytics.utils import LOGGER
 
 from data_augmentation.detection_augmentation.copy_and_paste_augmentation import (
     LOSSLESS_EXTENSIONS,
@@ -490,22 +491,145 @@ class YOLOCopyPasteDataset(CopyPasteDataset):
 
     collate_fn = staticmethod(YOLODataset.collate_fn)
 
-    def __getitem__(self, index):
+    def get_image_and_label(self, index):
+        """Generate an unformatted Ultralytics label ready for train transforms."""
         sample = super().__getitem__(index)
         labels = sample["target"]["labels"]
         height, width = sample["image"].shape[1:]
+        # Ultralytics detection transforms operate on uint8 BGR HWC images and
+        # Instances objects. MixedRealCopyPasteYOLODataset completes the latter
+        # conversion with the real YOLO dataset so both sources use one exact
+        # augmentation pipeline.
+        image = (sample["image"] * 255).round().to(torch.uint8).permute(1, 2, 0).numpy()
+        image = np.ascontiguousarray(image[:, :, ::-1])
 
         return {
-            # Le Trainer YOLO effectue lui-même la division par 255.
-            "img": (sample["image"] * 255).round().to(torch.uint8),
-            "cls": labels.float().view(-1, 1),
-            "bboxes": sample["target"]["boxes"],
-            "batch_idx": torch.zeros(len(labels), dtype=torch.long),
+            "img": image,
+            "cls": labels.numpy().astype(np.float32, copy=False).reshape(-1, 1),
+            "bboxes": sample["target"]["boxes"].numpy().astype(np.float32, copy=False),
+            "segments": [],
+            "keypoints": None,
+            "bbox_format": "xywh",
+            "normalized": True,
             "im_file": sample["img_path"],
             "ori_shape": (height, width),
             "resized_shape": (height, width),
-            "ratio_pad": ((1.0, 1.0), (0, 0)),
+            "ratio_pad": (1.0, 1.0),
         }
+
+    def __getitem__(self, index):
+        # Standalone use keeps the already formatted representation expected by
+        # YOLODataset.collate_fn. The mixed trainer instead calls
+        # get_image_and_label() and applies the real dataset transforms below.
+        label = self.get_image_and_label(index)
+        image = torch.from_numpy(label["img"][:, :, ::-1].copy()).permute(2, 0, 1)
+        labels = torch.from_numpy(label["cls"]).view(-1)
+
+        return {
+            # Le Trainer YOLO effectue lui-même la division par 255.
+            "img": image,
+            "cls": labels.float().view(-1, 1),
+            "bboxes": torch.from_numpy(label["bboxes"]),
+            "batch_idx": torch.zeros(len(labels), dtype=torch.long),
+            "im_file": label["im_file"],
+            "ori_shape": label["ori_shape"],
+            "resized_shape": label["resized_shape"],
+        }
+
+
+class MixedRealCopyPasteYOLODataset(Dataset):
+    """Mélange un passage sur le vrai train et des compositions copy-paste."""
+
+    collate_fn = staticmethod(YOLODataset.collate_fn)
+
+    def __init__(self, real_dataset, synthetic_dataset):
+        if len(real_dataset) == 0 or len(synthetic_dataset) == 0:
+            raise ValueError("Les datasets réel et copy-paste doivent être non vides.")
+        self.real_dataset = real_dataset
+        self.synthetic_dataset = synthetic_dataset
+        # Attributs consultés par DetectionTrainer pour les graphiques et close_mosaic.
+        self.labels = real_dataset.labels
+        self.im_files = real_dataset.im_files
+        self.rect = False
+        self.mosaic = getattr(real_dataset, "mosaic", False)
+
+    @property
+    def real_count(self):
+        return len(self.real_dataset)
+
+    @property
+    def synthetic_count(self):
+        return len(self.synthetic_dataset)
+
+    def __len__(self):
+        return self.real_count + self.synthetic_count
+
+    def __getitem__(self, index):
+        index = int(index)
+        if index < self.real_count:
+            return self.real_dataset[index]
+        # Apply the exact native YOLO train pipeline (HSV, geometry, flips,
+        # mosaic, Format, etc.) to synthetic samples too. Previously synthetic
+        # images bypassed these transforms and only real LPL images received
+        # native YOLO augmentation.
+        label = self.synthetic_dataset.get_image_and_label(index - self.real_count)
+        label = self.real_dataset.update_labels_info(label)
+        return self.real_dataset.transforms(label)
+
+    def set_epoch(self, epoch):
+        self.synthetic_dataset.set_epoch(epoch)
+
+    def close_mosaic(self, hyp):
+        self.mosaic = False
+        if hasattr(self.real_dataset, "close_mosaic"):
+            self.real_dataset.close_mosaic(hyp)
+
+
+class MixedRealCopyPasteYOLOTrainer(DetectionTrainer):
+    """Trainer YOLO avec train réel + copy-paste et validation réelle uniquement."""
+
+    configured_dataset = None
+
+    @classmethod
+    def configure(cls, parameters):
+        cls.configured_dataset = dict(parameters)
+
+    def __init__(self, *args, **kwargs):
+        if self.configured_dataset is None:
+            raise RuntimeError("Appeler MixedRealCopyPasteYOLOTrainer.configure() avant l'entraînement.")
+        self.copy_paste_parameters = dict(self.configured_dataset)
+        super().__init__(*args, **kwargs)
+        self.add_callback("on_train_epoch_start", self._set_copy_paste_epoch)
+
+    def build_dataset(self, img_path, mode="train", batch=None):
+        real_dataset = super().build_dataset(img_path, mode=mode, batch=batch)
+        if mode != "train":
+            # La sélection de best.pt doit mesurer uniquement les vraies images val.
+            return real_dataset
+
+        parameters = dict(self.copy_paste_parameters)
+        synthetic_fraction = float(parameters.pop("synthetic_fraction", 0.5))
+        if not 0 < synthetic_fraction < 1:
+            raise ValueError("copy_paste_data.synthetic_fraction doit être strictement entre 0 et 1.")
+        synthetic_count = max(1, round(len(real_dataset) * synthetic_fraction / (1 - synthetic_fraction)))
+        synthetic_dataset = YOLOCopyPasteDataset(
+            length=synthetic_count,
+            image_size=self.args.imgsz,
+            split="train",
+            **parameters,
+        )
+        mixed_dataset = MixedRealCopyPasteYOLODataset(real_dataset, synthetic_dataset)
+        LOGGER.info(
+            "Mixed LPL train: %d real + %d copy-paste images per epoch (%.1f%% synthetic)",
+            mixed_dataset.real_count,
+            mixed_dataset.synthetic_count,
+            100 * mixed_dataset.synthetic_count / len(mixed_dataset),
+        )
+        return mixed_dataset
+
+    @staticmethod
+    def _set_copy_paste_epoch(trainer):
+        trainer.train_loader.dataset.set_epoch(trainer.epoch)
 
 
 class CopyPasteYOLOTrainer(DetectionTrainer):

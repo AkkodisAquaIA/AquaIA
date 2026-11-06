@@ -1,0 +1,312 @@
+# Un seul fichier pilote toute la suite : entraînements, inférences et tableau final.
+benchmark:
+  name: "detection_standardized_benchmark"
+  output_dir: "results/benchmarks/detection_standardized_benchmark"
+  continue_on_error: false
+  auto_compute_stats: true
+  ranking_dataset: "lpl"
+
+model:
+  family: "yolo11"
+  size: "n"
+  pretrained_checkpoint: "yolo11n.pt"
+
+# Pour un nouveau jeu de données, il suffit notamment de modifier ces chemins.
+datasets:
+  lpl:
+    root: "datasets/LPL_dataset_final/dataset"
+    img_format: "TIF"
+  aquatic_insects:
+    root: "datasets/aquatic_insects_v7_1classe"
+    img_format: "jpg"
+
+# Protocole commun. La patience élevée limite les arrêts dus au bruit de la petite validation LPL.
+# Le batch 2 est volontairement identique pour isoler l'effet des résolutions 640/1024/2048.
+training_defaults:
+  task: "detect"
+  device: "auto"
+  imgsz: 640
+  batch: 2
+  workers: 3
+  epochs: 500
+  patience: 100
+  optimizer: "AdamW"
+  lr0: 0.0001
+  lrf: 0.05
+  cos_lr: true
+  weight_decay: 0.00005
+  cls: 4.0
+  box: 5.0
+  dfl: 1.5
+  conf: 0.001
+  iou: 0.5
+  val: true
+  seed: 42
+  deterministic: true
+  compile: false
+
+# mAP calculée avec les prédictions à partir de 0.001 ; précision/rappel au seuil 0.05.
+inference_defaults:
+  imgsz: 640
+  batch: 2
+  workers: 3
+  conf_thresh: 0.001
+  pr_conf_thresh: 0.05
+  conf: 0.10
+  iou: 0.5
+  num_samples: 20
+  seed: 0
+
+copy_paste_defaults: &copy_paste_defaults
+  enabled: true
+  cutout_dir: "datasets/LPL_dataset_cutouts_sam3_filtered_by_split/train"
+  background_dir: "datasets/Images_fond_blanc_&_bruits"
+  synthetic_fraction: 0.5
+  min_macroinvertebrates: 4
+  max_macroinvertebrates: 10
+  padding: 0.08
+  max_rotation: 180
+  cutout_scale_range: [0.8, 1.2]
+  allow_overlap: true
+  iou_max: 1.0
+  multi_class: false
+  use_noisy_backgrounds: true
+  cache_backgrounds: true
+
+augmentation_profiles:
+  none:
+    training: &no_yolo_augmentation
+      hsv_h: 0
+      hsv_s: 0
+      hsv_v: 0
+      degrees: 0
+      translate: 0
+      scale: 0
+      flipud: 0
+      fliplr: 0
+      mosaic: 0
+      mixup: 0
+      cutmix: 0
+      copy_paste: 0
+      close_mosaic: 0
+
+  yolo_standard:
+    training:
+      hsv_h: 0.015
+      hsv_s: 0.3
+      hsv_v: 0.3
+      degrees: 180
+      translate: 0.1
+      scale: 0.3
+      flipud: 0.5
+      fliplr: 0.5
+      mosaic: 0.5
+      mixup: 0
+      cutmix: 0
+      copy_paste: 0
+      close_mosaic: 25
+
+  yolo_moderate:
+    training:
+      hsv_h: 0.01
+      hsv_s: 0.15
+      hsv_v: 0.15
+      degrees: 20
+      translate: 0.05
+      scale: 0.15
+      flipud: 0.5
+      fliplr: 0.5
+      mosaic: 0.2
+      mixup: 0
+      cutmix: 0
+      copy_paste: 0
+      close_mosaic: 25
+
+  copy_paste:
+    training: *no_yolo_augmentation
+    copy_paste_data: *copy_paste_defaults
+
+  copy_paste_yolo_light:
+    training:
+      hsv_h: 0.005
+      hsv_s: 0.1
+      hsv_v: 0.1
+      degrees: 10
+      translate: 0.03
+      scale: 0.1
+      flipud: 0.5
+      fliplr: 0.5
+      mosaic: 0
+      mixup: 0
+      cutmix: 0
+      copy_paste: 0
+      close_mosaic: 0
+    copy_paste_data: *copy_paste_defaults
+
+experiments:
+  - id: M0
+    initialization_label: "COCO"
+    training_label: "Aucun"
+    imgsz: 640
+    init:
+      type: pretrained
+    evaluate:
+      dataset: lpl
+      split: test
+      overrides:
+        single_class: true
+
+  - id: M1
+    initialization_label: "M0"
+    training_label: "LPL sans augmentation"
+    imgsz: 640
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: none
+      overrides: {imgsz: 640}
+    evaluate: {dataset: lpl, split: test}
+
+  - id: M2
+    initialization_label: "M0"
+    training_label: "Aquatic Insects sans augmentation"
+    imgsz: 640
+    init: {type: experiment, experiment: M0}
+    # Supprimer cette section pour réentraîner M2 avec les paramètres globaux.
+    reuse:
+      checkpoint: "results/detect/yolo11_n_pretrained/20261016_103935/weights/best.pt"
+      run_dir: "results/detect/yolo11_n_pretrained/20261016_103935"
+    train:
+      dataset: aquatic_insects
+      augmentation: none
+      overrides: {imgsz: 640}
+    evaluate: {dataset: aquatic_insects, split: test}
+
+  - id: M3
+    initialization_label: "M0"
+    training_label: "Aquatic Insects avec augmentation YOLO"
+    imgsz: 640
+    init: {type: experiment, experiment: M0}
+    # Le pré-fine-tuning Roboflow existant est réutilisé ; M4 recevra ce best.pt.
+    reuse:
+      checkpoint: "results/detect/yolo11_n_pretrained/20261015_153825/weights/best.pt"
+      run_dir: "results/detect/yolo11_n_pretrained/20261015_153825"
+    train:
+      dataset: aquatic_insects
+      augmentation: yolo_standard
+      overrides: {imgsz: 640}
+    evaluate: {dataset: aquatic_insects, split: test}
+
+  - id: M4
+    initialization_label: "M3"
+    training_label: "LPL sans augmentation"
+    imgsz: 640
+    init: {type: experiment, experiment: M3}
+    train:
+      dataset: lpl
+      augmentation: none
+      overrides: {imgsz: 640}
+    evaluate: {dataset: lpl, split: test}
+
+  - id: M5
+    initialization_label: "M0"
+    training_label: "LPL avec augmentation YOLO"
+    imgsz: 640
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: yolo_standard
+      overrides: {imgsz: 640}
+    evaluate: {dataset: lpl, split: test}
+
+  - id: M6
+    initialization_label: "M0"
+    training_label: "LPL avec Copy-Paste"
+    imgsz: 640
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: copy_paste
+      overrides: {imgsz: 640}
+    evaluate: {dataset: lpl, split: test}
+
+  - id: M7
+    initialization_label: "M0"
+    training_label: "LPL avec Copy-Paste"
+    imgsz: 1024
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: copy_paste
+      overrides: {imgsz: 1024}
+    evaluate:
+      dataset: lpl
+      split: test
+      overrides: {imgsz: 1024}
+
+  - id: M8
+    initialization_label: "M0"
+    training_label: "LPL avec Copy-Paste"
+    imgsz: 2048
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: copy_paste
+      overrides: {imgsz: 2048}
+    evaluate:
+      dataset: lpl
+      split: test
+      overrides: {imgsz: 2048}
+
+  - id: M9
+    initialization_label: "M0"
+    training_label: "LPL sans augmentation"
+    imgsz: 1024
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: none
+      overrides: {imgsz: 1024}
+    evaluate:
+      dataset: lpl
+      split: test
+      overrides: {imgsz: 1024}
+
+  - id: M10
+    initialization_label: "M0"
+    training_label: "LPL sans augmentation"
+    imgsz: 2048
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: none
+      overrides: {imgsz: 2048}
+    evaluate:
+      dataset: lpl
+      split: test
+      overrides: {imgsz: 2048}
+
+  - id: M11
+    initialization_label: "M0"
+    training_label: "LPL avec augmentation YOLO modérée"
+    imgsz: 640
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: yolo_moderate
+      overrides: {imgsz: 640}
+    evaluate: {dataset: lpl, split: test}
+
+  - id: M12
+    initialization_label: "M0"
+    training_label: "LPL avec Copy-Paste et augmentations légères"
+    imgsz: 1024
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: copy_paste_yolo_light
+      overrides: {imgsz: 1024}
+    evaluate:
+      dataset: lpl
+      split: test
+      overrides: {imgsz: 1024}

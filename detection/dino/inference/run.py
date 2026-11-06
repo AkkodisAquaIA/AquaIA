@@ -82,6 +82,7 @@ def infer_dino(config, context):
         dataloaders=[infer_loader],
         predict_fn=predict,
         conf_thresh=inference_config.get("conf_thresh", 0.05),
+        pr_conf_thresh=inference_config.get("pr_conf_thresh"),
         device=device,
     )
     print(metrics)

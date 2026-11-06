@@ -598,6 +598,93 @@ def refine_sam3_instance(
     return image_crop, refined_mask, (crop_left, crop_top)
 
 
+def create_sam3_cutout_from_box(
+    original_image,
+    normalized_box,
+    model,
+    processor,
+    device,
+    context_ratio=0.5,
+    threshold=0.3,
+    max_size=1008,
+    full_resolution=True,
+):
+    """Détoure un objet SAM3 guidé par une bounding box YOLO connue."""
+
+    import torch
+
+    image_height, image_width = original_image.shape[:2]
+    _, center_x, center_y, box_width, box_height = normalized_box
+    left = max(0, round((center_x - box_width / 2) * image_width))
+    top = max(0, round((center_y - box_height / 2) * image_height))
+    right = min(image_width, round((center_x + box_width / 2) * image_width))
+    bottom = min(image_height, round((center_y + box_height / 2) * image_height))
+    if right <= left or bottom <= top:
+        return None
+
+    margin_x = round((right - left) * context_ratio)
+    margin_y = round((bottom - top) * context_ratio)
+    crop_left = max(0, left - margin_x)
+    crop_top = max(0, top - margin_y)
+    crop_right = min(image_width, right + margin_x)
+    crop_bottom = min(image_height, bottom + margin_y)
+    image_crop = original_image[crop_top:crop_bottom, crop_left:crop_right]
+
+    model_image = Image.fromarray(image_crop)
+    model_image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+    scale_x = model_image.width / image_crop.shape[1]
+    scale_y = model_image.height / image_crop.shape[0]
+    local_box = (
+        (left - crop_left) * scale_x,
+        (top - crop_top) * scale_y,
+        (right - crop_left) * scale_x,
+        (bottom - crop_top) * scale_y,
+    )
+    inputs = processor(
+        images=model_image,
+        input_boxes=[[[*local_box]]],
+        input_boxes_labels=[[1]],
+        return_tensors="pt",
+    ).to(device)
+    with torch.inference_mode():
+        outputs = model(**inputs)
+    move_sam3_outputs_to_cpu(outputs)
+    result = processor.post_process_instance_segmentation(
+        outputs,
+        threshold=threshold,
+        mask_threshold=0.5,
+        target_sizes=inputs["original_sizes"].tolist(),
+    )[0]
+
+    candidates = []
+    for candidate in result["masks"]:
+        candidate = candidate.numpy().astype(bool)
+        y, x = np.where(candidate)
+        if not len(x):
+            continue
+        candidate_box = (x.min(), y.min(), x.max() + 1, y.max() + 1)
+        candidates.append((box_iou(candidate_box, local_box), candidate))
+    if not candidates:
+        return None
+
+    _, mask = max(candidates, key=lambda item: item[0])
+    mask = np.asarray(
+        Image.fromarray(mask).resize(
+            (image_crop.shape[1], image_crop.shape[0]),
+            Image.Resampling.NEAREST,
+        )
+    ).astype(bool)
+    if full_resolution:
+        mask = refine_mask_full_resolution(image_crop, mask)
+    if not mask.any():
+        return None
+
+    y, x = np.where(mask)
+    image_crop = image_crop[y.min() : y.max() + 1, x.min() : x.max() + 1]
+    mask = mask[y.min() : y.max() + 1, x.min() : x.max() + 1]
+    return Image.fromarray(np.dstack((image_crop, mask.astype(np.uint8) * 255)))
+
+
 def create_cutouts_sam3(
     source_dir,
     output_dir,
@@ -611,16 +698,23 @@ def create_cutouts_sam3(
     full_resolution=True,
     class_name="macroinvertebrates",
     create_labels=True,
+    model=None,
+    processor=None,
+    device=None,
 ):
     """Crée les PNG détourés et les labels YOLO des images originales."""
 
     import torch
-    from transformers import Sam3Model, Sam3Processor
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Chargement de SAM3 sur {device}...")
-    processor = Sam3Processor.from_pretrained(model_id)
-    model = Sam3Model.from_pretrained(model_id).to(device).eval()
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    if (model is None) != (processor is None):
+        raise ValueError("model et processor doivent être fournis ensemble.")
+    if model is None:
+        from transformers import Sam3Model, Sam3Processor
+
+        print(f"Chargement de SAM3 sur {device}...")
+        processor = Sam3Processor.from_pretrained(model_id)
+        model = Sam3Model.from_pretrained(model_id).to(device).eval()
 
     source_dir = Path(source_dir)
     output_dir = Path(output_dir)

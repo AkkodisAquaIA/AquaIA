@@ -15,7 +15,11 @@ def infer_yolo(config, context):
     data_cfg = config["data"]
     # Bind the configured NMS IoU to predict so shared evaluation and visualization
     # functions can call it without accepting a YOLO-specific iou argument
-    predict_fn = partial(predict, iou=float(inference_config.get("iou", 0.5)))
+    predict_fn = partial(
+        predict,
+        iou=float(inference_config.get("iou", 0.5)),
+        single_class=bool(inference_config.get("single_class", False)),
+    )
 
     device = context["device"]
     checkpoint_path = context["checkpoint_path"]
@@ -59,6 +63,7 @@ def infer_yolo(config, context):
         dataloaders=[infer_loader],
         predict_fn=predict_fn,
         conf_thresh=inference_config.get("conf_thresh", 0.05),
+        pr_conf_thresh=inference_config.get("pr_conf_thresh"),
         device=device,
     )
     print(metrics)

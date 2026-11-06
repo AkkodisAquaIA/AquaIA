@@ -45,7 +45,11 @@ def _get_sorted_image_files(dataset_dir):
 
 
 def compute_and_save_stats(dataset_name=DATASET_NAME, image_size=IMAGE_SIZE):
-    dataset_dir = os.path.join(BASE_DIR, "datasets", dataset_name)
+    dataset_candidate = Path(dataset_name).expanduser()
+    if dataset_candidate.is_absolute() or dataset_candidate.is_dir():
+        dataset_dir = dataset_candidate.resolve()
+    else:
+        dataset_dir = (BASE_DIR / "datasets" / dataset_candidate).resolve()
     sorted_files = _get_sorted_image_files(dataset_dir)
     n = len(sorted_files)
     if n == 0:
@@ -60,6 +64,7 @@ def compute_and_save_stats(dataset_name=DATASET_NAME, image_size=IMAGE_SIZE):
     sum_ = np.zeros(channels, dtype=np.float64)
     sum_sq_ = np.zeros(channels, dtype=np.float64)
 
+    processed_images = 0
     for idx, file_path in enumerate(sorted_files):
         try:
             # Read image, transform to RGB, resize and normalize
@@ -74,6 +79,7 @@ def compute_and_save_stats(dataset_name=DATASET_NAME, image_size=IMAGE_SIZE):
                 # sum_ and sum_sq_ are of shape (3,) for RGB channels
                 sum_ += np.sum(arr, axis=(1, 2))
                 sum_sq_ += np.sum(arr**2, axis=(1, 2))
+                processed_images += 1
 
         except Exception as e:
             print(f"Failed to read image {file_path}: {e}")
@@ -84,7 +90,9 @@ def compute_and_save_stats(dataset_name=DATASET_NAME, image_size=IMAGE_SIZE):
             print(f"Processed: {idx + 1}/{n}")
 
     # Calculate final channel wise mean and std
-    total_pixels = n * pixel_count_per_img
+    if processed_images == 0:
+        raise RuntimeError(f"No readable images found under {dataset_dir / 'images'}")
+    total_pixels = processed_images * pixel_count_per_img
     mean = sum_ / total_pixels
     # Variance = E[X^2] - (E[X])^2
     var = (sum_sq_ / total_pixels) - (mean**2)
@@ -95,7 +103,7 @@ def compute_and_save_stats(dataset_name=DATASET_NAME, image_size=IMAGE_SIZE):
     stats = {"mean": mean.astype(np.float32), "std": std.astype(np.float32)}
 
     # Keep statistics for different input sizes in separate files
-    output_path = os.path.join(dataset_dir, f"stats_{image_size}.npy")
+    output_path = dataset_dir / f"stats_{image_size}.npy"
     np.save(output_path, stats)
     print(f"Statistics computation completed! Saved to: {output_path}")
     print(f"Mean: {stats['mean']}, Std: {stats['std']}")

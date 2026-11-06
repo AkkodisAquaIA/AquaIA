@@ -55,6 +55,25 @@ def train_yolo(config) -> Any:
     model_id = resolve_model_identifier(model_config)
     model = YOLO(model_id)
 
+    copy_paste_config = dict(config.get("copy_paste_data", {}))
+    use_copy_paste = bool(copy_paste_config.pop("enabled", False))
+    trainer_class = None
+    if use_copy_paste:
+        from data_augmentation.detection_augmentation.copy_paste_dataset import (
+            MixedRealCopyPasteYOLOTrainer,
+        )
+
+        cutout_dir = Path(copy_paste_config.get("cutout_dir", ""))
+        background_dir = Path(copy_paste_config.get("background_dir", ""))
+        if not cutout_dir.is_dir():
+            raise FileNotFoundError(f"[CONFIG ERROR] Copy-paste cutout directory not found: {cutout_dir.resolve()}")
+        if not background_dir.is_dir():
+            raise FileNotFoundError(f"[CONFIG ERROR] Copy-paste background directory not found: {background_dir.resolve()}")
+        copy_paste_config["cutout_dir"] = cutout_dir.resolve()
+        copy_paste_config["background_dir"] = background_dir.resolve()
+        MixedRealCopyPasteYOLOTrainer.configure(copy_paste_config)
+        trainer_class = MixedRealCopyPasteYOLOTrainer
+
     configured_device = training_config.get("device", "auto")
     if configured_device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -143,6 +162,8 @@ def train_yolo(config) -> Any:
 
     # ---------- Train ----------
     try:
+        if trainer_class is not None:
+            return model.train(trainer=trainer_class, **train_args)
         return model.train(**train_args)
     finally:
         tensorboard_writer.close()

@@ -6,7 +6,7 @@ def normalize_imgsz(config, phase):
     return int(config[phase]["imgsz"])
 
 
-def predict(model, samples, device, conf_thres, imgsz=None, iou=0.5):
+def predict(model, samples, device, conf_thres, imgsz=None, iou=0.5, single_class=False):
     """Return pixel xyxy boxes in the resized sample image coordinate system.
     For YOLO inference."""
     image_files = samples["img_paths"]
@@ -36,11 +36,14 @@ def predict(model, samples, device, conf_thres, imgsz=None, iou=0.5):
         scaled_boxes = boxes.xyxy.to(device=device, dtype=torch.float32).clone()
         scaled_boxes[:, [0, 2]] *= target_width / original_width
         scaled_boxes[:, [1, 3]] *= target_height / original_height
+        labels = boxes.cls.to(device=device, dtype=torch.int64)
+        if single_class:
+            labels = torch.zeros_like(labels)
         preds.append(
             {
                 "boxes": scaled_boxes,
                 "scores": boxes.conf.to(device),
-                "labels": boxes.cls.to(device=device, dtype=torch.int64),
+                "labels": labels,
             }
         )
     return preds

@@ -1,6 +1,7 @@
 import argparse
 import os
 from detection.runner import train_from_config, infer_from_config
+from detection.benchmark import add_benchmark_arguments, handle_benchmark
 
 
 def build_parser():
@@ -24,6 +25,10 @@ def build_parser():
     infer_parser = subparsers.add_parser("infer", help="Run inference on the specified dataset and split")
     infer_parser.add_argument("--config", type=str, default=os.path.join("detection", "infer_config_dino.yaml"))
     infer_parser.set_defaults(command_handler=handle_infer)
+
+    benchmark_parser = subparsers.add_parser("benchmark", help="Run a configurable detection experiment suite")
+    add_benchmark_arguments(benchmark_parser)
+    benchmark_parser.set_defaults(command_handler=handle_benchmark)
 
     return parser
 

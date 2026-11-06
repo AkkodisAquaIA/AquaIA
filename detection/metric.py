@@ -107,7 +107,7 @@ def save_metrics(metrics, output_dir):
 
 
 @torch.no_grad()
-def evaluate_map(predictions, targets, imgsz, split, device):
+def evaluate_map(predictions, targets, imgsz, split, device, pr_conf_thresh=None):
     """Compute detection metrics for a given split during training and inference.
     predictions xyxy pixel coords. target boxes cxcywh."""
     # Create a mAP calculator
@@ -148,9 +148,14 @@ def evaluate_map(predictions, targets, imgsz, split, device):
     false_positives = 0
     false_negatives = 0
     for prediction, reference in zip(predictions, refs):
-        pred_boxes = prediction["boxes"]
-        pred_labels = prediction["labels"]
         pred_scores = prediction["scores"]
+        if pr_conf_thresh is None:
+            keep = torch.ones_like(pred_scores, dtype=torch.bool)
+        else:
+            keep = pred_scores >= float(pr_conf_thresh)
+        pred_boxes = prediction["boxes"][keep]
+        pred_labels = prediction["labels"][keep]
+        pred_scores = pred_scores[keep]
         target_boxes = reference["boxes"]
         target_labels = reference["labels"]
         matched_targets = torch.zeros(len(target_boxes), dtype=torch.bool, device=target_boxes.device)
@@ -184,7 +189,7 @@ def evaluate_map(predictions, targets, imgsz, split, device):
 
 
 @torch.no_grad()
-def compute_metrics(model, dataloaders, predict_fn, device, conf_thresh):
+def compute_metrics(model, dataloaders, predict_fn, device, conf_thresh, pr_conf_thresh=None):
     """Compute mAP50 mAP50_95 metrics for a model on given dataloaders using a prediction function. For training and inference."""
     all_metrics = {}
     # Each split has its dataloader
@@ -210,6 +215,7 @@ def compute_metrics(model, dataloaders, predict_fn, device, conf_thresh):
             imgsz=imgsz,
             split=loader.dataset.data_split,
             device=device,
+            pr_conf_thresh=pr_conf_thresh,
         )
         all_metrics.update(metrics)
     return all_metrics
