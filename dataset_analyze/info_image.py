@@ -677,26 +677,28 @@ def calculer_seuil_depuis_difference(
     # Application de la marge et des limites
     # --------------------------------------------------------
 
-    seuil += float(marge_seuil)
+    if seuil_mad <= epsilon:
+        seuil = seuil_percentile
+        methode_seuil = "percentile périphérique, seuil MAD nul"
 
+    elif rapport_percentile_mad < 0.8:
+        seuil = seuil_percentile
+        methode_seuil = "percentile périphérique"
+
+    elif rapport_percentile_mad > 2.5:
+        seuil = mediane + 6.0 * sigma_robuste
+        methode_seuil = "MAD renforcé, percentile périphérique suspect"
+
+    else:
+        seuil = max(seuil_mad, seuil_percentile)
+        methode_seuil = "maximum MAD / percentile périphérique"
+
+    seuil += float(marge_seuil)
     seuil = max(float(seuil_min), float(seuil))
 
     if seuil_max is not None:
         seuil = min(float(seuil_max), seuil)
-
-    # seuil à utiliser 
-
-    # seuil = seuil * 0.8            # seuil_percentile        
-    if rapport_percentile_mad < 0.8:
-        seuil = seuil_percentile
-
-    elif rapport_percentile_mad > 2.5:
-        seuil = mediane + 6 * sigma_robuste
-
-    else:
-        seuil = max(seuil_mad,  seuil_percentile)
-
- 
+    
 
     # --------------------------------------------------------
     # Informations de diagnostic
@@ -1029,30 +1031,6 @@ def detecter_zone_depuis_masque(masque):
     )
 
 
-def detecter_zone_bestiole(
-    image,
-    seuil=None
-):
-    """
-    Crée le masque puis calcule la bounding box.
-
-    Cette fonction reste disponible pour une utilisation
-    indépendante. Dans le programme principal, le masque
-    n'est calculé qu'une seule fois.
-    """
-
-    masque_bestiole, _, _, _ = creer_masque_bestiole(
-        voir_image=voir_image,
-        rep=repertoire, 
-        image=image,
-        seuil=seuil
-    )
-
-    return detecter_zone_depuis_masque(
-        masque_bestiole
-    )
-
-
 def ajouter_marge_bbox(
     image,
     bbox,
@@ -1126,30 +1104,6 @@ def calculer_occupation_depuis_masque(masque_bestiole):
         occupation_pct=float(occupation_pct),
         surface_bestiole=float(surface_bestiole),
         surface_image=float(surface_image)
-    )
-
-
-def calculer_occupation(
-    image,
-    seuil=None
-):
-    """
-    Crée un masque et calcule l'occupation réelle.
-
-    Pour éviter les recalculs, utiliser de préférence
-    calculer_occupation_depuis_masque() lorsqu'un masque
-    est déjà disponible.
-    """
-
-    masque_bestiole, _, _, _ = creer_masque_bestiole(
-        voir_image=voir_image,
-        rep=repertoire,
-        image=image,
-        seuil=seuil
-    )
-
-    return calculer_occupation_depuis_masque(
-        masque_bestiole
     )
 
 
@@ -1231,12 +1185,6 @@ def afficher_comparaison_seuils(
 
     nombre_pixels_critiques = int(
         np.count_nonzero(pixels_critiques)
-    )
-
-    nb = util.format_nombre(nombre_pixels_critiques)
-    print(
-        f"Pixels conservés à {seuil:.3f} mais supprimés à "
-        f"{seuil_suivant:.3f} : {nb}"
     )
 
     plt.figure(figsize=(12, 8))

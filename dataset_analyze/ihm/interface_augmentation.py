@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
 import queue
+
 import threading
 import tkinter as tk
-
-from pathlib import Path
+from tkinter import ttk
 from tkinter import filedialog
 from tkinter import messagebox
-from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 
+
+from tools import utility as util
 
 from ihm.moteur_augmentation import (
     ConfigurationAugmentation,
@@ -34,6 +36,12 @@ from ihm.moteur_augmentation import (
     CONTRASTE_BRUIT,
 )
 
+
+
+#==================================================================================================
+
+
+#==================================================================================================
 
 class InterfaceAugmentation(tk.Tk):
 
@@ -322,7 +330,7 @@ class InterfaceAugmentation(tk.Tk):
         traitements_rotation = [
             (
                 ROTATION,
-                "Rotation"
+                "Rotation simple"
             ),
             (
                 ROT_FLIT_H,
@@ -330,7 +338,7 @@ class InterfaceAugmentation(tk.Tk):
             ),
             (
                 ROT_FLIT_H_C,
-                "Rotation + Symétrie H + contraste"
+                "Rotation + Symétrie H + Contraste"
             ),
             (
                 ROT_FLIT_V,
@@ -338,7 +346,7 @@ class InterfaceAugmentation(tk.Tk):
             ),
             (
                 ROT_FLIT_V_C,
-                "Rotation + Symétrie V + contraste"
+                "Rotation + Symétrie V + Contraste"
             ),
         ]
 
@@ -382,7 +390,7 @@ class InterfaceAugmentation(tk.Tk):
             ),
             (
                 CONTRASTE_BRUIT,
-                "Contraste + Bruit"
+                "Luminosité-Contraste + Bruit"
             ),
         ]
 
@@ -411,7 +419,65 @@ class InterfaceAugmentation(tk.Tk):
             traitements_autres
         )
 
-                
+
+        # ----------------------------------------------------
+        # Paramètres
+        # ----------------------------------------------------
+
+        cadre_parametres = ttk.LabelFrame(
+            conteneur,
+            text="Paramètres",
+            padding=10,
+            style="Section.TLabelframe"
+        )
+
+        cadre_parametres.pack(
+            fill="x",
+            pady=(0, 10)
+        )
+
+        self.ajouter_spinbox(
+            cadre_parametres,
+            colonne=0,
+            texte="Seuil détection :",
+            variable=self.seuil_detection_var,
+            minimum=1,
+            maximum=255
+        )
+
+        self.ajouter_spinbox(
+            cadre_parametres,
+            colonne=1,
+            texte="Rotations :",
+            variable=self.nombre_rotation_var,
+            minimum=1,
+            maximum=5
+        )
+
+        self.ajouter_spinbox(
+            cadre_parametres,
+            colonne=2,
+            texte="Zooms :",
+            variable=self.nombre_zoom_var,
+            minimum=1,
+            maximum=5
+        )
+
+        self.ajouter_spinbox(
+            cadre_parametres,
+            colonne=3,
+            texte="Autres :",
+            variable=self.nombre_autre_var,
+            minimum=1,
+            maximum=5
+        )
+
+
+        for colonne in range(4):
+            cadre_parametres.columnconfigure(
+                colonne,
+                weight=1
+            )
 
 
         # ----------------------------------------------------
@@ -444,9 +510,7 @@ class InterfaceAugmentation(tk.Tk):
         # Boutons de commande
         # ----------------------------------------------------
 
-        cadre_boutons = ttk.Frame(
-            conteneur
-        )
+        cadre_boutons = ttk.Frame(conteneur)
 
         cadre_boutons.pack(
             fill="x",
@@ -481,64 +545,6 @@ class InterfaceAugmentation(tk.Tk):
             ipady=4
         )
 
-
-        # ----------------------------------------------------
-        # Paramètres
-        # ----------------------------------------------------
-
-        cadre_parametres = ttk.LabelFrame(
-            conteneur,
-            text="Paramètres",
-            padding=10,
-            style="Section.TLabelframe"
-        )
-
-        cadre_parametres.pack(
-            fill="x",
-            pady=(0, 10)
-        )
-
-        self.ajouter_spinbox(
-            cadre_parametres,
-            colonne=0,
-            texte="Rotations :",
-            variable=self.nombre_rotation_var,
-            minimum=1,
-            maximum=10
-        )
-
-        self.ajouter_spinbox(
-            cadre_parametres,
-            colonne=1,
-            texte="Zooms :",
-            variable=self.nombre_zoom_var,
-            minimum=1,
-            maximum=10
-        )
-
-        self.ajouter_spinbox(
-            cadre_parametres,
-            colonne=2,
-            texte="Autres :",
-            variable=self.nombre_autre_var,
-            minimum=1,
-            maximum=10
-        )
-
-        self.ajouter_spinbox(
-            cadre_parametres,
-            colonne=3,
-            texte="Seuil détection :",
-            variable=self.seuil_detection_var,
-            minimum=1,
-            maximum=255
-        )
-
-        for colonne in range(4):
-            cadre_parametres.columnconfigure(
-                colonne,
-                weight=1
-            )
 
         # ----------------------------------------------------
         # Progression
@@ -655,7 +661,6 @@ class InterfaceAugmentation(tk.Tk):
         )
 
   
-
     # ========================================================
     # COMPOSANTS
     # ========================================================
@@ -758,7 +763,7 @@ class InterfaceAugmentation(tk.Tk):
 
         if not texte_repertoire:
             messagebox.showwarning(
-                "Répertoire manquant",
+                "Répertoire manquant !!",
                 "Sélectionnez un répertoire de travail."
             )
 
@@ -768,7 +773,7 @@ class InterfaceAugmentation(tk.Tk):
 
         if not repertoire.exists():
             messagebox.showerror(
-                "Répertoire introuvable",
+                "Répertoire introuvable !!",
                 "Le répertoire sélectionné n'existe pas."
             )
 
@@ -776,7 +781,7 @@ class InterfaceAugmentation(tk.Tk):
 
         if not repertoire.is_dir():
             messagebox.showerror(
-                "Sélection incorrecte",
+                "Sélection incorrecte !!",
                 "Le chemin sélectionné n'est pas un répertoire."
             )
 
@@ -786,7 +791,7 @@ class InterfaceAugmentation(tk.Tk):
 
         if not traitements:
             messagebox.showwarning(
-                "Aucune augmentation",
+                "Aucune augmentation sélectionnée !!",
                 "Sélectionnez au moins une augmentation."
             )
 
@@ -800,7 +805,7 @@ class InterfaceAugmentation(tk.Tk):
 
         except tk.TclError:
             messagebox.showerror(
-                "Paramètre incorrect",
+                "Paramètre incorrect !!",
                 "Un ou plusieurs paramètres numériques sont incorrects."
             )
 
@@ -969,10 +974,19 @@ class InterfaceAugmentation(tk.Tk):
 
         elif evenement.type == "statistiques":
 
+            nombre_images_creees = evenement.donnees.get(
+                "images_creees",
+                0
+            )
+
             self.images_creees_var.set(
+                util.format_nombre(nombre_images_creees)
+            )
+
+            self.defauts_var.set(
                 str(
                     evenement.donnees.get(
-                        "images_creees",
+                        "defauts",
                         0
                     )
                 )
@@ -1052,6 +1066,11 @@ class InterfaceAugmentation(tk.Tk):
             # --------------------------------------------------------
             # Résumé d'un traitement normal
             # --------------------------------------------------------
+            
+            img_source = util.format_nombre(resume.nombre_images_sources)
+            img_creed  = util.format_nombre(resume.nombre_images_creees)
+            prod_detec = len(resume.defauts)
+
             lignes = [
                 (
                     f"Répertoires traités : "
@@ -1060,11 +1079,11 @@ class InterfaceAugmentation(tk.Tk):
                 ),
                 (
                     f"Images sources traitées : "
-                    f"{resume.nombre_images_sources}"
+                    f"{img_source}"
                 ),
                 (
                     f"Images augmentées créées : "
-                    f"{resume.nombre_images_creees}"
+                    f"{img_creed}"
                 ),
                 (
                     f"Répertoires vides : "
@@ -1072,7 +1091,7 @@ class InterfaceAugmentation(tk.Tk):
                 ),
                 (
                     f"Problèmes détectés : "
-                    f"{len(resume.defauts)}"
+                    f"{prod_detec}"
                 ),
             ]
 
@@ -1109,7 +1128,6 @@ class InterfaceAugmentation(tk.Tk):
                     "Traitement terminé",
                     texte
                 )
-
 
 
     def fin_interface_traitement(self):

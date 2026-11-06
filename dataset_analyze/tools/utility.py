@@ -409,7 +409,8 @@ def input_value(message: str, color_key: str = 'input') -> int:
             display.print(text, colors['error'])
 
 
-def format_nombre(n):
+
+def format_nombre(n: int) ->str:
     return f"{n:,}".replace(",", " ")
 
 def afficher_mode(
