@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from app.api.routes import auth, datasets, exports, images, search, stats, taxonomy
 from app.api.routes import users
+from app.api.routes import system
 from app.core.config import settings
 from app.db.database import Base, engine
 
@@ -175,6 +176,7 @@ app.include_router(images.router, prefix="/api")
 app.include_router(taxonomy.router, prefix="/api")
 app.include_router(exports.router, prefix="/api")
 app.include_router(datasets.router, prefix="/api")
+app.include_router(system.router, prefix="/api", tags=["system"])
 
 
 @app.get("/health")
