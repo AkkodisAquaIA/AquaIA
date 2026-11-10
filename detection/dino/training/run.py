@@ -69,11 +69,13 @@ def get_datasets(
         img_size=img_size,
         augment=augmentation_config.get("augment", False),
         augmentation_config=augmentation_config,
+        letterbox=True,
     )
     val_dataset = JpgDetectionDataset(
         dataset_root=data_yaml_path,
         data_split="val",
         img_size=img_size,
+        letterbox=True,
     )
     num_classes = train_dataset.num_classes
     return train_dataset, val_dataset, num_classes

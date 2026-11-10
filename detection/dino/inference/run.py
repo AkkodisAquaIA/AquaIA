@@ -51,6 +51,7 @@ def infer_dino(config, context):
         dataset_root=infer_data_root,
         data_split=data_split,
         img_size=imgsz,
+        letterbox=True,
     )
     num_workers = max(int(inference_config.get("workers", 0)), 0)
     infer_loader = DataLoader(

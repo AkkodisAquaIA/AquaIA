@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from dataloading.det_augmentation import DetectionAugmentation, build_ultralytics_labels
 from PIL import Image
+from ultralytics.data.augment import Compose, Format, LetterBox
 import numpy as np
 import torch
 import random
@@ -23,7 +24,7 @@ class BaseDetectionDataset:
     - builds a sorted list of label files
     - parses YOLO-format label files into class labels and bounding boxes
     - stores targets as torch tensors
-    - some functions for augmentation
+    - supports LetterBox padding and optional augmentation then Format outputs RGB CHW tensors and normalized xywh boxes
     """
 
     def __init__(
@@ -35,6 +36,7 @@ class BaseDetectionDataset:
         augment: bool = False,
         augmentation_config=None,
         img_format: str = "jpg",
+        letterbox: bool = False,
     ):
         self.dataset_root = Path(dataset_root)
         self.data_split = data_split
@@ -49,6 +51,16 @@ class BaseDetectionDataset:
         # Ultralytics Mosaic samples the full dataset when cache is set to "ram"
         # Images remain loaded on demand; this flag only selects its index-sampling path
         self.cache = "ram"
+        self.preprocess = (
+            Compose(
+                [
+                    LetterBox(new_shape=(self.img_size, self.img_size)),
+                    Format(bbox_format="xywh", normalize=True, batch_idx=False, bgr=0.0),
+                ]
+            )
+            if letterbox
+            else None
+        )
         self.augmentation = (
             DetectionAugmentation(
                 dataset=self,
@@ -148,18 +160,19 @@ class BaseDetectionDataset:
         img_id = self.target_files[idx].stem
         img_path = self.img_dir / f"{img_id}.{self.img_format}"
 
-        # Augmentation
-        if self.augmentation is not None:
-            # augmentation updates image and bbox, then Format returns RGB CHW resized image
+        # Augmentation or deterministic LetterBox preprocessing
+        transforms = self.augmentation if self.augmentation is not None else self.preprocess
+        if transforms is not None:
+            # Transforms update image and bbox, then Format returns RGB CHW resized image
             # labels = {"img":..., "cls":..., "bboxes":...}
-            labels = self.augmentation(self.get_image_and_label(idx))
+            labels = transforms(self.get_image_and_label(idx))
             img = labels["img"]
             # Convert Ultralytics output back to the target dict used by the training loop
             target = {
                 "labels": labels["cls"].reshape(-1).to(dtype=torch.int64),
                 "boxes": labels["bboxes"].reshape(-1, 4).to(dtype=torch.float32),
             }
-        # Without augmentation
+        # Without augmentation or LetterBox preprocessing (currently used by YOLO inference)
         else:
             # RGB
             with Image.open(img_path).convert("RGB") as image:
