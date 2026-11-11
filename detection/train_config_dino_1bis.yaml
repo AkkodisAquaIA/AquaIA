@@ -1,0 +1,105 @@
+model:
+  family: "dinov3"
+  size : "small"
+  # "random": initializes DETR head ramdomly
+  # "pretrained": initializes from a previous COCO detection checkpoint
+  init: "random"
+  # Required for "pretrained", e.g. "results/.../weights/last.pt"
+  init_checkpoint: null
+
+data:
+  dataset_yaml: "datasets/coco_match"
+
+output:
+  # Root directory for run folders. Each run creates project/{YYYYMMDD_HHMMSS}/
+  # null automatically uses results/<task>/<family>_<size>_<init>
+  # Set a path string to override the automatically generated project directory
+  project: null
+
+logging:
+  # Save last.pt + last_training_state.pt every N epochs (0 = only at end)
+  save_period: 5
+
+early_stopping:
+  enabled: true
+  # Consecutive validation mAP50-95 evaluations without sufficient improvement
+  patience: 25
+  min_delta: 0.001
+
+training:
+  # ---------- CORE TASK / MODE ----------
+  # Both use it to create output dir, YOLO uses it to specify the training task
+  task: "detect"
+  # Random seed for model initialization, data shuffling and augmentation
+  seed: 42
+
+  # ---------- DEVICE ----------
+  device: "auto"
+
+  # ---------- DATA INPUT / LOADING ----------
+  imgsz: 640
+  batch: 32
+  # Number of PyTorch DataLoader workers
+  workers: 3
+
+  # ---------- TRAINING SCHEDULE ----------
+  # Epoch budget of this run
+  epochs: 20
+  # If cos_lr, warmup steps = epochs * warmup_ratio 
+  warmup_ratio: 0.25
+
+  # ---------- OPTIMIZER & LR ----------
+  optimizer: "AdamW"
+  lr0: 0.0005
+  # Min lr for cosine scheduler = lrf * lr0
+  lrf: 0.05
+  cos_lr: true
+  # Weight decay for optimizer
+  weight_decay: 0.00005
+
+  # ---------- LOSS / MATCHER HYPERPARAMETERS ----------
+  # Weights for class, bbox, giou in matching cost
+  cost_class: 2.0
+  cost_bbox: 5.0
+  cost_giou: 2.0
+  cost_bbox_type: "l1"
+  # Weights for class, bbox, giou in loss
+  cls: 4.0
+  box: 5.0
+  giou: 2.0
+
+  # ---------- DATA AUGMENTATION ----------
+  augment: true
+  hsv_h: 0
+  hsv_s: 0
+  hsv_v: 0
+  degrees: 0
+  translate: 0
+  scale: 0
+  flipud: 0
+  fliplr: 0
+  mosaic: 0
+  cutmix: 0
+  # Disable Mosaic and CutMix in the last N epochs
+  # Make sure close_mosaic <= epochs
+  close_mosaic: 20
+
+  # ---------- INFERENCE / EVAL-RELATED ----------
+  # Compute val mAP on first/last epochs and every N epochs
+  # 0 = first/last epochs only
+  val_map_period: 1
+  # !Temporary! Seed used to sample training set for post-training mAP evaluation
+  train_subset_seed: 42
+  # !Temporary! Fraction of sampling, for COCO use 0.34
+  train_subset_ratio: 0.34
+  # Confidence threshold used to filter bbox predictions before mAP calculation
+  conf_thresh: 0.05
+  # Confidence threshold for bbox prediction filtering
+  # DINO uses it to filter saved prediction visualizations
+  # YOLO uses it as the confidence threshold during validation
+  conf: 0.3
+
+  # ---------- PERFORMANCE / MISC ----------
+  # torch.compile() attempts to optimize the model's forward computation graph
+  # to make training or inference faster
+  compile: true

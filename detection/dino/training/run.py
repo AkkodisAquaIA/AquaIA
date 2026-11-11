@@ -334,6 +334,8 @@ def train_dino(config, resume_dir=None):
                 multi_image_augmentations_closed = True
                 logger.info("[AUGMENTATION] Mosaic and CutMix disabled")
 
+            # Capture the first param group's lr for this epoch before scheduler.step()
+            lr = optimizer.param_groups[0]["lr"]
             metric_dict = {"train": {}, "val": {}}
             logger.info(f"========== Epoch {epoch + 1}/{training_config['epochs']} ==========")
 
@@ -429,8 +431,6 @@ def train_dino(config, resume_dir=None):
             print_metrics(metric_dict)
 
             # Epoch-level logging
-            # Read first param group lr
-            lr = optimizer.param_groups[0]["lr"]
             logger.log_epoch(epoch + 1, training_config["epochs"], metric_dict, lr)
 
             # Checkpoint: best and periodic last
