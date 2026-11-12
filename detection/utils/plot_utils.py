@@ -126,21 +126,45 @@ def annotate_images_with_predictions(images, predictions, class_names, output_di
 
 
 @torch.no_grad()
-def save_sample_predictions(model, subset, output_dir, predict_fn, num_samples=20, conf=0.3, seed=0, device="cuda"):
+def save_sample_predictions(
+    model,
+    subset,
+    output_dir,
+    predict_fn,
+    num_samples=20,
+    conf=0.3,
+    seed=0,
+    device="cuda",
+    batch_size=1,
+):
     """Sample a subset of images from dataset, run model predictions, and save annotated images.
     For training and inference."""
-    samples = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device=device)
+    batch_size = int(batch_size)
+    if batch_size <= 0:
+        raise ValueError("batch_size must be greater than 0")
+
+    # Keep the complete visualization sample on CPU. Only one chunk at a time
+    # is sent through the model, which prevents high-resolution previews from
+    # bypassing the configured inference batch and exhausting GPU memory.
+    samples = sample_dataset(dataset=subset, num_samples=num_samples, seed=seed, device="cpu")
     print(f"Sampled {len(samples['img_paths'])} images from {subset.dataset_root} (split={subset.data_split})")
     model.eval()
-    predictions = predict_fn(model=model, samples=samples, device=device, conf_thres=conf)
+    for start in range(0, len(samples["img_paths"]), batch_size):
+        end = start + batch_size
+        sample_batch = {
+            "inputs": samples["inputs"][start:end],
+            "images": samples["images"][start:end],
+            "img_paths": samples["img_paths"][start:end],
+        }
+        predictions = predict_fn(model=model, samples=sample_batch, device=device, conf_thres=conf)
 
-    annotate_images_with_predictions(
-        images=samples["images"],
-        predictions=predictions,
-        class_names=subset.class_names,
-        output_dir=output_dir,
-        image_files=samples["img_paths"],
-    )
+        annotate_images_with_predictions(
+            images=sample_batch["images"],
+            predictions=predictions,
+            class_names=subset.class_names,
+            output_dir=output_dir,
+            image_files=sample_batch["img_paths"],
+        )
 
 
 def plot_metrics(run_dir, output_dir=None, metrics_filename="metrics.npy"):

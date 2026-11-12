@@ -89,6 +89,22 @@ def test_mixed_dataset_contains_real_and_synthetic_and_forwards_epoch():
     assert synthetic.epochs == [7]
 
 
+def test_mixed_dataset_can_limit_yolo_augmentations_to_real_images():
+    real = _FakeDataset("real", 3)
+    synthetic = _FakeDataset("synthetic", 2)
+    mixed = MixedRealCopyPasteYOLODataset(
+        real,
+        synthetic,
+        apply_yolo_augmentations_to_synthetic=False,
+    )
+
+    assert mixed[0]["source"] == "real"
+    synthetic_sample = mixed[3]
+    assert synthetic_sample["source"] == "synthetic"
+    assert "labels_updated" not in synthetic_sample
+    assert "yolo_augmented" not in synthetic_sample
+
+
 def test_yolo_copy_paste_sample_has_same_keys_as_real_yolo_sample(tmp_path):
     cutout_dir = tmp_path / "cutouts"
     _save_image(cutout_dir / "macroinvertebrates" / "insect.png")

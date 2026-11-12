@@ -74,6 +74,7 @@ def infer_dino(config, context):
         conf=inference_config.get("conf", 0.3),
         seed=inference_config["seed"],
         device=device,
+        batch_size=inference_config["batch"],
     )
 
     # Inference full size

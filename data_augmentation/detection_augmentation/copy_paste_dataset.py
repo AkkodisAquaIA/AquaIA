@@ -542,11 +542,12 @@ class MixedRealCopyPasteYOLODataset(Dataset):
 
     collate_fn = staticmethod(YOLODataset.collate_fn)
 
-    def __init__(self, real_dataset, synthetic_dataset):
+    def __init__(self, real_dataset, synthetic_dataset, apply_yolo_augmentations_to_synthetic=True):
         if len(real_dataset) == 0 or len(synthetic_dataset) == 0:
             raise ValueError("Les datasets réel et copy-paste doivent être non vides.")
         self.real_dataset = real_dataset
         self.synthetic_dataset = synthetic_dataset
+        self.apply_yolo_augmentations_to_synthetic = bool(apply_yolo_augmentations_to_synthetic)
         # Attributs consultés par DetectionTrainer pour les graphiques et close_mosaic.
         self.labels = real_dataset.labels
         self.im_files = real_dataset.im_files
@@ -568,6 +569,11 @@ class MixedRealCopyPasteYOLODataset(Dataset):
         index = int(index)
         if index < self.real_count:
             return self.real_dataset[index]
+        if not self.apply_yolo_augmentations_to_synthetic:
+            # Keep custom copy-paste compositions unchanged. Native YOLO
+            # transforms such as Mosaic are then applied only to real images,
+            # and Mosaic selects its additional images from real_dataset.
+            return self.synthetic_dataset[index - self.real_count]
         # Apply the exact native YOLO train pipeline (HSV, geometry, flips,
         # mosaic, Format, etc.) to synthetic samples too. Previously synthetic
         # images bypassed these transforms and only real LPL images received
@@ -609,6 +615,9 @@ class MixedRealCopyPasteYOLOTrainer(DetectionTrainer):
 
         parameters = dict(self.copy_paste_parameters)
         synthetic_fraction = float(parameters.pop("synthetic_fraction", 0.5))
+        apply_yolo_augmentations_to_synthetic = bool(
+            parameters.pop("apply_yolo_augmentations_to_synthetic", True)
+        )
         if not 0 < synthetic_fraction < 1:
             raise ValueError("copy_paste_data.synthetic_fraction doit être strictement entre 0 et 1.")
         synthetic_count = max(1, round(len(real_dataset) * synthetic_fraction / (1 - synthetic_fraction)))
@@ -618,12 +627,20 @@ class MixedRealCopyPasteYOLOTrainer(DetectionTrainer):
             split="train",
             **parameters,
         )
-        mixed_dataset = MixedRealCopyPasteYOLODataset(real_dataset, synthetic_dataset)
+        mixed_dataset = MixedRealCopyPasteYOLODataset(
+            real_dataset,
+            synthetic_dataset,
+            apply_yolo_augmentations_to_synthetic=apply_yolo_augmentations_to_synthetic,
+        )
         LOGGER.info(
             "Mixed LPL train: %d real + %d copy-paste images per epoch (%.1f%% synthetic)",
             mixed_dataset.real_count,
             mixed_dataset.synthetic_count,
             100 * mixed_dataset.synthetic_count / len(mixed_dataset),
+        )
+        LOGGER.info(
+            "Native YOLO augmentations on copy-paste images: %s",
+            "enabled" if apply_yolo_augmentations_to_synthetic else "disabled (real images only)",
         )
         return mixed_dataset
 

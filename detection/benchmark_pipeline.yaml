@@ -1,7 +1,9 @@
-# Un seul fichier pilote toute la suite : entraînements, inférences et tableau final.
+# Benchmark LPL complet : 500 epochs maximum, early stopping patience 25.
+# Les seuls entraînements réalisés par cette campagne sont des fine-tunings LPL.
+# Les deux pré-fine-tunings Aquatic Insects / Roboflow sont réutilisés.
 benchmark:
-  name: "detection_standardized_benchmark"
-  output_dir: "results/benchmarks/detection_standardized_benchmark"
+  name: "lpl_500ep_patience25_ablation"
+  output_dir: "results/benchmarks/lpl_500ep_patience25_ablation"
   continue_on_error: false
   auto_compute_stats: true
   ranking_dataset: "lpl"
@@ -11,7 +13,6 @@ model:
   size: "n"
   pretrained_checkpoint: "yolo11n.pt"
 
-# Pour un nouveau jeu de données, il suffit notamment de modifier ces chemins.
 datasets:
   lpl:
     root: "datasets/LPL_dataset_final/dataset"
@@ -20,16 +21,16 @@ datasets:
     root: "datasets/aquatic_insects_v7_1classe"
     img_format: "jpg"
 
-# Protocole commun. La patience élevée limite les arrêts dus au bruit de la petite validation LPL.
-# Le batch 2 est volontairement identique pour isoler l'effet des résolutions 640/1024/2048.
+# Protocole identique pour tous les nouveaux fine-tunings LPL.
+# Le batch 2 est conservé à toutes les résolutions pour isoler au mieux imgsz.
 training_defaults:
   task: "detect"
-  device: "auto"
+  device: "cuda"
   imgsz: 640
   batch: 2
   workers: 3
   epochs: 500
-  patience: 100
+  patience: 25
   optimizer: "AdamW"
   lr0: 0.0001
   lrf: 0.05
@@ -43,9 +44,9 @@ training_defaults:
   val: true
   seed: 42
   deterministic: true
-  compile: false
+  compile: true
 
-# mAP calculée avec les prédictions à partir de 0.001 ; précision/rappel au seuil 0.05.
+# mAP à partir de 0.001 ; précision et rappel au seuil fixe 0.05.
 inference_defaults:
   imgsz: 640
   batch: 2
@@ -54,7 +55,7 @@ inference_defaults:
   pr_conf_thresh: 0.05
   conf: 0.10
   iou: 0.5
-  num_samples: 20
+  num_samples: 16
   seed: 0
 
 copy_paste_defaults: &copy_paste_defaults
@@ -74,6 +75,7 @@ copy_paste_defaults: &copy_paste_defaults
   cache_backgrounds: true
 
 augmentation_profiles:
+  # Baseline : aucune augmentation YOLO native.
   none:
     training: &no_yolo_augmentation
       hsv_h: 0
@@ -82,6 +84,8 @@ augmentation_profiles:
       degrees: 0
       translate: 0
       scale: 0
+      shear: 0
+      perspective: 0
       flipud: 0
       fliplr: 0
       mosaic: 0
@@ -90,6 +94,7 @@ augmentation_profiles:
       copy_paste: 0
       close_mosaic: 0
 
+  # Ancien protocole fort, conservé comme point de comparaison.
   yolo_standard:
     training:
       hsv_h: 0.015
@@ -98,6 +103,8 @@ augmentation_profiles:
       degrees: 180
       translate: 0.1
       scale: 0.3
+      shear: 0
+      perspective: 0
       flipud: 0.5
       fliplr: 0.5
       mosaic: 0.5
@@ -106,14 +113,56 @@ augmentation_profiles:
       copy_paste: 0
       close_mosaic: 25
 
-  yolo_moderate:
+  # Très faibles variations de couleur et flips, sans Mosaic.
+  # La comparaison avec yolo_light_with_mosaic isole l'apport de Mosaic.
+  yolo_light_no_mosaic:
     training:
-      hsv_h: 0.01
-      hsv_s: 0.15
-      hsv_v: 0.15
-      degrees: 20
-      translate: 0.05
-      scale: 0.15
+      hsv_h: 0.002
+      hsv_s: 0.05
+      hsv_v: 0.05
+      degrees: 0
+      translate: 0
+      scale: 0
+      shear: 0
+      perspective: 0
+      flipud: 0.5
+      fliplr: 0.5
+      mosaic: 0
+      mixup: 0
+      cutmix: 0
+      copy_paste: 0
+      close_mosaic: 0
+
+  # Mosaic seule, sans couleur, flip ou transformation géométrique.
+  mosaic_only:
+    training: &mosaic_only_training
+      hsv_h: 0
+      hsv_s: 0
+      hsv_v: 0
+      degrees: 0
+      translate: 0
+      scale: 0
+      shear: 0
+      perspective: 0
+      flipud: 0
+      fliplr: 0
+      mosaic: 0.2
+      mixup: 0
+      cutmix: 0
+      copy_paste: 0
+      close_mosaic: 25
+
+  # Configuration YOLO light validée : couleurs faibles, flips et Mosaic 0.2.
+  yolo_light_with_mosaic:
+    training:
+      hsv_h: 0.002
+      hsv_s: 0.05
+      hsv_v: 0.05
+      degrees: 0
+      translate: 0
+      scale: 0
+      shear: 0
+      perspective: 0
       flipud: 0.5
       fliplr: 0.5
       mosaic: 0.2
@@ -122,28 +171,23 @@ augmentation_profiles:
       copy_paste: 0
       close_mosaic: 25
 
+  # Copy & Paste sans augmentation YOLO native.
   copy_paste:
     training: *no_yolo_augmentation
     copy_paste_data: *copy_paste_defaults
 
-  copy_paste_yolo_light:
-    training:
-      hsv_h: 0.005
-      hsv_s: 0.1
-      hsv_v: 0.1
-      degrees: 10
-      translate: 0.03
-      scale: 0.1
-      flipud: 0.5
-      fliplr: 0.5
-      mosaic: 0
-      mixup: 0
-      cutmix: 0
-      copy_paste: 0
-      close_mosaic: 0
-    copy_paste_data: *copy_paste_defaults
+  # Mosaic uniquement sur les vraies images LPL. Les compositions synthétiques
+  # restent inchangées après leur génération Copy & Paste.
+  copy_paste_mosaic_real_only:
+    training: *mosaic_only_training
+    copy_paste_data:
+      <<: *copy_paste_defaults
+      apply_yolo_augmentations_to_synthetic: false
 
 experiments:
+  # -------------------------------------------------------------------------
+  # Références et transfert depuis Aquatic Insects / Roboflow
+  # -------------------------------------------------------------------------
   - id: M0
     initialization_label: "COCO"
     training_label: "Aucun"
@@ -169,10 +213,9 @@ experiments:
 
   - id: M2
     initialization_label: "M0"
-    training_label: "Aquatic Insects sans augmentation"
+    training_label: "Aquatic Insects sans augmentation, réutilisé"
     imgsz: 640
     init: {type: experiment, experiment: M0}
-    # Supprimer cette section pour réentraîner M2 avec les paramètres globaux.
     reuse:
       checkpoint: "results/detect/yolo11_n_pretrained/20261016_103935/weights/best.pt"
       run_dir: "results/detect/yolo11_n_pretrained/20261016_103935"
@@ -184,10 +227,9 @@ experiments:
 
   - id: M3
     initialization_label: "M0"
-    training_label: "Aquatic Insects avec augmentation YOLO"
+    training_label: "Aquatic Insects avec augmentation YOLO, réutilisé"
     imgsz: 640
     init: {type: experiment, experiment: M0}
-    # Le pré-fine-tuning Roboflow existant est réutilisé ; M4 recevra ce best.pt.
     reuse:
       checkpoint: "results/detect/yolo11_n_pretrained/20261015_153825/weights/best.pt"
       run_dir: "results/detect/yolo11_n_pretrained/20261015_153825"
@@ -198,6 +240,17 @@ experiments:
     evaluate: {dataset: aquatic_insects, split: test}
 
   - id: M4
+    initialization_label: "M2"
+    training_label: "LPL sans augmentation"
+    imgsz: 640
+    init: {type: experiment, experiment: M2}
+    train:
+      dataset: lpl
+      augmentation: none
+      overrides: {imgsz: 640}
+    evaluate: {dataset: lpl, split: test}
+
+  - id: M5
     initialization_label: "M3"
     training_label: "LPL sans augmentation"
     imgsz: 640
@@ -208,9 +261,12 @@ experiments:
       overrides: {imgsz: 640}
     evaluate: {dataset: lpl, split: test}
 
-  - id: M5
+  # -------------------------------------------------------------------------
+  # Ablation des augmentations YOLO, toutes initialisées depuis COCO
+  # -------------------------------------------------------------------------
+  - id: M6
     initialization_label: "M0"
-    training_label: "LPL avec augmentation YOLO"
+    training_label: "LPL avec augmentations YOLO fortes"
     imgsz: 640
     init: {type: experiment, experiment: M0}
     train:
@@ -219,94 +275,91 @@ experiments:
       overrides: {imgsz: 640}
     evaluate: {dataset: lpl, split: test}
 
-  - id: M6
+  - id: M7
     initialization_label: "M0"
-    training_label: "LPL avec Copy-Paste"
+    training_label: "LPL avec couleurs légères et flips, sans Mosaic"
     imgsz: 640
     init: {type: experiment, experiment: M0}
     train:
       dataset: lpl
-      augmentation: copy_paste
+      augmentation: yolo_light_no_mosaic
       overrides: {imgsz: 640}
     evaluate: {dataset: lpl, split: test}
-
-  - id: M7
-    initialization_label: "M0"
-    training_label: "LPL avec Copy-Paste"
-    imgsz: 1024
-    init: {type: experiment, experiment: M0}
-    train:
-      dataset: lpl
-      augmentation: copy_paste
-      overrides: {imgsz: 1024}
-    evaluate:
-      dataset: lpl
-      split: test
-      overrides: {imgsz: 1024}
 
   - id: M8
     initialization_label: "M0"
-    training_label: "LPL avec Copy-Paste"
-    imgsz: 2048
-    init: {type: experiment, experiment: M0}
-    train:
-      dataset: lpl
-      augmentation: copy_paste
-      overrides: {imgsz: 2048}
-    evaluate:
-      dataset: lpl
-      split: test
-      overrides: {imgsz: 2048}
-
-  - id: M9
-    initialization_label: "M0"
-    training_label: "LPL sans augmentation"
-    imgsz: 1024
-    init: {type: experiment, experiment: M0}
-    train:
-      dataset: lpl
-      augmentation: none
-      overrides: {imgsz: 1024}
-    evaluate:
-      dataset: lpl
-      split: test
-      overrides: {imgsz: 1024}
-
-  - id: M10
-    initialization_label: "M0"
-    training_label: "LPL sans augmentation"
-    imgsz: 2048
-    init: {type: experiment, experiment: M0}
-    train:
-      dataset: lpl
-      augmentation: none
-      overrides: {imgsz: 2048}
-    evaluate:
-      dataset: lpl
-      split: test
-      overrides: {imgsz: 2048}
-
-  - id: M11
-    initialization_label: "M0"
-    training_label: "LPL avec augmentation YOLO modérée"
+    training_label: "LPL avec Mosaic uniquement"
     imgsz: 640
     init: {type: experiment, experiment: M0}
     train:
       dataset: lpl
-      augmentation: yolo_moderate
+      augmentation: mosaic_only
       overrides: {imgsz: 640}
     evaluate: {dataset: lpl, split: test}
 
+  - id: M9
+    initialization_label: "M0"
+    training_label: "LPL avec augmentations YOLO légères et Mosaic"
+    imgsz: 640
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: yolo_light_with_mosaic
+      overrides: {imgsz: 640}
+    evaluate: {dataset: lpl, split: test}
+
+  # -------------------------------------------------------------------------
+  # Copy & Paste à 640 px uniquement
+  # -------------------------------------------------------------------------
+  - id: M10
+    initialization_label: "M0"
+    training_label: "LPL avec Copy & Paste"
+    imgsz: 640
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: copy_paste
+      overrides: {imgsz: 640}
+    evaluate: {dataset: lpl, split: test}
+
+  - id: M11
+    initialization_label: "M0"
+    training_label: "LPL avec Copy & Paste et Mosaic sur images réelles"
+    imgsz: 640
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: copy_paste_mosaic_real_only
+      overrides: {imgsz: 640}
+    evaluate: {dataset: lpl, split: test}
+
+  # -------------------------------------------------------------------------
+  # Influence de la résolution sur la baseline uniquement
+  # -------------------------------------------------------------------------
   - id: M12
     initialization_label: "M0"
-    training_label: "LPL avec Copy-Paste et augmentations légères"
+    training_label: "LPL sans augmentation"
     imgsz: 1024
     init: {type: experiment, experiment: M0}
     train:
       dataset: lpl
-      augmentation: copy_paste_yolo_light
+      augmentation: none
       overrides: {imgsz: 1024}
     evaluate:
       dataset: lpl
       split: test
       overrides: {imgsz: 1024}
+
+  - id: M13
+    initialization_label: "M0"
+    training_label: "LPL sans augmentation"
+    imgsz: 2048
+    init: {type: experiment, experiment: M0}
+    train:
+      dataset: lpl
+      augmentation: none
+      overrides: {imgsz: 2048}
+    evaluate:
+      dataset: lpl
+      split: test
+      overrides: {imgsz: 2048}

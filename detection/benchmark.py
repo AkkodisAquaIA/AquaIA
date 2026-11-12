@@ -431,6 +431,18 @@ def run_benchmark(config_path: str | Path, only: list[str] | None = None, dry_ru
             completed[experiment_id] = previous
             continue
 
+        # A training may be complete even if its following inference failed
+        # (for example because visualization exhausted GPU memory). Reuse that
+        # run and retry only inference instead of paying for another training.
+        previous_run_dir = Path(previous.get("run_dir", ""))
+        previous_checkpoint = Path(previous.get("checkpoint", ""))
+        recover_completed_training = (
+            not force
+            and previous.get("fingerprint") == fingerprint
+            and previous_checkpoint.is_file()
+            and previous_run_dir.joinpath("results.csv").is_file()
+        )
+
         print(f"\n[{experiment_id}] {experiment.get('training_label', '')}")
         checkpoint = experiment_checkpoint(experiment, completed, config["model"], allow_missing=dry_run)
         evaluation_dataset = config["datasets"][experiment["evaluate"]["dataset"]]
@@ -438,7 +450,13 @@ def run_benchmark(config_path: str | Path, only: list[str] | None = None, dry_ru
         train_config_path = None
         reuse = experiment.get("reuse")
 
-        if reuse:
+        if recover_completed_training:
+            checkpoint = previous_checkpoint.resolve()
+            run_dir = previous_run_dir.resolve()
+            previous_train_config = previous.get("train_config")
+            train_config_path = Path(previous_train_config) if previous_train_config else None
+            print(f"  entraînement déjà terminé, reprise de l'inférence : {run_dir}")
+        elif reuse:
             checkpoint = resolve_path(reuse["checkpoint"])
             run_dir = resolve_path(reuse.get("run_dir") or checkpoint.parent.parent)
             if not checkpoint.is_file():
@@ -513,7 +531,7 @@ def run_benchmark(config_path: str | Path, only: list[str] | None = None, dry_ru
             "run_dir": str(run_dir.resolve()),
             "train_config": str(train_config_path) if train_config_path else None,
             "infer_config": str(infer_config_path),
-            "reused_training": bool(reuse),
+            "reused_training": bool(reuse or recover_completed_training),
         }
         state["experiments"][experiment_id] = record
         save_yaml(state_path, state)
