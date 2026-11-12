@@ -104,12 +104,12 @@ def load_taxonomy_prefixes(json_path):
 
 
 def decode_class_name(encoded_name, prefixes):
-    """Développe chaque préfixe taxonomique connu sans bloquer sur les autres."""
+    """Développe un nom taxonomique connu, sinon conserve le nom d'origine."""
     parts = normalize_text(encoded_name).split("_")
     if len(parts) < 3:
         return encoded_name, "nom_conserve"
 
-    decoded_parts = list(parts)
+    decoded_parts = []
     expanded = False
 
     for index in range(3):
@@ -117,10 +117,14 @@ def decode_class_name(encoded_name, prefixes):
         rank_prefixes = prefixes[index]
 
         if token in rank_prefixes:
-            decoded_parts[index] = rank_prefixes[token]
+            decoded_parts.append(rank_prefixes[token])
             expanded = True
+        elif token in rank_prefixes.values():
+            decoded_parts.append(token)
+        else:
+            return encoded_name, "nom_conserve"
 
-    standard_name = "_".join(decoded_parts)
+    standard_name = "_".join([*decoded_parts, *parts[3:]])
     status = "converti_par_prefixes" if expanded else "deja_complet"
     return standard_name, status
 

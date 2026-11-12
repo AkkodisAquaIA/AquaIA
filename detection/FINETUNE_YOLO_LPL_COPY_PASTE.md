@@ -1,111 +1,71 @@
-# Fine-tuning YOLO sur LPL avec le copy-paste en mémoire
+# Fine-tuning LPL avec Copy & Paste
 
-## Séparation des données
+Le mode mixte ajoute à chaque époque des compositions Copy & Paste générées en
+mémoire aux vraies images du train. La validation reste le split LPL réel : elle
+ne contient aucune composition synthétique et conserve son rôle dans la sélection
+de `best.pt`.
 
-Le dossier historique `datasets/LPL_dataset_cutouts_single` mélangeait des
-cutouts issus des images train, val et test. Il ne doit plus être utilisé
-directement pour entraîner un modèle.
+## Configuration
 
-Les cutouts audités sont maintenant rangés dans :
-
-```text
-datasets/LPL_dataset_cutouts_sam3_filtered_by_split/
-├── train/   # seules sources autorisées pour créer le train synthétique
-├── val/     # isolé, non utilisé pendant l'entraînement
-├── test/    # isolé, strictement interdit pendant l'entraînement
-├── filter_report.json
-├── manifest.csv
-└── rejected_cutouts.csv
-```
-
-Pour reconstruire ce dossier à partir des splits LPL :
-
-```bash
-python data_processing/generate_lpl_sam3_cutouts.py --overwrite
-python data_processing/filter_sam3_cutouts_with_lpl_annotations.py --fill-unmatched --overwrite
-```
-
-La première commande relance SAM3 sur chaque image des trois splits. La seconde
-ne conserve que les découpes qui correspondent à une bounding box LPL et crée
-aussi `datasets/LPL_dataset_cutouts_sam3_filtered_by_taxon`, organisé par nom
-taxonomique complet puis par split. L'option `--fill-unmatched` utilise chaque
-bounding box encore sans découpe comme prompt SAM3, ce qui permet notamment de
-traiter les mollusques que le prompt texte initial `insect` ne détecte pas.
-
-## Crops de classification par taxon complet
-
-Pour recréer les crops rectangulaires directement depuis les annotations LPL :
-
-```bash
-python data_processing/crop_detection_to_classification.py \
-  --images-dir datasets/LPL_dataset_final/dataset_LPL_no_split/TIF_cropped \
-  --labels-dir datasets/LPL_dataset_final/dataset_LPL_no_split/Annotations/labels/train \
-  --classes-yaml datasets/LPL_dataset_final/dataset_LPL_no_split/Annotations/data.yaml \
-  --output-dir datasets/LPL_dataset_final/dataset_LPL_no_split_crop_full_taxonomy
-```
-
-La conversion développe chaque préfixe taxonomique connu indépendamment. Un
-ordre déjà écrit en toutes lettres, comme `Plectoptera`, ne bloque donc plus la
-conversion de `Arthr_Insec` en `Arthropoda_Insecta`.
-
-## Composition d'une époque
-
-Avec `synthetic_fraction: 0.5`, une époque contient :
-
-- les 22 vraies images de `images/train` ;
-- 22 compositions copy-paste générées en mémoire à partir des cutouts du train ;
-- les 9 vraies images de `images/val` pour la validation uniquement.
-
-Les compositions changent à chaque époque grâce à la seed dépendante de
-l'époque. La validation ne contient aucune image synthétique et reste fixe.
-
-Les augmentations YOLO configurables (mosaic, HSV, rotations, flips, etc.) sont
-réglées à zéro afin d'isoler l'effet du copy-paste personnalisé. Ultralytics peut
-encore appliquer ses opérations Albumentations internes à très faible probabilité
-(Blur, Gray ou CLAHE). Pour augmenter ou réduire la part synthétique, modifier la
-même valeur dans les quatre fichiers :
+Ajouter cette section à un YAML d'entraînement YOLO :
 
 ```yaml
 copy_paste_data:
+  enabled: true
+  cutout_dir: datasets/LPL_dataset_cutouts_sam3_filtered_by_split/train
+  background_dir: datasets/Images_fond_blanc_&_bruits
   synthetic_fraction: 0.5
+  min_macroinvertebrates: 4
+  max_macroinvertebrates: 10
+  padding: 0.08
+  max_rotation: 180
+  cutout_scale_range: [0.8, 1.2]
+  allow_overlap: true
+  iou_max: 1.0
+  multi_class: false
+  use_noisy_backgrounds: true
+  cache_backgrounds: true
+  apply_yolo_augmentations_to_synthetic: true
 ```
 
-Par exemple, `0.33` donne environ un tiers d'images synthétiques et `0.67`
-environ deux tiers.
+Paramètres principaux :
 
-## Lancer les quatre entraînements
+| Paramètre | Rôle |
+| --- | --- |
+| `cutout_dir` | Cutouts utilisés pour créer les objets synthétiques. Pointer explicitement vers le sous-dossier `train`. |
+| `background_dir` | Fonds propres et bruités disponibles. |
+| `synthetic_fraction` | Part synthétique visée dans une époque. `0.5` crée autant d'images synthétiques que réelles. |
+| `min/max_macroinvertebrates` | Nombre d'objets collés par composition. |
+| `padding` | Marge conservée autour de l'image. |
+| `max_rotation` | Rotation aléatoire maximale des cutouts. |
+| `cutout_scale_range` | Intervalle de redimensionnement des objets. |
+| `allow_overlap` et `iou_max` | Autorisation et limite de superposition des objets. |
+| `use_noisy_backgrounds` | Autorise les fonds bruités en plus des fonds propres. |
+| `apply_yolo_augmentations_to_synthetic` | Applique aussi les transformations YOLO natives aux compositions synthétiques. |
 
-Depuis la racine du dépôt :
+Avec `apply_yolo_augmentations_to_synthetic: false`, les augmentations YOLO
+natives restent actives sur les vraies images, tandis que les compositions Copy
+& Paste sont utilisées telles qu'elles ont été générées.
+
+## Fonctionnement du mélange
+
+Le trainer construit d'abord le dataset YOLO réel. Pour le train uniquement, il
+ajoute un dataset synthétique dont la taille est calculée à partir de
+`synthetic_fraction`. Les deux sources utilisent le même `collate_fn`. Les
+compositions sont renouvelées à chaque époque grâce à la graine dépendante de
+l'époque.
+
+Le chemin des cutouts est explicite : le code ne déduit pas automatiquement leur
+split. Pour éviter toute fuite de données, seuls les cutouts issus des images
+`train` doivent être fournis. Les cutouts de validation et de test ne doivent
+jamais être utilisés pour l'entraînement.
+
+Lancement et suivi :
 
 ```bash
-source .venv/bin/activate
-```
-
-```bash
-python main.py train --config detection/finetune_copy_paste_configs/lpl_from_roboflow_300_aug.yaml
-```
-
-```bash
-python main.py train --config detection/finetune_copy_paste_configs/lpl_from_roboflow_1000_aug.yaml
-```
-
-```bash
-python main.py train --config detection/finetune_copy_paste_configs/lpl_from_roboflow_no_aug.yaml
-```
-
-```bash
-python main.py train --config detection/finetune_copy_paste_configs/lpl_from_coco_pretrained.yaml
-```
-
-Ne pas utiliser `--resume` : chaque commande initialise un nouveau fine-tuning
-LPL depuis les poids configurés.
-
-## TensorBoard
-
-```bash
+python main.py train --config path/to/copy_paste_config.yaml
 tensorboard --logdir results/detect_lpl_copy_paste --port 6006
 ```
 
-Ouvrir ensuite <http://localhost:6006>. Le nouveau `weights/best.pt` de chaque
-expérience est choisi avec la mAP50-95 calculée exclusivement sur les vraies
-images LPL de validation.
+Le fichier `detection/benchmark_pipeline.yaml` fournit des exemples de profils
+Copy & Paste seuls et Copy & Paste avec Mosaic sur les images réelles.

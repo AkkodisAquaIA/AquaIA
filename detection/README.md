@@ -77,6 +77,18 @@ python main.py train --config <train_config_path>
 python main.py infer --config <infer_config_path>
 ```
 
+Run a complete benchmark campaign from one YAML:
+
+```bash
+python main.py benchmark --config detection/benchmark_pipeline.yaml --dry-run
+python main.py benchmark --config detection/benchmark_pipeline.yaml
+```
+
+See [BENCHMARK_PIPELINE.md](BENCHMARK_PIPELINE.md) for the YAML reference,
+[FINETUNE_YOLO_LPL.md](FINETUNE_YOLO_LPL.md) for checkpoint initialization, and
+[FINETUNE_YOLO_LPL_COPY_PASTE.md](FINETUNE_YOLO_LPL_COPY_PASTE.md) for the mixed
+real and Copy & Paste dataset.
+
 ## Configuration files
 
 The active configuration files are:
@@ -131,9 +143,10 @@ A YOLO run contains the Ultralytics training artifacts and the project-level Ten
 By default, inference results are stored inside the selected training run:
 
 ```text
-<run_directory>/inference/<dataset_name>_<timestamp>/
+<run_directory>/inference/<dataset_name>_<checkpoint>_<timestamp>/
 ├── inference_metadata.yaml
-├── metrics.npy
+├── inference_metrics.yaml
+├── inference_metrics.csv
 └── inference_predictions/
 ```
 

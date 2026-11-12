@@ -150,6 +150,8 @@ def build_train_config(config: dict, experiment: dict, checkpoint: Path, suite_d
     profile = config["augmentation_profiles"][train["augmentation"]]
     training = deep_merge(config["training_defaults"], profile.get("training"))
     training = deep_merge(training, train.get("overrides"))
+    if "imgsz" not in (train.get("overrides") or {}):
+        training["imgsz"] = int(experiment.get("imgsz", training.get("imgsz", 640)))
 
     train_config = {
         "model": {
@@ -163,7 +165,6 @@ def build_train_config(config: dict, experiment: dict, checkpoint: Path, suite_d
             "project": str(suite_dir / "training" / experiment["id"]),
             "exist_ok": True,
             "save_period": 0,
-            "best_checkpoint_period": 0,
             "plots": True,
         },
         "training": training,
@@ -198,7 +199,8 @@ def build_infer_config(config: dict, experiment: dict, checkpoint: Path, run_dir
     evaluation = experiment["evaluate"]
     dataset = config["datasets"][evaluation["dataset"]]
     inference = deep_merge(config["inference_defaults"], evaluation.get("overrides"))
-    inference.setdefault("imgsz", int(experiment.get("imgsz", inference.get("imgsz", 640))))
+    if "imgsz" not in (evaluation.get("overrides") or {}):
+        inference["imgsz"] = int(experiment.get("imgsz", inference.get("imgsz", 640)))
     return {
         "run": {
             "runs_root": str(run_dir.parent),
@@ -264,8 +266,8 @@ def parse_training_metrics(run_dir: Path | None) -> dict:
     def value(row: dict, key: str) -> float:
         return float(row[key].strip())
 
-    # Ultralytics detection fitness: 10% mAP50 + 90% mAP50-95.
-    best = max(rows, key=lambda row: 0.1 * value(row, "metrics/mAP50(B)") + 0.9 * value(row, "metrics/mAP50-95(B)"))
+    # The detection checkpoint best.pt is selected from validation mAP50-95.
+    best = max(rows, key=lambda row: value(row, "metrics/mAP50-95(B)"))
     return {
         "val_map50": value(best, "metrics/mAP50(B)"),
         "val_map50_95": value(best, "metrics/mAP50-95(B)"),
@@ -304,7 +306,7 @@ def format_metric(value: float | None) -> str:
     return "" if value is None else f"{float(value):.4f}"
 
 
-def report_row(experiment: dict, record: dict, datasets: dict) -> dict:
+def report_row(experiment: dict, record: dict) -> dict:
     training = parse_training_metrics(Path(record["run_dir"])) if record.get("run_dir") else parse_training_metrics(None)
     inference = parse_inference_metrics(Path(record["inference_dir"])) if record.get("inference_dir") else parse_inference_metrics(None)
     return {
@@ -319,8 +321,8 @@ def report_row(experiment: dict, record: dict, datasets: dict) -> dict:
         "Test mAP50-95": format_metric(inference["test_map50_95"]),
         "Précision": format_metric(inference["precision"]),
         "Rappel": format_metric(inference["recall"]),
-        "Meilleure époque": training["best_epoch"] or "",
-        "Époques réalisées": training["epochs_completed"] or "",
+        "Meilleure époque": training["best_epoch"] if training["best_epoch"] is not None else "",
+        "Époques réalisées": training["epochs_completed"] if training["epochs_completed"] is not None else "",
         "Temps": format_duration(training["training_seconds"]),
         "Statut": record.get("status", "non exécuté"),
     }
@@ -348,10 +350,12 @@ def write_reports(
     suite_dir: Path,
     experiments: list[dict],
     state: dict,
-    datasets: dict,
     ranking_dataset: str | None = None,
 ) -> list[dict]:
-    rows = [report_row(experiment, state.get("experiments", {}).get(experiment["id"], {}), datasets) for experiment in experiments]
+    rows = [
+        report_row(experiment, state.get("experiments", {}).get(experiment["id"], {}))
+        for experiment in experiments
+    ]
     csv_path = suite_dir / "benchmark_results.csv"
     with csv_path.open("w", encoding="utf-8", newline="") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=REPORT_COLUMNS)
@@ -488,7 +492,6 @@ def run_benchmark(config_path: str | Path, only: list[str] | None = None, dry_ru
                         suite_dir,
                         all_enabled,
                         state,
-                        config["datasets"],
                         ranking_dataset=config["benchmark"].get("ranking_dataset"),
                     )
                     if config["benchmark"].get("continue_on_error", False):
@@ -556,7 +559,6 @@ def run_benchmark(config_path: str | Path, only: list[str] | None = None, dry_ru
                 suite_dir,
                 all_enabled,
                 state,
-                config["datasets"],
                 ranking_dataset=config["benchmark"].get("ranking_dataset"),
             )
 
@@ -565,7 +567,6 @@ def run_benchmark(config_path: str | Path, only: list[str] | None = None, dry_ru
             suite_dir,
             all_enabled,
             state,
-            config["datasets"],
             ranking_dataset=config["benchmark"].get("ranking_dataset"),
         )
         print(f"\nTableaux disponibles sous : {suite_dir}")

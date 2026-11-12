@@ -6,7 +6,7 @@ dm-tree>=0.1.9
 gast>=0.6.0
 makefun>=1.16.0
 numpy>=2.2.0
-transformers>=5.0,<6
+transformers>=4.0.0
 nvidia-dali-cuda120>=1.52.0
 nvidia-nvcomp-cu12>=5.0.0.6
 nvidia-nvimgcodec-cu12>=0.6.1.37
@@ -36,6 +36,7 @@ albumentations>=1.4
 # --- ML / embeddings ---
 torch>=2.1
 torchvision>=0.16
+transformers>=4.40
 huggingface_hub>=0.23
 umap-learn>=0.5
  
@@ -46,4 +47,3 @@ fiftyone>=0.23
 ultralytics>=8.0
 pyyaml>=6.0
 tensorboard>=2.14
-streamlit>=1.47

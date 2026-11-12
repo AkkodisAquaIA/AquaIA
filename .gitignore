@@ -55,18 +55,3 @@ data_cropping/sam/*_result_det/
 *.ts
 !aquaia-dataset-builder/**/*.ts
 *.zip
-
-# Local one-off experiment configurations.
-# The reusable benchmark is defined by detection/benchmark_pipeline.yaml.
-detection/finetune_base_configs/
-detection/finetune_configs/
-detection/finetune_copy_paste_configs/
-detection/finetune_copy_paste_no_overlap_configs/
-detection/finetune_extended_configs/
-detection/infer_copy_paste_configs/
-detection/infer_copy_paste_no_overlap_configs/
-detection/infer_lpl_configs/
-detection/infer_yolo26_configs/
-detection/infer_yolo26_optimized_configs/
-detection/yolo26_experiment_configs/
-detection/yolo26_optimized_configs/

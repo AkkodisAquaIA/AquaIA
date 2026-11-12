@@ -15,17 +15,12 @@
       "Platy": "Platyhelminthes"
     },
     {
-      "Arach": "Arachnida",
       "Bival": "Bivalvia",
-      "Branc": "Branchiopoda",
       "Clite": "Clitellata",
-      "Copep": "Copepoda",
       "Gastr": "Gastropoda",
       "Hydro": "Hydrozoa",
       "Insec": "Insecta",
       "Malac": "Malacostraca",
-      "Ostra": "Ostracoda",
-      "Polyc": "Polychaeta",
       "Rhabd": "Rhabditophora"
     },
     {
