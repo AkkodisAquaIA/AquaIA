@@ -64,6 +64,15 @@ class DINODetector(nn.Module):
         else:
             raise NotImplementedError("LoRA fine-tuning not implemented yet, set lora_ft to False for now")
 
+    # Override nn.Module.train() to control eval mode of backbone based on lora_ft flag
+    def train(self, mode=True):
+        # train() in nn.Module
+        super().train(mode)
+        if not self.lora_ft:
+            # Keep the frozen backbone in eval mode, even during training
+            self.backbone.eval()
+        return self
+
     def _forward_backbone(self, inputs):
         # Feed input to backbone and extract features
         # lora_ft = True -> need grad, lora_ft = False -> no grad

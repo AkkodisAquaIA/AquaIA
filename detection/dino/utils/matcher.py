@@ -84,7 +84,8 @@ class HungarianMatcher(nn.Module):
 
             # We flatten to compute the cost matrices in a batch
             # Z: get pred prob and bbox coords via fusion of dim 0 and 1
-            out_prob = outputs["pred_logits"].flatten(0, 1).sigmoid()  # Z: [batch_size * num_queries, num_classes]
+            # Keep focal-cost math in FP32 so the log epsilon does not underflow under AMP
+            out_prob = outputs["pred_logits"].flatten(0, 1).float().sigmoid()  # Z: [batch_size * num_queries, num_classes]
             out_bbox = outputs["pred_boxes"].flatten(0, 1)  # Z: [batch_size * num_queries, 4]
 
             # Also concat the target labels and boxes
