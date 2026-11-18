@@ -14,7 +14,6 @@ from tools import utility as util
 # ==================================================================================================
 
 SEUIL_DETECTION = None
-pas_seuil = 5
 TAILLE_BORD = 20
 SURFACE_MIN_PCT = 0.001
 
@@ -719,7 +718,8 @@ def creer_masque_bestiole(
         masque_bestiole,
         fond,
         difference,
-        float(seuil)
+        float(seuil),
+        informations_seuil
     )
 
 
