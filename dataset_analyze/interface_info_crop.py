@@ -12,6 +12,7 @@ from PySide6.QtGui import (
     QPixmap,
 )
 
+
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -26,11 +27,14 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
     QWidget,
+    QSizePolicy,
+    QScrollArea,
+    QMessageBox,
 )
 
 from config import constants as cst
 from tools import utility as util
-from moteur_info_crop import (
+from ihm.moteur_info_crop import (
     ErreurLectureImage,
     lire_image, 
     creer_masque_bestiole,
@@ -141,8 +145,8 @@ class InterfaceInfoCrop(QMainWindow):
         )
 
         self.resize(
-            1200,
-            800
+            900,
+            650
         )
 
 
@@ -170,24 +174,34 @@ class InterfaceInfoCrop(QMainWindow):
 
         self._creer_interface()
 
+        self.image_rgb_affichage = None
+
 
     # ----------------------------------------------------------
     # Création Label Affichage
     # ----------------------------------------------------------
     def _creer_label_affichage(
-        self,
-        texte,
-        largeur_min=600,
-        hauteur_min=300
-    ):
+    self,
+    texte,
+    largeur_min=600,
+    hauteur_min=200
+):
         """
-        Crée un QLabel standardisé destiné à l'affichage
-        d'une image ou d'un diagnostic.
+        Crée une zone standard d'affichage d'image.
         """
 
         label = QLabel(texte)
         label.setAlignment(Qt.AlignCenter)
-        label.setMinimumSize(largeur_min, hauteur_min)
+        label.setMinimumSize(
+            largeur_min,
+            hauteur_min
+        )
+
+        label.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Expanding
+        )
+
         label.setStyleSheet(
             f"""
             QLabel {{
@@ -199,7 +213,6 @@ class InterfaceInfoCrop(QMainWindow):
         )
 
         return label
-
 
     def _afficher_image_gris(
         self,
@@ -413,58 +426,31 @@ class InterfaceInfoCrop(QMainWindow):
         # Répertoire
         # ==========================================================
 
-        label_repertoire = QLabel(
-            "Répertoire :"
-        )
-
+        label_repertoire = QLabel("Répertoire :")
         self.champ_repertoire = QLineEdit()
-
-        self.champ_repertoire.setReadOnly(
-            True
-        )
-
-        self.champ_repertoire.setPlaceholderText(
-            "Sélectionnez le répertoire contenant les images"
-        )
-
-        self.bouton_parcourir = QPushButton(
-            "Parcourir..."
-        )
+        self.champ_repertoire.setReadOnly(True)
+        self.champ_repertoire.setPlaceholderText("Sélectionnez le répertoire contenant les images")
+        self.bouton_parcourir = QPushButton("Parcourir...")
 
         # ==========================================================
         # Image
         # ==========================================================
 
-        label_image = QLabel(
-            "Image :"
-        )
-
+        label_image = QLabel("Image :")
         self.combo_images = QComboBox()
-
-        self.combo_images.setEnabled(
-            False
-        )
+        self.combo_images.setEnabled(False)
 
         # ==========================================================
-        # Position
+        # Position          
         # ==========================================================
 
-        self.label_position_image = QLabel(
-            "0 / 0"
-        )
-
-        self.label_position_image.setAlignment(
-            Qt.AlignCenter
-        )
-
-        self.label_position_image.setMinimumWidth(
-            70
-        )
-
+        self.label_position_image = QLabel("0 / 0")
+        self.label_position_image.setAlignment(Qt.AlignCenter)
+        self.label_position_image.setMinimumWidth(70)
         self.label_position_image.setStyleSheet(
             f"""
             QLabel {{
-                color: {COULEUR_AQUA_DARK};
+                color: {COULEUR_AQUA_DARK};  
                 font-weight: bold;
                 padding: 4px;
             }}
@@ -475,24 +461,12 @@ class InterfaceInfoCrop(QMainWindow):
         # Navigation
         # ==========================================================
 
-        self.bouton_precedente = QPushButton(
-            "◀ Précédente"
-        )
-
-        self.bouton_suivante = QPushButton(
-            "Suivante ▶"
-        )
-
-        self.bouton_precedente.setEnabled(
-            False
-        )
-
-        self.bouton_suivante.setEnabled(
-            False
-        )
+        self.bouton_precedente = QPushButton("◀ Précédente")
+        self.bouton_suivante = QPushButton("Suivante ▶")
+        self.bouton_precedente.setEnabled(False)
+        self.bouton_suivante.setEnabled(False)
 
         # Style des boutons de navigation
-
         style_navigation = self._style_bouton(
             couleur_fond=COULEUR_AQUA_DARK,
             couleur_texte="white",
@@ -502,13 +476,8 @@ class InterfaceInfoCrop(QMainWindow):
             couleur_pressed=COULEUR_AQUA_DARK_PRESSED
         )
 
-        self.bouton_precedente.setStyleSheet(
-            style_navigation
-        )
-
-        self.bouton_suivante.setStyleSheet(
-            style_navigation
-        )
+        self.bouton_precedente.setStyleSheet(style_navigation)
+        self.bouton_suivante.setStyleSheet(style_navigation)
 
         # ==========================================================
         # Ligne Répertoire
@@ -545,23 +514,10 @@ class InterfaceInfoCrop(QMainWindow):
             0
         )
 
-        layout_navigation.addWidget(
-            self.bouton_precedente
-        )
-
-        layout_navigation.addWidget(
-            self.combo_images,
-            1
-        )
-
-        layout_navigation.addWidget(
-            self.label_position_image
-        )
-
-        layout_navigation.addWidget(
-            self.bouton_suivante
-        )
-
+        layout_navigation.addWidget(self.bouton_precedente)
+        layout_navigation.addWidget(self.combo_images, 1)
+        layout_navigation.addWidget(self.label_position_image)
+        layout_navigation.addWidget(self.bouton_suivante)
         layout_selection.addWidget(
             label_image,
             1,
@@ -599,9 +555,7 @@ class InterfaceInfoCrop(QMainWindow):
         # IMPORTANT : ajout à l'interface principale
         # ==========================================================
 
-        layout_principal.addLayout(
-            layout_selection
-        )
+        layout_principal.addLayout(layout_selection)
 
     def _creer_options_affichage(
         self,
@@ -688,7 +642,7 @@ class InterfaceInfoCrop(QMainWindow):
         self.affichage_image = self._creer_label_affichage(
             texte="Sélectionnez une image",
             largeur_min=600,
-            hauteur_min=400
+            hauteur_min=320
         )
 
         layout_principal.addWidget(
@@ -713,13 +667,8 @@ class InterfaceInfoCrop(QMainWindow):
             '&nbsp;&nbsp;BBox verte : zone sécurisée avec marge'
         )
 
-        legende_rouge.setStyleSheet(
-            style_legende
-        )
-
-        legende_verte.setStyleSheet(
-            style_legende
-        )
+        legende_rouge.setStyleSheet(style_legende)
+        legende_verte.setStyleSheet(style_legende)
 
         # ----------------------------------------------------------
         # Placement de la légende
@@ -760,37 +709,56 @@ class InterfaceInfoCrop(QMainWindow):
         # 1. MASQUE
         # ==========================================================
 
-        self.affichage_masque = self._creer_label_affichage(
-            texte="Aucun masque disponible"
+        self.widget_masque = QWidget()
+        layout_masque = QVBoxLayout(self.widget_masque)
+        layout_masque.setContentsMargins(
+            5,
+            5,
+            5,
+            5
         )
 
-        self.onglets_diagnostics.addTab(
-            self.affichage_masque,
-            "Masque"
+        aide_masque = self._creer_aide_diagnostic(
+            "Blanc : composante retenue comme organisme. "
+            "Noir : fond ou pixels rejetés."
         )
+
+        layout_masque.addWidget(aide_masque)
+
+        self.affichage_masque = self._creer_label_affichage(texte="Aucun masque disponible")
+        layout_masque.addWidget(self.affichage_masque)
+        self.onglets_diagnostics.addTab(self.widget_masque, "Masque")
 
         # ==========================================================
         # 2. DISTANCES
         # ==========================================================
 
-        self.affichage_distances = self._creer_label_affichage(
-            texte="Aucune carte des distances disponible"
+        self.widget_distances = QWidget()
+        layout_distances = QVBoxLayout(self.widget_distances)
+        layout_distances.setContentsMargins(
+            5,
+            5,
+            5,
+            5
         )
 
-        self.onglets_diagnostics.addTab(
-            self.affichage_distances,
-            "Distances"
+        aide_distances = self._creer_aide_diagnostic(
+            "La couleur représente la distance à la couleur du fond : "
+            "les zones les plus chaudes correspondent aux pixels "
+            "les plus différents du fond estimé."
         )
+
+        layout_distances.addWidget(aide_distances)
+        self.affichage_distances = self._creer_label_affichage(texte="Aucune carte des distances disponible")
+        layout_distances.addWidget(self.affichage_distances)
+        self.onglets_diagnostics.addTab(self.widget_distances, "Distances")
 
         # ==========================================================
         # 3. HISTOGRAMME
         # ==========================================================
 
         self.widget_histogramme = QWidget()
-
-        layout_histogramme = QVBoxLayout(
-            self.widget_histogramme
-        )
+        layout_histogramme = QVBoxLayout(self.widget_histogramme)
 
         layout_histogramme.setContentsMargins(
             5,
@@ -799,36 +767,25 @@ class InterfaceInfoCrop(QMainWindow):
             5
         )
 
-        self.figure_histogramme = Figure(
-            figsize=(8, 4)
+        self.figure_histogramme = Figure(figsize=(8, 4))
+        aide_histogramme = self._creer_aide_diagnostic(
+            "Distribution des distances au fond. "
+            "La ligne rouge indique le seuil retenu ; "
+            "P90, P95 et P99 indiquent les percentiles de la distribution."
         )
 
-        self.canvas_histogramme = FigureCanvas(
-            self.figure_histogramme
-        )
-
-        self.axes_histogramme = (
-            self.figure_histogramme.add_subplot(111)
-        )
-
-        layout_histogramme.addWidget(
-            self.canvas_histogramme
-        )
-
-        self.onglets_diagnostics.addTab(
-            self.widget_histogramme,
-            "Histogramme"
-        )
+        layout_histogramme.addWidget(aide_histogramme)
+        self.canvas_histogramme = FigureCanvas(self.figure_histogramme)
+        self.axes_histogramme = (self.figure_histogramme.add_subplot(111))
+        layout_histogramme.addWidget(self.canvas_histogramme)
+        self.onglets_diagnostics.addTab(self.widget_histogramme,"Histogramme")
 
         # ==========================================================
         # 4. PIXELS CRITIQUES
         # ==========================================================
 
         self.widget_pixels_critiques = QWidget()
-
-        layout_pixels_critiques = QVBoxLayout(
-            self.widget_pixels_critiques
-        )
+        layout_pixels_critiques = QVBoxLayout(self.widget_pixels_critiques)
 
         layout_pixels_critiques.setContentsMargins(
             5,
@@ -848,19 +805,20 @@ class InterfaceInfoCrop(QMainWindow):
             "Pourcentage : -"
         )
 
-        self.informations_pixels_critiques.setAlignment(
-            Qt.AlignCenter
-        )
-
+        self.informations_pixels_critiques.setAlignment(Qt.AlignCenter)
         self.informations_pixels_critiques.setStyleSheet(
             self._style_label_information(
                 couleur=COULEUR_AQUA_DARK
             )
         )
 
-        layout_pixels_critiques.addWidget(
-            self.informations_pixels_critiques
+        aide_pixels_critiques = self._creer_aide_diagnostic(
+            "Blanc : pixels actuellement détectés qui seraient perdus "
+            f"si le seuil augmentait de {PAS_SEUIL}."
         )
+
+        layout_pixels_critiques.addWidget(aide_pixels_critiques)
+        layout_pixels_critiques.addWidget(self.informations_pixels_critiques)
 
         # ----------------------------------------------------------
         # Image des pixels critiques
@@ -872,24 +830,29 @@ class InterfaceInfoCrop(QMainWindow):
             )
         )
 
-        layout_pixels_critiques.addWidget(
-            self.affichage_pixels_critiques
-        )
-
-        self.onglets_diagnostics.addTab(
-            self.widget_pixels_critiques,
-            "Pixels critiques"
-        )
+        layout_pixels_critiques.addWidget(self.affichage_pixels_critiques)
+        self.onglets_diagnostics.addTab(self.widget_pixels_critiques, "Pixels critiques")
 
         # ==========================================================
         # 5. CALCUL DU SEUIL
         # ==========================================================
 
         self.widget_calcul_seuil = QWidget()
+        layout_calcul_seuil = QGridLayout(self.widget_calcul_seuil)
 
-        layout_calcul_seuil = QGridLayout(
-            self.widget_calcul_seuil
+        aide_calcul_seuil = self._creer_aide_diagnostic(
+            "Détail du calcul automatique du seuil à partir "
+            "des variations observées dans la zone de fond."
         )
+
+        layout_calcul_seuil.addWidget(
+            aide_calcul_seuil,
+            0,
+            0,
+            1,
+            2
+        )
+
 
         layout_calcul_seuil.setContentsMargins(
             30,
@@ -898,13 +861,8 @@ class InterfaceInfoCrop(QMainWindow):
             20
         )
 
-        layout_calcul_seuil.setHorizontalSpacing(
-            8
-        )
-
-        layout_calcul_seuil.setVerticalSpacing(
-            8
-        )
+        layout_calcul_seuil.setHorizontalSpacing(8)
+        layout_calcul_seuil.setVerticalSpacing(8)
 
         # ----------------------------------------------------------
         # Champs affichés
@@ -953,7 +911,8 @@ class InterfaceInfoCrop(QMainWindow):
         # ----------------------------------------------------------
 
         for ligne, (cle, texte) in enumerate(
-            libelles
+            libelles,
+            start=1
         ):
 
             label = QLabel(
@@ -1034,53 +993,212 @@ class InterfaceInfoCrop(QMainWindow):
         layout_principal
     ):
         """
-        Crée les zones d'informations relatives
-        à la détection et à l'occupation de l'image.
+        Crée la grille présentant les informations
+        de détection et d'occupation.
         """
 
-        # ----------------------------------------------------------
-        # Informations de détection
-        # ----------------------------------------------------------
+        layout_informations = QGridLayout()
 
-        self.informations_detection = QLabel(
-            "Détection : -    |    "
-            "Seuil : -    |    "
-            "Fond BGR : -"
+        layout_informations.setContentsMargins(
+            10,
+            5,
+            10,
+            5
         )
 
-        self.informations_detection.setAlignment(
-            Qt.AlignLeft | Qt.AlignVCenter
+        layout_informations.setHorizontalSpacing(12)
+        layout_informations.setVerticalSpacing(5)
+
+        # ==========================================================
+        # Colonne gauche : Détection
+        # ==========================================================
+
+        label_detection = QLabel("Détection :")
+        label_seuil = QLabel("Seuil :")
+        label_fond = QLabel("Fond BGR :")
+
+        # ==========================================================
+        # Colonne droite : Occupation
+        # ==========================================================
+
+        label_surface_image = QLabel("Surface image :")
+        label_surface_bestiole = QLabel("Surface bestiole :")
+        label_occupation_reelle = QLabel("Occupation réelle :")
+        label_occupation_bbox = QLabel("Occupation BBox :")
+
+        # ==========================================================
+        # Valeurs
+        # ==========================================================
+
+        self.valeur_detection = QLabel("-")
+        self.valeur_seuil = QLabel("-")
+        self.valeur_fond = QLabel("-")
+        self.valeur_surface_image = QLabel("-")
+        self.valeur_surface_bestiole = QLabel("-")
+        self.valeur_occupation_reelle = QLabel("-")
+        self.valeur_occupation_bbox = QLabel("-")
+
+        # ==========================================================
+        # Style des libellés
+        # ==========================================================
+
+        labels = (
+            label_detection,
+            label_seuil,
+            label_fond,
+            label_surface_image,
+            label_surface_bestiole,
+            label_occupation_reelle,
+            label_occupation_bbox,
         )
 
-        self.informations_detection.setStyleSheet(
-            self._style_label_information()
+        for label in labels:
+
+            label.setAlignment(
+                Qt.AlignRight | Qt.AlignVCenter
+            )
+
+            label.setStyleSheet(
+                f"""
+                QLabel {{
+                    color: {COULEUR_AQUA_DARK};
+                    font-weight: bold;
+                }}
+                """
+            )
+
+
+        valeurs = (
+            self.valeur_detection,
+            self.valeur_seuil,
+            self.valeur_fond,
+            self.valeur_surface_image,
+            self.valeur_surface_bestiole,
+            self.valeur_occupation_reelle,
+            self.valeur_occupation_bbox,
         )
 
-        layout_principal.addWidget(
-            self.informations_detection
+        for valeur in valeurs:
+
+            valeur.setAlignment(
+                Qt.AlignLeft | Qt.AlignVCenter
+            )
+
+
+        # ==========================================================
+        # Partie Détection
+        # ==========================================================
+
+        layout_informations.addWidget(
+            label_detection,
+            0,
+            0
         )
 
-        # ----------------------------------------------------------
-        # Informations d'occupation
-        # ----------------------------------------------------------
-
-        self.informations_occupation = QLabel(
-            "Surface image : -    |    "
-            "Surface bestiole : -    |    "
-            "Occupation réelle : -    |    "
-            "Occupation BBox : -"
+        layout_informations.addWidget(
+            self.valeur_detection,
+            0,
+            1
         )
 
-        self.informations_occupation.setAlignment(
-            Qt.AlignLeft | Qt.AlignVCenter
+        layout_informations.addWidget(
+            label_seuil,
+            1,
+            0
         )
 
-        self.informations_occupation.setStyleSheet(
-            self._style_label_information()
+        layout_informations.addWidget(
+            self.valeur_seuil,
+            1,
+            1
         )
 
-        layout_principal.addWidget(
-            self.informations_occupation
+        layout_informations.addWidget(
+            label_fond,
+            2,
+            0
+        )
+
+        layout_informations.addWidget(
+            self.valeur_fond,
+            2,
+            1
+        )
+
+        # ==========================================================
+        # Partie Occupation
+        # ==========================================================
+
+        layout_informations.addWidget(
+            label_surface_image,
+            0,
+            2
+        )
+
+        layout_informations.addWidget(
+            self.valeur_surface_image,
+            0,
+            3
+        )
+
+        layout_informations.addWidget(
+            label_surface_bestiole,
+            1,
+            2
+        )
+
+        layout_informations.addWidget(
+            self.valeur_surface_bestiole,
+            1,
+            3
+        )
+
+        layout_informations.addWidget(
+            label_occupation_reelle,
+            2,
+            2
+        )
+
+        layout_informations.addWidget(
+            self.valeur_occupation_reelle,
+            2,
+            3
+        )
+
+        layout_informations.addWidget(
+            label_occupation_bbox,
+            3,
+            2
+        )
+
+        layout_informations.addWidget(
+            self.valeur_occupation_bbox,
+            3,
+            3
+        )
+
+        layout_informations.setColumnStretch(
+            0,
+            0
+        )
+
+        layout_informations.setColumnStretch(
+            1,
+            1
+        )
+
+        layout_informations.setColumnStretch(
+            2,
+            0
+        )
+
+        layout_informations.setColumnStretch(
+            3,
+            1
+        )
+
+        layout_principal.addLayout(
+            layout_informations
         )
 
     def _creer_zone_sauvegarde(
@@ -1098,23 +1216,11 @@ class InterfaceInfoCrop(QMainWindow):
         # État de la décision opérateur
         # ----------------------------------------------------------
 
-        self.label_decision = QLabel(
-            "Sélectionnez une image"
-        )
+        self.label_decision = QLabel("Sélectionnez une image")
+        self.label_decision.setAlignment(Qt.AlignCenter)
+        self.label_decision.setStyleSheet(self._style_label_information(couleur=COULEUR_AQUA_DARK))
 
-        self.label_decision.setAlignment(
-            Qt.AlignCenter
-        )
-
-        self.label_decision.setStyleSheet(
-            self._style_label_information(
-                couleur=COULEUR_AQUA_DARK
-            )
-        )
-
-        layout_principal.addWidget(
-            self.label_decision
-        )
+        layout_principal.addWidget(self.label_decision)
 
 
         # ==========================================================
@@ -1187,6 +1293,36 @@ class InterfaceInfoCrop(QMainWindow):
         layout_sauvegarde.addStretch()
         layout_principal.addLayout(layout_sauvegarde)
 
+
+        # ----------------------------------------------------------
+        # Bouton Quitter
+        # ----------------------------------------------------------
+
+        self.bouton_quitter = QPushButton("Quitter")
+
+        self.bouton_quitter.setStyleSheet(
+            self._style_bouton(
+                couleur_fond=COULEUR_BOUTON_NEUTRE,
+                couleur_texte="white",
+                couleur_bordure=COULEUR_BOUTON_NEUTRE_PRESSED,
+                couleur_hover=COULEUR_BOUTON_NEUTRE_HOVER,
+                couleur_texte_hover="white",
+                couleur_pressed=COULEUR_BOUTON_NEUTRE_PRESSED
+            )
+        )
+
+        layout_quitter = QHBoxLayout()
+
+        layout_quitter.addStretch()
+
+        layout_quitter.addWidget(
+            self.bouton_quitter
+        )
+
+        layout_principal.addLayout(
+            layout_quitter
+        )
+
     def _connecter_signaux(self):
         """
         Connecte les signaux de l'interface
@@ -1196,57 +1332,31 @@ class InterfaceInfoCrop(QMainWindow):
         # ----------------------------------------------------------
         # Sélection du répertoire
         # ----------------------------------------------------------
-
-        self.bouton_parcourir.clicked.connect(
-            self.selectionner_repertoire
-        )
+        self.bouton_parcourir.clicked.connect(self.selectionner_repertoire)
 
         # ----------------------------------------------------------
         # Sélection de l'image
         # ----------------------------------------------------------
-
-        self.combo_images.currentIndexChanged.connect(
-            self.selectionner_image
-        )
+        self.combo_images.currentIndexChanged.connect(self.selectionner_image)
 
         # ----------------------------------------------------------
         # Navigation
         # ----------------------------------------------------------
-
-        self.bouton_precedente.clicked.connect(
-            self.image_precedente
-        )
-
-        self.bouton_suivante.clicked.connect(
-            self.image_navigation_suivante
-        )
-
-
+        self.bouton_precedente.clicked.connect(self.image_precedente)
+        self.bouton_suivante.clicked.connect(self.image_navigation_suivante)
 
         # ----------------------------------------------------------
         # Diagnostics intermédiaires
         # ----------------------------------------------------------
-
-        self.checkbox_diagnostics.toggled.connect(
-            self.afficher_diagnostics
-        )
+        self.checkbox_diagnostics.toggled.connect(self.afficher_diagnostics)
 
         # ----------------------------------------------------------
         # Décisions opérateur
         # ----------------------------------------------------------
-
-        self.bouton_bbox_rouge.clicked.connect(
-            self.sauvegarder_bbox_rouge
-        )
-
-        self.bouton_bbox_verte.clicked.connect(
-            self.sauvegarder_bbox_verte
-        )
-
-        self.bouton_sans_sauvegarde.clicked.connect(
-            self.ne_pas_sauvegarder
-        )
-
+        self.bouton_bbox_rouge.clicked.connect(self.sauvegarder_bbox_rouge)
+        self.bouton_bbox_verte.clicked.connect(self.sauvegarder_bbox_verte)
+        self.bouton_sans_sauvegarde.clicked.connect(self.ne_pas_sauvegarder)
+        self.bouton_quitter.clicked.connect(self.close)
 
     def _style_bouton(
         self,
@@ -1352,7 +1462,6 @@ class InterfaceInfoCrop(QMainWindow):
         self.bouton_precedente.setEnabled(index > 0)
         self.bouton_suivante.setEnabled(index < total - 1)
 
-
     def image_precedente(self):
         """
         Sélectionne l'image précédente dans le QComboBox,
@@ -1442,6 +1551,10 @@ class InterfaceInfoCrop(QMainWindow):
         )
 
 
+
+
+
+
 #////////////////////////////////////////////////////////////////////
     def _reinitialiser_image_courante(self):
         """
@@ -1455,6 +1568,7 @@ class InterfaceInfoCrop(QMainWindow):
 
         self.image_courante = None
         self.chemin_image_courante = None
+        self.image_rgb_affichage = None
 
         # ----------------------------------------------------------
         # Bounding boxes
@@ -1535,6 +1649,9 @@ class InterfaceInfoCrop(QMainWindow):
             valeur.setText(
                 "-"
             )
+
+        self._reinitialiser_informations()
+
 
     def _gerer_erreur_lecture(
         self,
@@ -1619,17 +1736,7 @@ class InterfaceInfoCrop(QMainWindow):
         # Informations générales
         # ----------------------------------------------------------
 
-        self.informations_detection.setText(
-            "Détection : impossible    |    "
-            "Erreur de lecture de l'image"
-        )
-
-        self.informations_occupation.setText(
-            "Surface image : -    |    "
-            "Surface bestiole : -    |    "
-            "Occupation réelle : -    |    "
-            "Occupation BBox : -"
-        )
+        self._reinitialiser_informations()
 
         # ----------------------------------------------------------
         # Console
@@ -1642,6 +1749,23 @@ class InterfaceInfoCrop(QMainWindow):
         print(
             f"    {erreur}"
         )
+
+
+    def _reinitialiser_informations(self):
+        """
+        Remet à zéro les informations de détection
+        et d'occupation.
+        """
+
+        self.valeur_detection.setText("-")
+        self.valeur_seuil.setText("-")
+        self.valeur_fond.setText("-")
+        self.valeur_surface_image.setText("-")
+        self.valeur_surface_bestiole.setText("-")
+        self.valeur_occupation_reelle.setText("-")
+        self.valeur_occupation_bbox.setText("-")
+
+
 
     def _calculer_detection(
         self,
@@ -1816,6 +1940,71 @@ class InterfaceInfoCrop(QMainWindow):
             f'"{chemin_image.name}"'
         )
 
+
+    def _afficher_informations_image(
+    self,
+    bbox_detectee,
+    fond,
+    seuil_utilise,
+    surface_image,
+    surface_bestiole,
+    occupation_pct,
+    occupation_bbox_pct
+):
+        """
+        Met à jour les informations de détection
+        et d'occupation de l'image courante.
+        """
+
+        # ----------------------------------------------------------
+        # Détection
+        # ----------------------------------------------------------
+
+        detection = (
+            "Oui"
+            if bbox_detectee is not None
+            else "NON"
+        )
+
+        self.valeur_detection.setText(
+            detection
+        )
+
+        self.valeur_seuil.setText(
+            f"{seuil_utilise:.3f}"
+        )
+
+        self.valeur_fond.setText(
+            str(fond)
+        )
+
+        # ----------------------------------------------------------
+        # Surfaces
+        # ----------------------------------------------------------
+
+        self.valeur_surface_image.setText(
+            f"{util.format_nombre(surface_image)} px"
+        )
+
+        self.valeur_surface_bestiole.setText(
+            f"{util.format_nombre(surface_bestiole)} px"
+        )
+
+        # ----------------------------------------------------------
+        # Occupation
+        # ----------------------------------------------------------
+
+        self.valeur_occupation_reelle.setText(
+            f"{occupation_pct:.1f} %"
+        )
+
+        self.valeur_occupation_bbox.setText(
+            f"{occupation_bbox_pct:.1f} %"
+        )
+
+
+
+
     def _calculer_occupation(
         self,
         image,
@@ -1855,67 +2044,6 @@ class InterfaceInfoCrop(QMainWindow):
             occupation_bbox_pct
         )
 
-    def _afficher_informations_image(
-        self,
-        bbox_detectee,
-        fond,
-        seuil_utilise,
-        surface_image,
-        surface_bestiole,
-        occupation_pct,
-        occupation_bbox_pct
-    ):
-        """
-        Met à jour les informations de détection
-        et d'occupation affichées dans l'IHM.
-        """
-
-        # ----------------------------------------------------------
-        # Détection
-        # ----------------------------------------------------------
-
-        detection = (
-            "Oui"
-            if bbox_detectee is not None
-            else "NON"
-        )
-
-        texte_detection = (
-            f"Détection : {detection}    |    "
-            f"Seuil : {seuil_utilise:.3f}    |    "
-            f"Fond BGR : {fond}"
-        )
-
-        self.informations_detection.setText(
-            texte_detection
-        )
-
-        # ----------------------------------------------------------
-        # Formatage des surfaces
-        # ----------------------------------------------------------
-
-        surface_image_form = util.format_nombre(
-            surface_image
-        )
-
-        surface_bestiole_form = util.format_nombre(
-            surface_bestiole
-        )
-
-        # ----------------------------------------------------------
-        # Occupation
-        # ----------------------------------------------------------
-
-        texte_occupation = (
-            f"Surface image : {surface_image_form} px    |    "
-            f"Surface bestiole : {surface_bestiole_form} px    |    "
-            f"Occupation réelle : {occupation_pct:.1f} %    |    "
-            f"Occupation BBox : {occupation_bbox_pct:.1f} %"
-        )
-
-        self.informations_occupation.setText(
-            texte_occupation
-        )
 
     def _afficher_resultat_image(
         self,
@@ -2001,11 +2129,19 @@ class InterfaceInfoCrop(QMainWindow):
         )
 
         # ----------------------------------------------------------
-        # Affichage PySide6
+        # Mémorisation pour les futurs redimensionnements
+        # ----------------------------------------------------------
+
+        self.image_rgb_affichage = (
+            image_rgb
+        )
+
+        # ----------------------------------------------------------
+        # Affichage
         # ----------------------------------------------------------
 
         self._afficher_image_rgb(
-            image=image_rgb,
+            image=self.image_rgb_affichage,
             label=self.affichage_image
         )
 
@@ -2015,70 +2151,74 @@ class InterfaceInfoCrop(QMainWindow):
 
     #============================================================================================
     def _creer_interface(self):
+        """
+        Construit l'interface graphique principale.
+        """
+
+        # ==========================================================
+        # Widget central
+        # ==========================================================
+
+        widget_central = QWidget()
+
+        self.setCentralWidget(widget_central)
+        layout_central = QVBoxLayout(widget_central)
+        layout_central.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
+        # ==========================================================
+        # Zone défilable
+        # ==========================================================
+
+        self.zone_defilable = QScrollArea()
+        self.zone_defilable.setWidgetResizable(True)
+        self.zone_defilable.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Expanding
+        )
+
+        self.zone_defilable.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.zone_defilable.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        layout_central.addWidget(self.zone_defilable)
+
+        # ==========================================================
+        # Contenu de l'IHM
+        # ==========================================================
 
         widget_principal = QWidget()
 
-        self.setCentralWidget(widget_principal)
+        widget_principal.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Preferred
+        )
 
+        self.zone_defilable.setWidget(widget_principal)
         layout_principal = QVBoxLayout(widget_principal)
+        layout_principal.setAlignment(Qt.AlignTop)
 
-        # ----------------------------------------------------------
-        # En-tête
-        # ----------------------------------------------------------
+        # ==========================================================
+        # Construction
+        # ==========================================================
+
         self._creer_entete(layout_principal)
-       
-
-        # ----------------------------------------------------------
-        # Sélection répertoire / image
-        # ----------------------------------------------------------
         self._creer_selection_images(layout_principal)
-
-
-        # ----------------------------------------------------------
-        # Options d'affichage
-        # ----------------------------------------------------------
         self._creer_options_affichage(layout_principal)
-
-
-        # ----------------------------------------------------------
-        # Résumé du traitement
-        # ----------------------------------------------------------
         self._creer_resume(layout_principal)
+        self._creer_zone_image(layout_principal)
+        self._creer_informations(layout_principal)
+        self._creer_zone_sauvegarde(layout_principal)
+        self._creer_diagnostics(layout_principal)
         
 
-        # ----------------------------------------------------------
-        # Affichage de l'image principale
-        # ----------------------------------------------------------
-        self._creer_zone_image(layout_principal)
-
- 
-        # ----------------------------------------------------------
-        # Diagnostics intermédiaires
-        # ----------------------------------------------------------
-        self._creer_diagnostics(layout_principal)
-
-        # ----------------------------------------------------------
-        # Informations
-        # ----------------------------------------------------------
-        self._creer_informations(layout_principal)
-       
-
-        # ----------------------------------------------------------
-        # Zone de sauvegarde
-        # ----------------------------------------------------------    
-        self._creer_zone_sauvegarde(layout_principal)
-
-
-        # ----------------------------------------------------------
-        # Connexion des signaux
-        # ----------------------------------------------------------
+        # ==========================================================
+        # Signaux
+        # ==========================================================
         self._connecter_signaux()
 
-
-        # ----------------------------------------------------------
-        # Espace restant
-        # ----------------------------------------------------------
-        layout_principal.addStretch()
 
     def selectionner_repertoire(self):
 
@@ -2094,9 +2234,7 @@ class InterfaceInfoCrop(QMainWindow):
         repertoire = Path(repertoire)
 
         # Affichage du répertoire
-        self.champ_repertoire.setText(
-            str(repertoire)
-        )
+        self.champ_repertoire.setText(str(repertoire))
 
         # Recherche des images
         liste_images = sorted(
@@ -3280,6 +3418,124 @@ class InterfaceInfoCrop(QMainWindow):
             f"{informations['seuil_final']:.3f}"
         )
 
+    def _creer_aide_diagnostic(
+        self,
+        texte
+    ):
+        """
+        Crée une courte aide explicative pour
+        un onglet de diagnostic.
+        """
+
+        label = QLabel(texte)
+        label.setWordWrap(True)
+        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COULEUR_TEXTE_SECONDAIRE};
+                padding: 4px 6px;
+                font-style: italic;
+            }}
+            """
+        )
+
+        return label
+
+
+    def resizeEvent(
+        self,
+        event
+    ):
+        """
+        Réadapte les images affichées lorsque
+        la fenêtre change de dimensions.
+        """
+
+        # Laisse QMainWindow effectuer son traitement normal.
+        super().resizeEvent(
+            event
+        )
+
+        # ----------------------------------------------------------
+        # Image principale
+        # ----------------------------------------------------------
+
+        if self.image_rgb_affichage is not None:
+
+            self._afficher_image_rgb(
+                image=self.image_rgb_affichage,
+                label=self.affichage_image
+            )
+
+
+    def closeEvent(
+        self,
+        event
+    ):
+        """
+        Confirme la fermeture et génère les rapports
+        d'anomalies avant de quitter.
+        """
+
+        # ----------------------------------------------------------
+        # Nombre d'images restant à examiner
+        # ----------------------------------------------------------
+
+        restantes = sum(
+            1
+            for etat in self.etat_images.values()
+            if etat == ETAT_A_TRAITER
+        )
+
+        # ----------------------------------------------------------
+        # Confirmation
+        # ----------------------------------------------------------
+
+        if restantes > 0:
+
+            restantes_form = util.format_nombre(
+                restantes
+            )
+
+            reponse = QMessageBox.question(
+                self,
+                "Quitter Aqua-IA",
+                (
+                    f"Il reste {restantes_form} image(s) "
+                    "à examiner.\n\n"
+                    "Les rapports des anomalies déjà détectées "
+                    "seront sauvegardés avant la fermeture.\n\n"
+                    "Voulez-vous vraiment quitter ?"
+                ),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+
+            if reponse != QMessageBox.Yes:
+
+                event.ignore()
+
+                return
+
+        # ----------------------------------------------------------
+        # Génération des rapports
+        # ----------------------------------------------------------
+
+        if self.etat_images:
+
+            try:
+
+                self.generer_rapports()
+
+            except Exception as erreur:
+
+                print(
+                    "Erreur lors de la génération "
+                    f"des rapports : {erreur}"
+                )
+
+        event.accept()
 
 
 #----------------------------------------------------------------------------------------
