@@ -31,6 +31,7 @@ class DINODetector(nn.Module):
         quantize=False,
         num_classes=80,
         num_queries=90,
+        aux_loss=False,
     ):
         super(DINODetector, self).__init__()
         self.img_size = img_size
@@ -49,7 +50,13 @@ class DINODetector(nn.Module):
         self.backbone = torch.hub.load(**resolve_backbone_id(backbone_id))
         # TODO : turn into a stateless function
         self.positional_encoding = build_position_encoding(positional_encoding_id, h_dim=d_model)
-        self.detector = DETR(num_input_channels=self.backbone.embed_dim, num_classes=num_classes, num_queries=num_queries, d_model=d_model).to(device)
+        self.detector = DETR(
+            num_input_channels=self.backbone.embed_dim,
+            num_classes=num_classes,
+            num_queries=num_queries,
+            d_model=d_model,
+            aux_loss=aux_loss,
+        ).to(device)
         # Assuming square images for simplicity, otherwise we would need to compute patch_x and patch_y separately
         # Here is the patch grid size, aka nb of patches along one dimension, ex 640/16=40 for dinov3_small
         self.patch_size = self.img_size // self.backbone.patch_size

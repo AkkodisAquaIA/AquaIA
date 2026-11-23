@@ -21,7 +21,7 @@ logging:
   save_period: 5
 
 early_stopping:
-  enabled: true
+  enabled: false
   # Consecutive validation mAP50-95 evaluations without sufficient improvement
   patience: 25
   min_delta: 0.001
@@ -44,13 +44,13 @@ training:
 
   # ---------- TRAINING SCHEDULE ----------
   # Epoch budget of this run
-  epochs: 20
+  epochs: 200
   # If cos_lr, warmup steps = epochs * warmup_ratio 
-  warmup_ratio: 0.25
+  warmup_ratio: 0.025
 
   # ---------- OPTIMIZER & LR ----------
   optimizer: "AdamW"
-  lr0: 0.0005
+  lr0: 0.0001
   # Min lr for cosine scheduler = lrf * lr0
   lrf: 0.05
   cos_lr: true
@@ -82,7 +82,7 @@ training:
   cutmix: 0
   # Disable Mosaic and CutMix in the last N epochs
   # Make sure close_mosaic <= epochs
-  close_mosaic: 20
+  close_mosaic: 200
 
   # ---------- INFERENCE / EVAL-RELATED ----------
   # Compute val mAP on first/last epochs and every N epochs

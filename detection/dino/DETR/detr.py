@@ -33,7 +33,7 @@ class DETR(nn.Module):
         """
         super().__init__()
         self.num_queries = num_queries
-        self.transformer = Transformer(d_model=d_model)  # .to(dtype=dtype)
+        self.transformer = Transformer(d_model=d_model, return_intermediate_dec=aux_loss)  # .to(dtype=dtype)
         # Z: class head maps decoder-updated object queries to object-class logits; no-object is represented by all-zero focal targets
         self.class_embed = nn.Linear(d_model, num_classes)  # .to(dtype=dtype)
         # Z: bbox head maps decoder-updated object queries to bbox coord (cx, cy, w, h)

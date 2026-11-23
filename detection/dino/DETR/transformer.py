@@ -6,7 +6,7 @@ DETR Transformer class.
 Copy-paste from torch.nn.Transformer with modifications:
     * positional encodings are passed in MHattention
     * extra LN at the end of encoder is removed
-    * decoder returns a stack of activations from all decoding layers
+    * decoder returns a stack of activations from all decoding layers (Z: when requested)
 
 Samuel Beaussant : Taken from DETR official repo. Modified and simplified for the current project:
     * Remove Type Hints for less verbosity (mostly tensors anyway)
@@ -32,7 +32,8 @@ class Transformer(nn.Module):
         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout, activation)
         self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers)
         decoder_layer = TransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout, activation)
-        self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, return_intermediate=return_intermediate_dec)
+        decoder_norm = nn.LayerNorm(d_model)
+        self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm, return_intermediate=return_intermediate_dec)
 
         self._reset_parameters()
 
@@ -83,10 +84,12 @@ class TransformerDecoder(nn.Module):
     """Z: stacks decoder layer N times, each with its own parameters.
     Optionally returns intermediate outputs from each layer."""
 
-    def __init__(self, decoder_layer, num_layers, return_intermediate=False):
+    def __init__(self, decoder_layer, num_layers, norm=None, return_intermediate=False):
         super().__init__()
         self.layers = _get_clones(decoder_layer, num_layers)
         self.num_layers = num_layers
+        # Z: shared LN layer for all decoder layers' output
+        self.norm = norm
         self.return_intermediate = return_intermediate
 
     def forward(self, tgt, memory, pos=None, query_pos=None):
@@ -99,6 +102,14 @@ class TransformerDecoder(nn.Module):
             # Z: store output of each layer
             if self.return_intermediate:
                 intermediate.append(self.norm(output))
+
+        if self.norm is not None:
+            output = self.norm(output)
+            if self.return_intermediate:
+                # Z: delate last element from list
+                intermediate.pop()
+                # Z: append normalized output to list
+                intermediate.append(output)
 
         if self.return_intermediate:
             # Z: [num_layers, batch_size, num_queries, d_model]

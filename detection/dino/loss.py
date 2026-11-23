@@ -70,10 +70,11 @@ class SetCriterion(nn.Module):
         # Z: the losses to be applied
         self.losses = ["labels", "boxes", "cardinality"]
 
-    def loss_labels(self, outputs, targets, indices, num_boxes):
+    def loss_labels(self, outputs, targets, indices, num_boxes, log=True):
         """Classification loss (NLL)
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
         Z: Compute the sigmoid focal classification loss.
+        Z: log controls whether to report class_error for matched predictions.
         """
         assert "pred_logits" in outputs
         # Z: src_logits [batch_size, num_queries, num_classes]
@@ -134,10 +135,11 @@ class SetCriterion(nn.Module):
         # Z: register loss value, a scalar tensor
         losses = {"loss_ce": loss_ce}
 
-        # TODO this should probably be a separate loss, not hacked in this one here
-        # Z: percentage of incorrectly classified predictions among those matched by the Hungarian algorithm
-        # Z: compute top1 accuracy then subtract from 100 to get error rate
-        losses["class_error"] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
+        if log:
+            # TODO this should probably be a separate loss, not hacked in this one here
+            # Z: percentage of incorrectly classified predictions among those matched by the Hungarian algorithm
+            # Z: compute top1 accuracy then subtract from 100 to get error rate
+            losses["class_error"] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
         return losses
 
     @torch.no_grad()
@@ -272,7 +274,6 @@ class SetCriterion(nn.Module):
                     kwargs = {}
                     if loss == "labels":
                         # Logging is enabled only for the last layer
-                        # Z: !Warning! no log parameter in loss_labels
                         kwargs["log"] = False
                     # Z: add suffix _i to the loss name to avoid overwriting the main loss
                     l_dict = self.get_loss(loss, aux_outputs, targets, indices, num_boxes, **kwargs)
@@ -292,7 +293,6 @@ class SetCriterion(nn.Module):
                 kwargs = {}
                 if loss == "labels":
                     # Logging is enabled only for the last layer
-                    # Z: !Warning! no log parameter in loss_labels
                     kwargs["log"] = False
                 l_dict = self.get_loss(loss, enc_outputs, bin_targets, indices, num_boxes, **kwargs)
                 l_dict = {k + "_enc": v for k, v in l_dict.items()}

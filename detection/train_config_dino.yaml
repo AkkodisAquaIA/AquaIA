@@ -58,6 +58,8 @@ training:
   weight_decay: 0.00005
 
   # ---------- LOSS / MATCHER HYPERPARAMETERS ----------
+  # Supervise intermediate decoder layers
+  aux_loss: false
   # Weights for class, bbox, giou in matching cost
   cost_class: 2.0
   cost_bbox: 5.0

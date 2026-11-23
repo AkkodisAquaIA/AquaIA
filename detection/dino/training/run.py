@@ -198,12 +198,15 @@ def train_dino(config, resume_dir=None):
     backbone_config = config.get("model", {})
     backbone_family = str(backbone_config.get("family", "")).lower()
     backbone_size = str(backbone_config.get("size", "").lower())
+    # Z: get aux_loss from training_config, defaulting to True if not present
+    aux_loss = training_config.get("aux_loss", True)
 
     model = DINODetector(
         backbone_id=backbone_family + "_" + backbone_size,
         img_size=imgsz,
         device=device,
         num_classes=num_classes,
+        aux_loss=aux_loss,
     ).to(device)
 
     pretrained_training_state = None
@@ -231,6 +234,13 @@ def train_dino(config, resume_dir=None):
         "loss_bbox": training_config["box"],
         "loss_giou": training_config["giou"],
     }
+
+    # Copy the final decoder layer's loss weights to each auxiliary layer
+    if aux_loss:
+        aux_weight_dict = {}
+        for i in range(model.detector.transformer.decoder.num_layers - 1):
+            aux_weight_dict.update({f"{key}_{i}": weight for key, weight in loss_weight_dict.items()})
+        loss_weight_dict.update(aux_weight_dict)
     criterion = SetCriterion(
         num_classes=num_classes,
         matcher=matcher,
@@ -376,10 +386,19 @@ def train_dino(config, resume_dir=None):
                         inputs = inputs.to(device, non_blocking=True)
 
                         with torch.autocast(device_type=device, dtype=torch.float16, enabled=use_amp):
-                            # outputs = { "pred_logits": tensor(...), "pred_boxes": tensor(...), }
+                            # outputs = {
+                            #     "pred_logits": tensor(...), "pred_boxes": tensor(...),
+                            #     "aux_outputs": [
+                            #         {"pred_logits": tensor(...), "pred_boxes": tensor(...)},
+                            #         {"pred_logits": tensor(...), "pred_boxes": tensor(...)},
+                            #     ],
+                            # }
                             outputs = model(inputs)
-                            # loss_dict = { "loss_ce": ..., "class_error": ..., "loss_bbox": ...,
-                            # "loss_giou": ..., "cardinality_error": ... } batch level
+                            # loss_dict = {
+                            # "loss_ce": ..., "class_error": ..., "loss_bbox": ..., "loss_giou": ..., "cardinality_error": ...,
+                            # "loss_ce_0": ..., "loss_bbox_0": ..., "loss_giou_0": ..., "cardinality_error_0": ...,
+                            # "loss_ce_1": ..., "loss_bbox_1": ..., "loss_giou_1": ..., "cardinality_error_1": ...
+                            # } batch level
                             loss_dict = criterion(outputs, targets)
                         total_loss = sum(loss_dict[key] * loss_weight_dict[key] for key in loss_dict if key in loss_weight_dict)
 
