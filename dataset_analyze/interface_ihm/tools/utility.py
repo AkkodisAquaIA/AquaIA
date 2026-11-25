@@ -1,0 +1,492 @@
+import os
+import sys
+import threading
+import time
+import numpy as np
+import platform
+from colorama import Fore, Style
+from pathlib import Path
+from datetime import datetime
+from typing import TypedDict, Tuple
+
+import tools.display_color as dc
+from tools.display_color import DISPLAY_COLORS as colors
+from config import constants as ct
+
+ColorSpec = Tuple[int, int, int, str]
+
+#=====================================================================================================
+
+class DatasetStats(TypedDict):
+    images: int
+    labels: int
+    bounding_boxes: int
+    bbox_width_mean: float
+    bbox_height_mean: float
+    bbox_area_mean: float
+    bbox_width_min: float
+    bbox_width_max: float
+    bbox_height_min: float
+    bbox_height_max: float
+
+class Anomaly(TypedDict, total=False):
+    type: str
+    image: str
+    outside_ratio_pct: float
+    class_id: int
+
+class ValidationResults(TypedDict):
+    stats: DatasetStats
+    class_distribution: dict[int, int]
+    anomalies: list[Anomaly]
+
+class MiniProgressBar:
+    """
+    Lightweight animated text progress bar displayed on a single console line.
+    """
+
+    def __init__(self, message: str = "Loading", width: int = 20) -> None:
+        self.message: str = message
+        self.width: int = width
+        self.running: bool = False
+        self.thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        self.running = True
+        self.thread = threading.Thread(
+            target=self._animate,
+            daemon=True
+        )
+        self.thread.start()
+
+    def _animate(self) -> None:
+        """Internal animation loop."""
+
+        if platform.system().lower() == "windows":
+            spinner = "|/-\\"
+        else:
+            spinner = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+        
+        i: int = 0
+        progress: int = 0
+
+        while self.running:
+            fill: int = progress % (self.width + 1)
+            bar: str = "#" * fill + "." * (self.width - fill)
+            spin: str = spinner[i % len(spinner)]
+
+            sys.stdout.write(f"\r{self.message} [{bar}] {spin}")
+            sys.stdout.flush()
+
+            progress += 1
+            i += 1
+            time.sleep(0.1)
+
+    def stop(self) -> None:
+        if self.thread is None:
+            return
+
+        self.running = False
+        self.thread.join(timeout=1)
+
+        sys.stdout.write("\r" + " " * 80 + "\r")
+        sys.stdout.flush()
+
+class TablePrinter:
+
+    def __init__(self, columns):
+        """
+        columns = liste de dictionnaires :
+        [
+            {"title": "Mean", "width": 11, "align": ">",},
+            ...
+        ]
+        align : "<" gauche | ">" droite | "^" centre
+        """
+        self.columns = columns
+
+    # ──────────────────────────────────────────
+    # Helpers
+    # ──────────────────────────────────────────
+
+    def _line(self, left, mid, right):
+        line = left
+        for i, col in enumerate(self.columns):
+            line += "─" * col["width"]
+            line += mid if i < len(self.columns) - 1 else right
+        print(line)
+
+    def _format_cell(self, text, width, align):
+        return f"{text:{align}{width}}"
+
+    def _color_if(self, text, width, align, ok):
+        formatted = self._format_cell(text, width, align)
+        if ok:
+            return formatted
+        return f"{Fore.RED}{Style.BRIGHT}{formatted}{Style.RESET_ALL}"
+
+    # ──────────────────────────────────────────
+    # Public API
+    # ──────────────────────────────────────────
+
+    def header(self):
+        self._line("┌", "┬", "┐")
+
+        row = "│"
+        for col in self.columns:
+            row += self._format_cell(
+                col["title"],
+                col["width"],
+                "^"
+            ) + "│"
+        print(row)
+
+        self._line("├", "┼", "┤")
+
+    def row(self, values):
+        """
+        values = liste de tuples :
+        [
+            ("Width", True),
+            ("0.1523", True),
+            ("0.0152", True),
+            ("0.1000", condition_ok),
+        ]
+        condition_ok → bool (True = normal, False = rouge)
+        """
+        row = "│"
+        for (value, ok), col in zip(values, self.columns):
+            cell = self._color_if(
+                str(value),
+                col["width"],
+                col["align"],
+                ok
+            )
+            row += cell + "│"
+        print(row)
+
+    def footer(self):
+        self._line("└", "┴", "┘")
+
+#------------------------------------------------------------------------------------------
+
+# TODO A suprimer
+def quoi(valeur):
+    print(f"*-------------------\n {valeur} \n-------------------*")
+
+
+def get_dataset_paths(dataset_dir, split="train2017"):
+    dataset_dir = Path(dataset_dir)
+
+    images_dir = dataset_dir / "images" / split
+    labels_dir = dataset_dir / "labels" / split
+
+    if not images_dir.exists():
+        raise FileNotFoundError(f"Images dir introuvable : {images_dir}")
+
+    if not labels_dir.exists():
+        raise FileNotFoundError(f"Labels dir introuvable : {labels_dir}")
+
+    return images_dir, labels_dir
+
+def horodatage(file_name: str, defaut="") -> str:
+
+    # Generate a timestamp (format: YYYYMMDD_HHMMSS)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") 
+
+    # Extract filename without extension and file extension
+    stem = Path(file_name).stem
+    suffix = Path(file_name).suffix
+
+    # Build a new filename including the timestamp
+    filename_with_timestamp = f"{timestamp}_{defaut}_{stem}_{suffix}"
+
+    return filename_with_timestamp
+
+def rgb_to_ansi(rgb: tuple[int, int, int]) -> str:
+    """Convert RGB color to ANSI escape code."""
+    return f"\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
+
+def get_color(color_key: str) -> ColorSpec:
+    return colors.get(color_key, colors["info"])
+
+def get_path_color(prompt: str, color_key: str = 'input') -> Path:
+    """
+    Prompt the user for a valid filesystem path.
+
+    The prompt is displayed in the specified color if available
+    in the DISPLAY_COLORS dictionary.
+
+    Args:
+        prompt (str): Message displayed to the user.
+        color_key (str): Key used to retrieve RGB color.
+
+    Returns:
+        Path: Validated path entered by the user.
+    """
+    display: dc.DisplayColor = dc.DisplayColor()
+    color: tuple[int, int, int] = get_color(color_key) # type: ignore
+
+    while True:
+        input_color: str = rgb_to_ansi(color)
+        colored_prompt: str = f"{input_color}[?] {prompt} : {Style.RESET_ALL}"
+
+        path_input: str = input(colored_prompt).strip()
+
+        if os.path.exists(path_input):
+            return Path(path_input)
+
+        if os.path.isdir(path_input):
+            return Path(path_input)
+
+        error_text: str = f"Sélection invalide: '{path_input}'.\n Veuillez réessayer."
+        display.print(error_text, colors['error'])
+
+def get_directory_color(prompt: str, color_key: str = "input") -> Path:
+    display = dc.DisplayColor()
+    color = get_color(color_key)
+
+    while True:
+        input_color = rgb_to_ansi(color)
+        colored_prompt = (
+            f"{input_color}[?] {prompt} : {Style.RESET_ALL}"
+        )
+
+        path = Path(input(colored_prompt).strip())
+
+        if path.is_dir():
+            return path
+
+        display.print(
+            f"Le chemin '{path}' n'est pas un répertoire valide.",
+            colors['error']
+        )
+
+def check_directory(chemin: Path, name: str):
+    
+    display = dc.DisplayColor()
+
+    path = Path(chemin) / name
+
+    if not path.exists():
+        display.print(
+            f"Le répertoire '{name}' est introuvable !!! {ct.BELL}",
+            colors["error"]
+        )
+        return False
+
+    if not path.is_dir():
+        display.print(
+            f"'{name}' existe mais n'est pas un répertoire !!! {ct.BELL}",
+            colors["error"]
+        )
+        return False
+
+    if not any(path.iterdir()):
+        display.print(
+            f"Le répertoire '{name}' est vide !!!",
+            colors["error"]
+        )
+        return False
+
+    return True
+
+def est_incluse(liste1, liste2):
+    return all(element in liste2 for element in liste1)
+     
+
+def entrer_valeur(texte, maxi) -> int:
+    """
+    This function prompts the user to enter a value between 1 and 'maxi'.
+    It will keep asking until a valid integer within the range is provided.     
+
+    """
+
+    display = dc.DisplayColor()
+    color = colors['input']
+
+    while True:
+        try:
+            #  # Convert the input color from DISPLAY_COLORS to ANSI
+            input_color = rgb_to_ansi(color[:3])
+            # # Displays the prompt in color
+            prompt = f"{texte} (Maxi : {maxi}) " 
+            colored_select = f"{input_color}[?] {prompt}: {Style.RESET_ALL}"
+
+            select = int(input(colored_select).strip())
+
+            if 1 <= select <= maxi  :
+                return select
+            text = f"Sélection invalide. Veuillez réessayer. {ct.BELL}"
+            display.print(text, colors['error'])
+
+        # Input is not a number
+        except ValueError:
+            text = (
+                    f"Ce n'est pas un nombre . "
+                    f"Réessayez! {ct.BELL}"
+                )
+            display.print(text, colors['error'])
+
+
+def answer_yes_or_no(message: str, default=False, color_key: str = 'input') -> bool:
+    """
+    This function returns
+        - True for yes, y, oui, o.
+        - False for no, non n.
+        - The input does not take uppercase letters into account."
+    Displays the prompt in the specified color.
+    If the specified color key is invalid, the prompt will be displayed in Light Green.
+
+    """
+
+    display = dc.DisplayColor()
+
+    color = get_color(color_key)
+    while True:
+        # Convert the input color from DISPLAY_COLORS to ANSI
+        input_color = rgb_to_ansi(color) # type: ignore
+        # Displays the prompt in color
+
+        rep_auto = "(o/N)" if not default else "(O/n)"
+        colored_prompt = f"{input_color}[?] {message} {rep_auto} ? : {Style.RESET_ALL}"
+
+        reponse = input(colored_prompt).strip().lower()
+        if reponse == "":
+            return default
+        if reponse in {'oui', 'o'}:
+            return True
+        if reponse in {'non', 'n'}:
+            return False
+        
+        text = f"Réponse valide : (o/N) {ct.BELL}"
+        display.print(text, colors['error'])
+
+def waiting_enter_key():
+    """
+    This function returnsis wainting 'Enter' key
+    """
+
+    color = get_color('wait')
+    # Convert the input color from DISPLAY_COLORS to ANSI
+    input_color = rgb_to_ansi(color) # type: ignore
+
+    # Displays the prompt in color
+    colored_prompt = f"{input_color}[Wait...] Appuyez sur 'Enter' pour continuer ... {Style.RESET_ALL}"
+
+    _ = input(colored_prompt).strip().lower()
+
+def input_value(message: str, color_key: str = 'input') -> int:
+    """
+    This function returns a inter > 0 
+    """
+
+    display = dc.DisplayColor()
+    color = get_color(color_key)
+
+    while True:
+        # Convert the input color from DISPLAY_COLORS to ANSI
+        input_color = rgb_to_ansi(color) # type: ignore
+        # Displays the prompt in color
+        colored_prompt = f"{input_color}[?] {message} : {Style.RESET_ALL}"
+
+        try:
+            value = int(input(colored_prompt).strip())
+            if value > 0:
+                return value
+            else: 
+                text = (
+                        f"la valeur doit être positive!! . "
+                        f"Réessayez! {ct.BELL}"
+                    )
+            display.print(text, colors['error'])
+
+        except ValueError:
+            text = (
+                        f"Ce n'est pas un nombre . "
+                        f"Réessayez! {ct.BELL}"
+                    )
+            display.print(text, colors['error'])
+
+
+
+def format_nombre(n: int) ->str:
+    return f"{n:,}".replace(",", " ")
+
+def afficher_mode(
+    label: str,
+    enabled: bool,
+    ) -> None:
+    
+    display = dc.DisplayColor()
+
+    display.print(
+        f"{label} {'ON' if enabled else 'OFF'}",
+        colors["ok" if enabled else "warning"]
+    )
+
+    print()
+
+def draw_bar(value, vmin, vmax, length=50):
+    """
+    Barre visuelle normalisée
+    """
+    ratio = (value - vmin) / (vmax - vmin)
+    ratio = max(0, min(1, ratio))
+
+    filled = int(ratio * length)
+    empty = length - filled
+
+    scale = "█" * filled + "░" * empty
+    
+    return scale
+
+def afficher_liste_alignee(liste, nb_colonnes=4, separateur=" | "):
+    # Conversion en chaînes
+    items = [str(x) for x in liste]
+
+    # Découpage en lignes
+    lignes = [
+        items[i:i + nb_colonnes]
+        for i in range(0, len(items), nb_colonnes)
+    ]
+
+    # Largeur maximale de chaque colonne
+    largeurs = [0] * nb_colonnes
+    for ligne in lignes:
+        for col, valeur in enumerate(ligne):
+            largeurs[col] = max(largeurs[col], len(valeur))
+
+    # Affichage
+    for ligne in lignes:
+        print(
+            separateur.join(
+                valeur.ljust(largeurs[col])
+                for col, valeur in enumerate(ligne)
+            )
+        )
+
+def sortie_de_programme():
+
+    display = dc.DisplayColor()
+    print()
+
+    waiting_enter_key()
+
+    delay = 3
+
+    for secondes in range(delay, 0, -1):
+        display.print(
+            f"Programme terminé dans {secondes} "
+            f"seconde{'s' if secondes > 1 else ''}. ",
+            colors["goodbye"],
+            end="",
+            flush=True,
+            replace=True
+        )
+
+        time.sleep(1)
+
+    print(ct.BELL, end="", flush=True)
+
+    sys.exit(0)
