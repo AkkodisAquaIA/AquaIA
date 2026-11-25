@@ -12,7 +12,9 @@ from transformers import get_scheduler
 from dataloading.datasets import JpgDetectionDataset, parse_batch, detection_collate_fn
 from detection.dino.dino_detector import DINODetector
 from detection.dino.loss import SetCriterion
-from detection.metric import compute_metrics, evaluate_map, print_metrics, update_metric_dict
+from detection.metric import compute_metrics, evaluate_map, update_metric_dict
+#Comment out line below to disable Epoch summary in console
+#from detection.metric import print_metrics
 from detection.dino.utils.matcher import HungarianMatcher
 from detection.utils.config_utils import save_resolved_config
 from detection.utils.plot_utils import plot_metrics, save_sample_predictions
@@ -421,10 +423,11 @@ def train_dino(config, resume_dir=None):
                             scaler.update()
 
                         batch_loss = float(total_loss.item())
-                        # Show the current batch loss values in the progress bar, formatted to 4 decimal places
-                        progress.set_postfix(
-                            **{key: f"{float(value.item()):.4f}" for key, value in loss_dict.items() if key in loss_weight_dict},
-                        )
+                        #Comment out 4 lines below to disable batch tqdm bar loss info in console
+                        ## Show the current batch loss values in the progress bar, formatted to 4 decimal places
+                        #progress.set_postfix(
+                        #    **{key: f"{float(value.item()):.4f}" for key, value in loss_dict.items() if key in loss_weight_dict},
+                        #)
                         # loss_dict, batch_loss are batch level, metric_dict is epoch level, progress.total = nb batches
                         update_metric_dict(metric_dict, loss_dict, batch_loss, loader.dataset.data_split, progress.total)
 
@@ -445,9 +448,11 @@ def train_dino(config, resume_dir=None):
             #      "val": {"loss": ..., "loss_ce": ..., "loss_bbox": ..., "loss_giou": ...,},
             #      "epoch": ... }
             metric_dict["epoch"] = epoch + 1
-            # save epoch-level metrics to history and print them
+            # Save epoch-level metrics to history
             metrics_history.append(metric_dict)
-            print_metrics(metric_dict)
+            #Comment out 2 lines below to disable Epoch summary in console
+            ## And print them
+            #print_metrics(metric_dict)
 
             # Epoch-level logging
             logger.log_epoch(epoch + 1, training_config["epochs"], metric_dict, lr)

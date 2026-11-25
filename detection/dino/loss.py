@@ -273,8 +273,8 @@ class SetCriterion(nn.Module):
                 for loss in self.losses:
                     kwargs = {}
                     if loss == "labels":
-                        # Logging is enabled only for the last layer
-                        kwargs["log"] = False
+                        # Logging is enabled only for the last layer (Z: not now)
+                        kwargs["log"] = True
                     # Z: add suffix _i to the loss name to avoid overwriting the main loss
                     l_dict = self.get_loss(loss, aux_outputs, targets, indices, num_boxes, **kwargs)
                     l_dict = {k + f"_{i}": v for k, v in l_dict.items()}

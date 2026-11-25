@@ -200,7 +200,11 @@ def plot_metrics(run_dir, output_dir=None, metrics_filename="metrics.npy"):
             ax.plot(epochs, values, marker="o", linewidth=1.8, label=split)
             plotted = True
 
-        ax.set_title(METRIC_DISPLAY_NAMES.get(metric_name, metric_name))
+        display_name = METRIC_DISPLAY_NAMES.get(metric_name, metric_name)
+        base_name, _, decoder_index = metric_name.rpartition("_")
+        if metric_name not in METRIC_DISPLAY_NAMES and decoder_index.isdecimal() and base_name in METRIC_DISPLAY_NAMES:
+            display_name = f"{METRIC_DISPLAY_NAMES[base_name]}_{decoder_index}"
+        ax.set_title(display_name)
         ax.set_xlabel("Epoch")
         ax.set_ylabel("Value")
         ax.grid(True, alpha=0.3)

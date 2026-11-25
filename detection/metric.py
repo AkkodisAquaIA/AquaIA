@@ -55,6 +55,9 @@ def print_metrics(metrics):
                 continue
             # Format metric names and values for printing
             display_name = LOSS_DISPLAY_NAMES.get(key, key)
+            base_name, _, decoder_index = key.rpartition("_")
+            if key not in LOSS_DISPLAY_NAMES and decoder_index.isdecimal() and base_name in LOSS_DISPLAY_NAMES:
+                display_name = f"{LOSS_DISPLAY_NAMES[base_name]}_{decoder_index}"
             print_summary += f"{display_name}={value:.4f} | "
         # Do not print latest " | "
         print(print_summary[:-3])
