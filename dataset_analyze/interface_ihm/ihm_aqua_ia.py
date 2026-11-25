@@ -1,5 +1,4 @@
 import sys
-import numpy as np
 from pathlib import Path
 import yaml
 import json
@@ -100,6 +99,32 @@ COULEUR_SUCCES_FOND = "#D4EDDA"
 COULEUR_SUCCES_BORDURE = "#C3E6CB"
 
 
+# ==========================================================
+# Style commun des barres de progression
+# ==========================================================
+STYLE_PROGRESSION = f"""
+    QProgressBar {{
+        border: 1px solid {COULEUR_AQUA_DARK};
+        border-radius: 5px;
+        background-color: #E8E8E8;
+        color: {COULEUR_TEXTE};
+        text-align: center;
+        font-weight: bold;
+    }}
+
+    QProgressBar::chunk {{
+        background-color: {COULEUR_AQUA};
+        border-radius: 4px;
+    }}
+"""
+
+
+
+
+
+
+
+
 #==================================================================================================
 #==================================================================================================
 
@@ -112,6 +137,11 @@ class IhmAquaIa(QMainWindow):
         self.resize(900, 650)
 
         self.etat_images = {}
+
+        # ==========================================================
+        # Mémorisation du filtre utilisé pour chaque zone
+        # ==========================================================
+        self.filtre_par_zone = {}
 
         self.repertoire_selectionne = None
         self.repertoire_annotations = None
@@ -233,61 +263,6 @@ class IhmAquaIa(QMainWindow):
         )
 
         return box
-
-    # def image_precedente(self):
-    #     """
-    #     Affiche l'image précédente.
-    #     """
-
-    #     print(">>> CLIC PRECEDENTE")
-
-    #     index_actuel = self.combo_image.currentIndex()
-
-    #     print(
-    #         "Index avant :",
-    #         index_actuel,
-    #         "| Image :",
-    #         self.combo_image.currentText()
-    #     )
-
-    #     if index_actuel <= 1:
-    #         print("Première image : déplacement impossible")
-    #         return
-
-    #     nouvel_index = index_actuel - 1
-
-    #     print(
-    #         "Passage vers index :",
-    #         nouvel_index
-    #     )
-
-    #     self.combo_image.setCurrentIndex(
-    #         nouvel_index
-    #     )
-
-    #     print(
-    #         "Index après :",
-    #         self.combo_image.currentIndex(),
-    #         "| Image :",
-    #         self.combo_image.currentText()
-    #     )
-
-    # def image_suivante(self):
-    #     """
-    #     Affiche l'image suivante de la zone.
-    #     """
-
-    #     index_actuel = self.combo_image.currentIndex()
-    #     dernier_index = self.combo_image.count() - 1
-
-    #     if (
-    #         index_actuel >= 1
-    #         and index_actuel < dernier_index
-    #     ):
-
-    #         self.combo_image.setCurrentIndex(
-    #             index_actuel + 1
-    #         )
 
     def image_precedente(self):
         """
@@ -596,24 +571,7 @@ class IhmAquaIa(QMainWindow):
             )
         )
 
-        # ==========================================================
-        # Style commun des barres de progression
-        # ==========================================================
-        style_progression = f"""
-            QProgressBar {{
-                border: 1px solid {COULEUR_AQUA_DARK};
-                border-radius: 5px;
-                background-color: #E8E8E8;
-                color: {COULEUR_TEXTE};
-                text-align: center;
-                font-weight: bold;
-            }}
-
-            QProgressBar::chunk {{
-                background-color: {COULEUR_AQUA};
-                border-radius: 4px;
-            }}
-        """
+        
 
         # ==========================================================
         # Répertoire courant
@@ -651,7 +609,7 @@ class IhmAquaIa(QMainWindow):
         self.progression_repertoires.setFixedHeight(24)
 
         self.progression_repertoires.setStyleSheet(
-            style_progression
+            STYLE_PROGRESSION
         )
 
         # ==========================================================
@@ -690,7 +648,7 @@ class IhmAquaIa(QMainWindow):
         self.progression_images.setFixedHeight(24)
 
         self.progression_images.setStyleSheet(
-            style_progression
+            STYLE_PROGRESSION
         )
 
         # ==========================================================
@@ -869,6 +827,26 @@ class IhmAquaIa(QMainWindow):
             "Sélectionnez une zone"
         )
 
+        # ==========================================================
+        # Filtre des images
+        # ==========================================================
+        label_filtre_image = QLabel(
+            "Afficher :"
+        )
+
+        self.combo_filtre_etat = QComboBox()
+
+        self.combo_filtre_etat.addItems([
+            "Toutes les images",
+            "Non contrôlées",
+            "Correctes",
+            "À vérifier",
+            "Incorrectes",
+        ])
+
+        self.combo_filtre_etat.setCurrentIndex(0)
+
+        
         # ==========================================================
         # Sélection de l'image
         # ==========================================================
@@ -1298,6 +1276,32 @@ class IhmAquaIa(QMainWindow):
         )
 
         # ==========================================================
+        # Barre de progression du contrôle
+        # ==========================================================
+        self.progress_controle = QProgressBar()
+
+        self.progress_controle.setRange(
+            0,
+            100
+        )
+
+        self.progress_controle.setValue(0)
+
+        self.progress_controle.setFormat(
+            "Avancement de la zone : %p %"
+        )
+
+        self.progress_controle.setTextVisible(True)
+
+        self.progress_controle.setFixedHeight(24)
+
+        self.progress_controle.setStyleSheet(
+            STYLE_PROGRESSION
+        )
+
+
+
+        # ==========================================================
         # Passage automatique à l'image suivante
         # ==========================================================
         self.check_image_suivante_auto = QCheckBox(
@@ -1368,85 +1372,93 @@ class IhmAquaIa(QMainWindow):
         )
 
         # ----------------------------------------------------------
-        # Ligne 2 : Navigation Images
+        # Ligne 2 : Filtre des images
+        # ----------------------------------------------------------
+        layout_annotations.addWidget(
+            label_filtre_image,
+            2,
+            0
+        )
+
+        layout_annotations.addWidget(
+            self.combo_filtre_etat,
+            2,
+            1,
+            1,
+            2
+        )
+
+
+
+        # ----------------------------------------------------------
+        # Ligne 3 : Navigation Images
         # ----------------------------------------------------------
         layout_annotations.addWidget(
             label_image,
-            2,
+            3,
             0
         )
 
         layout_annotations.addLayout(
             layout_navigation_images,
-            2,
+            3,
             1,
             1,
             2
         )
 
         # ----------------------------------------------------------
-        # Ligne 3 : Titres
+        # Ligne 4 : Titres
         # ----------------------------------------------------------
         layout_annotations.addWidget(
             titre_image_originale,
-            3,
+            4,
             0
         )
 
         layout_annotations.addWidget(
             titre_image_annotee,
-            3,
+            4,
             1
         )
 
         # ----------------------------------------------------------
-        # Lignes 3 + 4 : Classes
+        # Lignes 4 : Classes
         # ----------------------------------------------------------
         layout_annotations.addLayout(
             layout_classes,
-            3,
+            4,
             2,
             2,
             1
         )
 
         # ----------------------------------------------------------
-        # Ligne 4 : Images
+        # Ligne 5 : Images
         # ----------------------------------------------------------
         layout_annotations.addWidget(
             self.label_image_originale,
-            4,
+            5,
             0
         )
 
         layout_annotations.addWidget(
             self.label_image_annotee,
-            4,
+            5,
             1
         )
 
         # ----------------------------------------------------------
-        # Ligne 5 : Contrôle
+        # Ligne 6 : Contrôle
         # ----------------------------------------------------------
         layout_annotations.addWidget(
             label_controle,
-            5,
+            6,
             0
         )
 
         layout_annotations.addLayout(
             layout_controle,
-            5,
-            1,
-            1,
-            2
-        )
-
-        # ----------------------------------------------------------
-        # Ligne 6 : Navigation automatique
-        # ----------------------------------------------------------
-        layout_annotations.addWidget(
-            self.check_image_suivante_auto,
             6,
             1,
             1,
@@ -1454,37 +1466,49 @@ class IhmAquaIa(QMainWindow):
         )
 
         # ----------------------------------------------------------
-        # Ligne 7 : Récapitulatif
+        # Ligne 7 : Navigation automatique
         # ----------------------------------------------------------
         layout_annotations.addWidget(
-            self.label_recap_controle,
+            self.check_image_suivante_auto,
             7,
-            0,
             1,
-            3
+            1,
+            2
         )
 
         # ----------------------------------------------------------
-        # Ligne 8 : Informations labels
+        # Ligne 8 : Récapitulatif
         # ----------------------------------------------------------
         layout_annotations.addWidget(
-            self.label_fichier_annotation,
+            self.label_recap_controle,
             8,
             0,
             1,
             3
         )
 
-        # ==========================================================
-        # Proportions des colonnes
-        # ==========================================================
-        
+        # ----------------------------------------------------------
+        # Ligne 9 : Progression du contrôle
+        # ----------------------------------------------------------
         layout_annotations.addWidget(
-            self.bouton_parcourir_annotations,
+            self.progress_controle,
+            9,
             0,
-            2,
-            Qt.AlignRight
+            1,
+            3
         )
+
+        # ----------------------------------------------------------
+        # Ligne 10 : Informations labels
+        # ----------------------------------------------------------
+        layout_annotations.addWidget(
+            self.label_fichier_annotation,
+            10,
+            0,
+            1,
+            3
+        )
+
 
         # ==========================================================
         # Ajout de la box au layout principal
@@ -1726,15 +1750,13 @@ class IhmAquaIa(QMainWindow):
             self.repertoire_zone = None
             self.repertoire_images_zone = None
             self.repertoire_labels_zone = None
-            self.combo_image.addItem("Sélectionnez une zone", None)
-            self.label_recap_controle.setText(
-                "✓ Correctes : 0    "
-                "⚠ À vérifier : 0    "
-                "✕ Incorrectes : 0    "
-                "○ Non contrôlées : 0"
+
+            self.combo_image.addItem(
+                "Sélectionnez une zone",
+                None
             )
 
-
+            self._reinitialiser_recap_controle()
 
             self.combo_image.blockSignals(False)
 
@@ -1775,6 +1797,8 @@ class IhmAquaIa(QMainWindow):
                 None
             )
 
+            self._reinitialiser_recap_controle()
+
             self.combo_image.blockSignals(False)
 
             return
@@ -1801,6 +1825,8 @@ class IhmAquaIa(QMainWindow):
                 None
             )
 
+            self._reinitialiser_recap_controle()
+
             self.combo_image.blockSignals(False)
 
             return
@@ -1825,9 +1851,37 @@ class IhmAquaIa(QMainWindow):
         self.label_position_image.setText(
             f"0 / {len(self.liste_images_zone)}"
         )
-
      
         self._mettre_a_jour_recap_controle()
+
+
+        # ==========================================================
+        # Restauration du filtre mémorisé pour la zone
+        # ==========================================================
+        cle_zone = str(
+            Path(self.repertoire_zone)
+        )
+
+        filtre_memorise = self.filtre_par_zone.get(
+            cle_zone,
+            "Toutes les images"
+        )
+
+        # ==========================================================
+        # Restauration sans déclencher les signaux
+        # ==========================================================
+        self.combo_filtre_etat.blockSignals(True)
+
+        self.combo_filtre_etat.setCurrentText(
+            filtre_memorise
+        )
+
+        self.combo_filtre_etat.blockSignals(False)
+
+        # ==========================================================
+        # Application explicite du filtre
+        # ==========================================================
+        self._appliquer_filtre_images()
 
         # ==========================================================
         # Réactivation du signal
@@ -1835,7 +1889,10 @@ class IhmAquaIa(QMainWindow):
         self.combo_image.blockSignals(False)
 
 
-    def _reinitialiser_affichage_image(self):
+    def _reinitialiser_affichage_image(
+            self,
+            reinitialiser_compteur=True
+        ):
         """
         Réinitialise toute la zone d'affichage lorsqu'aucune
         image n'est sélectionnée.
@@ -1876,9 +1933,11 @@ class IhmAquaIa(QMainWindow):
         # ==========================================================
         # Compteur
         # ==========================================================
-        self.label_position_image.setText(
-            "0 / 0"
-        )
+        if reinitialiser_compteur:
+
+            self.label_position_image.setText(
+                "0 / 0"
+            )
 
         # ==========================================================
         # Navigation
@@ -1929,11 +1988,9 @@ class IhmAquaIa(QMainWindow):
         # ==========================================================
         if chemin_image is None:
 
-            self.label_image_originale.clear()
-            self.label_image_originale.setText("Aucune image sélectionnée")
-            self.label_image_annotee.clear()
-            self.label_image_annotee.setText("Aucune annotation à afficher")
-            self.label_fichier_annotation.setText("Fichier de labels : —")
+            self._reinitialiser_affichage_image(
+                reinitialiser_compteur=False
+            )
 
             return
 
@@ -2139,9 +2196,57 @@ class IhmAquaIa(QMainWindow):
         self._sauvegarder_etats_controle()
 
         # ==========================================================
-        # Passage automatique à l'image suivante
+        # Vérification du filtre courant
+        # ==========================================================
+        image_correspond_filtre = (
+            self._image_correspond_filtre(
+                chemin_image
+            )
+        )
+
+        # ==========================================================
+        # L'image ne correspond plus au filtre
+        # ==========================================================
+        if not image_correspond_filtre:
+
+            # ======================================================
+            # Mémorisation de la position actuelle
+            # ======================================================
+            index_actuel = self.combo_image.currentIndex()
+
+            # ======================================================
+            # Reconstruction de la liste filtrée
+            # ======================================================
+            self._appliquer_filtre_images()
+
+            # ======================================================
+            # Nombre d'éléments restant dans la ComboBox
+            # index 0 = "Choisir une image..."
+            # ======================================================
+            nombre_elements = self.combo_image.count()
+
+            # ======================================================
+            # Sélection de l'image qui prend sa place
+            # ======================================================
+            if nombre_elements > 1:
+
+                nouvel_index = min(
+                    index_actuel,
+                    nombre_elements - 1
+                )
+
+                self.combo_image.setCurrentIndex(
+                    nouvel_index
+                )
+
+            return
+
+        # ==========================================================
+        # L'image appartient toujours au filtre
+        # Passage automatique éventuel à l'image suivante
         # ==========================================================
         if self.check_image_suivante_auto.isChecked():
+
             self.image_suivante()
         
 
@@ -2158,10 +2263,7 @@ class IhmAquaIa(QMainWindow):
             "_controle_annotations.json"
         )
 
-        return (
-            self.repertoire_annotations
-            / nom_json
-        )
+        return (self.repertoire_annotations / nom_json)
 
 
 
@@ -2188,23 +2290,13 @@ class IhmAquaIa(QMainWindow):
         # ==========================================================
         try:
 
-            with chemin_json.open(
-                "r",
-                encoding="utf-8"
-            ) as fichier:
+            with chemin_json.open("r", encoding="utf-8") as fichier:
 
-                donnees = json.load(
-                    fichier
-                )
+                donnees = json.load(fichier)
 
-        except (
-            OSError,
-            json.JSONDecodeError
-        ) as erreur:
+        except (OSError, json.JSONDecodeError) as erreur:
 
-            print(
-                f"Erreur lecture contrôle : {erreur}"
-            )
+            print(f"Erreur lecture contrôle : {erreur}")
 
             return
 
@@ -2261,31 +2353,19 @@ class IhmAquaIa(QMainWindow):
         self.bouton_annotation_verifier.setEnabled(True)
         self.bouton_annotation_incorrecte.setEnabled(True)
 
-        cle_image = str(
-            Path(chemin_image)
-        )
+        cle_image = str(Path(chemin_image))
 
         # ==========================================================
         # Recherche de l'état mémorisé
         # ==========================================================
-        etat = self.etat_images.get(
-            cle_image
-        )
+        etat = self.etat_images.get(cle_image)
 
         # ==========================================================
         # Etat visuel
         # ==========================================================
-        self.bouton_annotation_correcte.setChecked(
-            etat == "correcte"
-        )
-
-        self.bouton_annotation_verifier.setChecked(
-            etat == "a_verifier"
-        )
-
-        self.bouton_annotation_incorrecte.setChecked(
-            etat == "incorrecte"
-        )
+        self.bouton_annotation_correcte.setChecked(etat == "correcte")
+        self.bouton_annotation_verifier.setChecked(etat == "a_verifier")
+        self.bouton_annotation_incorrecte.setChecked(etat == "incorrecte")
 
     def _mettre_a_jour_recap_controle(self):
         """
@@ -2347,13 +2427,204 @@ class IhmAquaIa(QMainWindow):
         )
 
         # ==========================================================
-        # Affichage
+        # Avancement du contrôle
+        # ==========================================================
+        if nombre_images > 0:
+
+            pourcentage_controle = (
+                nombre_controlees
+                / nombre_images
+                * 100
+            )
+
+        else:
+
+            pourcentage_controle = 0
+
+        # ==========================================================
+        # Affichage du récapitulatif
         # ==========================================================
         self.label_recap_controle.setText(
             f"✓ Correctes : {nombre_correctes}    "
             f"⚠ À vérifier : {nombre_a_verifier}    "
             f"✕ Incorrectes : {nombre_incorrectes}    "
             f"○ Non contrôlées : {nombre_non_controlees}"
+        )
+
+        # ==========================================================
+        # Mise à jour de la barre de progression
+        # ==========================================================
+        self.progress_controle.setValue(
+            round(pourcentage_controle)
+        )
+
+        self.progress_controle.setFormat(
+            f"Avancement de la zone : "
+            f"{nombre_controlees} / {nombre_images} "
+            f"({pourcentage_controle:.0f} %)"
+        )
+
+    def _reinitialiser_recap_controle(self):
+        """
+        Réinitialise le récapitulatif et la progression
+        du contrôle des annotations.
+        """
+
+        self.label_recap_controle.setText(
+            "✓ Correctes : 0    "
+            "⚠ À vérifier : 0    "
+            "✕ Incorrectes : 0    "
+            "○ Non contrôlées : 0"
+        )
+
+        self.progress_controle.setValue(0)
+
+        self.progress_controle.setFormat(
+            "Avancement de la zone : 0 / 0 (0 %)"
+        )
+
+
+
+
+    def _image_correspond_filtre(self, chemin_image):
+        """
+        Indique si une image correspond
+        au filtre actuellement sélectionné.
+        """
+
+        # ==========================================================
+        # Filtre actuellement sélectionné
+        # ==========================================================
+        filtre = self.combo_filtre_etat.currentText()
+
+        # ==========================================================
+        # Toutes les images
+        # ==========================================================
+        if filtre == "Toutes les images":
+            return True
+
+        # ==========================================================
+        # Recherche de l'état de l'image
+        # ==========================================================
+        cle_image = str(
+            Path(chemin_image)
+        )
+
+        etat = self.etat_images.get(
+            cle_image
+        )
+
+        # ==========================================================
+        # Application du filtre
+        # ==========================================================
+        if filtre == "Non contrôlées":
+            return etat is None
+
+        if filtre == "Correctes":
+            return etat == "correcte"
+
+        if filtre == "À vérifier":
+            return etat == "a_verifier"
+
+        if filtre == "Incorrectes":
+            return etat == "incorrecte"
+
+        return True
+
+    def _memoriser_filtre_zone(self, filtre):
+        """
+        Mémorise le filtre sélectionné pour la zone courante.
+        """
+
+        # ==========================================================
+        # Vérification de la zone courante
+        # ==========================================================
+        repertoire_zone = getattr(
+            self,
+            "repertoire_zone",
+            None
+        )
+
+        if repertoire_zone is None:
+            return
+
+        # ==========================================================
+        # Clé unique de la zone
+        # ==========================================================
+        cle_zone = str(
+            Path(repertoire_zone)
+        )
+
+        # ==========================================================
+        # Mémorisation du filtre
+        # ==========================================================
+        self.filtre_par_zone[cle_zone] = filtre
+
+
+
+    def _appliquer_filtre_images(self):
+        """
+        Met à jour la liste déroulante des images
+        selon le filtre sélectionné.
+        """
+
+        # ==========================================================
+        # Aucune image dans la zone
+        # ==========================================================
+        if not self.liste_images_zone:
+            return
+
+        # ==========================================================
+        # Images correspondant au filtre
+        # ==========================================================
+        images_filtrees = [
+            chemin_image
+            for chemin_image in self.liste_images_zone
+            if self._image_correspond_filtre(chemin_image)
+        ]
+
+        # ==========================================================
+        # Mise à jour de la ComboBox
+        # ==========================================================
+        self.combo_image.blockSignals(True)
+
+        self.combo_image.clear()
+
+        # Élément neutre en première position
+        self.combo_image.addItem(
+            "Choisir une image...",
+            None
+        )
+
+        for chemin_image in images_filtrees:
+
+            self.combo_image.addItem(
+                Path(chemin_image).name,
+                chemin_image
+            )
+
+        self.combo_image.blockSignals(False)
+
+        # ==========================================================
+        # Mise à jour du compteur après filtrage
+        # ==========================================================
+        self.label_position_image.setText(
+            f"0 / {len(images_filtrees)}"
+        )
+
+        # ==========================================================
+        # Réinitialisation de l'affichage
+        # ==========================================================
+        self._reinitialiser_affichage_image(
+            reinitialiser_compteur=False
+        )
+
+
+        # ==========================================================
+        # Activation de la ComboBox
+        # ==========================================================
+        self.combo_image.setEnabled(
+            bool(images_filtrees)
         )
 
 
@@ -2676,19 +2947,6 @@ class IhmAquaIa(QMainWindow):
                 - hauteur_pixels / 2
             )
 
-            # ======================================================
-            # Dessin de la bounding box
-            # ======================================================
-
-            # print(
-            #     "BBox :",
-            #     f"classe={classe}",
-            #     f"x={int(round(x1))}",
-            #     f"y={int(round(y1))}",
-            #     f"largeur={int(round(largeur_pixels))}",
-            #     f"hauteur={int(round(hauteur_pixels))}"
-            # )
-
 
             painter.drawRect(
                 int(round(x1)),
@@ -2700,18 +2958,6 @@ class IhmAquaIa(QMainWindow):
             # ==========================================================
             # Numéro de classe
             # ==========================================================
-            texte_classe = str(classe)
-
-            painter.drawText(
-                int(round(x1)),
-                max(
-                    12,
-                    int(round(y1)) - 4
-                ),
-                texte_classe
-            )
-
-
             texte_classe = str(
                 classe
             )
@@ -2801,8 +3047,6 @@ class IhmAquaIa(QMainWindow):
                 f"Erreur sauvegarde contrôle : {erreur}"
             )
 
-
-
     def _creer_zone_sortie(
         self,
         layout_principal
@@ -2889,6 +3133,23 @@ class IhmAquaIa(QMainWindow):
         self.combo_zone.currentIndexChanged.connect(
             self.selectionner_zone
         )
+
+        # ----------------------------------------------------------
+        # Filtrage des images
+        # ----------------------------------------------------------
+        self.combo_filtre_etat.currentTextChanged.connect(
+            self._appliquer_filtre_images
+        )
+
+        # ----------------------------------------------------------
+        # Mémorisation du filtre par zone
+        # ----------------------------------------------------------
+        self.combo_filtre_etat.currentTextChanged.connect(
+            self._memoriser_filtre_zone
+        )
+
+
+
 
         # ----------------------------------------------------------
         # Image précédente
