@@ -116,7 +116,7 @@ def rename_coeloptera_folders(root_path):
 
             folder.rename(new_path)
 
-            print(f"RENOMMÉ :")
+            print("RENOMMÉ :")
             print(f"  {old_name}")
             print(f"  -> {new_name}")
 

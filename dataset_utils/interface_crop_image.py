@@ -532,11 +532,6 @@ def main():
 
     root = tk.Tk()
 
-    app = CropApplication(
-        root,
-        base_dir
-    )
-
     root.mainloop()
 
 
