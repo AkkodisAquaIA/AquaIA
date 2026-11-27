@@ -1,34 +1,40 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Plus, Loader2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
-import { getExports, createExport } from "@/lib/api";
+import { Download, Plus, Loader2, CheckCircle, AlertCircle, RefreshCw, FolderOpen } from "lucide-react";
+import { getExports, createExport, downloadExport, getDatasets } from "@/lib/api";
 import { useAppStore } from "@/store/appStore";
-import type { ExportJob } from "@/types";
+import type { ExportJob, Dataset } from "@/types";
 import { formatDate } from "@/lib/utils";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { cn } from "@/lib/utils";
 
 const EXPORT_TYPES = [
   { id: "classification", label: "Classification folders", desc: "class/image.jpg structure" },
-  { id: "yolo", label: "YOLO", desc: "images/ + data.yaml" },
-  { id: "coco", label: "COCO JSON", desc: "instances_validated.json" },
-  { id: "csv", label: "CSV", desc: "metadata spreadsheet" },
+  { id: "yolo",           label: "YOLO",                  desc: "images/ + data.yaml" },
+  { id: "coco",           label: "COCO JSON",             desc: "instances_validated.json" },
+  { id: "csv",            label: "CSV",                   desc: "metadata spreadsheet" },
 ];
 
 export default function ExportPanel() {
-  const { currentUserId } = useAppStore();
+  const { currentUserId, isReadOnly } = useAppStore();
   const [jobs, setJobs] = useState<ExportJob[]>([]);
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState("classification");
+  const [selectedDataset, setSelectedDataset] = useState<number | null>(null);
 
   const reload = () => {
     if (!currentUserId) return;
     getExports(currentUserId).then(setJobs).finally(() => setLoading(false));
   };
 
-  useEffect(() => { reload(); }, [currentUserId]);
+  useEffect(() => {
+    if (!currentUserId) return;
+    getDatasets(currentUserId).then(setDatasets);
+    reload();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
 
   // Poll running jobs every 3s
   useEffect(() => {
@@ -42,7 +48,7 @@ export default function ExportPanel() {
     if (!currentUserId) return;
     setCreating(true);
     try {
-      const job = await createExport(currentUserId, selected);
+      const job = await createExport(currentUserId, selected, selectedDataset ?? undefined);
       setJobs((prev) => [job, ...prev]);
     } finally {
       setCreating(false);
@@ -56,30 +62,77 @@ export default function ExportPanel() {
         <p className="text-sm text-[var(--text-dim)] mt-1">Export validated images as AI-ready datasets</p>
       </div>
 
-      {/* Export format selector */}
-      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
-        <p className="text-sm font-medium text-[var(--text-base)]">Export format</p>
-        <div className="grid grid-cols-2 gap-2">
-          {EXPORT_TYPES.map((t) => (
-            <button key={t.id} onClick={() => setSelected(t.id)}
-              className={`p-3 rounded-lg border text-left transition-colors ${
-                selected === t.id
-                  ? "bg-green-500/10 border-green-500/30"
-                  : "bg-[var(--bg-input)] border-[var(--border)] hover:border-[var(--border-hi)]"
-              }`}>
-              <p className={`text-sm font-medium ${selected === t.id ? "text-green-400" : "text-[var(--text-base)]"}`}>
-                {t.label}
-              </p>
-              <p className="text-xs text-[var(--text-dim)] mt-0.5">{t.desc}</p>
-            </button>
-          ))}
+      {isReadOnly && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+          <span>Read-only — login to create exports</span>
         </div>
-        <button onClick={handleCreate} disabled={creating}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors">
-          {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          {creating ? "Creating…" : "Create export job"}
-        </button>
-      </div>
+      )}
+
+      {!isReadOnly && (
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 space-y-4">
+          {/* Dataset selector */}
+          <div>
+            <p className="text-sm font-medium text-[var(--text-base)] mb-2">Dataset</p>
+            <div className="flex flex-col gap-1.5">
+              <button
+                onClick={() => setSelectedDataset(null)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-lg border text-sm text-left transition-colors",
+                  selectedDataset === null
+                    ? "bg-green-500/10 border-green-500/30 text-green-400"
+                    : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
+                )}>
+                <span className="text-xs">All validated images</span>
+              </button>
+              {datasets.map((ds) => (
+                <button
+                  key={ds.id}
+                  onClick={() => setSelectedDataset(ds.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors",
+                    selectedDataset === ds.id
+                      ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
+                      : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)]"
+                  )}>
+                  <FolderOpen className={cn("w-3.5 h-3.5 shrink-0", selectedDataset === ds.id ? "text-indigo-400" : "text-[var(--text-muted)]")} />
+                  <span className="text-sm">{ds.name}</span>
+                  <span className="ml-auto text-xs text-[var(--text-muted)]">{ds.image_count} img</span>
+                </button>
+              ))}
+              {datasets.length === 0 && (
+                <p className="text-xs text-[var(--text-muted)] px-1">No datasets yet — exporting all validated images</p>
+              )}
+            </div>
+          </div>
+
+          {/* Format selector */}
+          <div>
+            <p className="text-sm font-medium text-[var(--text-base)] mb-2">Export format</p>
+            <div className="grid grid-cols-2 gap-2">
+              {EXPORT_TYPES.map((t) => (
+                <button key={t.id} onClick={() => setSelected(t.id)}
+                  className={cn(
+                    "p-3 rounded-lg border text-left transition-colors",
+                    selected === t.id
+                      ? "bg-green-500/10 border-green-500/30"
+                      : "bg-[var(--bg-input)] border-[var(--border)] hover:border-[var(--border-hi)]"
+                  )}>
+                  <p className={cn("text-sm font-medium", selected === t.id ? "text-green-400" : "text-[var(--text-base)]")}>
+                    {t.label}
+                  </p>
+                  <p className="text-xs text-[var(--text-dim)] mt-0.5">{t.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={handleCreate} disabled={creating}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors">
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {creating ? "Creating…" : "Create export job"}
+          </button>
+        </div>
+      )}
 
       {/* Jobs list */}
       <div>
@@ -105,7 +158,8 @@ export default function ExportPanel() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] text-[var(--text-dim)] text-xs">
-                  <th className="px-4 py-3 text-left">Type</th>
+                  <th className="px-4 py-3 text-left">Dataset</th>
+                  <th className="px-4 py-3 text-left">Format</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Created</th>
                   <th className="px-4 py-3 text-left">Download</th>
@@ -114,21 +168,30 @@ export default function ExportPanel() {
               <tbody>
                 {jobs.map((job) => (
                   <tr key={job.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--bg-input)]">
-                    <td className="px-4 py-2.5 text-[var(--text-base)] font-mono text-xs">{job.export_type}</td>
+                    <td className="px-4 py-2.5">
+                      {job.dataset_name ? (
+                        <span className="flex items-center gap-1.5 text-xs text-[var(--text-base)]">
+                          <FolderOpen className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          {job.dataset_name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[var(--text-muted)]">All validated</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-[var(--text-dim)] font-mono text-xs">{job.export_type}</td>
                     <td className="px-4 py-2.5">
                       <StatusBadge status={job.status} />
                     </td>
                     <td className="px-4 py-2.5 text-[var(--text-muted)] text-xs">{formatDate(job.created_at)}</td>
                     <td className="px-4 py-2.5">
                       {job.status === "done" ? (
-                        <a
-                          href={`${API_BASE}/exports/${job.id}/download?user_id=${currentUserId}`}
-                          download
+                        <button
+                          onClick={() => currentUserId && downloadExport(currentUserId, job.id)}
                           className="flex items-center gap-1 text-xs text-green-500 hover:text-green-400 transition-colors"
                         >
                           <Download className="w-3.5 h-3.5" />
                           Download
-                        </a>
+                        </button>
                       ) : job.status === "running" ? (
                         <Loader2 className="w-3.5 h-3.5 text-[var(--text-muted)] animate-spin" />
                       ) : (

@@ -64,19 +64,23 @@ export default function SearchPanel() {
 const LIMIT_OPTIONS = [10, 25, 50, 100, 200];
 
 function SearchByNameMode() {
-  const { searchQuery, setSearchQuery, selectedSources, toggleSource, currentUserId } = useAppStore();
+  const { selectedSources, toggleSource, currentUserId } = useAppStore();
+  const [genus, setGenus] = useState("");
+  const [species, setSpecies] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ImageRecord[]>([]);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [limit, setLimit] = useState(50);
 
+  const effectiveQuery = [genus.trim(), species.trim()].filter(Boolean).join(" ");
+
   const handleSearch = async () => {
-    if (!searchQuery.trim() || !currentUserId) return;
+    if (!effectiveQuery || !currentUserId) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await runSearch(currentUserId, searchQuery.trim(), selectedSources, limit);
+      const data = await runSearch(currentUserId, effectiveQuery, selectedSources, limit);
       setResults(data);
       setSearched(true);
     } catch {
@@ -90,22 +94,53 @@ function SearchByNameMode() {
     <div className="space-y-5">
       <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
         <div className="flex gap-2">
-          <Autocomplete
-            value={searchQuery}
-            onChange={setSearchQuery}
-            onSelect={(v) => setSearchQuery(v)}
-            onEnter={handleSearch}
-            placeholder="e.g. Ephemeroptera, Baetis rhodani…"
-          />
-          <button
-            onClick={handleSearch}
-            disabled={loading || !searchQuery.trim()}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            {loading ? "Searching…" : "Search"}
-          </button>
+          <div className="flex flex-1 gap-2">
+            <div className="flex-1">
+              <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Genus</label>
+              <Autocomplete
+                value={genus}
+                onChange={setGenus}
+                onSelect={(v) => {
+                  const parts = v.trim().split(/\s+/);
+                  if (parts.length >= 2) {
+                    setGenus(parts[0]);
+                    setSpecies(parts.slice(1).join(" "));
+                  } else {
+                    setGenus(v);
+                  }
+                }}
+                onEnter={handleSearch}
+                placeholder="e.g. Paracorixa"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Species <span className="text-[var(--text-ghost)]">(optional)</span></label>
+              <input
+                type="text"
+                value={species}
+                onChange={(e) => setSpecies(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                placeholder="e.g. concinna"
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-green-500/50 transition-colors"
+              />
+            </div>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={handleSearch}
+              disabled={loading || !effectiveQuery}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              {loading ? "Searching…" : "Search"}
+            </button>
+          </div>
         </div>
+        {effectiveQuery && (
+          <p className="text-[10px] text-[var(--text-muted)]">
+            Query: <span className="italic text-[var(--text-dim)]">{effectiveQuery}</span>
+          </p>
+        )}
 
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
@@ -172,8 +207,8 @@ function SearchByNameMode() {
       {!searched && (
         <div className="flex flex-col items-center justify-center h-48 text-center">
           <Search className="w-12 h-12 text-[var(--text-ghost)] mb-3" />
-          <p className="text-sm text-[var(--text-dim)]">Enter a scientific name to start searching</p>
-          <p className="text-xs text-[var(--text-muted)] mt-1">e.g. Ephemeroptera, Plecoptera, Trichoptera</p>
+          <p className="text-sm text-[var(--text-dim)]">Enter a genus or a genus + species to search</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">e.g. Genus: Paracorixa · Species: concinna</p>
         </div>
       )}
     </div>
@@ -438,7 +473,7 @@ function UploadMode() {
 
 function ImageCard({ image }: { image: ImageRecord }) {
   const src = image.local_path
-    ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/images/${image.id}/thumbnail`
+    ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/images/${image.id}/thumbnail?user_id=${image.user_id}`
     : image.source_image_url;
 
   return (

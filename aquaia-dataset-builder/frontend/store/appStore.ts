@@ -2,6 +2,11 @@ import { create } from "zustand";
 import type { PanelId, ImageRecord, User } from "@/types";
 import { getUsers, createUser } from "@/lib/api";
 
+export interface LoginModal {
+  userId: number;
+  displayName: string;
+}
+
 interface AppState {
   theme: "dark" | "light";
   toggleTheme: () => void;
@@ -30,9 +35,16 @@ interface AppState {
   currentUserName: string;
   workspaces: User[];
   workspaceReady: boolean;
+  isReadOnly: boolean;
   initWorkspace: () => Promise<void>;
-  setWorkspace: (id: number, name: string) => void;
+  setWorkspace: (id: number, name: string, readOnly?: boolean) => void;
   setWorkspaces: (workspaces: User[]) => void;
+  setReadOnly: (v: boolean) => void;
+
+  // Auth
+  loginModal: LoginModal | null;
+  openLoginModal: (userId: number, displayName: string) => void;
+  closeLoginModal: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -82,6 +94,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentUserName: "",
   workspaces: [],
   workspaceReady: false,
+  isReadOnly: false,
 
   initWorkspace: async () => {
     try {
@@ -96,6 +109,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const savedId = typeof window !== "undefined"
         ? parseInt(localStorage.getItem("adiab-workspace-id") || "0")
         : 0;
+      const savedReadOnly = typeof window !== "undefined"
+        ? localStorage.getItem("adiab-readonly") === "true"
+        : false;
 
       const saved = users.find((u) => u.id === savedId);
       const target = saved ?? users[0];
@@ -103,18 +119,41 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (typeof window !== "undefined") {
         localStorage.setItem("adiab-workspace-id", String(target.id));
       }
-      set({ currentUserId: target.id, currentUserName: target.display_name, workspaceReady: true });
+      set({ currentUserId: target.id, currentUserName: target.display_name, isReadOnly: savedReadOnly, workspaceReady: true });
     } catch {
       set({ workspaceReady: true });
     }
   },
 
-  setWorkspace: (id, name) => {
+  setWorkspace: (id, name, readOnly = false) => {
     if (typeof window !== "undefined") {
       localStorage.setItem("adiab-workspace-id", String(id));
+      localStorage.setItem("adiab-readonly", readOnly ? "true" : "false");
     }
-    set({ currentUserId: id, currentUserName: name });
+    const state = get();
+    const nextPanel =
+      readOnly && ["search", "validation", "settings"].includes(state.activePanel)
+        ? "dataset" as const
+        : state.activePanel;
+    set({ currentUserId: id, currentUserName: name, isReadOnly: readOnly, activePanel: nextPanel });
   },
 
   setWorkspaces: (workspaces) => set({ workspaces }),
+
+  setReadOnly: (v) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("adiab-readonly", v ? "true" : "false");
+    }
+    const state = get();
+    const nextPanel =
+      v && ["search", "validation", "settings"].includes(state.activePanel)
+        ? "dataset" as const
+        : state.activePanel;
+    set({ isReadOnly: v, activePanel: nextPanel });
+  },
+
+  // Auth
+  loginModal: null,
+  openLoginModal: (userId, displayName) => set({ loginModal: { userId, displayName } }),
+  closeLoginModal: () => set({ loginModal: null }),
 }));

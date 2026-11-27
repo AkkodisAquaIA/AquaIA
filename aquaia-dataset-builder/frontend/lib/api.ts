@@ -6,8 +6,10 @@ import type {
   PaginatedResponse,
   SearchHistory,
   Taxon,
+  TaxonQueueItem,
   ExportJob,
   User,
+  UserWithToken,
 } from "@/types";
 
 const api = axios.create({
@@ -15,12 +17,42 @@ const api = axios.create({
   timeout: 30000,
 });
 
+// Attach stored token for the current workspace on every request
+api.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const { useAppStore } = require("@/store/appStore");
+    const { currentUserId } = useAppStore.getState();
+    if (currentUserId) {
+      const token = localStorage.getItem(`adiab-token-${currentUserId}`);
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
+// On 401 — clear stale token(s) and open login modal
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401 && typeof window !== "undefined") {
+      const { useAppStore } = require("@/store/appStore");
+      const { currentUserId, currentUserName, openLoginModal } = useAppStore.getState();
+      // Clear all workspace tokens
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("adiab-token-"))
+        .forEach((k) => localStorage.removeItem(k));
+      if (currentUserId) openLoginModal(currentUserId, currentUserName);
+    }
+    return Promise.reject(err);
+  }
+);
+
 // Users / Workspaces
 export const getUsers = () =>
   api.get<User[]>("/users").then((r) => r.data);
 
-export const createUser = (display_name: string) =>
-  api.post<User>("/users", { display_name }).then((r) => r.data);
+export const createUser = (display_name: string, password: string) =>
+  api.post<UserWithToken>("/users", { display_name, password }).then((r) => r.data);
 
 export const updateUser = (id: number, display_name: string) =>
   api.patch<User>(`/users/${id}`, { display_name }).then((r) => r.data);
@@ -49,6 +81,15 @@ export const getImages = (
   api
     .get<PaginatedResponse<ImageRecord>>("/images", { params: { user_id: userId, ...params } })
     .then((r) => r.data);
+
+export const clearImages = (userId: number, status?: string, taxonId?: number) =>
+  api.delete("/images", { params: { user_id: userId, ...(status ? { status } : {}), ...(taxonId ? { taxon_id: taxonId } : {}) } });
+
+export const deleteImage = (userId: number, imageId: number) =>
+  api.delete(`/images/${imageId}`, { params: { user_id: userId } });
+
+export const getTaxonQueue = (userId: number) =>
+  api.get<TaxonQueueItem[]>("/taxonomy/queue", { params: { user_id: userId } }).then((r) => r.data);
 
 export const updateImageStatus = (userId: number, id: number, status: string, notes?: string) =>
   api
@@ -104,6 +145,9 @@ export const createDataset = (userId: number, name: string, description?: string
 export const deleteDataset = (userId: number, id: number) =>
   api.delete(`/datasets/${id}`, { params: { user_id: userId } });
 
+export const renameDataset = (userId: number, id: number, name: string, description?: string) =>
+  api.patch<Dataset>(`/datasets/${id}`, { name, description }, { params: { user_id: userId } }).then((r) => r.data);
+
 export const getDatasetImages = (userId: number, datasetId: number) =>
   api
     .get<ImageRecord[]>(`/datasets/${datasetId}/images`, { params: { user_id: userId } })
@@ -128,14 +172,57 @@ export const importFromUrl = (userId: number, url: string, scientific_name?: str
     .post<ImageRecord>("/images/import-url", { user_id: userId, url, scientific_name })
     .then((r) => r.data);
 
-export const uploadFiles = (userId: number, files: File[], scientific_name?: string) => {
+export type Attribution = { source_url: string; author: string; license: string };
+
+export const uploadFiles = (
+  userId: number,
+  files: File[],
+  scientific_name?: string,
+  validated = false,
+  attributions?: Attribution[],
+) => {
   const form = new FormData();
   form.append("user_id", String(userId));
+  form.append("validated", String(validated));
   files.forEach((f) => form.append("files", f));
   if (scientific_name) form.append("scientific_name", scientific_name);
+  if (attributions) form.append("attributions_json", JSON.stringify(attributions));
   return api
     .post<ImageRecord[]>("/images/upload", form, {
       headers: { "Content-Type": "multipart/form-data" },
     })
     .then((r) => r.data);
+};
+
+// Auth
+export const loginWorkspace = (userId: number, password: string) =>
+  api.post<{ access_token: string; token_type: string; user_id: number }>("/auth/login", { user_id: userId, password }).then((r) => r.data);
+
+export const setWorkspacePassword = (userId: number, newPassword: string, oldPassword?: string) =>
+  api.post("/auth/set-password", { user_id: userId, new_password: newPassword, old_password: oldPassword ?? null });
+
+export const removeWorkspacePassword = (userId: number, currentPassword: string) =>
+  api.delete("/auth/password", { data: { user_id: userId, current_password: currentPassword } });
+
+export const getWorkspaceAuthStatus = (userId: number) =>
+  api.get<{ user_id: number; is_protected: boolean }>(`/auth/status/${userId}`).then((r) => r.data);
+
+export const downloadExport = async (userId: number, jobId: number) => {
+  const res = await api.get(`/exports/${jobId}/download`, {
+    params: { user_id: userId },
+    responseType: "blob",
+  });
+  // Read filename from Content-Disposition header set by the backend
+  const disposition: string = res.headers["content-disposition"] ?? "";
+  const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+  const filename = match?.[1]?.replace(/['"]/g, "") ?? `export-${jobId}.zip`;
+
+  const url = URL.createObjectURL(new Blob([res.data]));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };

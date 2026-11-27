@@ -33,7 +33,7 @@ if __name__ == "__main__":
         label_path = label_dir / f"{img_path.stem}.txt"
 
         # Skip if label file does not exist
-        if not label_path.exists():
+        if not Path(to_long_path(label_path)).exists():
             print(f"Warning: Label file not found for image {img_path}")
             continue
 

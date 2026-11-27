@@ -129,26 +129,33 @@ Every image retrieved by Search lands here with status `pending`. Nothing enters
 
 ### 3. Dataset Explorer — organise validated images
 
-Only images with status `validated` appear here.
+Only images with status `validated` appear here. A dataset groups **species folders** (taxon folders), not individual images.
 
-**How to create a dataset and add images:**
+**How to create a dataset and add species:**
 
-1. Click the **Datasets tab** → **+ New dataset** → type a name (e.g. `Ephemeroptera v1`) → **Create**
-2. Click the **Validated tab** → images are shown as a grid
-3. Click individual images to select them (green border + checkmark), or click **Select all**
-4. A dropdown appears on the right — choose your dataset
-5. Click **Add to dataset** → the image count on the dataset card updates immediately
+1. Click the **Datasets tab** → **+ New dataset** → type a name (e.g. `Macroinvertebrates v1`) → **Create**
+2. Click the **Validated tab** → validated images are shown grouped by species folder
+3. On each species folder header, click **Add to dataset** → a dropdown lists your datasets
+4. Choose an existing dataset (a checkmark appears if the folder is already there) — or click **New dataset…** to create one and assign the folder in one action
+5. The dataset card updates immediately: species badges and image count are shown
 
-> The Name field is required — the Create button stays disabled until you fill it in.
+You can add as many species folders as you want to the same dataset. A dataset contains:
+- **One species** (e.g. `Glossiphonia_complanata` only)
+- **Or multiple species** (e.g. `Glossiphonia_complanata` + `Branchiobdella` + `Orectochilus_villosus`)
 
-**Deduplication protection:** each image can only belong to one dataset at a time.
-- Images already assigned to a dataset show an **indigo badge** with the dataset name — you can still select them but they won't be moved
-- If you try to add images that are already in a *different* dataset, an amber warning banner lists the conflicts and only the unassigned images are actually added
+**Viewing and editing a dataset:**
+- Click a dataset card to open its detail view → species are shown as collapsible sub-folders
+- Each sub-folder has a **Remove species** button that removes all images of that taxon from the dataset (the images stay in your Validated library)
+- The pencil icon on a dataset card lets you rename it inline (Enter to confirm, Escape to cancel)
+
+**Deleting images from the Validated library:**
+- Hover over an individual image → red trash icon → confirm
+- Use the folder trash icon to delete all images of a species at once (with confirmation)
 
 | Tab | Content |
 |-----|---------|
-| **Datasets** | Named collections with image count and creation date. Create, browse and delete datasets here. |
-| **Validated** | All validated images. Multi-select here to assign images to a dataset. |
+| **Datasets** | Named collections. Each shows its species (indigo badges) and image count. Create, rename, browse, delete datasets here. |
+| **Validated** | All validated images grouped by species folder. Assign folders to datasets or delete images here. |
 | **Taxons** | Taxonomy built automatically from searches (scientific name, common name, rank). |
 
 ### 4. Export Center — export for AI training
@@ -158,12 +165,45 @@ Only images with status `validated` appear here.
 | Format | Description |
 |--------|-------------|
 | **Classification** | One folder per taxon — standard for `torchvision.ImageFolder`, Keras `flow_from_directory` |
-| **YOLO** | `images/` + `labels/` folders with `.txt` annotation files |
-| **COCO JSON** | Single `annotations.json` in COCO format |
-| **CSV** | Flat table with image path, taxon, license, author… |
+| **YOLO** | `images/<taxon>/` sub-folders + `data.yaml` class list |
+| **COCO JSON** | `images/` flat folder + `instances_validated.json` in COCO format |
+| **CSV** | `metadata.csv` flat table with image path, taxon, license, author… |
 
 - Click **Create export job** → a zip is generated in the background
 - Click **Download** once the job status shows `done` (page auto-refreshes while running)
+
+#### Source & Licence attribution files (SL files)
+
+Every export zip automatically includes **SL attribution files** — one per species folder — so the source and licence of every image is always documented alongside the data.
+
+**Naming convention:** `SL_<FOLDER_NAME_UPPERCASE>.csv`
+
+Examples:
+- `Glossiphonia_complanata/SL_GLOSSIPHONIA_COMPLANATA.csv`
+- `Branchiobdella/SL_BRANCHIOBDELLA.csv`
+
+**File format (CSV, UTF-8):**
+
+| Column | Content |
+|--------|---------|
+| `source_url` | Full URL of the original image page (e.g. `https://www.inaturalist.org/photos/12345`) |
+| `author` | Author / photographer name as provided by the source |
+| `license` | Licence identifier (e.g. `CC BY 4.0`, `CC0`, `CC BY-NC 4.0`) |
+
+**One row per image** in the folder, in the same order as the image files.
+
+**Export format coverage:**
+
+| Export format | SL file location |
+|---------------|-----------------|
+| Classification | `<taxon>/SL_<TAXON>.csv` — one file per species folder |
+| YOLO | `images/<taxon>/SL_<TAXON>.csv` — one file per species folder |
+| COCO JSON | `SL_SOURCES.csv` at the root (flat, all images) |
+| CSV | `SL_SOURCES.csv` at the root (flat, all images) |
+
+**Why?** Images sourced from Wikimedia Commons, iNaturalist and GBIF are almost all under Creative Commons licences. These licences require attribution — the creator's name must be cited and the licence link included in any derived work (including AI training datasets). The SL file makes it trivial to fulfil this legal obligation without having to re-look up metadata after the fact.
+
+> Tip: if you plan to publish your training dataset or share it with partners, keep the SL files in the archive — they serve as the attribution record.
 
 ### 5. Settings — platform configuration
 

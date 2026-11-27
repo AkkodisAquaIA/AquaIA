@@ -3,6 +3,8 @@ import torch.nn as nn
 from .position_encoding import build_position_encoding
 from .DETR import DETR
 from .backbone_id_map import resolve_backbone_id
+
+# torch.nn.attention tool box to control/expand attention mechanisms
 import torch.nn.attention as attn
 
 
@@ -16,15 +18,19 @@ class DINODetector(nn.Module):
         self,
         img_size,
         backbone_id="dinov3_small",
+        # !Warning! detector_head_id not used
         detector_head_id="detr",
         positional_encoding_id="sine",
         d_model=256,  # Transformer hidden dimension
         device="cpu",
+        # !Warning! inference_mode not used
         inference_mode=False,
+        # !Warning! lora_ft not used
         lora_ft=False,
+        # !Warning! quantize not used
         quantize=False,
-        num_classes=91,
-        num_queries=50,
+        num_classes=80,
+        num_queries=90,
     ):
         super(DINODetector, self).__init__()
         self.img_size = img_size
@@ -37,34 +43,46 @@ class DINODetector(nn.Module):
         self.lora_ft = lora_ft
         self.quantize = quantize
 
-        # ----- Build model (backbone + positional encoding +  detection head) -----
+        # ----- Build model (backbone + positional encoding + detection head) -----
+        # torch.hub.load() can load models from local or online repo
+        # **dict unpacks the dictionary returned into keyword arguments for exterior function call
         self.backbone = torch.hub.load(**resolve_backbone_id(backbone_id))
         # TODO : turn into a stateless function
         self.positional_encoding = build_position_encoding(positional_encoding_id, h_dim=d_model)
         self.detector = DETR(num_input_channels=self.backbone.embed_dim, num_classes=num_classes, num_queries=num_queries, d_model=d_model).to(device)
         # Assuming square images for simplicity, otherwise we would need to compute patch_x and patch_y separately
+        # Here is the patch grid size, aka nb of patches along one dimension, ex 640/16=40 for dinov3_small
         self.patch_size = self.img_size // self.backbone.patch_size
 
-        # precompute positional encoding once for a single image (will be broadcasted in forward)
+        # Precompute positional encoding once for a single image (will be broadcasted in forward)
+        # Assuming equal size for all images
         self.pe = self.positional_encoding(patch_x=self.patch_size, device=self.device)
 
         if not self.lora_ft:
+            # Only backbone
             self.backbone.eval().to(device)
         else:
             raise NotImplementedError("LoRA fine-tuning not implemented yet, set lora_ft to False for now")
 
-    def _forward_backbone(self, images):
+    def _forward_backbone(self, inputs):
         # Feed input to backbone and extract features
+        # lora_ft = True -> need grad, lora_ft = False -> no grad
         with torch.set_grad_enabled(self.lora_ft):
-            features = self.backbone(images, is_training=True)["x_norm_patchtokens"]  # (B, H*W, C)
+            # If lora_ft = False, backbone not trained
+            # Return outputs following the DINOv3's training path, richer results
+            features = self.backbone(inputs, is_training=True)["x_norm_patchtokens"]  # (B, H*W, C)
+        # Expand PE to batch size
         return features, self.pe.unsqueeze(0).expand(features.shape[0], -1, -1)  # (B, H*W, 2*num_pos_feats) add batch dimension with broadcasting
 
-    def forward(self, images):
-        if images.device.type == "cuda":
+    def forward(self, inputs):
+        if inputs.device.type == "cuda":
+            # If GPU then flash attention or efficient attention else normal math attention
+            # The choice depends on pytorch itself
             backends = [attn.SDPBackend.FLASH_ATTENTION, attn.SDPBackend.EFFICIENT_ATTENTION]
         else:
             backends = [attn.SDPBackend.MATH]
         with torch.nn.attention.sdpa_kernel(backends=backends):
-            embeddings, pe = self._forward_backbone(images)
+            embeddings, pe = self._forward_backbone(inputs)
             out = self.detector(embeddings, pe)
+        # out = dict with keys "pred_logits", "pred_boxes", "aux_outputs" (if aux_loss=True)
         return out

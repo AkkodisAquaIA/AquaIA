@@ -1,17 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Plus, Check, Users, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Check, Users, Loader2, Pencil, Trash2, Lock, Eye, EyeOff } from "lucide-react";
 import { useAppStore } from "@/store/appStore";
 import { createUser, deleteUser, updateUser, getUsers } from "@/lib/api";
 import type { User } from "@/types";
 import { cn } from "@/lib/utils";
 
 export default function WorkspaceSelector() {
-  const { currentUserId, currentUserName, workspaces, setWorkspace, setWorkspaces } = useAppStore();
+  const { currentUserId, currentUserName, workspaces, setWorkspace, setWorkspaces, openLoginModal, isReadOnly } = useAppStore();
   const [open, setOpen] = useState(false);
+  const [pendingWs, setPendingWs] = useState<User | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showNewPwdConfirm, setShowNewPwdConfirm] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -36,15 +42,33 @@ export default function WorkspaceSelector() {
     return users;
   };
 
+  const resetCreateForm = () => {
+    setCreating(false);
+    setNewName("");
+    setNewPassword("");
+    setNewPasswordConfirm("");
+    setShowNewPwd(false);
+    setShowNewPwdConfirm(false);
+    setCreateError("");
+  };
+
   const handleCreate = async () => {
     if (!newName.trim()) return;
+    if (!newPassword) { setCreateError("PIN is required"); return; }
+    if (!/^\d+$/.test(newPassword)) { setCreateError("PIN must contain digits only"); return; }
+    if (newPassword.length < 6) { setCreateError("PIN must be at least 6 digits"); return; }
+    if (newPassword !== newPasswordConfirm) { setCreateError("PINs do not match"); return; }
     setSaving(true);
     try {
-      const user = await createUser(newName.trim());
+      const result = await createUser(newName.trim(), newPassword);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`adiab-token-${result.id}`, result.access_token);
+      }
       await refreshWorkspaces();
-      setWorkspace(user.id, user.display_name);
-      setNewName("");
-      setCreating(false);
+      setWorkspace(result.id, result.display_name);
+      resetCreateForm();
+    } catch {
+      setCreateError("Failed to create workspace");
     } finally {
       setSaving(false);
     }
@@ -83,6 +107,9 @@ export default function WorkspaceSelector() {
         <span className="text-[var(--text-base)] font-medium max-w-[140px] truncate">
           {currentUserName || "…"}
         </span>
+        {isReadOnly && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 shrink-0">read-only</span>
+        )}
         <ChevronDown className={cn("w-3.5 h-3.5 text-[var(--text-muted)] transition-transform", open && "rotate-180")} />
       </button>
 
@@ -114,7 +141,15 @@ export default function WorkspaceSelector() {
                   </div>
                 ) : (
                   <button
-                    onClick={() => { setWorkspace(ws.id, ws.display_name); setOpen(false); }}
+                    onClick={() => {
+                      const hasToken = typeof window !== "undefined" && !!localStorage.getItem(`adiab-token-${ws.id}`);
+                      if (ws.is_protected && !hasToken) {
+                        setPendingWs(ws);
+                      } else {
+                        setWorkspace(ws.id, ws.display_name, false);
+                        setOpen(false);
+                      }
+                    }}
                     className="flex-1 min-w-0 flex items-center gap-2 text-left"
                   >
                     {ws.id === currentUserId
@@ -124,6 +159,12 @@ export default function WorkspaceSelector() {
                     <span className={cn("text-sm truncate", ws.id === currentUserId ? "text-green-400 font-medium" : "text-[var(--text-base)]")}>
                       {ws.display_name}
                     </span>
+                    {ws.id === currentUserId && isReadOnly && (
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 shrink-0">read-only</span>
+                    )}
+                    {ws.is_protected && ws.id !== currentUserId && (
+                      <Lock className="w-3 h-3 text-amber-400 shrink-0 ml-auto" />
+                    )}
                   </button>
                 )}
 
@@ -151,24 +192,97 @@ export default function WorkspaceSelector() {
             ))}
           </div>
 
+          {/* Pending workspace: choose View or Login */}
+          {pendingWs && (
+            <div className="border-t border-[var(--border)] p-3 space-y-2">
+              <p className="text-xs text-[var(--text-dim)]">
+                Access <span className="italic font-medium text-[var(--text-base)]">{pendingWs.display_name}</span>:
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setWorkspace(pendingWs.id, pendingWs.display_name, true);
+                    setPendingWs(null);
+                    setOpen(false);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors"
+                >
+                  <Eye className="w-3.5 h-3.5" /> View only
+                </button>
+                <button
+                  onClick={() => {
+                    openLoginModal(pendingWs.id, pendingWs.display_name);
+                    setPendingWs(null);
+                    setOpen(false);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                >
+                  <Lock className="w-3.5 h-3.5" /> Login
+                </button>
+              </div>
+              <button onClick={() => setPendingWs(null)} className="w-full text-center text-[10px] text-[var(--text-muted)] hover:text-[var(--text-dim)] transition-colors">
+                Cancel
+              </button>
+            </div>
+          )}
+
           <div className="border-t border-[var(--border)] p-2">
             {creating ? (
-              <div className="flex items-center gap-2">
+              <div className="space-y-2">
                 <input
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setCreating(false); }}
+                  onKeyDown={(e) => { if (e.key === "Escape") resetCreateForm(); }}
                   placeholder="Workspace name…"
-                  className="flex-1 bg-[var(--bg-input)] border border-green-500/40 rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none"
+                  className="w-full bg-[var(--bg-input)] border border-green-500/40 rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none"
                 />
-                <button
-                  onClick={handleCreate}
-                  disabled={saving || !newName.trim()}
-                  className="p-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/40 text-green-400 disabled:opacity-40 transition-colors"
-                >
-                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                </button>
+                <p className="text-[10px] text-[var(--text-muted)] px-1">PIN — numbers only, minimum 6 digits</p>
+                <div className="relative">
+                  <input
+                    type={showNewPwd ? "text" : "password"}
+                    inputMode="numeric"
+                    pattern="\d*"
+                    value={newPassword}
+                    onChange={(e) => { setNewPassword(e.target.value.replace(/\D/g, "")); setCreateError(""); }}
+                    placeholder="PIN (e.g. 123456)"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500/40 pr-7"
+                  />
+                  <button type="button" onClick={() => setShowNewPwd(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                    {showNewPwd ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showNewPwdConfirm ? "text" : "password"}
+                    inputMode="numeric"
+                    pattern="\d*"
+                    value={newPasswordConfirm}
+                    onChange={(e) => { setNewPasswordConfirm(e.target.value.replace(/\D/g, "")); setCreateError(""); }}
+                    placeholder="Confirm PIN"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-amber-500/40 pr-7"
+                  />
+                  <button type="button" onClick={() => setShowNewPwdConfirm(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                    {showNewPwdConfirm ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  </button>
+                </div>
+                {createError && <p className="text-[10px] text-red-400 px-1">{createError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreate}
+                    disabled={saving || !newName.trim() || !newPassword || !newPasswordConfirm}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg bg-green-600/20 hover:bg-green-600/40 text-green-400 disabled:opacity-40 transition-colors"
+                  >
+                    {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                    Create
+                  </button>
+                  <button
+                    onClick={resetCreateForm}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : (
               <button

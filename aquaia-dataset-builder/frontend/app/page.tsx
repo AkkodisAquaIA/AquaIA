@@ -4,12 +4,14 @@ import { useEffect } from "react";
 import { useAppStore } from "@/store/appStore";
 import Sidebar from "@/components/sidebar/Sidebar";
 import WorkspaceSelector from "@/components/workspace/WorkspaceSelector";
+import WorkspaceLoginModal from "@/components/workspace/WorkspaceLoginModal";
 import DashboardPanel from "@/features/dashboard/DashboardPanel";
 import SearchPanel from "@/features/search/SearchPanel";
 import ValidationPanel from "@/features/validation/ValidationPanel";
 import DatasetPanel from "@/features/dataset/DatasetPanel";
 import ExportPanel from "@/features/export/ExportPanel";
 import SettingsPanel from "@/features/settings/SettingsPanel";
+import DocsPanel from "@/features/docs/DocsPanel";
 
 function ActivePanel() {
   const { activePanel } = useAppStore();
@@ -20,11 +22,12 @@ function ActivePanel() {
     case "dataset":     return <DatasetPanel />;
     case "export":      return <ExportPanel />;
     case "settings":    return <SettingsPanel />;
+    case "docs":        return <DocsPanel />;
   }
 }
 
 export default function Home() {
-  const { initWorkspace, workspaceReady } = useAppStore();
+  const { initWorkspace, workspaceReady, currentUserId, activePanel } = useAppStore();
 
   useEffect(() => {
     initWorkspace();
@@ -33,6 +36,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--bg-base)]">
+      <WorkspaceLoginModal />
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
@@ -57,13 +61,20 @@ export default function Home() {
           <WorkspaceSelector />
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
-          {workspaceReady ? (
-            <ActivePanel />
-          ) : (
+        <main className={`flex-1 overflow-hidden ${activePanel === "docs" ? "" : "overflow-y-auto p-6"}`}>
+          {!workspaceReady ? (
             <div className="flex items-center justify-center h-full">
               <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : !currentUserId ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+              <p className="text-[var(--text-base)] font-medium">No workspace selected</p>
+              <p className="text-sm text-[var(--text-dim)]">
+                Click <span className="font-medium text-[var(--text-base)]">Add workspace</span> in the top-right to create one.
+              </p>
+            </div>
+          ) : (
+            <ActivePanel />
           )}
         </main>
       </div>

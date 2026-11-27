@@ -16,6 +16,7 @@ nvidia-nvtiff-cu12>=0.6.0.78
 nvtx>=0.2.14
 packaging>=25.0
 six>=1.17.0
+tqdm>=4.66
 wheel>=0.45.1
 wrapt>=2.0.1
  

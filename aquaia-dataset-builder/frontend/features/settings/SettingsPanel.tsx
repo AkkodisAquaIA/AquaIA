@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/store/appStore";
 import { cn } from "@/lib/utils";
-import { Star, X } from "lucide-react";
-import { getTaxons, setTaxonReference } from "@/lib/api";
+import { Star, X, Lock, LockOpen, Eye, EyeOff, Loader2 } from "lucide-react";
+import { getTaxons, setTaxonReference, setWorkspacePassword, removeWorkspacePassword, loginWorkspace, getWorkspaceAuthStatus } from "@/lib/api";
 import type { Taxon } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -24,10 +24,67 @@ export default function SettingsPanel() {
   const [customH, setCustomH] = useState(String(cropHeight));
   const [taxons, setTaxons] = useState<Taxon[]>([]);
 
+  // Security state
+  const [isProtected, setIsProtected] = useState(false);
+  const [securityMode, setSecurityMode] = useState<"view" | "set" | "change" | "remove">("view");
+  const [showPwd, setShowPwd] = useState(false);
+  const [showPwdNew, setShowPwdNew] = useState(false);
+  const [showPwdConfirm, setShowPwdConfirm] = useState(false);
+  const [secOld, setSecOld] = useState("");
+  const [secNew, setSecNew] = useState("");
+  const [secConfirm, setSecConfirm] = useState("");
+  const [secLoading, setSecLoading] = useState(false);
+  const [secError, setSecError] = useState("");
+  const [secSuccess, setSecSuccess] = useState("");
+
   useEffect(() => {
     if (!currentUserId) return;
     getTaxons(currentUserId).then(setTaxons).catch(() => {});
+    getWorkspaceAuthStatus(currentUserId).then((s) => setIsProtected(s.is_protected)).catch(() => {});
+    setSecurityMode("view");
+    setSecOld(""); setSecNew(""); setSecConfirm(""); setSecError(""); setSecSuccess("");
   }, [currentUserId]);
+
+  const resetSecForm = () => {
+    setSecurityMode("view");
+    setSecOld(""); setSecNew(""); setSecConfirm(""); setSecError(""); setShowPwd(false); setShowPwdNew(false); setShowPwdConfirm(false);
+  };
+
+  const handleSetPassword = async () => {
+    if (!/^\d+$/.test(secNew)) { setSecError("PIN must contain digits only"); return; }
+    if (secNew.length < 6) { setSecError("PIN must be at least 6 digits"); return; }
+    if (secNew !== secConfirm) { setSecError("PINs do not match"); return; }
+    setSecLoading(true); setSecError("");
+    try {
+      await setWorkspacePassword(currentUserId!, secNew, isProtected ? secOld : undefined);
+      const { data } = await loginWorkspace(currentUserId!, secNew).then(d => ({ data: d }));
+      if (typeof window !== "undefined") localStorage.setItem(`adiab-token-${currentUserId}`, data.access_token);
+      setIsProtected(true);
+      setSecSuccess(isProtected ? "PIN changed successfully" : "PIN set — workspace is now protected");
+      resetSecForm();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setSecError(msg || "Failed to update password");
+    } finally {
+      setSecLoading(false);
+    }
+  };
+
+  const handleRemovePassword = async () => {
+    setSecLoading(true); setSecError("");
+    try {
+      await removeWorkspacePassword(currentUserId!, secOld);
+      if (typeof window !== "undefined") localStorage.removeItem(`adiab-token-${currentUserId}`);
+      setIsProtected(false);
+      setSecSuccess("PIN removed — workspace is now open");
+      resetSecForm();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setSecError(msg || "Incorrect password");
+    } finally {
+      setSecLoading(false);
+    }
+  };
 
   const handleClearReference = async (taxon: Taxon) => {
     if (!currentUserId) return;
@@ -139,7 +196,7 @@ export default function SettingsPanel() {
                 <div className="aspect-square">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`${API_BASE}/images/${t.reference_image_id}/thumbnail`}
+                    src={`${API_BASE}/images/${t.reference_image_id}/thumbnail?user_id=${currentUserId}`}
                     alt={t.scientific_name}
                     className="w-full h-full object-cover"
                   />
@@ -161,6 +218,158 @@ export default function SettingsPanel() {
                 </button>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Workspace Security */}
+      <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-[var(--text-base)]">Workspace security</p>
+            <p className="text-xs text-[var(--text-dim)] mt-0.5">
+              {isProtected
+                ? "This workspace is password-protected. Others can only read and download datasets."
+                : "Anyone can currently modify this workspace. Set a password to restrict write access."}
+            </p>
+          </div>
+          <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium border", isProtected
+            ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+            : "bg-[var(--bg-input)] border-[var(--border)] text-[var(--text-muted)]"
+          )}>
+            {isProtected ? <Lock className="w-3 h-3" /> : <LockOpen className="w-3 h-3" />}
+            {isProtected ? "Protected" : "Open"}
+          </div>
+        </div>
+
+        {secSuccess && (
+          <p className="text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">{secSuccess}</p>
+        )}
+
+        {securityMode === "view" && (
+          <div className="flex flex-wrap gap-2">
+            {!isProtected && (
+              <button
+                onClick={() => { setSecurityMode("set"); setSecSuccess(""); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors"
+              >
+                <Lock className="w-3 h-3" /> Set PIN
+              </button>
+            )}
+            {isProtected && (
+              <>
+                <button
+                  onClick={() => { setSecurityMode("change"); setSecSuccess(""); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors"
+                >
+                  <Lock className="w-3 h-3" /> Change PIN
+                </button>
+                <button
+                  onClick={() => { setSecurityMode("remove"); setSecSuccess(""); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
+                >
+                  <LockOpen className="w-3 h-3" /> Remove PIN
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {(securityMode === "set" || securityMode === "change") && (
+          <div className="space-y-3">
+            {securityMode === "change" && (
+              <div className="relative">
+                <input
+                  type={showPwd ? "text" : "password"}
+                  inputMode="numeric"
+                  pattern="\d*"
+                  placeholder="Current PIN"
+                  value={secOld}
+                  onChange={(e) => { setSecOld(e.target.value.replace(/\D/g, "")); setSecError(""); }}
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-green-500/50 pr-9"
+                />
+                <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                  {showPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            )}
+            <p className="text-xs text-[var(--text-muted)]">PIN — numbers only, minimum 6 digits</p>
+            <div className="relative">
+              <input
+                type={showPwdNew ? "text" : "password"}
+                inputMode="numeric"
+                pattern="\d*"
+                placeholder="New PIN (e.g. 123456)"
+                value={secNew}
+                onChange={(e) => { setSecNew(e.target.value.replace(/\D/g, "")); setSecError(""); }}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-green-500/50 pr-9"
+              />
+              <button type="button" onClick={() => setShowPwdNew(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                {showPwdNew ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showPwdConfirm ? "text" : "password"}
+                inputMode="numeric"
+                pattern="\d*"
+                placeholder="Confirm new PIN"
+                value={secConfirm}
+                onChange={(e) => { setSecConfirm(e.target.value.replace(/\D/g, "")); setSecError(""); }}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-green-500/50 pr-9"
+              />
+              <button type="button" onClick={() => setShowPwdConfirm(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                {showPwdConfirm ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            {secError && <p className="text-xs text-red-400">{secError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={handleSetPassword}
+                disabled={secLoading || !secNew || !secConfirm || (securityMode === "change" && !secOld)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white transition-colors"
+              >
+                {secLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Lock className="w-3 h-3" />}
+                {securityMode === "set" ? "Set PIN" : "Change PIN"}
+              </button>
+              <button onClick={resetSecForm} className="px-3 py-1.5 text-xs rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {securityMode === "remove" && (
+          <div className="space-y-3">
+            <p className="text-xs text-[var(--text-dim)]">Enter your current PIN to remove protection.</p>
+            <div className="relative">
+              <input
+                type={showPwd ? "text" : "password"}
+                inputMode="numeric"
+                pattern="\d*"
+                placeholder="Current PIN"
+                value={secOld}
+                onChange={(e) => { setSecOld(e.target.value.replace(/\D/g, "")); setSecError(""); }}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-base)] placeholder-[var(--text-muted)] focus:outline-none focus:border-red-500/50 pr-9"
+              />
+              <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                {showPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            {secError && <p className="text-xs text-red-400">{secError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={handleRemovePassword}
+                disabled={secLoading || !secOld}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-red-500/80 hover:bg-red-500 disabled:opacity-40 text-white transition-colors"
+              >
+                {secLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <LockOpen className="w-3 h-3" />}
+                Remove PIN
+              </button>
+              <button onClick={resetSecForm} className="px-3 py-1.5 text-xs rounded-lg bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border-hi)] transition-colors">
+                Cancel
+              </button>
+            </div>
           </div>
         )}
       </div>

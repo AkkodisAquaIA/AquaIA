@@ -1,3 +1,4 @@
+# Z: https://github.com/impiga/Plain-DETR/blob/main/util/misc.py
 # ------------------------------------------------------------------------
 # Plain-DETR
 # Copyright (c) 2023 Xi'an Jiaotong University & Microsoft Research Asia.
@@ -307,6 +308,7 @@ def setup_for_distributed(is_master):
 
 
 def is_dist_avail_and_initialized():
+    """Z: Check if distributed training is available and initialized."""
     if not dist.is_available():
         return False
     if not dist.is_initialized():
@@ -315,6 +317,7 @@ def is_dist_avail_and_initialized():
 
 
 def get_world_size():
+    """Z: Get the number of processes in the current distributed group."""
     if not is_dist_avail_and_initialized():
         return 1
     return dist.get_world_size()
@@ -392,14 +395,22 @@ def init_distributed_mode(args):
 
 @torch.no_grad()
 def accuracy(output, target, topk=(1,)):
-    """Computes the precision@k for the specified values of k"""
+    """Computes the precision@k for the specified values of k.
+    Z: Top-k accuracy is the percentage of samples whose true class
+    appears among the model’s k highest-scoring predictions."""
+    # Z: if no element in target, return scalar 0
     if target.numel() == 0:
         return [torch.zeros([], device=output.device)]
     maxk = max(topk)
     batch_size = target.size(0)
 
+    # Z: output.topk(k=maxk, dim=1, largest=True, sorted=True)
+    # Z: for each sample select the maxk classes with highest scores along class dim
+    # Z: pred = tensor([ [2,4],[1,3],...]) sample 0 class 2 4, sample 1 class 1 3, ...
     _, pred = output.topk(maxk, 1, True, True)
+    # Z: transpose, tensor([ [2,1,...],[4,3,...]]) 1st for all samples, 2nd for all samples, ...
     pred = pred.t()
+    # Z: compare the predicted classes with the true classes
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 
     # print(pred)
@@ -407,6 +418,7 @@ def accuracy(output, target, topk=(1,)):
 
     res = []
     for k in topk:
+        # Z: get top k correct predictions' number
         correct_k = correct[:k].view(-1).float().sum(0)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res

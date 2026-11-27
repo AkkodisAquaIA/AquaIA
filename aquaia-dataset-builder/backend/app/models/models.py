@@ -8,15 +8,20 @@ from app.db.database import Base
 
 
 class User(Base):
-    """Workspace / user — lightweight identity, no passwords."""
+    """Workspace / user — optional password protection."""
 
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(255))
+    password_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def is_protected(self) -> bool:
+        return self.password_hash is not None
 
     user_images: Mapped[list["UserImage"]] = relationship("UserImage", back_populates="user", cascade="all, delete-orphan")
     datasets: Mapped[list["Dataset"]] = relationship("Dataset", back_populates="user", cascade="all, delete-orphan")

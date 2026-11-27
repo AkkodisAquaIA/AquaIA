@@ -47,6 +47,7 @@ deploy/.env
 docker/build/
 /results
 /datasets
+DockerfileZ
 
 # data_cropping/sam
 data_cropping/sam/*_result_det_*/

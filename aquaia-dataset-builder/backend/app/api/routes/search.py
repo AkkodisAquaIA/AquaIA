@@ -1,7 +1,10 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.api.deps import verify_workspace_access
 from app.db.database import get_db
 from app.models.models import SearchHistory, User
 from app.schemas.schemas import SearchRequest, SearchHistoryRead, ImageRecordRead
@@ -28,8 +31,10 @@ async def list_searches(
 async def run_search_endpoint(
     body: SearchRequest,
     background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(body.user_id, authorization, db)
     user = await db.get(User, body.user_id)
     if not user:
         raise HTTPException(404, f"Workspace {body.user_id} not found")

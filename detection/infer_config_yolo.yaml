@@ -1,0 +1,28 @@
+run:
+  # Root directory where all training runs are saved
+  runs_root: "results/detect/yolo11_n_pretrained"
+  # One specific training run directory
+  run_dir: null
+
+data:
+  infer_data_root: "datasets/aquatic_insects_v7_1classe"
+  # Dataset split used for inference
+  split: "test"
+
+inference:
+  imgsz : 640
+  batch: 30
+  # Number of PyTorch DataLoader workers
+  workers: 3
+  # Confidence threshold used to filter bbox predictions before mAP calculation
+  conf_thresh: 0.05
+  # Confidence threshold for bbox prediction visualization filtering
+  conf: 0.3
+  # IoU threshold for NMS; matches training.iou
+  iou: 0.5
+  # Number of samples used for prediction visualization, must be greater than 0
+  num_samples: 20
+  seed: 0
+
+output:
+  output_dir: "results/infer_yolo"

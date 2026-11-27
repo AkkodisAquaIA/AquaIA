@@ -1,14 +1,21 @@
 import hashlib
+import ipaddress
+import json as _json
+import socket
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
+from urllib.parse import urlparse
 
 from pydantic import BaseModel
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sql_delete
 from sqlalchemy.orm import selectinload
 
+from app.api.deps import verify_workspace_access
+from app.core.config import settings
 from app.db.database import get_db
 from app.models.models import ImageAsset, UserImage, User
 from app.schemas.schemas import ImageRecordRead, ImageStatusUpdate, ImportUrlRequest, image_record_read
@@ -20,6 +27,46 @@ router = APIRouter(prefix="/images", tags=["images"])
 
 VALID_STATUSES = {"pending", "validated", "rejected", "duplicate", "review_later"}
 IMAGE_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "tif", "tiff", "bmp"}
+
+_PRIVATE_NETS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("0.0.0.0/8"),
+]
+
+
+def _validate_url_safe(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(400, "Only http/https URLs are allowed")
+    host = parsed.hostname
+    if not host:
+        raise HTTPException(400, "Invalid URL: missing hostname")
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        raise HTTPException(400, f"Cannot resolve hostname: {host}")
+    for info in infos:
+        addr = info[4][0]
+        try:
+            ip = ipaddress.ip_address(addr)
+            if any(ip in net for net in _PRIVATE_NETS):
+                raise HTTPException(400, "URL resolves to a private or reserved address")
+        except ValueError:
+            pass
+
+
+def _safe_path(stored: Optional[str], *roots: Path) -> Path:
+    if not stored:
+        raise HTTPException(404, "File not available")
+    resolved = Path(stored).resolve()
+    if not any(str(resolved).startswith(str(r.resolve())) for r in roots):
+        raise HTTPException(403, "Access denied")
+    return resolved
+
 
 _UI_LOAD = [selectinload(UserImage.asset).selectinload(ImageAsset.taxon), selectinload(UserImage.taxon)]
 
@@ -57,7 +104,7 @@ async def _build_read(db: AsyncSession, ui: UserImage) -> ImageRecordRead:
 async def list_images(
     user_id: int = Query(..., ge=1),
     page: int = Query(1, ge=1),
-    size: int = Query(50, ge=1, le=200),
+    size: int = Query(50, ge=1, le=1000),
     status: str | None = Query(None),
     source: str | None = Query(None),
     taxon_id: int | None = Query(None),
@@ -90,6 +137,29 @@ async def list_images(
     }
 
 
+# ── Clear (bulk delete) ─────────────────────────────────────────────────────────
+
+
+@router.delete("", status_code=204)
+async def clear_images(
+    user_id: int = Query(..., ge=1),
+    status: str | None = Query(None),
+    taxon_id: int | None = Query(None),
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_workspace_access(user_id, authorization, db)
+    await _get_user_or_404(db, user_id)
+    if status and status not in VALID_STATUSES:
+        raise HTTPException(400, f"Invalid status. Must be one of: {VALID_STATUSES}")
+    q = sql_delete(UserImage).where(UserImage.user_id == user_id)
+    if status:
+        q = q.where(UserImage.status == status)
+    if taxon_id:
+        q = q.where(UserImage.taxon_id == taxon_id)
+    await db.execute(q)
+
+
 # ── Import by URL ───────────────────────────────────────────────────────────────
 
 
@@ -97,8 +167,11 @@ async def list_images(
 async def import_from_url(
     body: ImportUrlRequest,
     background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(body.user_id, authorization, db)
+    _validate_url_safe(body.url)
     await _get_user_or_404(db, body.user_id)
 
     taxon = None
@@ -144,16 +217,28 @@ async def upload_files(
     user_id: int = Form(...),
     files: list[UploadFile] = File(...),
     scientific_name: str | None = Form(None),
+    validated: bool = Form(False),
+    attributions_json: str | None = Form(None),
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(user_id, authorization, db)
     await _get_user_or_404(db, user_id)
 
     taxon = None
     if scientific_name:
         taxon = await get_or_create_taxon(db, scientific_name)
 
+    # Parse per-image attributions: [{source_url, author, license}]
+    attributions: list[dict] = []
+    if attributions_json:
+        try:
+            attributions = _json.loads(attributions_json)
+        except Exception:
+            raise HTTPException(400, "Invalid attributions_json")
+
     results: list[UserImage] = []
-    for upload in files:
+    for idx, upload in enumerate(files):
         content = await upload.read()
         if not content:
             continue
@@ -165,6 +250,11 @@ async def upload_files(
         if ext == "jpeg":
             ext = "jpg"
 
+        attr = attributions[idx] if idx < len(attributions) else {}
+        source_url = attr.get("source_url") or f"upload://{fname}"
+        author = attr.get("author") or None
+        license_ = attr.get("license") or None
+
         sha256 = hashlib.sha256(content).hexdigest()
 
         # Check for exact duplicate at asset level
@@ -173,7 +263,9 @@ async def upload_files(
             asset = ImageAsset(
                 taxon_id=taxon.id if taxon else None,
                 source_name="local_upload",
-                source_image_url=f"upload://{fname}",
+                source_image_url=source_url,
+                author=author,
+                license=license_,
             )
             db.add(asset)
             await db.flush()
@@ -183,6 +275,14 @@ async def upload_files(
                 setattr(asset, k, v)
             if fields.get("perceptual_hash"):
                 await _flag_near_duplicate(db, asset.id, fields["perceptual_hash"], sha256)
+        else:
+            # Update attribution if the existing asset has no useful metadata
+            if source_url and asset.source_image_url.startswith("upload://"):
+                asset.source_image_url = source_url
+            if author and not asset.author:
+                asset.author = author
+            if license_ and not asset.license:
+                asset.license = license_
 
         # Create UserImage if not already exists
         existing_ui = await db.scalar(select(UserImage).where(UserImage.user_id == user_id, UserImage.image_asset_id == asset.id))
@@ -193,7 +293,8 @@ async def upload_files(
             user_id=user_id,
             image_asset_id=asset.id,
             taxon_id=taxon.id if taxon else None,
-            status="pending",
+            status="validated" if validated else "pending",
+            validated_at=datetime.utcnow() if validated else None,
         )
         db.add(ui)
         results.append(ui)
@@ -215,8 +316,10 @@ async def update_status(
     user_image_id: int,
     body: ImageStatusUpdate,
     user_id: int = Query(..., ge=1),
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(user_id, authorization, db)
     if body.status not in VALID_STATUSES:
         raise HTTPException(400, f"Invalid status. Must be one of: {VALID_STATUSES}")
     ui = await db.get(UserImage, user_image_id, options=_UI_LOAD)
@@ -246,8 +349,10 @@ async def crop_image(
     user_image_id: int,
     body: CropRequest,
     user_id: int = Query(..., ge=1),
+    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
+    await verify_workspace_access(user_id, authorization, db)
     from PIL import Image as PILImage
     import io as _io
 
@@ -302,25 +407,47 @@ async def crop_image(
 
 
 @router.get("/{user_image_id}/file")
-async def serve_image_file(user_image_id: int, db: AsyncSession = Depends(get_db)):
+async def serve_image_file(
+    user_image_id: int,
+    user_id: int = Query(..., ge=1),
+    db: AsyncSession = Depends(get_db),
+):
     ui = await db.get(UserImage, user_image_id, options=[selectinload(UserImage.asset)])
-    if not ui or not ui.asset.local_path:
-        raise HTTPException(404, "Local file not available")
-    path = Path(ui.asset.local_path)
+    if not ui or ui.user_id != user_id:
+        raise HTTPException(404, "Image not found in this workspace")
+    path = _safe_path(ui.asset.local_path, settings.storage_raw, settings.storage_validated, settings.storage_rejected, settings.storage_duplicates)
     if not path.exists():
         raise HTTPException(404, "File not found on disk")
     return FileResponse(path)
 
 
 @router.get("/{user_image_id}/thumbnail")
-async def serve_thumbnail(user_image_id: int, db: AsyncSession = Depends(get_db)):
+async def serve_thumbnail(
+    user_image_id: int,
+    user_id: int = Query(..., ge=1),
+    db: AsyncSession = Depends(get_db),
+):
     ui = await db.get(UserImage, user_image_id, options=[selectinload(UserImage.asset)])
-    if not ui or not ui.asset.thumbnail_path:
-        raise HTTPException(404, "Thumbnail not available")
-    path = Path(ui.asset.thumbnail_path)
+    if not ui or ui.user_id != user_id:
+        raise HTTPException(404, "Image not found in this workspace")
+    path = _safe_path(ui.asset.thumbnail_path, settings.storage_thumbnails)
     if not path.exists():
         raise HTTPException(404, "Thumbnail not found on disk")
     return FileResponse(path, media_type="image/jpeg")
+
+
+@router.delete("/{user_image_id}", status_code=204)
+async def delete_image(
+    user_image_id: int,
+    user_id: int = Query(..., ge=1),
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_workspace_access(user_id, authorization, db)
+    ui = await db.get(UserImage, user_image_id)
+    if not ui or ui.user_id != user_id:
+        raise HTTPException(404, "Image not found in this workspace")
+    await db.delete(ui)
 
 
 @router.get("/{user_image_id}", response_model=ImageRecordRead)
