@@ -48,7 +48,7 @@ def comparer_dossiers(path1, path2):
 
 if __name__ == "__main__":
     # MODIFIE CES CHEMINS
-    path1 = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/PERLA_cropped"
+    path1 = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/PERLA_cropped_Sarah_20042026_vuLPL"
     path2 = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026"
 
     comparer_dossiers(path1, path2)

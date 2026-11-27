@@ -91,7 +91,6 @@ def generate_cvat_labels(classes_dir, output_file="cvat_labels.json"):
 
 
 def main():
-
     classes_path = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/PERLA_cropped_Sarah_20042026_vuLPL"
     excel_output = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/cvat/classes_abbreviations.xlsx"
     json_output = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/cvat/cvat_labels.json"

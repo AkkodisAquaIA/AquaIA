@@ -65,11 +65,11 @@ def plot_images_per_class(root_path, extensions=(".jpg", ".jpeg", ".png", ".tif"
 
 
 # 🔹 Exemple d'utilisation
-fichier = "/home/sarah.laroui/Bureau/AQUA-IA/Docs/AQUA-IA_dataset/AQUA-IA_dataset_Nb_images_per_class.xlsx"
+fichier = "/home/sarah.laroui/Bureau/AQUA-IA/Docs/ADOUR-GARONNE/AG_dataset_Nb_images_per_class.xlsx"
 colonne_dossiers = "Classe"
 
 CLASSES_IA = extraire_noms_dossiers(fichier, colonne_dossiers)
 
 print(CLASSES_IA)
 
-plot_images_per_class("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/NOT_USED/AQUA-IA_dataset_mars2026")
+plot_images_per_class("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AG_dataset")

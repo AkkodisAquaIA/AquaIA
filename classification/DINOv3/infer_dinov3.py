@@ -27,7 +27,7 @@ from common_dinov3 import DinoV3Classifier
 
 import os
 
-RUN_DIR = Path(os.environ.get("RUN_DIR", "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/unfreeze1/focal_05/20260602-115513"))
+RUN_DIR = Path(os.environ.get("RUN_DIR", "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/unfreeze1/focal_05/20260917-161227"))
 
 INPUT_DIR = Path(os.environ.get("DATA_DIR", "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited/test"))
 

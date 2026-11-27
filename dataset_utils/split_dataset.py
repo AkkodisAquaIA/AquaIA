@@ -4,13 +4,13 @@ import shutil
 import re
 from pathlib import Path
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 # =========================================================
 # ⚙️ CONFIG — À MODIFIER
 # =========================================================
-DATA_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026")  # ton dossier actuel: DATA_DIR/classe_x/*.jpg
-OUT_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited")  # dossier de sortie
+DATA_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AG_dataset_genus_09-29")  # ton dossier actuel: DATA_DIR/classe_x/*.jpg
+OUT_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AG_dataset_genus_09-29_splited")  # dossier de sortie
 
 GROUP_BY_FILENAME = False
 
@@ -74,60 +74,68 @@ def list_class_files(class_dir: Path) -> List[Path]:
     return sorted([p for p in class_dir.iterdir() if p.is_file() and p.suffix.lower() in EXTS])
 
 
-def split_groups(groups: List[str], train_r: float, val_r: float, test_r: float, rng: random.Random) -> Tuple[List[str], List[str], List[str]]:
-    """
-    Split des GROUPES (pas des images) pour empêcher la fuite.
-    Les ratios sont approximatifs; on vise au mieux.
-    """
+def split_groups(
+    groups,
+    train_r,
+    val_r,
+    test_r,
+    rng,
+    min_groups_for_split=6,
+):
     assert abs((train_r + val_r + test_r) - 1.0) < 1e-6
 
+    groups = groups[:]
+    rng.shuffle(groups)
+
     n = len(groups)
+
     if n == 0:
         return [], [], []
-    if n == 1:
-        return groups, [], []
-    if n == 2:
-        return [groups[0]], [groups[1]], []
-    if n == 3:
-        return [groups[0]], [groups[1]], [groups[2]]
 
-    rng.shuffle(groups)
+    # Classes avec moins de 6 individus/groupes indépendants :
+    # tout dans train
+    if n < min_groups_for_split:
+        return groups, [], []
 
     n_train = int(round(n * train_r))
     n_val = int(round(n * val_r))
     n_test = n - n_train - n_val
 
-    # Ajustements pour éviter des splits vides si possible
-    if n_test <= 0:
-        n_test = 1
-        if n_train > 1:
-            n_train -= 1
-        else:
-            n_val = max(1, n_val - 1)
-
-    if n_val <= 0:
+    # Garantir au moins 1 groupe en validation et test
+    if n_val < 1:
         n_val = 1
-        if n_train > 1:
-            n_train -= 1
-        else:
-            n_test = max(1, n_test - 1)
 
-    # Re-garantir somme
-    s = n_train + n_val + n_test
-    if s != n:
-        n_test += n - s
+    if n_test < 1:
+        n_test = 1
+
+    # Le reste va au train
+    n_train = n - n_val - n_test
 
     train_g = groups[:n_train]
     val_g = groups[n_train : n_train + n_val]
-    test_g = groups[n_train + n_val : n_train + n_val + n_test]
+    test_g = groups[n_train + n_val :]
+
     return train_g, val_g, test_g
 
 
-def split_files(files: List[Path], train_ratio: float, val_ratio: float, test_ratio: float, rng):
+def split_files(
+    files,
+    train_ratio,
+    val_ratio,
+    test_ratio,
+    rng,
+    min_files_for_split=6,
+):
     files = files[:]
     rng.shuffle(files)
 
     n_total = len(files)
+
+    # Classes très rares :
+    # toutes les images restent dans le train
+    if n_total < min_files_for_split:
+        return files, [], []
+
     n_train = int(round(n_total * train_ratio))
     n_val = int(round(n_total * val_ratio))
 
