@@ -2,11 +2,11 @@ import pandas as pd
 from pathlib import Path
 
 # === PARAMÈTRES ===
-dossier_racine = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/NOT_USED/AQUA-IA_dataset_mars2026")
-fichier_sortie = "/home/sarah.laroui/Bureau/AQUA-IA/Docs/AQUA-IA_dataset/AQUA-IA_dataset_Nb_images_per_class.xlsx"
+dossier_racine = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AG_dataset_genus_09-29")
+fichier_sortie = "/home/sarah.laroui/Bureau/AQUA-IA/Docs/FinBenthic_1-2_PERLA_AG_per_genre/AG_dataset_genus_Nb_images_per_class.xlsx"
 
 # Extensions d'images à prendre en compte
-extensions = (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".webp")
+extensions = (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".tif", ".webp")
 
 # === TRAITEMENT ===
 resultats = []

@@ -273,6 +273,8 @@ def main():
         raise RuntimeError(f"On attend {train_dir} et {val_dir}")
 
     processor = AutoImageProcessor.from_pretrained(CFG.model_id, token=CFG.token)
+    print(processor)
+    print("size =", processor.size)
 
     def to_pixel_values(pil_img):
         return processor(images=pil_img, return_tensors="pt")["pixel_values"].squeeze(0)

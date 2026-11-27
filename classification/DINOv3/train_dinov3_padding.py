@@ -1,0 +1,532 @@
+#!/usr/bin/env python3
+# train_dinov3.py
+
+from __future__ import annotations
+import json
+import time
+from dataclasses import dataclass, asdict, field
+from pathlib import Path
+from typing import Dict, Optional, Tuple
+import os
+import numpy as np
+from PIL import Image, ImageOps
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.cuda.amp import autocast, GradScaler
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
+from torchvision.datasets import ImageFolder
+from torchvision.transforms import Compose, Lambda
+from transformers import AutoImageProcessor
+
+from common_dinov3 import ensure_dir, write_json, set_seed, get_env_info, DinoV3Classifier, freeze_all, unfreeze_last_n_blocks, save_checkpoint, infer_block_index
+
+from losses import FocalLoss
+
+torch.cuda.empty_cache()
+
+
+def compute_class_weights_from_imagefolder(train_ds, num_classes: int, mode: str = "sqrt_inv", max_weight: float = 5.0, eps: float = 1e-8) -> torch.Tensor:
+    """
+    Calcule des poids de classes à partir de train_ds.targets.
+
+    mode:
+        - "inv"      : inverse fréquence classique
+        - "sqrt_inv" : inverse racine carrée, plus doux
+        - "log_inv"  : pondération logarithmique, encore plus stable
+    """
+
+    counts = torch.bincount(torch.tensor(train_ds.targets, dtype=torch.long), minlength=num_classes).float()
+
+    if torch.any(counts == 0):
+        missing = (counts == 0).nonzero(as_tuple=True)[0].tolist()
+        raise RuntimeError(f"Certaines classes n'ont aucun sample dans train: {missing}")
+
+    freq = counts / counts.sum()
+
+    if mode == "inv":
+        weights = 1.0 / (freq + eps)
+
+    elif mode == "sqrt_inv":
+        weights = 1.0 / torch.sqrt(freq + eps)
+
+    elif mode == "log_inv":
+        weights = 1.0 / torch.log(1.02 + freq)
+
+    else:
+        raise ValueError(f"Mode inconnu : {mode}")
+
+    # normalisation
+    weights = weights / weights.mean()
+
+    # éviter des poids trop extrêmes
+    weights = torch.clamp(weights, max=max_weight)
+
+    # re-normalisation après clamp
+    weights = weights / weights.mean()
+
+    return weights
+
+
+# =========================
+# CONFIG
+# =========================
+
+
+@dataclass
+class Config:
+    # --- paths
+    run_dir: str = field(default_factory=lambda: os.environ.get("RUN_DIR", "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Results/test_dinov3/unfreeze1/focal_05"))
+    make_subrun_with_timestamp: bool = True
+
+    data_dir: str = field(default_factory=lambda: os.environ.get("DATA_DIR", "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AQUA-IA_dataset_mars2026_splited"))
+
+    # --- model
+    model_id: str = "facebook/dinov3-vits16-pretrain-lvd1689m"
+    token: Optional[str] = field(default_factory=lambda: os.environ.get("HF_TOKEN"))
+
+    # --- training
+    epochs: int = int(os.environ.get("EPOCHS", 30))
+    batch_size: int = 32
+
+    lr_head: float = 1e-3
+    lr_backbone: float = 3e-5
+    weight_decay: float = 0.05
+    dropout: float = 0.0
+    unfreeze_last_n_blocks: int = int(os.environ.get("UNFREEZE", 1))
+
+    use_amp: bool = True
+    num_workers: int = 4
+    seed: int = 42
+
+    # --- early stopping
+    early_patience: int = int(os.environ.get("EARLY_PATIENCE", 15))
+    early_min_delta: float = 1e-5
+
+    # --- scheduler
+    scheduler: str = "cosine"
+    cosine_tmax_epochs: Optional[int] = None
+    plateau_factor: float = 0.5
+    plateau_patience: int = 2
+    plateau_min_lr: float = 1e-7
+
+    save_last: bool = True
+
+    # --- loss
+    loss_name: str = "focal"  # "ce"#
+    focal_gamma: float = 0.5
+    focal_alpha_mode: str = "auto"
+    focal_alpha_scalar: Optional[float] = None
+    focal_ignore_index: int = -100
+
+    # --- post-init (validation + création dossiers)
+    def __post_init__(self):
+        # créer dossier résultats
+        os.makedirs(self.run_dir, exist_ok=True)
+
+        # vérifier dataset
+        if not os.path.isdir(self.data_dir):
+            raise FileNotFoundError(f"data_dir introuvable : {self.data_dir}")
+
+        # warning token
+        if self.token is None:
+            print("⚠️ HF_TOKEN non défini (modèle gated ?)")
+
+
+CFG = Config()
+
+
+# =========================
+# UTILS
+# =========================
+
+
+def get_lrs(optimizer: optim.Optimizer) -> Dict[str, float]:
+    return {f"group_{i}": float(g.get("lr", 0.0)) for i, g in enumerate(optimizer.param_groups)}
+
+
+def build_criterion(cfg: Config, device: torch.device, train_ds=None, num_classes: Optional[int] = None):
+    if cfg.loss_name.lower() == "ce":
+        return nn.CrossEntropyLoss(), None
+    #     alpha = compute_class_weights_from_imagefolder(
+    #     train_ds,
+    #     num_classes,
+    #     mode="sqrt_inv",
+    #     max_weight=5.0
+    # ).to(device)
+    #     return torch.nn.CrossEntropyLoss(weight=alpha), None
+
+    elif cfg.loss_name.lower() == "focal":
+        alpha = None
+
+        if cfg.focal_alpha_mode == "none":
+            alpha = None
+
+        elif cfg.focal_alpha_mode == "scalar":
+            alpha = cfg.focal_alpha_scalar
+            if alpha is None:
+                raise ValueError("focal_alpha_scalar doit être défini si focal_alpha_mode='scalar'")
+
+        elif cfg.focal_alpha_mode == "auto":
+            if train_ds is None or num_classes is None:
+                raise ValueError("train_ds et num_classes sont requis si focal_alpha_mode='auto'")
+            alpha = compute_class_weights_from_imagefolder(train_ds, num_classes, mode="sqrt_inv", max_weight=5.0).to(device)
+            print(f"[INFO] Focal alpha auto = {alpha.detach().cpu().tolist()}")
+
+        else:
+            raise ValueError(f"focal_alpha_mode inconnu: {cfg.focal_alpha_mode}")
+
+        criterion = FocalLoss(
+            alpha=alpha,
+            gamma=cfg.focal_gamma,
+            reduction="mean",
+            ignore_index=cfg.focal_ignore_index,
+        ).to(device)
+
+        if isinstance(alpha, torch.Tensor):
+            alpha_resolved = alpha.detach().cpu().tolist()
+        else:
+            alpha_resolved = alpha
+
+        return criterion, alpha_resolved
+
+    else:
+        raise ValueError(f"loss_name inconnu: {cfg.loss_name}")
+
+
+# =========================
+# TRAIN / EVAL
+# =========================
+def train_one_epoch(model, loader, optimizer, scaler, criterion, device, use_amp: bool) -> float:
+    model.train()
+    total_loss = 0.0
+    total = 0
+
+    for pixel_values, targets in loader:
+        pixel_values = pixel_values.to(device, non_blocking=True)
+        targets = targets.to(device, non_blocking=True)
+
+        optimizer.zero_grad(set_to_none=True)
+
+        with autocast(enabled=use_amp):
+            logits = model(pixel_values)
+            loss = criterion(logits, targets)
+
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+
+        total_loss += float(loss.item()) * targets.size(0)
+        total += targets.size(0)
+
+    return total_loss / max(1, total)
+
+
+@torch.no_grad()
+def eval_loss_acc(model, loader, criterion, device) -> Tuple[float, float]:
+    model.eval()
+    total_loss = 0.0
+    correct = 0
+    total = 0
+
+    for pixel_values, targets in loader:
+        pixel_values = pixel_values.to(device, non_blocking=True)
+        targets = targets.to(device, non_blocking=True)
+
+        logits = model(pixel_values)
+        loss = criterion(logits, targets)
+
+        preds = logits.argmax(dim=1)
+        correct += int((preds == targets).sum().item())
+        total += targets.size(0)
+        total_loss += float(loss.item()) * targets.size(0)
+
+    return total_loss / max(1, total), correct / max(1, total)
+
+
+def main():
+    set_seed(CFG.seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"[INFO] device={device}")
+
+    base = Path(CFG.run_dir)
+    run_dir = base / time.strftime("%Y%m%d-%H%M%S") if CFG.make_subrun_with_timestamp else base
+
+    tb_dir = run_dir / "tb"
+    ckpt_dir = run_dir / "checkpoints"
+    ensure_dir(tb_dir)
+    ensure_dir(ckpt_dir)
+    print(f"[INFO] run_dir={run_dir}")
+
+    env = get_env_info()
+    write_json(run_dir / "config.json", {"config": asdict(CFG), "env": env})
+
+    writer = SummaryWriter(log_dir=str(tb_dir))
+    writer.add_text("run/env", json.dumps(env, indent=2, ensure_ascii=False))
+    writer.add_text("run/config", json.dumps(asdict(CFG), indent=2, ensure_ascii=False))
+
+    root = Path(CFG.data_dir)
+    train_dir = root / "train"
+    val_dir = root / "val"
+    if not train_dir.exists() or not val_dir.exists():
+        raise RuntimeError(f"On attend {train_dir} et {val_dir}")
+
+    from PIL import Image, ImageOps
+
+    processor = AutoImageProcessor.from_pretrained(
+        CFG.model_id,
+        token=CFG.token
+    )
+
+
+    def pad_to_square(pil_img: Image.Image) -> Image.Image:
+        """
+        Ajoute du padding pour transformer l'image en carré
+        SANS modifier son rapport largeur/hauteur.
+
+        Exemple :
+            800 x 300
+                ↓
+            800 x 800
+                ↓
+            le processor DINOv3 fera ensuite le resize 224 x 224
+        """
+
+        # Sécurité : DINOv3 attend une image RGB
+        pil_img = pil_img.convert("RGB")
+
+        width, height = pil_img.size
+
+        # Taille du carré = plus grande dimension
+        max_dim = max(width, height)
+
+        # Quantité totale de padding nécessaire
+        pad_width = max_dim - width
+        pad_height = max_dim - height
+
+        # Répartition du padding de manière symétrique
+        pad_left = pad_width // 2
+        pad_right = pad_width - pad_left
+
+        pad_top = pad_height // 2
+        pad_bottom = pad_height - pad_top
+
+        # Couleur du padding :
+        # moyenne des pixels de l'image
+        mean_color = tuple(
+            int(x)
+            for x in np.asarray(pil_img).mean(axis=(0, 1))
+        )
+
+        padded_img = ImageOps.expand(
+            pil_img,
+            border=(
+                pad_left,
+                pad_top,
+                pad_right,
+                pad_bottom
+            ),
+            fill=mean_color
+        )
+
+        return padded_img
+
+
+    def to_pixel_values(pil_img):
+
+        # 1. Padding carré
+        pil_img = pad_to_square(pil_img)
+
+        # 2. Le processor DINOv3 effectue ensuite :
+        #       resize → 224 x 224
+        #       rescale
+        #       normalisation
+        pixel_values = processor(
+            images=pil_img,
+            return_tensors="pt"
+        )["pixel_values"]
+
+        return pixel_values.squeeze(0)
+
+
+    transform = Compose([
+        Lambda(to_pixel_values)
+    ])
+
+
+    train_ds = ImageFolder(
+        str(train_dir),
+        transform=transform
+    )
+
+    val_ds = ImageFolder(
+        str(val_dir),
+        transform=transform
+    )
+
+    num_classes = len(train_ds.classes)
+    if len(val_ds.classes) != num_classes or train_ds.classes != val_ds.classes:
+        raise RuntimeError("Train/Val n'ont pas exactement les mêmes classes (dossiers).")
+
+    write_json(run_dir / "class_to_idx.json", train_ds.class_to_idx)
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=CFG.batch_size,
+        shuffle=True,
+        num_workers=CFG.num_workers,
+        pin_memory=(device.type == "cuda"),
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=CFG.batch_size,
+        shuffle=False,
+        num_workers=CFG.num_workers,
+        pin_memory=(device.type == "cuda"),
+    )
+
+    model = DinoV3Classifier(CFG.model_id, num_classes=num_classes, dropout=CFG.dropout)
+
+    for name, _ in model.backbone.named_parameters():
+        idx = infer_block_index(name)
+        if idx is not None:
+            print(name, "->", idx)
+            break
+
+    freeze_all(model.backbone)
+    unfreeze_last_n_blocks(model.backbone, CFG.unfreeze_last_n_blocks)
+
+    print("UNFREEZE =", CFG.unfreeze_last_n_blocks)
+
+    print("Trainable backbone params:", sum(p.numel() for p in model.backbone.parameters() if p.requires_grad))
+
+    for p in model.head.parameters():
+        p.requires_grad = True
+
+    model.to(device)
+
+    criterion, focal_alpha_resolved = build_criterion(CFG, device, train_ds=train_ds, num_classes=num_classes)
+    print(f"[INFO] Loss={CFG.loss_name}")
+
+    head_params = [p for p in model.head.parameters() if p.requires_grad]
+    backbone_params = [p for p in model.backbone.parameters() if p.requires_grad]
+
+    param_groups = []
+    if backbone_params:
+        param_groups.append({"params": backbone_params, "lr": CFG.lr_backbone})
+    param_groups.append({"params": head_params, "lr": CFG.lr_head})
+
+    optimizer = optim.AdamW(param_groups, weight_decay=CFG.weight_decay)
+    scaler = GradScaler(enabled=(CFG.use_amp and device.type == "cuda"))
+
+    scheduler = None
+    if CFG.scheduler == "cosine":
+        tmax = CFG.cosine_tmax_epochs or CFG.epochs
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=tmax)
+        print(f"[INFO] Scheduler=CosineAnnealingLR(T_max={tmax})")
+    elif CFG.scheduler == "plateau":
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=CFG.plateau_factor,
+            patience=CFG.plateau_patience,
+            min_lr=CFG.plateau_min_lr,
+            verbose=True,
+        )
+        print("[INFO] Scheduler=ReduceLROnPlateau(mode=min)")
+    else:
+        print("[INFO] Scheduler=none")
+
+    best_val_loss = float("inf")
+    best_val_acc = -1.0
+    best_epoch = -1
+    epochs_no_improve = 0
+
+    for epoch in range(1, CFG.epochs + 1):
+        train_loss = train_one_epoch(model, train_loader, optimizer, scaler, criterion, device, CFG.use_amp)
+        val_loss, val_acc = eval_loss_acc(model, val_loader, criterion, device)
+        lrs = get_lrs(optimizer)
+
+        print(f"[E{epoch:02d}] train_loss={train_loss:.4f} val_loss={val_loss:.4f} val_acc={val_acc:.4f} lrs={lrs}")
+
+        writer.add_scalar("loss/train", train_loss, epoch)
+        writer.add_scalar("loss/val", val_loss, epoch)
+        writer.add_scalar("acc/val", val_acc, epoch)
+        for k, v in lrs.items():
+            writer.add_scalar(f"lr/{k}", v, epoch)
+
+        if CFG.save_last:
+            save_checkpoint(
+                ckpt_dir / "last.pt",
+                {
+                    "epoch": epoch,
+                    "state_dict": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "scaler": scaler.state_dict(),
+                    "val_loss": val_loss,
+                    "val_acc": val_acc,
+                    "class_to_idx": train_ds.class_to_idx,
+                    "classes": train_ds.classes,
+                    "config": asdict(CFG),
+                    "env": env,
+                    "model_id": CFG.model_id,
+                    "focal_alpha_resolved": focal_alpha_resolved,
+                },
+            )
+
+        if val_loss < best_val_loss - CFG.early_min_delta:
+            best_val_loss = val_loss
+            best_val_acc = max(best_val_acc, val_acc)
+            best_epoch = epoch
+            epochs_no_improve = 0
+
+            save_checkpoint(
+                ckpt_dir / "best.pt",
+                {
+                    "epoch": epoch,
+                    "state_dict": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "scaler": scaler.state_dict(),
+                    "val_loss": val_loss,
+                    "val_acc": val_acc,
+                    "class_to_idx": train_ds.class_to_idx,
+                    "classes": train_ds.classes,
+                    "config": asdict(CFG),
+                    "env": env,
+                    "model_id": CFG.model_id,
+                },
+            )
+            print("[INFO] best.pt mis à jour")
+        else:
+            epochs_no_improve += 1
+            print(f"[INFO] ⏳ pas d'amélioration ({epochs_no_improve}/{CFG.early_patience})")
+
+        if scheduler is not None:
+            if CFG.scheduler == "plateau":
+                scheduler.step(val_loss)
+            else:
+                scheduler.step()
+
+        if epochs_no_improve >= CFG.early_patience:
+            print("[EARLY STOPPING]")
+            break
+
+    results = {
+        "best_val_loss": float(best_val_loss),
+        "best_val_acc": float(best_val_acc),
+        "best_epoch": int(best_epoch),
+    }
+    write_json(run_dir / "results_trainval.json", results)
+    writer.add_text("results/trainval", json.dumps(results, indent=2), 0)
+    writer.close()
+
+    print("[DONE] Train/Val terminé.")
+    print(f"[DONE] run_dir={run_dir}")
+    print(f"[DONE] TensorBoard: tensorboard --logdir {run_dir.parent.resolve()}")
+
+
+if __name__ == "__main__":
+    main()

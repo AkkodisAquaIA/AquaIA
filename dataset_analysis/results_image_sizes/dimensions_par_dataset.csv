@@ -1,0 +1,4 @@
+dataset,n_images,width_median,height_median,short_side_min,short_side_p10,short_side_p25,short_side_median,short_side_p75,short_side_p90,short_side_max,long_side_min,long_side_p10,long_side_p25,long_side_median,long_side_p75,long_side_p90,long_side_max,aspect_ratio_median,megapixels_median
+FIN-Benthic2,29755,100.0,92.0,20,44.0,56.0,76.0,116.0,208.0,468,20,68.0,88.0,120.0,188.0,308.0,720,1.04,0.009072
+FIN-Benthic,7634,168.0,142.0,9,64.0,87.0,116.0,149.0,176.0,255,21,146.0,163.0,183.0,205.0,222.0,256,1.2077787381158167,0.020487
+PERLA,723,450.0,230.0,21,101.0,140.5,219.0,314.0,436.2000000000003,1855,98,305.2,377.5,469.0,628.0,799.8000000000008,4369,2.053231939163498,0.09975

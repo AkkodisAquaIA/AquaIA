@@ -1,0 +1,4 @@
+dataset,n_images,n_outliers,outliers_%,long_Q1,long_median,long_Q3,long_lower_limit,long_upper_limit,short_Q1,short_median,short_Q3,short_lower_limit,short_upper_limit
+FIN-Benthic,7634,67,0.877652606759235,163.0,183.0,205.0,100.0,268.0,87.0,116.0,149.0,0,242.0
+FIN-Benthic2,29755,3482,11.702234918501093,88.0,120.0,188.0,0.0,338.0,56.0,76.0,116.0,0,206.0
+PERLA,723,33,4.564315352697095,377.5,469.0,628.0,1.75,1003.75,140.5,219.0,314.0,0,574.25
