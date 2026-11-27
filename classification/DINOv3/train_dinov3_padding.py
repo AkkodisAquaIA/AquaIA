@@ -274,7 +274,6 @@ def main():
     if not train_dir.exists() or not val_dir.exists():
         raise RuntimeError(f"On attend {train_dir} et {val_dir}")
 
-    from PIL import Image, ImageOps
 
     processor = AutoImageProcessor.from_pretrained(
         CFG.model_id,
