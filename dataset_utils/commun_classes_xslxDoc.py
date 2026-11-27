@@ -18,12 +18,7 @@ def read_first_column(excel_path):
     classes = []
 
     # Colonne A, à partir de la ligne 2
-    for row in ws.iter_rows(
-        min_row=2,
-        min_col=1,
-        max_col=1,
-        values_only=True
-    ):
+    for row in ws.iter_rows(min_row=2, min_col=1, max_col=1, values_only=True):
         value = row[0]
 
         if value is not None:
@@ -38,7 +33,6 @@ def read_first_column(excel_path):
 
 
 def compare_classes(file1, file2, output_file):
-
     # Lecture des deux fichiers
     classes1 = read_first_column(file1)
     classes2 = read_first_column(file2)
@@ -111,14 +105,9 @@ def compare_classes(file1, file2, output_file):
 
 
 if __name__ == "__main__":
-
     FILE1 = "/home/sarah.laroui/Bureau/AQUA-IA/Docs/AQUA-IA_dataset/AQUA-IA_dataset_Nb_images_per_class.xlsx"
     FILE2 = "/home/sarah.laroui/Bureau/AQUA-IA/Docs/ADOUR-GARONNE/AG_dataset_Nb_images_per_class.xlsx"
 
     OUTPUT_FILE = "/home/sarah.laroui/Bureau/AQUA-IA/Docs/AQUA-IA_dataset/AQUA-IA_dataset_AG_common_classes.xlsx"
 
-    compare_classes(
-        FILE1,
-        FILE2,
-        OUTPUT_FILE
-    )
+    compare_classes(FILE1, FILE2, OUTPUT_FILE)

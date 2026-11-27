@@ -177,9 +177,11 @@ def build_eval_criterion(
     print(f"[INFO] Eval criterion = FocalLoss(gamma={gamma}, alpha={'None' if alpha is None else alpha}, ignore_index={ignore_index})")
     return criterion
 
+
 # =========================
 # PREPROCESSING
 # =========================
+
 
 def pad_to_square(pil_img: Image.Image) -> Image.Image:
     """
@@ -205,10 +207,7 @@ def pad_to_square(pil_img: Image.Image) -> Image.Image:
     pad_top = pad_height // 2
     pad_bottom = pad_height - pad_top
 
-    mean_color = tuple(
-        int(x)
-        for x in np.asarray(pil_img).mean(axis=(0, 1))
-    )
+    mean_color = tuple(int(x) for x in np.asarray(pil_img).mean(axis=(0, 1)))
 
     padded_img = ImageOps.expand(
         pil_img,
@@ -285,6 +284,7 @@ class LabeledFolderDataset(Dataset):
             x = preprocess_image(img, self.processor)
 
         return x, y, str(path)
+
 
 class UnlabeledRecursiveDataset(Dataset):
     """

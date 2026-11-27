@@ -10,39 +10,26 @@ classes = set()
 
 # Parcours de tous les fichiers ZIP
 for zip_path in ANNOTATIONS_DIR.glob("*.zip"):
-
     print(f"Lecture : {zip_path.name}")
 
     try:
         with zipfile.ZipFile(zip_path, "r") as z:
-
             # Recherche de instances_default.json dans le ZIP
-            json_files = [
-                name for name in z.namelist()
-                if name.endswith("instances_default.json")
-            ]
+            json_files = [name for name in z.namelist() if name.endswith("instances_default.json")]
 
             if not json_files:
                 print("  ⚠ Aucun instances_default.json trouvé")
                 continue
 
             for json_file in json_files:
-
                 with z.open(json_file) as f:
                     data = json.load(f)
 
                 # Association category_id -> nom de classe
-                category_map = {
-                    category["id"]: category["name"]
-                    for category in data.get("categories", [])
-                }
+                category_map = {category["id"]: category["name"] for category in data.get("categories", [])}
 
                 # IDs des catégories réellement utilisées
-                used_category_ids = {
-                    annotation["category_id"]
-                    for annotation in data.get("annotations", [])
-                    if "category_id" in annotation
-                }
+                used_category_ids = {annotation["category_id"] for annotation in data.get("annotations", []) if "category_id" in annotation}
 
                 # Récupération des noms des classes utilisées
                 for category_id in used_category_ids:

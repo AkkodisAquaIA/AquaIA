@@ -38,6 +38,7 @@ MISSING_TAXON_VALUES = {
 # FONCTIONS
 # ============================================================
 
+
 def normalize(value):
     """
     Normalise une valeur pour faciliter les comparaisons :
@@ -111,7 +112,6 @@ def taxon_matches_class(taxon_row, parsed_class):
     """
 
     for column in TAXONOMIC_COLUMNS:
-
         taxon_value = taxon_row[column]
 
         # Niveau non renseigné -> on ne le compare pas
@@ -130,13 +130,13 @@ def taxon_matches_class(taxon_row, parsed_class):
 # PROGRAMME PRINCIPAL
 # ============================================================
 
+
 def compare_taxons_and_classes(
     taxons_file,
     classes_file,
     output_classes_presentes,
     output_taxons_absents,
 ):
-
     taxons_file = Path(taxons_file)
     classes_file = Path(classes_file)
 
@@ -145,14 +145,10 @@ def compare_taxons_and_classes(
     # --------------------------------------------------------
 
     if not taxons_file.exists():
-        raise FileNotFoundError(
-            f"Le fichier taxonomique n'existe pas : {taxons_file}"
-        )
+        raise FileNotFoundError(f"Le fichier taxonomique n'existe pas : {taxons_file}")
 
     if not classes_file.exists():
-        raise FileNotFoundError(
-            f"Le fichier des classes n'existe pas : {classes_file}"
-        )
+        raise FileNotFoundError(f"Le fichier des classes n'existe pas : {classes_file}")
 
     # --------------------------------------------------------
     # Lecture des fichiers Excel
@@ -167,17 +163,10 @@ def compare_taxons_and_classes(
     # Vérification des colonnes taxonomiques
     # --------------------------------------------------------
 
-    missing_columns = [
-        column
-        for column in TAXONOMIC_COLUMNS
-        if column not in taxons_df.columns
-    ]
+    missing_columns = [column for column in TAXONOMIC_COLUMNS if column not in taxons_df.columns]
 
     if missing_columns:
-        raise ValueError(
-            "Colonnes absentes du tableau taxonomique : "
-            + ", ".join(missing_columns)
-        )
+        raise ValueError("Colonnes absentes du tableau taxonomique : " + ", ".join(missing_columns))
 
     # --------------------------------------------------------
     # Première colonne du tableau des classes
@@ -196,7 +185,6 @@ def compare_taxons_and_classes(
     invalid_classes = []
 
     for value in classes_df[class_column]:
-
         if pd.isna(value):
             continue
 
@@ -220,11 +208,8 @@ def compare_taxons_and_classes(
     # --------------------------------------------------------
 
     if invalid_classes:
-
         print("\nATTENTION : certaines classes ne respectent pas la nomenclature :")
-        print(
-            "Embranchement_Classe_Ordre_Famille_Genre_Espèce\n"
-        )
+        print("Embranchement_Classe_Ordre_Famille_Genre_Espèce\n")
 
         for class_name in invalid_classes:
             print(f"  - {class_name}")
@@ -243,7 +228,6 @@ def compare_taxons_and_classes(
     match_details = []
 
     for class_info in parsed_classes:
-
         class_name = class_info["class_name"]
         parsed_class = class_info["taxonomy"]
 
@@ -251,9 +235,7 @@ def compare_taxons_and_classes(
 
         # Recherche de toutes les lignes compatibles
         for position, (_, taxon_row) in enumerate(taxons_df.iterrows()):
-
             if taxon_matches_class(taxon_row, parsed_class):
-
                 # Score de précision :
                 # +1 pour chaque niveau taxonomique réellement renseigné
                 specificity_score = 0
@@ -276,11 +258,7 @@ def compare_taxons_and_classes(
         # ----------------------------------------------------
 
         if possible_matches:
-
-            best_match = max(
-                possible_matches,
-                key=lambda x: x["score"]
-            )
+            best_match = max(possible_matches, key=lambda x: x["score"])
 
             taxon_row = best_match["taxon_row"]
             position = best_match["position"]
@@ -298,9 +276,7 @@ def compare_taxons_and_classes(
                     "FAMILLE": taxon_row.get("FAMILLE", ""),
                     "GENRE": taxon_row.get("GENRE", ""),
                     "Commentaires": taxon_row.get("Commentaires", ""),
-                    "Fréquent en Bassin AG": taxon_row.get(
-                        "Fréquent en Bassin AG", ""
-                    ),
+                    "Fréquent en Bassin AG": taxon_row.get("Fréquent en Bassin AG", ""),
                     "Niveau_precision": best_match["score"],
                 }
             )
@@ -313,25 +289,14 @@ def compare_taxons_and_classes(
     classes_presentes_df = pd.DataFrame(match_details)
 
     if not classes_presentes_df.empty:
-        classes_presentes_df = (
-            classes_presentes_df
-            .drop_duplicates()
-            .sort_values("Classe")
-            .reset_index(drop=True)
-        )
+        classes_presentes_df = classes_presentes_df.drop_duplicates().sort_values("Classe").reset_index(drop=True)
 
     # ========================================================
     # TABLEAU 2
     # Taxons du tableau de référence sans classe correspondante
     # ========================================================
 
-    taxons_absents_df = taxons_df.loc[
-        [
-            index
-            for index, has_match in enumerate(taxon_has_match)
-            if not has_match
-        ]
-    ].copy()
+    taxons_absents_df = taxons_df.loc[[index for index, has_match in enumerate(taxon_has_match) if not has_match]].copy()
 
     taxons_absents_df = taxons_absents_df.reset_index(drop=True)
 
@@ -339,15 +304,9 @@ def compare_taxons_and_classes(
     # Sauvegarde
     # --------------------------------------------------------
 
-    classes_presentes_df.to_excel(
-        output_classes_presentes,
-        index=False
-    )
+    classes_presentes_df.to_excel(output_classes_presentes, index=False)
 
-    taxons_absents_df.to_excel(
-        output_taxons_absents,
-        index=False
-    )
+    taxons_absents_df.to_excel(output_taxons_absents, index=False)
 
     # --------------------------------------------------------
     # Résumé
@@ -359,47 +318,27 @@ def compare_taxons_and_classes(
 
     print(f"Nombre de classes analysées : {len(parsed_classes)}")
 
-    print(
-        f"Classes trouvées dans le tableau taxonomique : "
-        f"{len(matched_classes)}"
-    )
+    print(f"Classes trouvées dans le tableau taxonomique : {len(matched_classes)}")
 
-    print(
-        f"Classes sans correspondance : "
-        f"{len(parsed_classes) - len(matched_classes)}"
-    )
+    print(f"Classes sans correspondance : {len(parsed_classes) - len(matched_classes)}")
 
     print(f"Nombre de taxons de référence : {len(taxons_df)}")
 
-    print(
-        f"Taxons sans classe correspondante : "
-        f"{len(taxons_absents_df)}"
-    )
+    print(f"Taxons sans classe correspondante : {len(taxons_absents_df)}")
 
     print("\nFichiers générés :")
 
-    print(
-        f"  1. Classes présentes : "
-        f"{output_classes_presentes}"
-    )
+    print(f"  1. Classes présentes : {output_classes_presentes}")
 
-    print(
-        f"  2. Taxons absents : "
-        f"{output_taxons_absents}"
-    )
+    print(f"  2. Taxons absents : {output_taxons_absents}")
 
     # --------------------------------------------------------
     # Affichage des classes non trouvées
     # --------------------------------------------------------
 
-    unmatched_classes = [
-        c["class_name"]
-        for c in parsed_classes
-        if c["class_name"] not in matched_classes
-    ]
+    unmatched_classes = [c["class_name"] for c in parsed_classes if c["class_name"] not in matched_classes]
 
     if unmatched_classes:
-
         print("\nClasses ne correspondant à aucun taxon :")
 
         for class_name in unmatched_classes:
@@ -411,7 +350,6 @@ def compare_taxons_and_classes(
 # ============================================================
 
 if __name__ == "__main__":
-
     compare_taxons_and_classes(
         TAXONS_FILE,
         CLASSES_FILE,

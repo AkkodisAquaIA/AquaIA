@@ -112,8 +112,8 @@ def split_groups(
     n_train = n - n_val - n_test
 
     train_g = groups[:n_train]
-    val_g = groups[n_train:n_train + n_val]
-    test_g = groups[n_train + n_val:]
+    val_g = groups[n_train : n_train + n_val]
+    test_g = groups[n_train + n_val :]
 
     return train_g, val_g, test_g
 
@@ -143,8 +143,8 @@ def split_files(
     n_val = min(n_val, n_total - n_train)
 
     train_files = files[:n_train]
-    val_files = files[n_train:n_train + n_val]
-    test_files = files[n_train + n_val:]
+    val_files = files[n_train : n_train + n_val]
+    test_files = files[n_train + n_val :]
 
     return train_files, val_files, test_files
 

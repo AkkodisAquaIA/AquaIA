@@ -7,6 +7,7 @@ REPORT_FILE = Path_results + "/classification_report.txt"
 CONFUSION_MATRIX_FILE = Path_results + "/confusion_matrix.npy"
 OUTPUT_FILE = Path_results + "/confusion_analysis.csv"
 
+
 def parse_classification_report(report_file):
     rows = []
 
@@ -14,10 +15,7 @@ def parse_classification_report(report_file):
         for line in f:
             line = line.strip()
 
-            match = re.match(
-                r"(.+?)\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)\s+(\d+)$",
-                line
-            )
+            match = re.match(r"(.+?)\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)\s+(\d+)$", line)
 
             if match:
                 class_name = match.group(1)
@@ -25,13 +23,7 @@ def parse_classification_report(report_file):
                 if class_name in ["accuracy", "macro avg", "weighted avg"]:
                     continue
 
-                rows.append({
-                    "class": class_name,
-                    "precision": float(match.group(2)),
-                    "recall": float(match.group(3)),
-                    "f1_score": float(match.group(4)),
-                    "total": int(match.group(5))
-                })
+                rows.append({"class": class_name, "precision": float(match.group(2)), "recall": float(match.group(3)), "f1_score": float(match.group(4)), "total": int(match.group(5))})
 
     return pd.DataFrame(rows)
 
@@ -52,10 +44,7 @@ def get_top_confusions(cm, class_names, top_k=4):
         # Les top_k plus grosses confusions
         top_indices = np.argsort(row)[-top_k:][::-1]
 
-        result = {
-            "class": class_name,
-            "nb_images_mal_predites": misclassified
-        }
+        result = {"class": class_name, "nb_images_mal_predites": misclassified}
 
         for rank, j in enumerate(top_indices, start=1):
             result[f"confusion_{rank}_class"] = class_names[j]
@@ -73,10 +62,7 @@ def main():
     class_names = report_df["class"].tolist()
 
     if cm.shape[0] != len(class_names):
-        raise ValueError(
-            f"Problème de dimensions : matrice {cm.shape}, "
-            f"mais {len(class_names)} classes dans le rapport."
-        )
+        raise ValueError(f"Problème de dimensions : matrice {cm.shape}, mais {len(class_names)} classes dans le rapport.")
 
     confusion_df = get_top_confusions(cm, class_names, top_k=4)
 
@@ -90,16 +76,12 @@ def main():
             "f1_score",
             "total",
             "nb_images_mal_predites",
-
             "confusion_1_class",
             "confusion_1_count",
-
             "confusion_2_class",
             "confusion_2_count",
-
             "confusion_3_class",
             "confusion_3_count",
-
             "confusion_4_class",
             "confusion_4_count",
         ]

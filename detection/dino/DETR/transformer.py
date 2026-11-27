@@ -42,7 +42,6 @@ class Transformer(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, src, query_embed, pos_embed):
-
         bs = src.shape[0]
         query_embed = query_embed.unsqueeze(0).expand(bs, -1, -1)  # no copy
         tgt = torch.zeros_like(query_embed)

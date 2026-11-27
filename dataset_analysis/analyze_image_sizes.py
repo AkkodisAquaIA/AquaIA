@@ -55,6 +55,7 @@ TARGET_SIZES = [224, 336, 448, 512, 672]
 # DÉTECTION DU DATASET SOURCE
 # ============================================================
 
+
 def detect_source_dataset(path: Path) -> str:
     """
     Détecte le dataset source à partir du nom du fichier.
@@ -77,9 +78,11 @@ def detect_source_dataset(path: Path) -> str:
 
     return "INCONNU"
 
+
 # ============================================================
 # DÉTECTION DES IMAGES HORS NORME
 # ============================================================
+
 
 def detect_size_outliers(df: pd.DataFrame, iqr_factor: float = 1.5):
     """
@@ -109,7 +112,6 @@ def detect_size_outliers(df: pd.DataFrame, iqr_factor: float = 1.5):
     print("=" * 70)
 
     for dataset in sorted(df["dataset"].unique()):
-
         subset = df[df["dataset"] == dataset].copy()
 
         # ----------------------------------------------------
@@ -126,9 +128,7 @@ def detect_size_outliers(df: pd.DataFrame, iqr_factor: float = 1.5):
             q1_long - iqr_factor * iqr_long,
         )
 
-        upper_long = (
-            q3_long + iqr_factor * iqr_long
-        )
+        upper_long = q3_long + iqr_factor * iqr_long
 
         # ----------------------------------------------------
         # Côté court
@@ -144,39 +144,25 @@ def detect_size_outliers(df: pd.DataFrame, iqr_factor: float = 1.5):
             q1_short - iqr_factor * iqr_short,
         )
 
-        upper_short = (
-            q3_short + iqr_factor * iqr_short
-        )
+        upper_short = q3_short + iqr_factor * iqr_short
 
         # ----------------------------------------------------
         # Identification des outliers
         # ----------------------------------------------------
 
-        subset["outlier_long"] = (
-            (subset["long_side"] < lower_long)
-            | (subset["long_side"] > upper_long)
-        )
+        subset["outlier_long"] = (subset["long_side"] < lower_long) | (subset["long_side"] > upper_long)
 
-        subset["outlier_short"] = (
-            (subset["short_side"] < lower_short)
-            | (subset["short_side"] > upper_short)
-        )
+        subset["outlier_short"] = (subset["short_side"] < lower_short) | (subset["short_side"] > upper_short)
 
-        subset["size_outlier"] = (
-            subset["outlier_long"]
-            | subset["outlier_short"]
-        )
+        subset["size_outlier"] = subset["outlier_long"] | subset["outlier_short"]
 
-        outliers = subset[
-            subset["size_outlier"]
-        ].copy()
+        outliers = subset[subset["size_outlier"]].copy()
 
         # ----------------------------------------------------
         # Type d'anomalie
         # ----------------------------------------------------
 
         def get_reason(row):
-
             reasons = []
 
             if row["long_side"] > upper_long:
@@ -205,13 +191,9 @@ def detect_size_outliers(df: pd.DataFrame, iqr_factor: float = 1.5):
         median_long = subset["long_side"].median()
         median_short = subset["short_side"].median()
 
-        outliers["long_vs_median"] = (
-            outliers["long_side"] / median_long
-        )
+        outliers["long_vs_median"] = outliers["long_side"] / median_long
 
-        outliers["short_vs_median"] = (
-            outliers["short_side"] / median_short
-        )
+        outliers["short_vs_median"] = outliers["short_side"] / median_short
 
         all_outliers.append(outliers)
 
@@ -224,15 +206,12 @@ def detect_size_outliers(df: pd.DataFrame, iqr_factor: float = 1.5):
                 "dataset": dataset,
                 "n_images": len(subset),
                 "n_outliers": len(outliers),
-                "outliers_%":
-                    100 * len(outliers) / len(subset),
-
+                "outliers_%": 100 * len(outliers) / len(subset),
                 "long_Q1": q1_long,
                 "long_median": median_long,
                 "long_Q3": q3_long,
                 "long_lower_limit": lower_long,
                 "long_upper_limit": upper_long,
-
                 "short_Q1": q1_short,
                 "short_median": median_short,
                 "short_Q3": q3_short,
@@ -244,39 +223,18 @@ def detect_size_outliers(df: pd.DataFrame, iqr_factor: float = 1.5):
         print(f"\n{dataset}")
         print("-" * 50)
 
-        print(
-            f"Côté long  : "
-            f"Q1={q1_long:.0f} | "
-            f"médiane={median_long:.0f} | "
-            f"Q3={q3_long:.0f}"
-        )
+        print(f"Côté long  : Q1={q1_long:.0f} | médiane={median_long:.0f} | Q3={q3_long:.0f}")
 
-        print(
-            f"Bornes     : "
-            f"{lower_long:.0f} → {upper_long:.0f} px"
-        )
+        print(f"Bornes     : {lower_long:.0f} → {upper_long:.0f} px")
 
-        print(
-            f"Côté court : "
-            f"Q1={q1_short:.0f} | "
-            f"médiane={median_short:.0f} | "
-            f"Q3={q3_short:.0f}"
-        )
+        print(f"Côté court : Q1={q1_short:.0f} | médiane={median_short:.0f} | Q3={q3_short:.0f}")
 
-        print(
-            f"Bornes     : "
-            f"{lower_short:.0f} → {upper_short:.0f} px"
-        )
+        print(f"Bornes     : {lower_short:.0f} → {upper_short:.0f} px")
 
-        print(
-            f"Images hors norme : "
-            f"{len(outliers)} / {len(subset)} "
-            f"({100 * len(outliers) / len(subset):.2f} %)"
-        )
+        print(f"Images hors norme : {len(outliers)} / {len(subset)} ({100 * len(outliers) / len(subset):.2f} %)")
 
         # Affichage des 10 plus grandes anomalies
         if len(outliers) > 0:
-
             print("\nImages les plus grandes :")
 
             largest = outliers.sort_values(
@@ -285,26 +243,19 @@ def detect_size_outliers(df: pd.DataFrame, iqr_factor: float = 1.5):
             ).head(10)
 
             for _, row in largest.iterrows():
-
-                print(
-                    f"  {row['width']}×{row['height']} | "
-                    f"{row['class']} | "
-                    f"{row['filename']}"
-                )
+                print(f"  {row['width']}×{row['height']} | {row['class']} | {row['filename']}")
 
     # --------------------------------------------------------
     # Fusion
     # --------------------------------------------------------
 
     if all_outliers:
-
         outlier_df = pd.concat(
             all_outliers,
             ignore_index=True,
         )
 
     else:
-
         outlier_df = pd.DataFrame()
 
     summary_df = pd.DataFrame(summary)
@@ -316,22 +267,16 @@ def detect_size_outliers(df: pd.DataFrame, iqr_factor: float = 1.5):
 # ANALYSE DES IMAGES
 # ============================================================
 
-def collect_image_sizes(dataset_dir: Path) -> pd.DataFrame:
 
+def collect_image_sizes(dataset_dir: Path) -> pd.DataFrame:
     records = []
 
-    image_paths = [
-        p
-        for p in dataset_dir.rglob("*")
-        if p.is_file() and p.suffix.lower() in EXTENSIONS
-    ]
+    image_paths = [p for p in dataset_dir.rglob("*") if p.is_file() and p.suffix.lower() in EXTENSIONS]
 
     print(f"Images trouvées : {len(image_paths)}")
 
     for i, path in enumerate(image_paths, start=1):
-
         try:
-
             with Image.open(path) as img:
                 width, height = img.size
 
@@ -356,16 +301,10 @@ def collect_image_sizes(dataset_dir: Path) -> pd.DataFrame:
             )
 
         except (UnidentifiedImageError, OSError) as e:
-
-            print(
-                f"[WARNING] Impossible de lire : "
-                f"{path} ({e})"
-            )
+            print(f"[WARNING] Impossible de lire : {path} ({e})")
 
         if i % 5000 == 0:
-            print(
-                f"{i}/{len(image_paths)} images analysées..."
-            )
+            print(f"{i}/{len(image_paths)} images analysées...")
 
     return pd.DataFrame(records)
 
@@ -374,8 +313,8 @@ def collect_image_sizes(dataset_dir: Path) -> pd.DataFrame:
 # STATISTIQUES GLOBALES
 # ============================================================
 
-def print_stats(df: pd.DataFrame):
 
+def print_stats(df: pd.DataFrame):
     print("\n" + "=" * 70)
     print("STATISTIQUES GLOBALES")
     print("=" * 70)
@@ -388,14 +327,9 @@ def print_stats(df: pd.DataFrame):
     dataset_counts = df["dataset"].value_counts()
 
     for dataset, count in dataset_counts.items():
-
         percentage = 100 * count / len(df)
 
-        print(
-            f"{dataset:15s} : "
-            f"{count:6d} "
-            f"({percentage:5.1f} %)"
-        )
+        print(f"{dataset:15s} : {count:6d} ({percentage:5.1f} %)")
 
     columns = [
         "width",
@@ -407,7 +341,6 @@ def print_stats(df: pd.DataFrame):
     ]
 
     for col in columns:
-
         values = df[col]
 
         print(f"\n--- {col} ---")
@@ -427,16 +360,14 @@ def print_stats(df: pd.DataFrame):
 # STATISTIQUES PAR DATASET
 # ============================================================
 
-def dataset_statistics(df: pd.DataFrame):
 
+def dataset_statistics(df: pd.DataFrame):
     stats = (
         df.groupby("dataset")
         .agg(
             n_images=("path", "count"),
-
             width_median=("width", "median"),
             height_median=("height", "median"),
-
             short_side_min=("short_side", "min"),
             short_side_p10=(
                 "short_side",
@@ -456,7 +387,6 @@ def dataset_statistics(df: pd.DataFrame):
                 lambda x: x.quantile(0.90),
             ),
             short_side_max=("short_side", "max"),
-
             long_side_min=("long_side", "min"),
             long_side_p10=(
                 "long_side",
@@ -476,9 +406,7 @@ def dataset_statistics(df: pd.DataFrame):
                 lambda x: x.quantile(0.90),
             ),
             long_side_max=("long_side", "max"),
-
             aspect_ratio_median=("aspect_ratio", "median"),
-
             megapixels_median=("megapixels", "median"),
         )
         .sort_values("long_side_median")
@@ -491,21 +419,17 @@ def dataset_statistics(df: pd.DataFrame):
 # AFFICHAGE STATS PAR DATASET
 # ============================================================
 
-def print_dataset_stats(dataset_stats: pd.DataFrame):
 
+def print_dataset_stats(dataset_stats: pd.DataFrame):
     print("\n" + "=" * 70)
     print("DIMENSIONS PAR DATASET SOURCE")
     print("=" * 70)
 
     for dataset, row in dataset_stats.iterrows():
-
         print(f"\n{dataset}")
         print("-" * 50)
 
-        print(
-            f"Nombre d'images : "
-            f"{int(row['n_images'])}"
-        )
+        print(f"Nombre d'images : {int(row['n_images'])}")
 
         print(
             f"Côté court : "
@@ -516,22 +440,15 @@ def print_dataset_stats(dataset_stats: pd.DataFrame):
             f"P90={row['short_side_p90']:.0f}"
         )
 
-        print(
-            f"Côté long  : "
-            f"P10={row['long_side_p10']:.0f} | "
-            f"P25={row['long_side_p25']:.0f} | "
-            f"médiane={row['long_side_median']:.0f} | "
-            f"P75={row['long_side_p75']:.0f} | "
-            f"P90={row['long_side_p90']:.0f}"
-        )
+        print(f"Côté long  : P10={row['long_side_p10']:.0f} | P25={row['long_side_p25']:.0f} | médiane={row['long_side_median']:.0f} | P75={row['long_side_p75']:.0f} | P90={row['long_side_p90']:.0f}")
 
 
 # ============================================================
 # COMPARAISON RÉSOLUTIONS DINOv3
 # ============================================================
 
-def analyse_target_sizes(df: pd.DataFrame):
 
+def analyse_target_sizes(df: pd.DataFrame):
     print("\n" + "=" * 70)
     print("COMPARAISON DES RÉSOLUTIONS DINOv3")
     print("=" * 70)
@@ -539,45 +456,26 @@ def analyse_target_sizes(df: pd.DataFrame):
     results = []
 
     for dataset in sorted(df["dataset"].unique()):
-
         subset = df[df["dataset"] == dataset]
 
         print("\n" + "=" * 50)
-        print(
-            f"{dataset} "
-            f"({len(subset)} images)"
-        )
+        print(f"{dataset} ({len(subset)} images)")
         print("=" * 50)
 
         for size in TARGET_SIZES:
+            n_downscale = (subset["long_side"] > size).sum()
 
-            n_downscale = (
-                subset["long_side"] > size
-            ).sum()
+            n_upscale = (subset["long_side"] < size).sum()
 
-            n_upscale = (
-                subset["long_side"] < size
-            ).sum()
+            n_same = (subset["long_side"] == size).sum()
 
-            n_same = (
-                subset["long_side"] == size
-            ).sum()
+            pct_downscale = 100 * n_downscale / len(subset)
 
-            pct_downscale = (
-                100 * n_downscale / len(subset)
-            )
+            pct_upscale = 100 * n_upscale / len(subset)
 
-            pct_upscale = (
-                100 * n_upscale / len(subset)
-            )
+            pct_same = 100 * n_same / len(subset)
 
-            pct_same = (
-                100 * n_same / len(subset)
-            )
-
-            scale_factor = (
-                size / subset["long_side"]
-            )
+            scale_factor = size / subset["long_side"]
 
             results.append(
                 {
@@ -587,41 +485,21 @@ def analyse_target_sizes(df: pd.DataFrame):
                     "downscaled_%": pct_downscale,
                     "upscaled_%": pct_upscale,
                     "unchanged_%": pct_same,
-                    "median_scale_factor":
-                        scale_factor.median(),
-                    "p10_scale_factor":
-                        scale_factor.quantile(0.10),
-                    "p90_scale_factor":
-                        scale_factor.quantile(0.90),
+                    "median_scale_factor": scale_factor.median(),
+                    "p10_scale_factor": scale_factor.quantile(0.10),
+                    "p90_scale_factor": scale_factor.quantile(0.90),
                 }
             )
 
-            print(
-                f"\n{size} × {size}"
-            )
+            print(f"\n{size} × {size}")
 
-            print(
-                f"  Réduites   : "
-                f"{n_downscale:6d} "
-                f"({pct_downscale:5.1f} %)"
-            )
+            print(f"  Réduites   : {n_downscale:6d} ({pct_downscale:5.1f} %)")
 
-            print(
-                f"  Agrandies  : "
-                f"{n_upscale:6d} "
-                f"({pct_upscale:5.1f} %)"
-            )
+            print(f"  Agrandies  : {n_upscale:6d} ({pct_upscale:5.1f} %)")
 
-            print(
-                f"  Identiques : "
-                f"{n_same:6d} "
-                f"({pct_same:5.1f} %)"
-            )
+            print(f"  Identiques : {n_same:6d} ({pct_same:5.1f} %)")
 
-            print(
-                f"  Facteur médian : "
-                f"{scale_factor.median():.2f}×"
-            )
+            print(f"  Facteur médian : {scale_factor.median():.2f}×")
 
     return pd.DataFrame(results)
 
@@ -630,34 +508,29 @@ def analyse_target_sizes(df: pd.DataFrame):
 # STATISTIQUES PAR CLASSE
 # ============================================================
 
-def class_statistics(df: pd.DataFrame):
 
+def class_statistics(df: pd.DataFrame):
     stats = (
         df.groupby("class")
         .agg(
             n_images=("path", "count"),
             n_datasets=("dataset", "nunique"),
-
             short_side_median=(
                 "short_side",
                 "median",
             ),
-
             long_side_median=(
                 "long_side",
                 "median",
             ),
-
             long_side_p25=(
                 "long_side",
                 lambda x: x.quantile(0.25),
             ),
-
             long_side_p75=(
                 "long_side",
                 lambda x: x.quantile(0.75),
             ),
-
             aspect_ratio_median=(
                 "aspect_ratio",
                 "median",
@@ -673,28 +546,24 @@ def class_statistics(df: pd.DataFrame):
 # STATISTIQUES CLASSE × DATASET
 # ============================================================
 
-def class_dataset_statistics(df: pd.DataFrame):
 
+def class_dataset_statistics(df: pd.DataFrame):
     stats = (
         df.groupby(["class", "dataset"])
         .agg(
             n_images=("path", "count"),
-
             short_side_median=(
                 "short_side",
                 "median",
             ),
-
             long_side_median=(
                 "long_side",
                 "median",
             ),
-
             long_side_p25=(
                 "long_side",
                 lambda x: x.quantile(0.25),
             ),
-
             long_side_p75=(
                 "long_side",
                 lambda x: x.quantile(0.75),
@@ -710,8 +579,8 @@ def class_dataset_statistics(df: pd.DataFrame):
 # MATRICE CLASSE × DATASET
 # ============================================================
 
-def create_class_dataset_matrix(df: pd.DataFrame):
 
+def create_class_dataset_matrix(df: pd.DataFrame):
     matrix = pd.crosstab(
         df["class"],
         df["dataset"],
@@ -720,15 +589,9 @@ def create_class_dataset_matrix(df: pd.DataFrame):
     matrix["TOTAL"] = matrix.sum(axis=1)
 
     # Nombre de datasets représentés pour chaque classe
-    dataset_columns = [
-        col
-        for col in matrix.columns
-        if col != "TOTAL"
-    ]
+    dataset_columns = [col for col in matrix.columns if col != "TOTAL"]
 
-    matrix["N_DATASETS"] = (
-        matrix[dataset_columns] > 0
-    ).sum(axis=1)
+    matrix["N_DATASETS"] = (matrix[dataset_columns] > 0).sum(axis=1)
 
     return matrix
 
@@ -737,45 +600,30 @@ def create_class_dataset_matrix(df: pd.DataFrame):
 # CLASSES MONO-DATASET
 # ============================================================
 
-def print_single_dataset_classes(matrix: pd.DataFrame):
 
+def print_single_dataset_classes(matrix: pd.DataFrame):
     print("\n" + "=" * 70)
     print("CLASSES PRÉSENTES DANS UN SEUL DATASET")
     print("=" * 70)
 
-    single = matrix[
-        matrix["N_DATASETS"] == 1
-    ]
+    single = matrix[matrix["N_DATASETS"] == 1]
 
-    print(
-        f"\n{len(single)} / {len(matrix)} classes "
-        f"sont présentes dans un seul dataset."
-    )
+    print(f"\n{len(single)} / {len(matrix)} classes sont présentes dans un seul dataset.")
 
-    dataset_columns = [
-        col
-        for col in matrix.columns
-        if col not in {"TOTAL", "N_DATASETS"}
-    ]
+    dataset_columns = [col for col in matrix.columns if col not in {"TOTAL", "N_DATASETS"}]
 
     for dataset in dataset_columns:
+        classes = single[single[dataset] > 0]
 
-        classes = single[
-            single[dataset] > 0
-        ]
-
-        print(
-            f"\n{dataset} : "
-            f"{len(classes)} classes"
-        )
+        print(f"\n{dataset} : {len(classes)} classes")
 
 
 # ============================================================
 # GRAPHIQUES
 # ============================================================
 
-def create_plots(df: pd.DataFrame, output_dir: Path):
 
+def create_plots(df: pd.DataFrame, output_dir: Path):
     output_dir.mkdir(
         parents=True,
         exist_ok=True,
@@ -786,10 +634,7 @@ def create_plots(df: pd.DataFrame, output_dir: Path):
     # --------------------------------------------------------
 
     for dataset in sorted(df["dataset"].unique()):
-
-        subset = df[
-            df["dataset"] == dataset
-        ]
+        subset = df[df["dataset"] == dataset]
 
         # Côté long
         plt.figure(figsize=(10, 6))
@@ -801,7 +646,6 @@ def create_plots(df: pd.DataFrame, output_dir: Path):
         )
 
         for size in TARGET_SIZES:
-
             plt.axvline(
                 size,
                 linestyle="--",
@@ -811,22 +655,15 @@ def create_plots(df: pd.DataFrame, output_dir: Path):
         plt.xlabel("Côté long (pixels)")
         plt.ylabel("Nombre d'images")
 
-        plt.title(
-            f"Distribution du côté long — {dataset}"
-        )
+        plt.title(f"Distribution du côté long — {dataset}")
 
         plt.legend()
         plt.tight_layout()
 
-        safe_name = (
-            dataset
-            .replace("/", "_")
-            .replace(" ", "_")
-        )
+        safe_name = dataset.replace("/", "_").replace(" ", "_")
 
         plt.savefig(
-            output_dir
-            / f"hist_long_side_{safe_name}.png",
+            output_dir / f"hist_long_side_{safe_name}.png",
             dpi=200,
         )
 
@@ -842,7 +679,6 @@ def create_plots(df: pd.DataFrame, output_dir: Path):
         )
 
         for size in TARGET_SIZES:
-
             plt.axvline(
                 size,
                 linestyle="--",
@@ -852,16 +688,13 @@ def create_plots(df: pd.DataFrame, output_dir: Path):
         plt.xlabel("Côté court (pixels)")
         plt.ylabel("Nombre d'images")
 
-        plt.title(
-            f"Distribution du côté court — {dataset}"
-        )
+        plt.title(f"Distribution du côté court — {dataset}")
 
         plt.legend()
         plt.tight_layout()
 
         plt.savefig(
-            output_dir
-            / f"hist_short_side_{safe_name}.png",
+            output_dir / f"hist_short_side_{safe_name}.png",
             dpi=200,
         )
 
@@ -872,8 +705,8 @@ def create_plots(df: pd.DataFrame, output_dir: Path):
 # MAIN
 # ============================================================
 
-def main():
 
+def main():
     OUTPUT_DIR.mkdir(
         parents=True,
         exist_ok=True,
@@ -888,10 +721,7 @@ def main():
     df = collect_image_sizes(DATASET_DIR)
 
     if df.empty:
-
-        raise RuntimeError(
-            "Aucune image trouvée dans le dataset."
-        )
+        raise RuntimeError("Aucune image trouvée dans le dataset.")
 
     # --------------------------------------------------------
     # Stats globales
@@ -931,9 +761,7 @@ def main():
     # Stats classe × dataset
     # --------------------------------------------------------
 
-    class_dataset_stats = (
-        class_dataset_statistics(df)
-    )
+    class_dataset_stats = class_dataset_statistics(df)
 
     # --------------------------------------------------------
     # Matrice classe × dataset
@@ -957,8 +785,7 @@ def main():
     )
 
     resolution_results.to_csv(
-        OUTPUT_DIR
-        / "comparaison_resolutions_dinov3_par_dataset.csv",
+        OUTPUT_DIR / "comparaison_resolutions_dinov3_par_dataset.csv",
         index=False,
     )
 
@@ -967,8 +794,7 @@ def main():
     )
 
     class_dataset_stats.to_csv(
-        OUTPUT_DIR
-        / "dimensions_par_classe_et_dataset.csv",
+        OUTPUT_DIR / "dimensions_par_classe_et_dataset.csv",
         index=False,
     )
 
@@ -999,10 +825,7 @@ def main():
     print("TERMINÉ")
     print("=" * 70)
 
-    print(
-        f"\nRésultats disponibles dans : "
-        f"{OUTPUT_DIR.resolve()}"
-    )
+    print(f"\nRésultats disponibles dans : {OUTPUT_DIR.resolve()}")
 
 
 if __name__ == "__main__":

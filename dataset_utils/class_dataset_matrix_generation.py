@@ -9,14 +9,12 @@ DATASET_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/
 OUTDIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Docs/FinBenthic_1-2_PERLA_AG_per_genre")
 
 # Extensions d'images acceptées
-IMAGE_EXTENSIONS = {
-    ".jpg", ".jpeg", ".png", ".tif", ".tiff",
-    ".bmp", ".webp"
-}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
 
 # ============================================================
 # IDENTIFICATION DU DATASET
 # ============================================================
+
 
 def get_dataset(filename):
     """
@@ -46,22 +44,14 @@ rows = []
 
 # Chaque sous-dossier correspond à une classe
 for class_dir in sorted(DATASET_DIR.iterdir()):
-
     if not class_dir.is_dir():
         continue
 
     class_name = class_dir.name
 
-    counts = {
-        "Classe": class_name,
-        "PERLA": 0,
-        "FIN-Benthic": 0,
-        "FIN-Benthic2": 0,
-        "INCONNU": 0
-    }
+    counts = {"Classe": class_name, "PERLA": 0, "FIN-Benthic": 0, "FIN-Benthic2": 0, "INCONNU": 0}
 
     for image_path in class_dir.rglob("*"):
-
         if not image_path.is_file():
             continue
 
@@ -82,12 +72,7 @@ for class_dir in sorted(DATASET_DIR.iterdir()):
 df = pd.DataFrame(rows)
 
 # Nombre total d'images par classe
-df["TOTAL"] = (
-    df["PERLA"]
-    + df["FIN-Benthic"]
-    + df["FIN-Benthic2"]
-    + df["INCONNU"]
-)
+df["TOTAL"] = df["PERLA"] + df["FIN-Benthic"] + df["FIN-Benthic2"] + df["INCONNU"]
 
 # Tri par nom de classe
 df = df.sort_values("Classe").reset_index(drop=True)
@@ -129,10 +114,6 @@ df["Nb_datasets"] = (df[dataset_columns] > 0).sum(axis=1)
 
 output_csv = OUTDIR / "matrice_class_per_dataset.csv"
 
-df.to_csv(
-    output_csv,
-    index=False,
-    encoding="utf-8-sig"
-)
+df.to_csv(output_csv, index=False, encoding="utf-8-sig")
 
 print(f"\nMatrice sauvegardée dans :\n{output_csv}")

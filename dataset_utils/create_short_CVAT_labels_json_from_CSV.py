@@ -21,6 +21,7 @@ CLASS_COL = 0
 # FONCTION DE TRANSFORMATION
 # ============================================================
 
+
 def shorten_label(label):
     """
     Raccourcit uniquement les deux premiers niveaux
@@ -44,9 +45,7 @@ def shorten_label(label):
     parts = label.split("_")
 
     if len(parts) < 2:
-        print(
-            f"WARNING : nomenclature invalide : '{label}'"
-        )
+        print(f"WARNING : nomenclature invalide : '{label}'")
         return None
 
     # Raccourcissement Embranchement
@@ -86,7 +85,6 @@ print(f"Nombre de classes dans l'Excel : {len(df)}")
 labels = []
 
 for original_label in df[class_column]:
-
     # Ignore les cellules vides
     if pd.isna(original_label):
         continue
@@ -96,31 +94,19 @@ for original_label in df[class_column]:
     if short_label is None:
         continue
 
-    labels.append({
-        "name": short_label,
-        "type": "any",
-        "attributes": []
-    })
+    labels.append({"name": short_label, "type": "any", "attributes": []})
 
 
 # ============================================================
 # VÉRIFICATION DES DOUBLONS
 # ============================================================
 
-label_names = [
-    item["name"]
-    for item in labels
-]
+label_names = [item["name"] for item in labels]
 
-duplicates = sorted({
-    label
-    for label in label_names
-    if label_names.count(label) > 1
-})
+duplicates = sorted({label for label in label_names if label_names.count(label) > 1})
 
 
 if duplicates:
-
     print("\n" + "=" * 70)
     print("WARNING : LABELS EN DOUBLE")
     print("=" * 70)
@@ -137,63 +123,32 @@ else:
 # ============================================================
 
 if labels:
-
-    lengths = [
-        len(item["name"])
-        for item in labels
-    ]
+    lengths = [len(item["name"]) for item in labels]
 
     print("\nLongueur des labels :")
 
-    print(
-        f"  Minimum : "
-        f"{min(lengths)} caractères"
-    )
+    print(f"  Minimum : {min(lengths)} caractères")
 
-    print(
-        f"  Maximum : "
-        f"{max(lengths)} caractères"
-    )
+    print(f"  Maximum : {max(lengths)} caractères")
 
-    print(
-        f"  Moyenne : "
-        f"{sum(lengths) / len(lengths):.1f} caractères"
-    )
-
+    print(f"  Moyenne : {sum(lengths) / len(lengths):.1f} caractères")
 
     # Recherche du label le plus long
-    longest_label = max(
-        labels,
-        key=lambda x: len(x["name"])
-    )
+    longest_label = max(labels, key=lambda x: len(x["name"]))
 
     print("\nLabel le plus long :")
 
-    print(
-        f"  {longest_label['name']}"
-    )
+    print(f"  {longest_label['name']}")
 
-    print(
-        f"  -> {len(longest_label['name'])} caractères"
-    )
+    print(f"  -> {len(longest_label['name'])} caractères")
 
 
 # ============================================================
 # EXPORT JSON
 # ============================================================
 
-with open(
-    OUTPUT_FILE,
-    "w",
-    encoding="utf-8"
-) as f:
-
-    json.dump(
-        labels,
-        f,
-        ensure_ascii=False,
-        indent=4
-    )
+with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+    json.dump(labels, f, ensure_ascii=False, indent=4)
 
 
 # ============================================================

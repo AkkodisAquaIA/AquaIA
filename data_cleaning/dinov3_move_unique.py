@@ -99,7 +99,6 @@ def compute_adaptive_threshold(X, k=K):
 
 
 def greedy_dedup_knn(X, sim_threshold, k=K):
-
     print("sim_threshold", sim_threshold)
 
     n = X.shape[0]

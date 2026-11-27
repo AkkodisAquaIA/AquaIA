@@ -274,12 +274,7 @@ def main():
     if not train_dir.exists() or not val_dir.exists():
         raise RuntimeError(f"On attend {train_dir} et {val_dir}")
 
-
-    processor = AutoImageProcessor.from_pretrained(
-        CFG.model_id,
-        token=CFG.token
-    )
-
+    processor = AutoImageProcessor.from_pretrained(CFG.model_id, token=CFG.token)
 
     def pad_to_square(pil_img: Image.Image) -> Image.Image:
         """
@@ -315,27 +310,13 @@ def main():
 
         # Couleur du padding :
         # moyenne des pixels de l'image
-        mean_color = tuple(
-            int(x)
-            for x in np.asarray(pil_img).mean(axis=(0, 1))
-        )
+        mean_color = tuple(int(x) for x in np.asarray(pil_img).mean(axis=(0, 1)))
 
-        padded_img = ImageOps.expand(
-            pil_img,
-            border=(
-                pad_left,
-                pad_top,
-                pad_right,
-                pad_bottom
-            ),
-            fill=mean_color
-        )
+        padded_img = ImageOps.expand(pil_img, border=(pad_left, pad_top, pad_right, pad_bottom), fill=mean_color)
 
         return padded_img
 
-
     def to_pixel_values(pil_img):
-
         # 1. Padding carré
         pil_img = pad_to_square(pil_img)
 
@@ -343,28 +324,15 @@ def main():
         #       resize → 224 x 224
         #       rescale
         #       normalisation
-        pixel_values = processor(
-            images=pil_img,
-            return_tensors="pt"
-        )["pixel_values"]
+        pixel_values = processor(images=pil_img, return_tensors="pt")["pixel_values"]
 
         return pixel_values.squeeze(0)
 
+    transform = Compose([Lambda(to_pixel_values)])
 
-    transform = Compose([
-        Lambda(to_pixel_values)
-    ])
+    train_ds = ImageFolder(str(train_dir), transform=transform)
 
-
-    train_ds = ImageFolder(
-        str(train_dir),
-        transform=transform
-    )
-
-    val_ds = ImageFolder(
-        str(val_dir),
-        transform=transform
-    )
+    val_ds = ImageFolder(str(val_dir), transform=transform)
 
     num_classes = len(train_ds.classes)
     if len(val_ds.classes) != num_classes or train_ds.classes != val_ds.classes:

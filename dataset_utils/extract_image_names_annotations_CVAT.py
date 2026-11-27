@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 
 import argparse
@@ -15,14 +14,10 @@ def extract_image_names(annotations_dir: Path):
     """
 
     if not annotations_dir.exists():
-        raise FileNotFoundError(
-            f"Le dossier n'existe pas : {annotations_dir}"
-        )
+        raise FileNotFoundError(f"Le dossier n'existe pas : {annotations_dir}")
 
     if not annotations_dir.is_dir():
-        raise NotADirectoryError(
-            f"Le chemin indiqué n'est pas un dossier : {annotations_dir}"
-        )
+        raise NotADirectoryError(f"Le chemin indiqué n'est pas un dossier : {annotations_dir}")
 
     # Recherche récursive de tous les fichiers ZIP
     zip_files = sorted(annotations_dir.rglob("*.zip"))
@@ -41,26 +36,19 @@ def extract_image_names(annotations_dir: Path):
     all_image_names = []
 
     for zip_path in zip_files:
-
         print(f"[ZIP] {zip_path.name}")
 
         try:
             with zipfile.ZipFile(zip_path, "r") as zf:
-
                 # Recherche de tous les instances_default.json,
                 # quelle que soit leur position dans le ZIP
-                json_files = [
-                    name
-                    for name in zf.namelist()
-                    if Path(name).name == "instances_default.json"
-                ]
+                json_files = [name for name in zf.namelist() if Path(name).name == "instances_default.json"]
 
                 if not json_files:
                     print("      [ATTENTION] Aucun instances_default.json trouvé.")
                     continue
 
                 for json_path in json_files:
-
                     print(f"      JSON : {json_path}")
 
                     try:
@@ -79,7 +67,6 @@ def extract_image_names(annotations_dir: Path):
                     image_names = []
 
                     for image in data["images"]:
-
                         file_name = image.get("file_name")
 
                         if file_name:
@@ -100,27 +87,11 @@ def extract_image_names(annotations_dir: Path):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=("Extrait les noms d'images contenus dans les instances_default.json présents dans des fichiers ZIP."))
 
-    parser = argparse.ArgumentParser(
-        description=(
-            "Extrait les noms d'images contenus dans les "
-            "instances_default.json présents dans des fichiers ZIP."
-        )
-    )
+    parser.add_argument("annotations_dir", type=Path, help="Chemin vers le dossier Annotations")
 
-    parser.add_argument(
-        "annotations_dir",
-        type=Path,
-        help="Chemin vers le dossier Annotations"
-    )
-
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=Path("image_names.txt"),
-        help="Fichier texte de sortie (défaut : image_names.txt)"
-    )
+    parser.add_argument("-o", "--output", type=Path, default=Path("image_names.txt"), help="Fichier texte de sortie (défaut : image_names.txt)")
 
     args = parser.parse_args()
 
@@ -170,4 +141,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

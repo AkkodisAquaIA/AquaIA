@@ -28,12 +28,7 @@ def copy_folders_from_excel(excel_path, source_path, output_path):
 
     # Première colonne = colonne A
     # min_row=2 suppose que la première ligne est un en-tête
-    for row in ws.iter_rows(
-        min_row=2,
-        min_col=1,
-        max_col=1,
-        values_only=True
-    ):
+    for row in ws.iter_rows(min_row=2, min_col=1, max_col=1, values_only=True):
         value = row[0]
 
         if value is not None:
@@ -49,7 +44,6 @@ def copy_folders_from_excel(excel_path, source_path, output_path):
     already_existing = []
 
     for folder_name in folder_names:
-
         source_folder = source_path / folder_name
         destination_folder = output_path / folder_name
 
@@ -97,21 +91,10 @@ def copy_folders_from_excel(excel_path, source_path, output_path):
 
 
 if __name__ == "__main__":
+    excel_path = "/home/sarah.laroui/Bureau/AQUA-IA/Docs/ADOUR-GARONNE/classes_presentes_dans_taxons.xlsx"
 
-    excel_path = (
-        "/home/sarah.laroui/Bureau/AQUA-IA/Docs/ADOUR-GARONNE/classes_presentes_dans_taxons.xlsx"
-    )
+    source_path = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/Fusion_PERLA_AQUAIA_2sept"
 
-    source_path = (
-        "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/Fusion_PERLA_AQUAIA_2sept"
-    )
+    output_path = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AG_dataset"
 
-    output_path = (
-        "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/AG_dataset"
-    )
-
-    copy_folders_from_excel(
-        excel_path,
-        source_path,
-        output_path
-    )
+    copy_folders_from_excel(excel_path, source_path, output_path)

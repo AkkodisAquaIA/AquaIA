@@ -23,7 +23,6 @@ def blur_score(image_path):
 
 
 def move_blurry_images(dataset_path, threshold):
-
     dataset_path = Path(dataset_path)
     outliers_root = dataset_path / "outliers_flou"
 

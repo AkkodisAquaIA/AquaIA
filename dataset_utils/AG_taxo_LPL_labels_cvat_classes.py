@@ -26,14 +26,11 @@ OUTPUT_CLASSES_DIR = Path("/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Da
 REPLACEMENTS = {
     # Genre
     "sans genre spécifié": "Genus",
-
     # Famille
     "sans famille spécifiée": "Familia",
-
     # Ordre
     "sans ordre spécifié": "Order",
     "sans ordre taxo": "Order",
-
     # Classe
     "sans classe spécifiée": "Classis",
 }
@@ -42,6 +39,7 @@ REPLACEMENTS = {
 # ============================================================
 # FONCTIONS
 # ============================================================
+
 
 def clean_taxon(value):
     """
@@ -128,16 +126,10 @@ required_columns = [
     "GENRE",
 ]
 
-missing_columns = [
-    col for col in required_columns
-    if col not in df.columns
-]
+missing_columns = [col for col in required_columns if col not in df.columns]
 
 if missing_columns:
-    raise ValueError(
-        "Colonnes manquantes dans le fichier Excel : "
-        + ", ".join(missing_columns)
-    )
+    raise ValueError("Colonnes manquantes dans le fichier Excel : " + ", ".join(missing_columns))
 
 
 # ============================================================
@@ -163,25 +155,18 @@ for column in taxonomy_columns:
 print("\nVérification des valeurs manquantes...")
 
 for column in taxonomy_columns:
-
     empty_mask = df[column] == ""
     n_empty = empty_mask.sum()
 
     if n_empty > 0:
-        print(
-            f"WARNING : {n_empty} valeur(s) vide(s) "
-            f"dans la colonne {column}"
-        )
+        print(f"WARNING : {n_empty} valeur(s) vide(s) dans la colonne {column}")
 
 
 # ============================================================
 # CRÉATION DES LABELS COMPLETS
 # ============================================================
 
-df["label"] = df.apply(
-    create_full_label,
-    axis=1
-)
+df["label"] = df.apply(create_full_label, axis=1)
 
 
 # ============================================================
@@ -190,26 +175,19 @@ df["label"] = df.apply(
 
 n_before = len(df)
 
-df_unique = df.drop_duplicates(
-    subset=["label"]
-).copy()
+df_unique = df.drop_duplicates(subset=["label"]).copy()
 
 n_duplicates = n_before - len(df_unique)
 
 if n_duplicates > 0:
-    print(
-        f"\n{n_duplicates} doublon(s) supprimé(s)."
-    )
+    print(f"\n{n_duplicates} doublon(s) supprimé(s).")
 
 
 # ============================================================
 # CRÉATION DES LABELS COURTS
 # ============================================================
 
-df_unique["short_label"] = df_unique.apply(
-    create_short_label,
-    axis=1
-)
+df_unique["short_label"] = df_unique.apply(create_short_label, axis=1)
 
 df_unique["length"] = df_unique["short_label"].str.len()
 
@@ -218,20 +196,16 @@ df_unique["length"] = df_unique["short_label"].str.len()
 # VÉRIFICATION DES COLLISIONS
 # ============================================================
 
-collision_mask = df_unique["short_label"].duplicated(
-    keep=False
-)
+collision_mask = df_unique["short_label"].duplicated(keep=False)
 
 collisions = df_unique[collision_mask]
 
 if not collisions.empty:
-
     print("\n" + "=" * 60)
     print("WARNING : COLLISIONS DE LABELS COURTS")
     print("=" * 60)
 
     for short_label, group in collisions.groupby("short_label"):
-
         print(f"\nLabel court : {short_label}")
 
         for label in group["label"]:
@@ -259,10 +233,7 @@ excel_output.columns = [
     "Nombre_caracteres",
 ]
 
-excel_output.to_excel(
-    OUTPUT_EXCEL,
-    index=False
-)
+excel_output.to_excel(OUTPUT_EXCEL, index=False)
 
 
 # ============================================================
@@ -271,18 +242,8 @@ excel_output.to_excel(
 
 json_classes = df_unique["short_label"].tolist()
 
-with open(
-    OUTPUT_JSON,
-    "w",
-    encoding="utf-8"
-) as f:
-
-    json.dump(
-        json_classes,
-        f,
-        ensure_ascii=False,
-        indent=4
-    )
+with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
+    json.dump(json_classes, f, ensure_ascii=False, indent=4)
 
 
 # ============================================================
@@ -292,30 +253,20 @@ with open(
 print("\nCréation des dossiers de classes...")
 
 # Création du dossier principal
-OUTPUT_CLASSES_DIR.mkdir(
-    parents=True,
-    exist_ok=True
-)
+OUTPUT_CLASSES_DIR.mkdir(parents=True, exist_ok=True)
 
 created_count = 0
 
 for label in df_unique["label"]:
-
     class_directory = OUTPUT_CLASSES_DIR / label
 
     # exist_ok=True permet de ne pas générer d'erreur
     # si le dossier existe déjà
-    class_directory.mkdir(
-        parents=True,
-        exist_ok=True
-    )
+    class_directory.mkdir(parents=True, exist_ok=True)
 
     created_count += 1
 
-print(
-    f"{created_count} dossier(s) de classes disponibles "
-    f"dans : {OUTPUT_CLASSES_DIR}"
-)
+print(f"{created_count} dossier(s) de classes disponibles dans : {OUTPUT_CLASSES_DIR}")
 
 
 # ============================================================
@@ -329,25 +280,13 @@ print("=" * 60)
 print(f"Nombre de classes : {len(df_unique)}")
 
 if len(df_unique) > 0:
+    print(f"Longueur minimale : {df_unique['length'].min()} caractères")
 
-    print(
-        f"Longueur minimale : "
-        f"{df_unique['length'].min()} caractères"
-    )
+    print(f"Longueur maximale : {df_unique['length'].max()} caractères")
 
-    print(
-        f"Longueur maximale : "
-        f"{df_unique['length'].max()} caractères"
-    )
+    print(f"Longueur moyenne  : {df_unique['length'].mean():.1f} caractères")
 
-    print(
-        f"Longueur moyenne  : "
-        f"{df_unique['length'].mean():.1f} caractères"
-    )
-
-    longest = df_unique.loc[
-        df_unique["length"].idxmax()
-    ]
+    longest = df_unique.loc[df_unique["length"].idxmax()]
 
     print("\nLabel le plus long :")
     print(f"  {longest['short_label']}")

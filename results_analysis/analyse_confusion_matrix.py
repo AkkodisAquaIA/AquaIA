@@ -18,5 +18,5 @@ for i in range(cm.shape[0]):
 
     print(f"Classe {i}:")
     for j in top2:
-        print(f"  -> Classe {j}: {cm[i,j]} échantillons ({percentages[j]:.2f}%)")
+        print(f"  -> Classe {j}: {cm[i, j]} échantillons ({percentages[j]:.2f}%)")
     print()

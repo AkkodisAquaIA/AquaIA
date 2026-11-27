@@ -528,7 +528,6 @@ def get_swin_layer_id(var_name, backbone_type):
 
 
 def get_layerwise_param_dict(model, args, return_name=False):
-
     parameter_groups = {}
     for n, p in model.named_parameters():
         if not p.requires_grad:

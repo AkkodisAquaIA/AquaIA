@@ -32,10 +32,7 @@ def merge_folders(source: Path, destination: Path):
                     target = destination / f"{stem}_duplicate_{i}{suffix}"
                     i += 1
 
-                print(
-                    f"    ATTENTION : fichier dupliqué détecté : {item.name}\n"
-                    f"    -> renommé en : {target.name}"
-                )
+                print(f"    ATTENTION : fichier dupliqué détecté : {item.name}\n    -> renommé en : {target.name}")
 
             shutil.move(str(item), str(target))
 
@@ -56,7 +53,6 @@ def rename_coeloptera_folders(root_path):
     folders = list(root.iterdir())
 
     for folder in folders:
-
         if not folder.is_dir():
             continue
 
@@ -65,10 +61,7 @@ def rename_coeloptera_folders(root_path):
         # Nomenclature :
         # Embranchement_Classe_Ordre_Famille_Genre_Espèce
         if len(parts) != 6:
-            print(
-                f"ATTENTION : nomenclature inattendue, dossier ignoré : "
-                f"{folder.name}"
-            )
+            print(f"ATTENTION : nomenclature inattendue, dossier ignoré : {folder.name}")
             continue
 
         # Vérification de l'ordre
@@ -87,7 +80,6 @@ def rename_coeloptera_folders(root_path):
         # -> fusion
         # -----------------------------------------------------
         if new_path.exists():
-
             print("\nFUSION détectée :")
             print(f"  Source      : {old_name}")
             print(f"  Destination : {new_name}")
@@ -99,10 +91,7 @@ def rename_coeloptera_folders(root_path):
                 try:
                     folder.rmdir()
                 except OSError:
-                    print(
-                        f"ATTENTION : le dossier source n'a pas pu être "
-                        f"supprimé complètement : {folder}"
-                    )
+                    print(f"ATTENTION : le dossier source n'a pas pu être supprimé complètement : {folder}")
 
             print("  -> Fusion terminée.")
 
@@ -113,7 +102,6 @@ def rename_coeloptera_folders(root_path):
         # -> renommage simple
         # -----------------------------------------------------
         else:
-
             folder.rename(new_path)
 
             print("RENOMMÉ :")
@@ -130,9 +118,6 @@ def rename_coeloptera_folders(root_path):
 
 
 if __name__ == "__main__":
-
-    root_path = (
-        "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/Fusion_PERLA_AQUAIA_24juin"
-    )
+    root_path = "/home/sarah.laroui/Bureau/AQUA-IA/Python_code/Data/Datasets/Fusion_PERLA_AQUAIA_24juin"
 
     rename_coeloptera_folders(root_path)

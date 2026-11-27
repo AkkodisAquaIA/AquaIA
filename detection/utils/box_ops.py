@@ -108,7 +108,6 @@ def masks_to_boxes(masks):
 
 
 def delta2bbox(proposals, deltas, max_shape=None, wh_ratio_clip=16 / 1000, clip_border=True, add_ctr_clamp=False, ctr_clamp=32):
-
     dxy = deltas[..., :2]
     dwh = deltas[..., 2:]
 
